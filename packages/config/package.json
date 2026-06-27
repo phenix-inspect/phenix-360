@@ -1,0 +1,14 @@
+{
+  "name": "@phenix360/config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tooling config (TypeScript, Prettier) for the PHÉNIX 360 monorepo",
+  "files": [
+    "tsconfig.base.json",
+    "prettier.config.mjs"
+  ],
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./prettier": "./prettier.config.mjs"
+  }
+}

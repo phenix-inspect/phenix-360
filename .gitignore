@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+
+# Builds & caches
+dist/
+build/
+out/
+.turbo/
+.cache/
+*.tsbuildinfo
+coverage/
+
+# Python (gateway)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment & secrets (portability: everything is env-driven)
+.env
+.env.*
+!.env.example
+*token.json*
+*credentials.json*
+*.pem
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Archives & large assets
+**/*.zip
+**/*.tar
+**/*.tar.gz
+**/*.tgz

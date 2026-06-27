@@ -1,0 +1,8 @@
+legacy/
+.claude/
+docs/adr/
+node_modules/
+dist/
+build/
+.turbo/
+pnpm-lock.yaml

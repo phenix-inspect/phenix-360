@@ -1,0 +1,5 @@
+packages:
+  - "apps/client"
+  - "apps/compagnon"
+  - "packages/*"
+# apps/gateway is a Python (FastAPI) service, not a pnpm workspace member.
