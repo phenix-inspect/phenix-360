@@ -70,6 +70,49 @@ importers:
         specifier: ^7.3.0
         version: 7.4.1
 
+  apps/demo:
+    dependencies:
+      '@phenix360/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@phenix360/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      react:
+        specifier: ^19.0.0
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@phenix360/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-react':
+        specifier: ^4.3.4
+        version: 4.7.0(vite@6.4.3(jiti@1.21.7)(terser@5.48.0))
+      autoprefixer:
+        specifier: ^10.4.20
+        version: 10.5.2(postcss@8.5.15)
+      postcss:
+        specifier: ^8.4.49
+        version: 8.5.15
+      tailwindcss:
+        specifier: ^3.4.17
+        version: 3.4.19
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.7
+        version: 6.4.3(jiti@1.21.7)(terser@5.48.0)
+
   packages/config: {}
 
   packages/core:
