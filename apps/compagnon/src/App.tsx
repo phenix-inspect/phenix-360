@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityItem,
   Badge,
+  BrandLockup,
   Button,
   Card,
   CardContent,
@@ -9,7 +11,6 @@ import {
   CardTitle,
   Textarea,
   Timeline,
-  ActivityItem,
 } from '@phenix360/ui';
 import { PROJECT_STEPS, PROJECT_STEP_LABEL, type ProjectStep } from '@phenix360/core';
 import { allItems, clearAll, enqueue, type QueuedSaisie } from './offline/queue';
@@ -92,11 +93,8 @@ export function App(): React.JSX.Element {
 
   return (
     <main className="mx-auto max-w-2xl space-y-6 p-4 sm:p-6">
-      <header className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="font-serif text-2xl font-semibold tracking-tight">PHÉNIX 360</h1>
-          <p className="text-sm text-muted-foreground">Compagnon — PoC capture hors-ligne</p>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <BrandLockup subtitle />
         <div className="flex items-center gap-2">
           {effectiveOnline ? (
             <Badge variant="success">En ligne</Badge>

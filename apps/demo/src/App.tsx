@@ -1,5 +1,15 @@
-import { useState } from 'react';
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@phenix360/ui';
+import { useEffect, useState } from 'react';
+import {
+  Badge,
+  BrandLockup,
+  BrandSplash,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+} from '@phenix360/ui';
 import {
   PROJECT_STATUS_LABEL,
   PROJECT_STATUSES,
@@ -27,11 +37,12 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="min-h-screen">
+      <BootSplash />
       <header className="sticky top-0 z-sticky border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3">
-          <div className="mr-auto">
-            <span className="font-serif text-lg font-semibold tracking-tight">PHÉNIX 360</span>
-            <span className="ml-2 text-xs text-muted-foreground">Mode Démo</span>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-4">
+          <div className="mr-auto flex items-center gap-3">
+            <BrandLockup subtitle />
+            <Badge variant="neutral">Mode Démo</Badge>
           </div>
 
           {snap.projects.length > 0 && (
@@ -93,6 +104,26 @@ export function App(): React.JSX.Element {
       </main>
     </div>
   );
+}
+
+/**
+ * Écran de démarrage : l'identité PHÉNIX (logo + nom + tagline) en premier,
+ * fondu de sortie léger, puis démontage. Sobre, pas de gadget.
+ */
+function BootSplash(): React.JSX.Element | null {
+  const [phase, setPhase] = useState<'visible' | 'leaving' | 'gone'>('visible');
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('leaving'), 1300);
+    const t2 = setTimeout(() => setPhase('gone'), 1750);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+
+  if (phase === 'gone') return null;
+  return <BrandSplash leaving={phase === 'leaving'} />;
 }
 
 function Surface({
