@@ -4,22 +4,58 @@ Socle visuel partagé par les deux apps (client & compagnon). **Thème clair,
 noir & or, premium.** Pas de mascotte, pas de glassmorphism — l'UX prime
 (ADR-004 §0/§2.2).
 
-> **Étape 3 du Sprint 0 — faite : tokens + fontes.** Les primitives shadcn/ui
-> re-skinnées viendront ensuite (réexportées depuis `src/index.ts`).
+> **Sprint 0 — faits :** tokens + fontes (étape 3) puis primitives shadcn/ui
+> re-skinnées, réexportées depuis `src/index.ts`.
+
+## Règle absolue — les tokens font foi
+
+Aucun composant n'embarque de **couleur, ombre, rayon ou espacement** en dur :
+tout passe par les tokens (classes du preset) ou les classes sémantiques. La
+règle complète et son garde-fou automatique (`pnpm --filter @phenix360/ui lint`)
+sont décrits dans **[`CONVENTIONS.md`](./CONVENTIONS.md)**.
 
 ## Contenu
 
 ```
 packages/ui/
 ├── tailwind-preset.ts        Preset Tailwind (mappe les tokens sur le thème)
+├── CONVENTIONS.md            Règle « tokens = source de vérité » + garde-fou
+├── scripts/check-tokens.mjs  Garde-fou lint (valeurs premium en dur interdites)
 └── src/
-    ├── index.ts              Barrel du package
+    ├── index.ts              Barrel du package (tokens + cn + primitives)
+    ├── lib/cn.ts             Fusion de classes (clsx + tailwind-merge)
+    ├── components/           Primitives re-skinnées (sobres, premium)
     └── tokens/
         ├── tokens.css        ⭐ Source de vérité runtime (variables CSS)
         ├── tokens.ts         Tokens typés (accès JS + alimente le preset)
         ├── fonts.css         Chargement des 3 fontes (auto-hébergées)
         └── index.ts          Barrel des tokens
 ```
+
+## Primitives
+
+Construites sur Radix UI + `cva`, icônes `lucide-react`, mouvement discret via
+`tailwindcss-animate`. Toutes adossées aux tokens (thème clair, noir & or).
+
+| Primitive                                            | Rôle                                                             |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| `Button`                                             | action ; l'or réservé à l'action principale (`asChild` supporté) |
+| `Card` (+ `Header/Title/Description/Content/Footer`) | surface élevée sobre                                             |
+| `Badge`                                              | étiquette d'état (cycle des demandes, statuts)                   |
+| `Tabs`                                               | navigation segmentée                                             |
+| `Dialog`                                             | modale (fondu + léger zoom, backdrop `overlay`)                  |
+| `Input` / `Textarea`                                 | saisie                                                           |
+| `Timeline` / `ActivityItem`                          | **brique du journal d'événements** (voir ci-dessous)             |
+
+### `ActivityItem` — brique du journal
+
+Pensé pour mapper 1:1 une ligne `event` (ADR-002/004 §4), pas un simple visuel.
+Props : `type` (`compte_rendu`/`photo`/`document`/`demande` → icône par défaut),
+`title`, `description`, `date` (`created_at`), `author` + `authorRole`,
+`visibility` (`interne` affiche un repère « masqué au client »), `marker`
+(override) et `media` (zone extensible pour vignettes photo / pièce jointe). Les
+types sont locaux pour l'instant ; ils seront remplacés par ceux de
+`@phenix360/core`.
 
 ## Les tokens
 

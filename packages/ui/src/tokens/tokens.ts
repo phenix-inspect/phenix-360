@@ -22,6 +22,13 @@ const cssVar = (name: string): string => `var(--${name})`;
  * COULEURS — rôles sémantiques (→ primitives shadcn re-skinnées)
  * ------------------------------------------------------------------------- */
 export const colors = {
+  /* Primitives utilitaires (pas des couleurs de marque) — indispensables aux
+   * bordures/anneaux/superpositions. La palette de marque reste seule source. */
+  transparent: 'transparent',
+  current: 'currentColor',
+  inherit: 'inherit',
+  overlay: cssVar('overlay'),
+
   background: cssVar('background'),
   foreground: cssVar('foreground'),
   surface: { DEFAULT: cssVar('surface'), foreground: cssVar('surface-foreground') },

@@ -97,6 +97,7 @@
   --border: var(--ink-100);
   --input: var(--ink-200);
   --ring: var(--gold-400); /* anneau de focus visible (accessibilité) */
+  --overlay: rgb(19 16 9 / 0.45); /* fond de modale (backdrop), encre profonde translucide */
 
   /* ------------------------------------------------------------------ *
    * 3. RAYONS — doux, premium. shadcn dérive sm/md/lg de --radius.
