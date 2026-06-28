@@ -7,12 +7,13 @@
  */
 import type { Role } from '../actor.js';
 import type { EventState, EventType, EventVisibility } from '../event.js';
-import type { ProjectStep } from '../project.js';
+import type { ProjectStatus, ProjectStep } from '../project.js';
 
 export interface ProjectRow {
   id: string;
   name: string;
   client_id: string | null;
+  status: ProjectStatus;
   current_step: ProjectStep | null;
   created_at: string;
 }

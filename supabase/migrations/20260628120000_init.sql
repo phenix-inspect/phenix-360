@@ -19,6 +19,7 @@ create type event_type       as enum ('compte_rendu', 'photo', 'document', 'dema
 create type event_visibility as enum ('client', 'interne');
 create type event_state      as enum ('brouillon', 'publie', 'ouverte', 'traitee', 'close');
 create type project_step     as enum ('gros_oeuvre', 'second_oeuvre', 'finitions', 'reception');
+create type project_status   as enum ('en_preparation', 'en_cours', 'receptionne');
 
 -- ----------------------------------------------------------------------------
 -- project (≡ chantier) — un projet = un journal (ADR-001 §2)
@@ -27,6 +28,7 @@ create table project (
   id            uuid primary key default gen_random_uuid(),
   name          text not null,
   client_id     uuid references auth.users on delete set null, -- V1 : un client = un chantier
+  status        project_status not null default 'en_preparation',
   current_step  project_step,                                  -- cache dérivé du dernier CR publié
   created_at    timestamptz not null default now()
 );

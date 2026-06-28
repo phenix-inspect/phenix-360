@@ -29,12 +29,27 @@ export const PROJECT_STEP_ORDER: Record<ProjectStep, number> = {
   reception: 3,
 };
 
+/**
+ * Statut de vie du projet (distinct de l'étape de chantier) : pilote l'objet
+ * central côté équipe. Saisi/ajusté à la main (≠ avancement, qui est dérivé).
+ */
+export const PROJECT_STATUSES = ['en_preparation', 'en_cours', 'receptionne'] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  en_preparation: 'En préparation',
+  en_cours: 'En cours',
+  receptionne: 'Réceptionné',
+};
+
 export interface Project {
   id: ProjectId;
-  /** Nom du chantier. */
+  /** Titre du chantier. */
   name: string;
   /** Client propriétaire — V1 : un client = un chantier. */
   clientId: UserId | null;
+  /** Statut de vie du projet (saisi). */
+  status: ProjectStatus;
   /** Cache dérivé du dernier compte_rendu publié (jamais saisi à la main). */
   currentStep: ProjectStep | null;
   createdAt: IsoDateTime;

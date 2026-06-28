@@ -29,9 +29,9 @@ on conflict (id) do nothing;
 -- ----------------------------------------------------------------------------
 -- Projet + membres
 -- ----------------------------------------------------------------------------
-insert into project (id, name, client_id, created_at)
+insert into project (id, name, client_id, status, created_at)
 values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Rénovation Martin — Lyon 6e',
-        '22222222-2222-2222-2222-222222222222', now() - interval '20 days')
+        '22222222-2222-2222-2222-222222222222', 'en_cours', now() - interval '20 days')
 on conflict (id) do nothing;
 
 insert into project_member (project_id, user_id, role)
