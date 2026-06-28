@@ -1,31 +1,21 @@
 import * as React from 'react';
 import { EyeOff, FileText, HelpCircle, Image, NotebookPen } from 'lucide-react';
+import type { ActorRole, EventType, EventVisibility } from '@phenix360/core';
+import { ROLE_LABEL } from '@phenix360/core';
 import { cn } from '../lib/cn.js';
 import { Badge } from './badge.js';
 
 /**
- * Timeline + ActivityItem — la brique du JOURNAL D'ÉVÉNEMENTS (ADR-002/004 §4),
- * pas un simple ornement. ActivityItem est pensé pour mapper 1:1 une ligne
- * `event` : date, auteur + rôle, type, visibilité client/interne, titre,
- * description, et une zone média extensible (photo/document à venir).
+ * Timeline + ActivityItem — la brique du JOURNAL D'ÉVÉNEMENTS (ADR-002/004 §4).
+ * Couche de PRÉSENTATION uniquement : le vocabulaire métier (type, rôle,
+ * visibilité) vient des types canoniques de `@phenix360/core` — aucune
+ * duplication. La mise en forme (icône, libellé, mono) reste ici.
  *
- * Les types ci-dessous sont volontairement minimaux et locaux ; ils seront
- * remplacés par les types canoniques de `@phenix360/core` quand ils existeront.
- *
- * Sobre, premium, modulaire : marqueur sur surface, connecteur fin, horodatage
- * en mono. Le connecteur du dernier élément est masqué. Tokens uniquement.
+ * Pilotée par props d'affichage (déjà dérivées d'une ligne `event`) : sobre,
+ * premium, modulaire. Connecteur du dernier élément masqué. Tokens uniquement.
  */
-export type EventType = 'compte_rendu' | 'photo' | 'document' | 'demande';
-export type AuthorRole = 'compagnon' | 'equipe' | 'client';
-export type Visibility = 'client' | 'interne';
 
-const ROLE_LABEL: Record<AuthorRole, string> = {
-  compagnon: 'Compagnon',
-  equipe: 'Équipe',
-  client: 'Client',
-};
-
-/** Icône de marqueur par défaut selon le type d'événement (surchargée par `marker`). */
+/** Icône de marqueur par défaut selon le type d'événement (présentation). */
 const TYPE_ICON: Record<EventType, React.ReactNode> = {
   compte_rendu: <NotebookPen aria-hidden="true" />,
   photo: <Image aria-hidden="true" />,
@@ -59,9 +49,9 @@ export interface ActivityItemProps extends Omit<React.LiHTMLAttributes<HTMLLIEle
   /** Nom de l'auteur (l'IA n'est jamais auteur — ADR-001). */
   author?: React.ReactNode;
   /** Rôle de l'auteur. */
-  authorRole?: AuthorRole;
+  authorRole?: ActorRole;
   /** Visibilité : `interne` affiche un repère discret « masqué au client ». */
-  visibility?: Visibility;
+  visibility?: EventVisibility;
   /** Override de l'icône/contenu du marqueur. */
   marker?: React.ReactNode;
   /** Zone média extensible : vignettes photo, pièce jointe document, etc. */

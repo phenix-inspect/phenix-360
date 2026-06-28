@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@phenix360/core": "workspace:*",
     "@fontsource-variable/hanken-grotesk": "^5.1.0",
     "@fontsource-variable/jetbrains-mono": "^5.1.0",
     "@fontsource-variable/newsreader": "^5.1.0",

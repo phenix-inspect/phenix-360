@@ -53,9 +53,10 @@ Pensé pour mapper 1:1 une ligne `event` (ADR-002/004 §4), pas un simple visuel
 Props : `type` (`compte_rendu`/`photo`/`document`/`demande` → icône par défaut),
 `title`, `description`, `date` (`created_at`), `author` + `authorRole`,
 `visibility` (`interne` affiche un repère « masqué au client »), `marker`
-(override) et `media` (zone extensible pour vignettes photo / pièce jointe). Les
-types sont locaux pour l'instant ; ils seront remplacés par ceux de
-`@phenix360/core`.
+(override) et `media` (zone extensible pour vignettes photo / pièce jointe). Le
+vocabulaire métier (`type`, `authorRole`, `visibility`) provient des **types
+canoniques de `@phenix360/core`** — `@phenix360/ui` reste une couche de
+présentation, sans duplication (core ne dépend jamais de ui).
 
 ## Les tokens
 
