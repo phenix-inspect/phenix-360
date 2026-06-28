@@ -28,11 +28,15 @@ unique, zéro dérive).
 Un chantier de démo : CR publié (avancement), photo, **décision en attente du
 client**, et un brouillon interne (invisible au client). Idempotent.
 
-## Vérification locale
+## Vérification
+
+Sur un PostgreSQL nu (ce que joue la CI — voir [`test/`](./test)) :
 
 ```bash
-supabase db reset   # applique migrations + seed
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres \
+  bash supabase/test/run.sh
 ```
 
-> Schéma validé hors-ligne sur PostgreSQL 16 (stubs `auth`/`storage`) : trigger
-> d'avancement, RLS client/interne et seed conformes au modèle core.
+> Applique stubs `auth`/`storage` + migrations + seed + test RLS (trigger
+> d'avancement, vues client/interne). La CLI Supabase sera ajoutée plus tard
+> pour les comportements Supabase spécifiques.
