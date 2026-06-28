@@ -24,10 +24,12 @@ import {
   type ProjectPatch,
   type UserId,
 } from '@phenix360/core';
+import { buildDemoSeed } from './seed';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
 const ACTIVE_KEY = 'phenix-demo:active:v1';
+const SEEDED_KEY = 'phenix-demo:seeded:v1';
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
@@ -118,14 +120,32 @@ export const demo = {
   resolveDemande: (id: EventId, resolution: DemandeResolution) =>
     mutate(backend.resolveDemande(id, resolution)),
 
+  /** Charge le chantier de démonstration (jeu de données vivant). */
+  loadDemo(): void {
+    const { state, people, activeProjectId } = buildDemoSeed();
+    kv.save(state);
+    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
+    localStorage.setItem(SEEDED_KEY, '1');
+    refresh();
+    broadcast();
+  },
+
+  /** Repart de zéro (états vides élégants) — sans réamorcer la démo. */
   reset(): void {
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(PEOPLE_KEY);
     localStorage.removeItem(ACTIVE_KEY);
+    localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
   },
 };
+
+// Premier chargement : on amorce le chantier de démonstration une seule fois.
+if (typeof localStorage !== 'undefined' && localStorage.getItem(SEEDED_KEY) === null) {
+  demo.loadDemo();
+}
 
 export function useDemo(): DemoSnapshot {
   return useSyncExternalStore(demo.subscribe, demo.getSnapshot, demo.getSnapshot);

@@ -1,83 +1,27 @@
 import { useState } from 'react';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Input,
-  Textarea,
-  Timeline,
-  ActivityItem,
-} from '@phenix360/ui';
+import { Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
+import { MessageCircle, Send, Sparkles } from 'lucide-react';
 import {
   clientFeed,
-  forClient,
-  gallery,
   nextClientAction,
   pendingClientDecisions,
   runAssistant,
   userId,
   type AssistantResult,
-  type Decision,
   type EventActor,
   type Project,
 } from '@phenix360/core';
 import { demo, nameOf, type DemoSnapshot } from '../store';
-import { fmtDateTime } from '../lib/format';
-import { eventDescription, eventTitle } from './CompagnonView';
+import { SmartBanner } from '../components/SmartBanner';
+import { ProjectHero } from '../components/ProjectHero';
+import { StepProgress } from '../components/StepProgress';
+import { MomentCard } from '../components/MomentCard';
+import { DecisionResponder } from '../components/DecisionResponder';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'client');
   const id = member?.userId ?? project.clientId ?? userId('client-demo');
   return { userId: id, role: 'client', displayName: nameOf(snap, id) };
-}
-
-function DecisionResponder({
-  decision,
-  actor,
-}: {
-  decision: Decision;
-  actor: EventActor;
-}): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const [texte, setTexte] = useState('');
-  const submit = async () => {
-    if (!texte.trim()) return;
-    await demo.resolveDemande(decision.eventId, {
-      texte: texte.trim(),
-      resolvedBy: actor.userId,
-      resolvedAt: new Date().toISOString(),
-    });
-    setTexte('');
-    setOpen(false);
-  };
-  if (!open) {
-    return (
-      <Button size="sm" onClick={() => setOpen(true)}>
-        Répondre
-      </Button>
-    );
-  }
-  return (
-    <div className="w-full space-y-2">
-      <Textarea
-        value={texte}
-        onChange={(e) => setTexte(e.target.value)}
-        rows={2}
-        placeholder="Votre décision…"
-      />
-      <div className="flex gap-2">
-        <Button size="sm" onClick={() => void submit()}>
-          Valider ma décision
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Annuler
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 export function ClientView({
@@ -89,98 +33,76 @@ export function ClientView({
 }): React.JSX.Element {
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
-  const action = nextClientAction(project, events);
   const feed = clientFeed(events);
-  const photos = gallery(forClient(events));
   const decisions = pendingClientDecisions(events);
+  const action = nextClientAction(project, events);
+  // La décision prioritaire est déjà portée par le bandeau : on liste le reste.
+  const otherDecisions =
+    action.kind === 'decision_attendue'
+      ? decisions.filter((d) => d.eventId !== action.decision.eventId)
+      : decisions;
+
+  const latest = feed[0];
+  const rest = feed.slice(1);
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="font-serif text-xl font-semibold tracking-tight">{project.name}</h2>
-        <p className="text-sm text-muted-foreground">
-          Votre espace — {nameOf(snap, project.clientId)}
-        </p>
-      </div>
+    <div className="space-y-6">
+      <SmartBanner project={project} events={events} actor={actor} />
 
-      {/* Bandeau intelligent — l'UI n'affiche que le résultat de nextClientAction */}
-      <Card
-        className={action.kind === 'decision_attendue' ? 'border-primary shadow-gold' : undefined}
-      >
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {action.kind === 'decision_attendue' && <Badge variant="gold">Action</Badge>}
-            {action.title}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm text-muted-foreground">{action.detail}</p>
-          {action.kind === 'decision_attendue' && (
-            <DecisionResponder decision={action.decision} actor={actor} />
-          )}
+      <Card>
+        <CardContent className="space-y-5 p-6">
+          <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} />
+          <StepProgress current={project.currentStep} />
         </CardContent>
       </Card>
 
-      <Assistant snap={snap} project={project} actor={actor} />
-
-      {decisions.length > 0 && (
+      {otherDecisions.length > 0 && (
         <section className="space-y-2">
-          <h3 className="text-sm font-medium">Décisions en attente ({decisions.length})</h3>
+          <h3 className="text-sm font-medium text-foreground">
+            Autres décisions en attente ({otherDecisions.length})
+          </h3>
           <ul className="space-y-2">
-            {decisions.map((d) => (
-              <li key={d.eventId} className="rounded-lg border border-border bg-surface p-3">
+            {otherDecisions.map((d) => (
+              <li key={d.eventId} className="rounded-xl border border-border bg-surface p-4">
                 <p className="text-sm text-foreground">{d.question}</p>
-                <div className="mt-2">
-                  <DecisionResponder decision={d} actor={actor} />
-                </div>
+                <DecisionResponder decision={d} actor={actor} className="mt-2" />
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {photos.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-medium">Photos ({photos.length})</h3>
-          <div className="grid grid-cols-3 gap-2">
-            {photos.map((p) => (
-              <figure key={p.id} className="overflow-hidden rounded-lg border border-border">
-                <div className="flex aspect-square items-center justify-center bg-muted text-xs text-muted-foreground">
-                  Photo
-                </div>
-                {p.content.legende && (
-                  <figcaption className="truncate p-2 text-xs text-muted-foreground">
-                    {p.content.legende}
-                  </figcaption>
-                )}
-              </figure>
-            ))}
-          </div>
-        </section>
+      {feed.length === 0 ? (
+        <EmptyState
+          icon={<Sparkles aria-hidden />}
+          title="Votre récit commence bientôt"
+          description="Votre premier compte rendu et vos premières photos apparaîtront ici. Votre équipe PHÉNIX prépare votre chantier."
+        />
+      ) : (
+        <>
+          <section className="space-y-3">
+            <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
+              Dernière activité
+            </h2>
+            <MomentCard event={latest!} authorName={nameOf(snap, latest!.actor.userId)} />
+          </section>
+
+          {rest.length > 0 && (
+            <section className="space-y-4">
+              <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
+                Le récit de votre chantier
+              </h2>
+              <div className="space-y-5">
+                {rest.map((e) => (
+                  <MomentCard key={e.id} event={e} authorName={nameOf(snap, e.actor.userId)} />
+                ))}
+              </div>
+            </section>
+          )}
+        </>
       )}
 
-      <section className="space-y-3">
-        <h3 className="text-sm font-medium">Le récit de votre chantier</h3>
-        {feed.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Votre équipe PHÉNIX prépare votre chantier.
-          </p>
-        ) : (
-          <Timeline>
-            {feed.map((e) => (
-              <ActivityItem
-                key={e.id}
-                type={e.type}
-                title={eventTitle(e)}
-                description={eventDescription(e)}
-                date={fmtDateTime(e.createdAt)}
-                author={nameOf(snap, e.actor.userId)}
-                authorRole={e.actor.role}
-              />
-            ))}
-          </Timeline>
-        )}
-      </section>
+      <Assistant snap={snap} project={project} actor={actor} />
     </div>
   );
 }
@@ -223,26 +145,30 @@ function Assistant({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Assistant PHÉNIX 360</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-3 p-6">
+        <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+          <MessageCircle aria-hidden />
+          <h2 className="font-serif text-lg font-semibold tracking-tight">
+            Une question sur votre chantier ?
+          </h2>
+        </div>
         <div className="flex gap-2">
           <Input
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Posez une question sur votre chantier…"
+            placeholder="Ex. Où en est la salle de bain ?"
             onKeyDown={(e) => {
               if (e.key === 'Enter') void ask();
             }}
           />
           <Button onClick={() => void ask()} disabled={busy}>
+            <Send aria-hidden />
             Demander
           </Button>
         </div>
 
         {result?.kind === 'answer' && (
-          <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
+          <div className="space-y-2 rounded-lg border border-border bg-paper-50 p-3">
             <p className="whitespace-pre-line text-sm text-foreground">{result.answer}</p>
             {result.sources.length > 0 && (
               <p className="text-xs text-muted-foreground">
@@ -253,7 +179,7 @@ function Assistant({
         )}
 
         {result?.kind === 'demande_intent' && (
-          <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
+          <div className="space-y-2 rounded-lg border border-border bg-paper-50 p-3">
             <p className="text-sm text-muted-foreground">{result.message}</p>
             <Button size="sm" onClick={() => void transmettre()}>
               Transmettre à l'équipe

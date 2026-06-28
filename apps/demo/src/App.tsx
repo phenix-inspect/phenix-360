@@ -1,15 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
-  Badge,
   BrandLockup,
-  BrandSplash,
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
   Input,
+  SegmentedControl,
 } from '@phenix360/ui';
+import { PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
 import {
   PROJECT_STATUS_LABEL,
   PROJECT_STATUSES,
@@ -24,35 +30,135 @@ import { demo, useDemo } from './store';
 import { CompagnonView } from './surfaces/CompagnonView';
 import { ClientView } from './surfaces/ClientView';
 
-type ViewMode = 'split' | 'compagnon' | 'client';
+type ViewMode = 'compagnon' | 'client' | 'split';
+
+const VIEW_OPTIONS = [
+  { value: 'compagnon' as const, label: 'Compagnon' },
+  { value: 'client' as const, label: 'Espace client' },
+  { value: 'split' as const, label: 'Côte à côte' },
+];
 
 export function App(): React.JSX.Element {
   const snap = useDemo();
-  const [view, setView] = useState<ViewMode>('split');
+  const [view, setView] = useState<ViewMode>('client');
   const [creating, setCreating] = useState(false);
+  const [managing, setManaging] = useState(false);
 
   const activeProject =
     snap.projects.find((p) => p.id === snap.activeProjectId) ?? snap.projects[0] ?? null;
-  const showCreate = creating || activeProject === null;
 
   return (
     <div className="min-h-screen">
-      <BootSplash />
       <header className="sticky top-0 z-sticky border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-4">
-          <div className="mr-auto flex items-center gap-3">
-            <BrandLockup subtitle />
-            <Badge variant="neutral">Mode Démo</Badge>
-          </div>
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-5 sm:px-6">
+          <BrandLockup size="lg" subtitle className="mr-auto" />
+          <SegmentedControl
+            value={view}
+            onValueChange={setView}
+            options={VIEW_OPTIONS}
+            aria-label="Choisir la vue"
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Gérer"
+            title="Gérer"
+            onClick={() => setManaging(true)}
+          >
+            <Settings2 aria-hidden />
+          </Button>
+        </div>
+      </header>
 
-          {snap.projects.length > 0 && (
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+        {creating || activeProject === null ? (
+          activeProject === null && !creating ? (
+            <div className="mx-auto max-w-xl py-10">
+              <EmptyState
+                icon={<Sparkles aria-hidden />}
+                title="Aucun projet pour l'instant"
+                description="Créez votre premier chantier, ou rechargez le projet de démonstration pour découvrir PHÉNIX 360."
+                action={
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <Button onClick={() => setCreating(true)}>Créer votre premier projet</Button>
+                    <Button variant="outline" onClick={() => demo.loadDemo()}>
+                      Charger la démonstration
+                    </Button>
+                  </div>
+                }
+              />
+            </div>
+          ) : (
+            <CreateProject onDone={() => setCreating(false)} />
+          )
+        ) : view === 'split' ? (
+          <div className="grid gap-6 lg:grid-cols-2">
+            <FramedSurface label="Côté compagnon">
+              <CompagnonView snap={snap} project={activeProject} />
+            </FramedSurface>
+            <FramedSurface label="Côté client">
+              <ClientView snap={snap} project={activeProject} />
+            </FramedSurface>
+          </div>
+        ) : view === 'compagnon' ? (
+          <CompagnonView snap={snap} project={activeProject} />
+        ) : (
+          <ClientView snap={snap} project={activeProject} />
+        )}
+      </main>
+
+      <ManageDialog
+        open={managing}
+        onClose={() => setManaging(false)}
+        onNewProject={() => {
+          setManaging(false);
+          setCreating(true);
+        }}
+      />
+    </div>
+  );
+}
+
+function FramedSurface({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      {children}
+    </div>
+  );
+}
+
+function ManageDialog({
+  open,
+  onClose,
+  onNewProject,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onNewProject: () => void;
+}): React.JSX.Element {
+  const snap = useDemo();
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Gérer</DialogTitle>
+          <DialogDescription>Projets et données de démonstration.</DialogDescription>
+        </DialogHeader>
+
+        {snap.projects.length > 1 && (
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="text-muted-foreground">Projet actif</span>
             <select
-              value={activeProject?.id ?? ''}
-              onChange={(e) => {
-                demo.setActiveProject(projectId(e.target.value));
-                setCreating(false);
-              }}
-              className="h-9 max-w-48 rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+              value={snap.activeProjectId ?? ''}
+              onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
+              className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
             >
               {snap.projects.map((p) => (
                 <option key={p.id} value={p.id}>
@@ -60,88 +166,39 @@ export function App(): React.JSX.Element {
                 </option>
               ))}
             </select>
-          )}
+          </label>
+        )}
 
-          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
-            {(['split', 'compagnon', 'client'] as ViewMode[]).map((m) => (
-              <Button
-                key={m}
-                size="sm"
-                variant={view === m ? 'primary' : 'ghost'}
-                onClick={() => setView(m)}
-              >
-                {m === 'split' ? 'Côte à côte' : m === 'compagnon' ? 'Compagnon' : 'Espace client'}
-              </Button>
-            ))}
-          </div>
-
-          <Button size="sm" variant="outline" onClick={() => setCreating(true)}>
-            + Projet
+        <div className="grid gap-2">
+          <Button variant="outline" className="justify-start" onClick={onNewProject}>
+            <PlusCircle aria-hidden />
+            Nouveau projet
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => demo.reset()}>
-            Réinitialiser
+          <Button
+            variant="outline"
+            className="justify-start"
+            onClick={() => {
+              demo.loadDemo();
+              onClose();
+            }}
+          >
+            <Sparkles aria-hidden />
+            Recharger la démonstration
+          </Button>
+          <Button
+            variant="ghost"
+            className="justify-start text-muted-foreground"
+            onClick={() => {
+              demo.reset();
+              onClose();
+            }}
+          >
+            <RotateCcw aria-hidden />
+            Repartir de zéro
           </Button>
         </div>
-      </header>
-
-      <main className="mx-auto max-w-6xl px-4 py-6">
-        {showCreate ? (
-          <CreateProject onDone={() => setCreating(false)} />
-        ) : view === 'split' ? (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Surface label="Compagnon" tone="interne">
-              <CompagnonView snap={snap} project={activeProject!} />
-            </Surface>
-            <Surface label="Espace client" tone="client">
-              <ClientView snap={snap} project={activeProject!} />
-            </Surface>
-          </div>
-        ) : view === 'compagnon' ? (
-          <CompagnonView snap={snap} project={activeProject!} />
-        ) : (
-          <ClientView snap={snap} project={activeProject!} />
-        )}
-      </main>
-    </div>
-  );
-}
-
-/**
- * Écran de démarrage : l'identité PHÉNIX (logo + nom + tagline) en premier,
- * fondu de sortie léger, puis démontage. Sobre, pas de gadget.
- */
-function BootSplash(): React.JSX.Element | null {
-  const [phase, setPhase] = useState<'visible' | 'leaving' | 'gone'>('visible');
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('leaving'), 1300);
-    const t2 = setTimeout(() => setPhase('gone'), 1750);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
-
-  if (phase === 'gone') return null;
-  return <BrandSplash leaving={phase === 'leaving'} />;
-}
-
-function Surface({
-  label,
-  tone,
-  children,
-}: {
-  label: string;
-  tone: 'interne' | 'client';
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div className="rounded-xl border border-border bg-paper-50 p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Badge variant={tone === 'client' ? 'gold' : 'neutral'}>{label}</Badge>
-      </div>
-      {children}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
