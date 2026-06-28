@@ -47,4 +47,20 @@ Sélecteurs purs sur `Event[]`, réutilisables partout :
 `pendingClientDecisions`, `clientDecisionBanner`.
 
 > `isVisibleToClient(event)` est la **source unique** de la règle de visibilité
-> client ; la policy RLS Postgres devra la **refléter** (et non l'inverse).
+> client ; la policy RLS Postgres la **reflète** (et non l'inverse).
+
+## Accès portable (`data/`)
+
+Les écrans ne parlent jamais à Supabase en direct (ADR-004 §2.5 r3) : ils
+passent par le **port** `JournalRepository`.
+
+- `JournalRepository` — contrat neutre (`getProject`, `listProjects`,
+  `listEvents`, `appendEvent`) en termes produit.
+- `createSupabaseJournal(client)` — adaptateur Supabase (seul endroit qui
+  connaît Supabase). Import **type-only** : `core` ne tire aucune dépendance
+  runtime ; l'app injecte son client (URL/clés par variables d'env, r6).
+- `mapProjectRow` / `mapEventRow` / `toEventInsert` — frontière unique
+  snake_case (SQL) ↔ camelCase (modèle). La RLS reste la garantie à la source.
+
+Changer d'hébergement souverain = fournir un autre client / adaptateur, **sans
+toucher aux appelants**.

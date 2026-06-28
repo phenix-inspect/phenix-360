@@ -15,3 +15,4 @@ export * from './attachment.js';
 export * from './event.js';
 export * from './decision.js';
 export * from './views.js';
+export * from './data/index.js';

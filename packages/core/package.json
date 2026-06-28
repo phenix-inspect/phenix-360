@@ -13,8 +13,17 @@
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "@supabase/supabase-js": "^2.47.0"
+  },
+  "peerDependenciesMeta": {
+    "@supabase/supabase-js": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@phenix360/config": "workspace:*",
+    "@supabase/supabase-js": "^2.47.0",
     "typescript": "^5.7.2"
   }
 }
