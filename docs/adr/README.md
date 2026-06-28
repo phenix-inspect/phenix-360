@@ -9,6 +9,7 @@ Toute évolution structurelle se fait par un **nouvel ADR** qui amende les préc
 | [ADR-002](./ADR-002-modele-evenement.md) | Modèle d'événement (enveloppe + contenu typé) | Accepté |
 | [ADR-003](./ADR-003-stack-hebergement-ia.md) | Stack, hébergement UE/RGPD, IA | Accepté (tranché par ADR-004) |
 | [ADR-004](./ADR-004-architecture-technique-et-depot.md) | Architecture technique, dépôt & principes | **Accepté — référence** |
+| [ADR-005](./ADR-005-conventions-de-nommage.md) | Conventions de nommage (code, schéma, vocabulaire) | Accepté (amende ADR-004 §4) |
 
 ## Principes directeurs (rappel ADR-004 §0)
 
