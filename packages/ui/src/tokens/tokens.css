@@ -1,0 +1,143 @@
+/*
+ * PHÉNIX 360 — Design tokens (source de vérité runtime)
+ * ----------------------------------------------------------------------------
+ * Fichier UNIQUE de tokens (ADR-004 §2.2). Thème clair, noir & or, premium.
+ * Pas de glassmorphism, pas de mascotte. L'UX prime (ADR-004 §0).
+ *
+ * Deux univers partagent ce socle :
+ *   • CLIENT    — lent, contemplatif, émotionnel (éditorial, Newsreader).
+ *   • COMPAGNON — dense, rapide, efficace (utilitaire, Hanken Grotesk).
+ *
+ * Organisation :
+ *   1. Palette brute (échelles noir / or / papier + fonctionnel)
+ *   2. Rôles sémantiques (compatibles shadcn/ui : background, primary, …)
+ *   3. Rayons, ombres, mouvement, fontes
+ *
+ * Les valeurs hex vivent ICI (single source). tokens.ts et le preset Tailwind
+ * référencent ces variables via var(--…) — aucune duplication de littéraux.
+ * Pour caler sur le handoff Design System §4 : ajuster uniquement ce fichier.
+ */
+
+:root {
+  /* ------------------------------------------------------------------ *
+   * 1. PALETTE BRUTE
+   * ------------------------------------------------------------------ */
+
+  /* Or (accent de marque) — or antique, mat, jamais criard. */
+  --gold-50: #fbf6ec;
+  --gold-100: #f4e8ce;
+  --gold-200: #e8d09c;
+  --gold-300: #dbb667;
+  --gold-400: #c99f45;
+  --gold-500: #b5893c; /* accent primaire */
+  --gold-600: #997235;
+  --gold-700: #7a5a2c;
+  --gold-800: #5c4423;
+  --gold-900: #3d2e18;
+
+  /* Encre (noir chaud) — near-black tirant légèrement chaud, marie l'or. */
+  --ink-50: #f6f5f3;
+  --ink-100: #e7e4df;
+  --ink-200: #cbc6bd;
+  --ink-300: #a8a199;
+  --ink-400: #7c756c;
+  --ink-500: #564f47;
+  --ink-600: #3b362f;
+  --ink-700: #2a2620;
+  --ink-800: #1c1915; /* encre principale (texte) */
+  --ink-900: #131009; /* encre profonde */
+
+  /* Papier (neutres chauds, fonds clairs) — sensation éditoriale. */
+  --paper-0: #ffffff; /* surface pure */
+  --paper-50: #fcfaf6;
+  --paper-100: #f8f4ec; /* canevas (fond app) */
+  --paper-200: #f0eadd;
+  --paper-300: #e6ddcb;
+
+  /* Fonctionnel — sobre, désaturé, cohérent avec un thème clair premium. */
+  --success: #4f7a4a;
+  --success-fg: #ffffff;
+  --warning: #c28a2e;
+  --warning-fg: #1c1915;
+  --danger: #a8443b;
+  --danger-fg: #ffffff;
+  --info: #3e6b85;
+  --info-fg: #ffffff;
+
+  /* ------------------------------------------------------------------ *
+   * 2. RÔLES SÉMANTIQUES (consommés par les primitives shadcn re-skinnées)
+   * ------------------------------------------------------------------ */
+  --background: var(--paper-100); /* canevas de l'app */
+  --foreground: var(--ink-800); /* texte courant */
+
+  --surface: var(--paper-0); /* cartes, feuilles, surfaces élevées */
+  --surface-foreground: var(--ink-800);
+
+  --card: var(--paper-0);
+  --card-foreground: var(--ink-800);
+
+  --popover: var(--paper-0);
+  --popover-foreground: var(--ink-800);
+
+  --primary: var(--gold-500); /* l'or : action principale, accents */
+  --primary-foreground: var(--ink-900); /* texte sombre sur l'or = premium + contraste */
+
+  --secondary: var(--ink-100);
+  --secondary-foreground: var(--ink-800);
+
+  --muted: var(--paper-200);
+  --muted-foreground: var(--ink-500);
+
+  --accent: var(--gold-100);
+  --accent-foreground: var(--ink-900);
+
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-fg);
+
+  --border: var(--ink-100);
+  --input: var(--ink-200);
+  --ring: var(--gold-400); /* anneau de focus visible (accessibilité) */
+  --overlay: rgb(19 16 9 / 0.45); /* fond de modale (backdrop), encre profonde translucide */
+
+  /* ------------------------------------------------------------------ *
+   * 3. RAYONS — doux, premium. shadcn dérive sm/md/lg de --radius.
+   * ------------------------------------------------------------------ */
+  --radius: 0.625rem; /* 10px — rayon de base */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 14px);
+  --radius-full: 9999px;
+
+  /* ------------------------------------------------------------------ *
+   * 4. OMBRES — élévation douce, teintée encre. Aucun glassmorphism.
+   * ------------------------------------------------------------------ */
+  --shadow-xs: 0 1px 2px 0 rgb(19 16 9 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(19 16 9 / 0.08), 0 1px 2px -1px rgb(19 16 9 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(19 16 9 / 0.1), 0 2px 6px -3px rgb(19 16 9 / 0.07);
+  --shadow-lg: 0 12px 28px -6px rgb(19 16 9 / 0.12), 0 6px 12px -8px rgb(19 16 9 / 0.08);
+  --shadow-xl: 0 24px 48px -12px rgb(19 16 9 / 0.18);
+  /* lueur d'or discrète pour les états mis en avant (à employer avec parcimonie). */
+  --shadow-gold: 0 6px 20px -6px rgb(181 137 60 / 0.35);
+
+  /* ------------------------------------------------------------------ *
+   * 5. MOUVEMENT — calme côté client, vif côté compagnon.
+   * ------------------------------------------------------------------ */
+  --duration-fast: 120ms; /* feedback immédiat (compagnon) */
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --duration-slower: 560ms; /* transitions contemplatives (client) */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ------------------------------------------------------------------ *
+   * 6. FONTES — voir fonts.css pour le chargement (auto-hébergé, RGPD).
+   * ------------------------------------------------------------------ */
+  --font-serif: 'Newsreader Variable', 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-sans:
+    'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto,
+    sans-serif;
+  --font-mono:
+    'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}

@@ -1,0 +1,7 @@
+{
+  "extends": "@phenix360/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src"]
+}

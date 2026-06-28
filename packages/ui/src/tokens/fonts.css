@@ -1,0 +1,27 @@
+/*
+ * PHÉNIX 360 — Chargement des fontes
+ * ----------------------------------------------------------------------------
+ * Trois familles (ADR-004 §2.2) :
+ *   • Newsreader      — serif éditoriale, l'émotion (univers client).
+ *   • Hanken Grotesk  — sans-serif UI, la densité (univers compagnon + corps).
+ *   • JetBrains Mono  — mono, la donnée technique (références, montants, codes).
+ *
+ * Auto-hébergées via @fontsource (fontes variables) — PAS de CDN Google Fonts :
+ *   • RGPD : aucun appel tiers exposant l'IP du visiteur (ADR-003/004, UE).
+ *   • Portabilité : aucune dépendance réseau externe (ADR-004 §2.5).
+ *   • Perf : un seul fichier variable par famille.
+ *
+ * Importer ce fichier UNE fois dans le point d'entrée de chaque app, avant
+ * tokens.css. Les familles sont ensuite référencées par les variables
+ * --font-serif / --font-sans / --font-mono (cf. tokens.css).
+ */
+
+/* Newsreader — axe de graisse variable + italique (citations, accents). */
+@import '@fontsource-variable/newsreader';
+@import '@fontsource-variable/newsreader/wght-italic.css';
+
+/* Hanken Grotesk — axe de graisse variable. */
+@import '@fontsource-variable/hanken-grotesk';
+
+/* JetBrains Mono — axe de graisse variable. */
+@import '@fontsource-variable/jetbrains-mono';

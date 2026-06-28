@@ -1,0 +1,50 @@
+{
+  "name": "@phenix360/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PHÉNIX 360 — Design System : tokens, fontes et primitives partagées (thème clair, noir & or)",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tokens": "./src/tokens/index.ts",
+    "./tailwind-preset": "./tailwind-preset.ts",
+    "./tokens.css": "./src/tokens/tokens.css",
+    "./fonts.css": "./src/tokens/fonts.css"
+  },
+  "files": [
+    "src",
+    "tailwind-preset.ts"
+  ],
+  "scripts": {
+    "lint": "node scripts/check-tokens.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@phenix360/core": "workspace:*",
+    "@fontsource-variable/hanken-grotesk": "^5.1.0",
+    "@fontsource-variable/jetbrains-mono": "^5.1.0",
+    "@fontsource-variable/newsreader": "^5.1.0",
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-slot": "^1.1.2",
+    "@radix-ui/react-tabs": "^1.1.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.475.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "tailwindcss": ">=3.4"
+  },
+  "devDependencies": {
+    "@phenix360/config": "workspace:*",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2"
+  }
+}
