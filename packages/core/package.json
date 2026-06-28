@@ -1,0 +1,20 @@
+{
+  "name": "@phenix360/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PHÉNIX 360 — modèle canonique (journal d'événements) + accès données portable",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@phenix360/config": "workspace:*",
+    "typescript": "^5.7.2"
+  }
+}

@@ -23,6 +23,15 @@ importers:
 
   packages/config: {}
 
+  packages/core:
+    devDependencies:
+      '@phenix360/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+
   packages/ui:
     dependencies:
       '@fontsource-variable/hanken-grotesk':
