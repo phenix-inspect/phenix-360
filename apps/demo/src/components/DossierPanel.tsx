@@ -109,15 +109,20 @@ export function DossierPanel({
         <RoadmapProgress roadmap={dossier.roadmap} />
       </Section>
 
-      {dossier.infos.startDate && (
-        <Section
-          icon={<CalendarDays aria-hidden />}
-          title="Planning prévisionnel"
-          count={dossier.roadmap.length}
-        >
-          <SmartPlanningView dossier={dossier} />
-        </Section>
-      )}
+      <Section icon={<CalendarDays aria-hidden />} title="Planning" count={dossier.roadmap.length}>
+        <label className="flex flex-col gap-1.5 text-sm sm:max-w-xs">
+          <span className="text-muted-foreground">Date de démarrage</span>
+          <input
+            type="date"
+            value={dossier.infos.startDate ?? ''}
+            onChange={(e) =>
+              patch({ infos: { ...dossier.infos, startDate: e.target.value || undefined } })
+            }
+            className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
+          />
+        </label>
+        <SmartPlanningView dossier={dossier} />
+      </Section>
 
       <Section icon={<Banknote aria-hidden />} title="Commandes" count={dossier.orders.length}>
         <div className="grid gap-3 sm:grid-cols-2">

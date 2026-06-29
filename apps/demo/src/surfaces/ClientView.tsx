@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
-import { MessageCircle, Palette, Send, Sparkles } from 'lucide-react';
+import { CalendarRange, MessageCircle, Palette, Send, Sparkles } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   clientFeed,
@@ -16,7 +16,7 @@ import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
-import { RoadmapProgress } from '../components/RoadmapProgress';
+import { GrandesEtapes } from '../components/GrandesEtapes';
 import { MomentCard } from '../components/MomentCard';
 import { DecisionResponder } from '../components/DecisionResponder';
 
@@ -55,13 +55,21 @@ export function ClientView({
       <Card>
         <CardContent className="space-y-5 p-6">
           <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} />
-          {dossier ? (
-            <RoadmapProgress roadmap={dossier.roadmap} />
-          ) : (
-            <StepProgress current={project.currentStep} />
-          )}
+          {!dossier && <StepProgress current={project.currentStep} />}
         </CardContent>
       </Card>
+
+      {dossier && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+            <CalendarRange aria-hidden />
+            <h2 className="font-serif text-lg font-semibold tracking-tight">
+              Les grandes étapes du chantier
+            </h2>
+          </div>
+          <GrandesEtapes dossier={dossier} />
+        </section>
+      )}
 
       {dossier && dossier.selections.length > 0 && (
         <section className="space-y-3">

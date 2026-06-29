@@ -353,15 +353,20 @@ interface BasePhase {
   drying?: number;
 }
 
+interface PhaseDuration {
+  stepId: string;
+  label: string;
+  durationDays: number;
+  drying?: number;
+}
+
 /**
- * Dates par étape : enchaînement séquentiel (dépendances), durées pondérées par
- * métier + tampons de séchage, mis à l'échelle de la durée annoncée. Source
- * commune au planning ET aux alertes/vigilances (pas de dates divergentes).
+ * Durées par étape (toujours disponibles, même sans date de démarrage) :
+ * pondérées par métier + tampons de séchage, mises à l'échelle de la durée
+ * annoncée. C'est le « planning préparé » (ordre + durées + dépendances).
  */
-export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
-  const start = dossier.infos.startDate;
-  if (!start || dossier.roadmap.length === 0) return [];
-  const startMs = new Date(`${start}T00:00:00`).getTime();
+export function phaseDurations(dossier: ProjectDossier): PhaseDuration[] {
+  if (dossier.roadmap.length === 0) return [];
   const raw = dossier.roadmap.map((s) => ({
     s,
     dur: stepDuration(s.label),
@@ -370,20 +375,35 @@ export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
   const rawTotal = raw.reduce((a, r) => a + r.dur + r.dry, 0) || 1;
   const target = dossier.infos.duration ? parseDurationDays(dossier.infos.duration) : 0;
   const factor = target > 0 ? target / rawTotal : 1;
-  let cursor = startMs;
-  return raw.map((r) => {
-    const dur = Math.max(1, Math.round(r.dur * factor));
-    const dry = Math.round(r.dry * factor);
+  return raw.map((r) => ({
+    stepId: r.s.id,
+    label: r.s.label,
+    durationDays: Math.max(1, Math.round(r.dur * factor)),
+    drying: Math.round(r.dry * factor) || undefined,
+  }));
+}
+
+/**
+ * Dates par étape (« planning daté ») : enchaînement séquentiel à partir de la
+ * date de démarrage. [] tant que la date n'est pas fixée. Source commune au
+ * planning ET aux alertes/vigilances (pas de dates divergentes).
+ */
+export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
+  const start = dossier.infos.startDate;
+  if (!start) return [];
+  let cursor = new Date(`${start}T00:00:00`).getTime();
+  return phaseDurations(dossier).map((d) => {
+    const dry = d.drying ?? 0;
     const s = cursor;
-    const e = s + (dur - 1) * DAY_MS;
+    const e = s + (d.durationDays - 1) * DAY_MS;
     cursor = e + DAY_MS + dry * DAY_MS;
     return {
-      stepId: r.s.id,
-      label: r.s.label,
+      stepId: d.stepId,
+      label: d.label,
       start: iso(new Date(s)),
       end: iso(new Date(e)),
-      durationDays: dur,
-      drying: dry || undefined,
+      durationDays: d.durationDays,
+      drying: d.drying,
     };
   });
 }
@@ -391,56 +411,73 @@ export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
 export interface PlanningOrderMarker {
   orderId: string;
   label: string;
-  /** Date limite pour commander (début d'étape − délai fournisseur). */
-  commanderAvant: string;
-  /** Trop tard / trop tendu et commande pas encore passée. */
-  risk: boolean;
+  /** Délai fournisseur annoncé (jours), si connu. */
+  delaiJours?: number;
+  /** Date limite pour commander (présente seulement si planning daté). */
+  commanderAvant?: string;
+  /** Trop tard / trop tendu et commande pas encore passée (mode daté). */
+  risk?: boolean;
 }
 export interface PlanningChoiceMarker {
   selectionId: string;
   categorie: string;
   label: string;
-  /** Date limite pour figer le choix (avant de pouvoir commander/poser). */
-  figerAvant: string;
+  /** Date limite pour figer le choix (présente seulement si planning daté). */
+  figerAvant?: string;
   /** Choix encore à faire. */
   pending: boolean;
 }
-export interface PlanningPhase extends BasePhase {
+export interface PlanningPhase extends PhaseDuration {
+  /** Présents seulement quand la date de démarrage est fixée. */
+  start?: string;
+  end?: string;
   orders: PlanningOrderMarker[];
   choices: PlanningChoiceMarker[];
 }
 export interface SmartPlanning {
+  /** false = planning préparé (sans dates) ; true = planning daté. */
+  dated: boolean;
   startDate: string | null;
   phases: PlanningPhase[];
   endDate: string | null;
 }
 
-/** Le planning intelligent : phases datées + jalons commande/choix à anticiper. */
+/**
+ * Le planning intelligent, en DEUX états :
+ *  • préparé (pas de date de démarrage) → ordre, durées, dépendances, commandes
+ *    à anticiper, décisions à obtenir — sans dates calendaires ;
+ *  • daté (date validée) → dates de début/fin, dates limites de commande et de
+ *    décision client. Dérivé du dossier (vivant), une seule source de vérité.
+ */
 export function buildSmartPlanning(
   dossier: ProjectDossier,
   nowMs: number = Date.now(),
 ): SmartPlanning {
-  const base = computePhaseDates(dossier);
-  if (base.length === 0) {
-    return { startDate: dossier.infos.startDate ?? null, phases: [], endDate: null };
+  const durations = phaseDurations(dossier);
+  if (durations.length === 0) {
+    return { dated: false, startDate: null, phases: [], endDate: null };
   }
-  const phases: PlanningPhase[] = base.map((b) => ({ ...b, orders: [], choices: [] }));
-  const byId = new Map(phases.map((p) => [p.stepId, p]));
+  const dated = Boolean(dossier.infos.startDate);
+  const datedById = new Map(computePhaseDates(dossier).map((p) => [p.stepId, p]));
   const FIGER_BUFFER = 14;
+
+  const phases: PlanningPhase[] = durations.map((d) => {
+    const dd = datedById.get(d.stepId);
+    return { ...d, start: dd?.start, end: dd?.end, orders: [], choices: [] };
+  });
+  const byId = new Map(phases.map((p) => [p.stepId, p]));
 
   for (const o of dossier.orders) {
     const sid = (o.stepIds ?? []).find((id) => byId.has(id));
     if (!sid) continue;
     const ph = byId.get(sid)!;
-    const phStart = new Date(`${ph.start}T00:00:00`).getTime();
-    const lead = o.delaiJours ?? 7;
-    const limit = phStart - lead * DAY_MS;
-    ph.orders.push({
-      orderId: o.id,
-      label: o.label,
-      commanderAvant: iso(new Date(limit)),
-      risk: !ORDER_PLACED.has(o.statut) && limit <= nowMs,
-    });
+    const marker: PlanningOrderMarker = { orderId: o.id, label: o.label, delaiJours: o.delaiJours };
+    if (ph.start) {
+      const limit = new Date(`${ph.start}T00:00:00`).getTime() - (o.delaiJours ?? 7) * DAY_MS;
+      marker.commanderAvant = iso(new Date(limit));
+      marker.risk = !ORDER_PLACED.has(o.statut) && limit <= nowMs;
+    }
+    ph.orders.push(marker);
   }
 
   for (const s of dossier.selections) {
@@ -448,20 +485,25 @@ export function buildSmartPlanning(
     const rule = SELECTION_STEP.find((m) => m.re.test(hay));
     const ph = rule ? phases.find((p) => rule.step.test(p.label.toLowerCase())) : undefined;
     if (!ph) continue;
-    const phStart = new Date(`${ph.start}T00:00:00`).getTime();
-    ph.choices.push({
+    const marker: PlanningChoiceMarker = {
       selectionId: s.id,
       categorie: s.categorie,
       label: s.label,
-      figerAvant: iso(new Date(phStart - FIGER_BUFFER * DAY_MS)),
       pending: s.statut === 'a_choisir',
-    });
+    };
+    if (ph.start) {
+      marker.figerAvant = iso(
+        new Date(new Date(`${ph.start}T00:00:00`).getTime() - FIGER_BUFFER * DAY_MS),
+      );
+    }
+    ph.choices.push(marker);
   }
 
   return {
+    dated,
     startDate: dossier.infos.startDate ?? null,
     phases,
-    endDate: phases[phases.length - 1]!.end,
+    endDate: dated ? (phases[phases.length - 1]!.end ?? null) : null,
   };
 }
 
