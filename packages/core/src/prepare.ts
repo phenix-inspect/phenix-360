@@ -191,14 +191,43 @@ export function optionRef(selection: ClientSelection, optionId: string): string 
 }
 
 /**
- * Le client a délégué : PHÉNIX recommande au conducteur la proposition la plus
- * cohérente, à confirmer ou ajuster. Sélecteur PUR (démo : règle déterministe ;
- * une vraie IA croisera style, budget et harmonie du projet — même sortie).
+ * Critères d'évaluation d'une proposition (catalogue des raisons possibles).
+ * PHÉNIX justifie chaque recommandation avec 3 à 4 de ces critères.
+ */
+export const RECO_REASONS = {
+  style: 'cohérence avec le style général du projet',
+  budget: 'respect du budget',
+  entretien: "facilité d'entretien",
+  delai: 'disponibilité et délai',
+  harmonie: 'harmonie avec les autres choix',
+  robustesse: 'robustesse dans le temps',
+  premium: 'rendu premium',
+  miseEnOeuvre: 'simplicité de mise en œuvre',
+} as const;
+export type RecoReasonKey = keyof typeof RECO_REASONS;
+const RECO_REASON_KEYS = Object.keys(RECO_REASONS) as RecoReasonKey[];
+
+/** Score déterministe 0–100 pour une graine (placeholder du futur moteur). */
+function recoScore(seed: string): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return Math.abs(h) % 101;
+}
+
+/**
+ * Le client a délégué : PHÉNIX recommande la proposition la plus cohérente et la
+ * justifie (3–4 raisons). Sélecteur PUR. V1 DÉTERMINISTE mais MODEL-READY : on
+ * note chaque proposition par critère, on retient la meilleure et ses meilleurs
+ * critères comme raisons. Un vrai moteur (style + budget + harmonie réels)
+ * remplacera `recoScore` SANS changer la sortie ni l'UI.
  */
 export interface DelegationRecommendation {
   optionId: string;
   ref: string;
   title: string;
+  /** Critères retenus (traçables / branchables au vrai moteur). */
+  reasonKeys: RecoReasonKey[];
+  /** Libellés lisibles des critères retenus. */
   reasons: string[];
 }
 export function recommendDelegatedOption(
@@ -206,18 +235,30 @@ export function recommendDelegatedOption(
 ): DelegationRecommendation | null {
   const opts = selection.options ?? [];
   if (opts.length === 0) return null;
-  const idx = Math.min(1, opts.length - 1); // la proposition la plus équilibrée
-  const opt = opts[idx]!;
+
+  // Note chaque proposition, critère par critère (placeholder du moteur PHÉNIX).
+  const scored = opts.map((o, i) => {
+    const perCriterion = RECO_REASON_KEYS.map((k) => ({
+      k,
+      score: recoScore(`${selection.id}:${o.id}:${k}`),
+    }));
+    const total = perCriterion.reduce((a, c) => a + c.score, 0);
+    return { o, i, perCriterion, total };
+  });
+
+  const best = scored.reduce((a, b) => (b.total > a.total ? b : a));
+  const count = 3 + (recoScore(`${selection.id}:n`) % 2); // 3 ou 4 raisons
+  const reasonKeys = [...best.perCriterion]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, count)
+    .map((c) => c.k);
+
   return {
-    optionId: opt.id,
-    ref: opt.ref ?? String.fromCharCode(65 + idx),
-    title: opt.title,
-    reasons: [
-      'cohérente avec le style général du projet',
-      'bon équilibre entre budget et rendu',
-      'facile à entretenir dans le temps',
-      'compatible avec les autres choix du chantier',
-    ],
+    optionId: best.o.id,
+    ref: best.o.ref ?? String.fromCharCode(65 + best.i),
+    title: best.o.title,
+    reasonKeys,
+    reasons: reasonKeys.map((k) => RECO_REASONS[k]),
   };
 }
 
