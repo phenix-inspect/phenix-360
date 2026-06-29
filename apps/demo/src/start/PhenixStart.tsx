@@ -1,20 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrandLockup, Button } from '@phenix360/ui';
 import { PREPARATION_STAGES, mockAnalyzeDossier, type ProjectProposal } from '@phenix360/core';
-import { CheckCircle2, FileText, Loader2, Sparkles, UploadCloud, X } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  FileText,
+  Loader2,
+  Sparkles,
+  UploadCloud,
+  X,
+} from 'lucide-react';
 import { demo } from '../store';
 import { ProposalReview } from './ProposalReview';
 
-type Phase = 'drop' | 'analysis' | 'proposal';
+type Phase = 'drop' | 'analysis' | 'ready' | 'review';
 interface Dropped {
   id: string;
   name: string;
 }
 
 /**
- * PHÉNIX Start — on ne crée plus un projet en remplissant un formulaire, on
- * dépose un dossier et PHÉNIX prépare le chantier. Dépôt → analyse scénarisée →
- * proposition éditable → validation humaine (création réelle du projet).
+ * Création du projet. Le conducteur ne remplit pas un logiciel : il dépose le
+ * devis signé, PHÉNIX prend de l'avance, puis il DÉCOUVRE un projet déjà
+ * préparé qu'il n'a plus qu'à ajuster. Rien n'est créé sans validation finale.
  */
 export function PhenixStart({
   onCreated,
@@ -27,12 +35,10 @@ export function PhenixStart({
   const [files, setFiles] = useState<Dropped[]>([]);
   const [proposal, setProposal] = useState<ProjectProposal | null>(null);
 
-  const startAnalysis = () => setPhase('analysis');
-
   const onAnalysisDone = async () => {
     const result = await mockAnalyzeDossier({ files: files.map((f) => ({ name: f.name })) });
     setProposal(result);
-    setPhase('proposal');
+    setPhase('ready');
   };
 
   const validate = async (edited: ProjectProposal) => {
@@ -41,22 +47,29 @@ export function PhenixStart({
   };
 
   if (phase === 'analysis') return <AnalysisScreen onDone={() => void onAnalysisDone()} />;
-  if (phase === 'proposal' && proposal)
+  if (phase === 'ready' && proposal)
+    return <ReadyScreen proposal={proposal} onContinue={() => setPhase('review')} />;
+  if (phase === 'review' && proposal)
     return (
       <ProposalReview
         proposal={proposal}
         onValidate={(p) => void validate(p)}
-        onCancel={onCancel}
+        onCancel={() => setPhase('ready')}
       />
     );
 
   return (
-    <DropScreen files={files} setFiles={setFiles} onStart={startAnalysis} onCancel={onCancel} />
+    <DropScreen
+      files={files}
+      setFiles={setFiles}
+      onStart={() => setPhase('analysis')}
+      onCancel={onCancel}
+    />
   );
 }
 
 /* -------------------------------------------------------------------------- *
- * 1. Dépôt du dossier
+ * 1. Le dossier arrive — le devis signé est la base, obligatoire
  * -------------------------------------------------------------------------- */
 function DropScreen({
   files,
@@ -84,11 +97,11 @@ function DropScreen({
     <div className="mx-auto max-w-2xl space-y-6">
       <header className="space-y-2 text-center">
         <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
-          Nouveau projet
+          Nouveau chantier
         </h1>
         <p className="mx-auto max-w-lg text-sm text-muted-foreground">
-          Déposez votre dossier. PHÉNIX l’analyse et prépare automatiquement le chantier — vous
-          n’aurez plus qu’à vérifier et valider.
+          Pour commencer, déposez le devis signé — c'est la base de votre chantier. Je m'occupe du
+          reste.
         </p>
       </header>
 
@@ -113,11 +126,11 @@ function DropScreen({
           <UploadCloud aria-hidden />
         </span>
         <span className="font-serif text-lg font-semibold tracking-tight text-foreground">
-          Déposez votre dossier
+          Déposez le devis signé
         </span>
         <span className="max-w-md text-sm text-muted-foreground">
-          Devis accepté, plans, DPE, photos avant travaux, diagnostics, mails du client, CCTP,
-          descriptif architecte… Glissez-déposez plusieurs fichiers.
+          Ajoutez aussi, si vous les avez, plans, DPE, diagnostics, photos, CCTP, descriptif
+          architecte… Vous pourrez en ajouter à tout moment.
         </span>
         <input
           ref={inputRef}
@@ -128,53 +141,57 @@ function DropScreen({
         />
       </button>
 
-      <p className="text-center text-xs text-muted-foreground">
-        Le devis n’est pas obligatoire, mais <strong>fortement recommandé</strong> pour une
-        préparation complète.
-      </p>
-
       {files.length > 0 && (
         <ul className="space-y-2">
-          {files.map((f) => (
-            <li
-              key={f.id}
-              className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-            >
-              <FileText aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-foreground">{f.name}</span>
-              <button
-                type="button"
-                aria-label="Retirer"
-                className="text-muted-foreground hover:text-foreground [&_svg]:size-4"
-                onClick={() => setFiles((prev) => prev.filter((x) => x.id !== f.id))}
+          {files.map((f) => {
+            const isDevis = f.name.toLowerCase().includes('devis');
+            return (
+              <li
+                key={f.id}
+                className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
               >
-                <X aria-hidden />
-              </button>
-            </li>
-          ))}
+                <FileText aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-foreground">{f.name}</span>
+                {isDevis && (
+                  <span className="shrink-0 text-xs font-medium uppercase tracking-wide text-gold-700">
+                    Devis signé
+                  </span>
+                )}
+                <button
+                  type="button"
+                  aria-label="Retirer"
+                  className="text-muted-foreground hover:text-foreground [&_svg]:size-4"
+                  onClick={() => setFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                >
+                  <X aria-hidden />
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onCancel}>
-          Annuler
-        </Button>
-        <Button onClick={onStart}>
-          <Sparkles aria-hidden />
-          {files.length === 0 ? 'Préparer sans document' : 'Lancer l’analyse PHÉNIX'}
-        </Button>
-      </div>
-      {!hasDevis && files.length > 0 && (
-        <p className="text-center text-xs text-muted-foreground">
-          Aucun devis détecté — PHÉNIX préparera une base que vous pourrez compléter.
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="ghost" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button onClick={onStart} disabled={!hasDevis}>
+            <Sparkles aria-hidden /> PHÉNIX prépare le chantier
+          </Button>
+        </div>
+        <p className="text-right text-xs text-muted-foreground">
+          {hasDevis
+            ? 'Devis signé détecté — je peux préparer le chantier.'
+            : 'Le devis signé est obligatoire pour démarrer un chantier.'}
         </p>
-      )}
+      </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- *
- * 2. Analyse scénarisée
+ * 2. PHÉNIX prépare (progression sereine)
  * -------------------------------------------------------------------------- */
 function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
   const [done, setDone] = useState(0);
@@ -184,7 +201,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
       const t = setTimeout(onDone, 500);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setDone((n) => n + 1), 480);
+    const t = setTimeout(() => setDone((n) => n + 1), 460);
     return () => clearTimeout(t);
   }, [done, onDone]);
 
@@ -192,7 +209,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-8 py-10">
       <div className="flex flex-col items-center gap-3 text-center">
         <BrandLockup size="lg" />
-        <p className="text-sm text-muted-foreground">PHÉNIX prépare votre chantier…</p>
+        <p className="text-sm text-muted-foreground">Je prépare votre chantier…</p>
       </div>
 
       <ol className="w-full space-y-1">
@@ -216,9 +233,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
                 )}
               </span>
               <span
-                className={`text-sm ${
-                  isDone || isActive ? 'text-foreground' : 'text-muted-foreground'
-                }`}
+                className={`text-sm ${isDone || isActive ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 {stage.label}
               </span>
@@ -226,6 +241,44 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- *
+ * 3. « Votre projet est prêt. » — l'effet temps gagné
+ * -------------------------------------------------------------------------- */
+function ReadyScreen({
+  proposal,
+  onContinue,
+}: {
+  proposal: ProjectProposal;
+  onContinue: () => void;
+}): React.JSX.Element {
+  const d = proposal.dossier;
+  return (
+    <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 py-10 text-center">
+      <span className="flex size-16 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-8">
+        <Sparkles aria-hidden />
+      </span>
+      <div className="space-y-3">
+        <h1 className="font-serif text-4xl font-semibold tracking-tight text-foreground">
+          Votre projet est prêt.
+        </h1>
+        <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
+          J'ai déjà préparé votre chantier à partir du devis signé. Nous allons maintenant le
+          parcourir ensemble afin de vérifier qu'il correspond parfaitement à votre projet. Vous
+          pourrez tout modifier avant de démarrer le chantier.
+        </p>
+      </div>
+      <p className="text-sm text-foreground">
+        En quelques secondes, j'ai déjà préparé <strong>{d.roadmap.length} étapes</strong>,{' '}
+        <strong>{d.orders.length} commandes</strong>,{' '}
+        <strong>{d.selections.length} choix client</strong> et trié vos documents.
+      </p>
+      <Button size="lg" onClick={onContinue}>
+        Découvrons votre projet <ArrowRight aria-hidden />
+      </Button>
     </div>
   );
 }

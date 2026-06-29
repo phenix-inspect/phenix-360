@@ -1,30 +1,53 @@
 import { useState } from 'react';
-import { Badge, Button, Card, CardContent, Input } from '@phenix360/ui';
+import { Button, Card, CardContent, Input } from '@phenix360/ui';
 import {
-  DOCUMENT_STATUSES,
   DOCUMENT_STATUS_LABEL,
+  DOCUMENT_STATUSES,
   ORDER_STATUS_LABEL,
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
   SELECTION_STATUSES,
+  buildOrderAlerts,
   buildPlanning,
+  type ClientSelection,
   type DocumentStatus,
+  type Order,
   type OrderStatus,
+  type PreparationQuestion,
   type ProjectDossier,
   type ProjectProposal,
   type SelectionStatus,
 } from '@phenix360/core';
 import {
   ArrowDown,
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   CalendarDays,
   CheckCircle2,
+  Lightbulb,
   Plus,
-  Sparkles,
   Trash2,
 } from 'lucide-react';
 import { fmtDateShort, fmtMoney } from '../lib/format';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
+
+/* -------------------------------------------------------------------------- *
+ * Le conducteur ne remplit pas un logiciel : il DÉCOUVRE ce que PHÉNIX a déjà
+ * préparé, puis ajuste. Chaque chapitre s'ouvre sur « Ce que PHÉNIX a déjà
+ * préparé », jamais sur une page vide. Pas de validation intermédiaire.
+ * -------------------------------------------------------------------------- */
+
+type ChapterId = 'projet' | 'travaux' | 'achats' | 'choix' | 'documents' | 'planning';
+
+const CHAPTERS: { id: ChapterId; label: string; title: string }[] = [
+  { id: 'projet', label: 'Le projet', title: 'Le projet' },
+  { id: 'travaux', label: 'Les travaux', title: 'Les travaux' },
+  { id: 'achats', label: 'Achats', title: 'Les achats & commandes' },
+  { id: 'choix', label: 'Choix', title: 'Les choix du client' },
+  { id: 'documents', label: 'Documents', title: 'Les documents' },
+  { id: 'planning', label: 'Le planning', title: 'Le planning' },
+];
 
 const parseDurationDays = (duration?: string): number => {
   if (!duration) return 60;
@@ -38,7 +61,8 @@ const parseDurationDays = (duration?: string): number => {
   return n;
 };
 
-const selectCls = 'h-9 rounded-md border border-input bg-surface px-2 text-sm text-foreground';
+const selectCls = 'h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground';
+const uid = (): string => crypto.randomUUID().slice(0, 8);
 
 export function ProposalReview({
   proposal,
@@ -51,421 +75,154 @@ export function ProposalReview({
 }): React.JSX.Element {
   const [name, setName] = useState(proposal.projectName);
   const [dossier, setDossier] = useState<ProjectDossier>(proposal.dossier);
+  const [step, setStep] = useState(0); // 0..CHAPTERS.length-1 = chapitre ; === length = récap
 
   const patch = (next: Partial<ProjectDossier>) => setDossier((d) => ({ ...d, ...next }));
-  const setInfo = <K extends keyof ProjectDossier['infos']>(
-    key: K,
-    value: ProjectDossier['infos'][K],
-  ) => patch({ infos: { ...dossier.infos, [key]: value } });
+  const isRecap = step === CHAPTERS.length;
+  const chapter = CHAPTERS[step];
 
-  const recomputePlanning = () => {
-    const start = dossier.infos.startDate ?? new Date().toISOString().slice(0, 10);
-    patch({
-      planning: buildPlanning(dossier.roadmap, start, parseDurationDays(dossier.infos.duration)),
-    });
-  };
-
-  const unanswered = dossier.questions.filter((q) => !q.answered).length;
+  const goNext = () => setStep((s) => Math.min(CHAPTERS.length, s + 1));
+  const goPrev = () => (step === 0 ? onCancel() : setStep((s) => s - 1));
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-12">
-      <header className="space-y-2 text-center">
-        <Badge variant="gold" className="mx-auto">
-          <Sparkles aria-hidden /> Proposition de PHÉNIX
-        </Badge>
-        <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
-          Projet proposé par PHÉNIX
-        </h1>
-        <p className="mx-auto max-w-xl text-sm text-muted-foreground">
-          Ceci n’est pas encore le projet. PHÉNIX a préparé le chantier à partir de votre dossier —
-          vérifiez, corrigez, complétez, puis validez. <strong>L’IA prépare, vous validez.</strong>
+      <header className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
+          Création du projet
         </p>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">{name}</h1>
+        <ChapterRail current={step} onJump={setStep} />
       </header>
 
-      <Field label="Nom du projet">
-        <Input value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-
-      {/* Informations générales */}
-      <Block title="Informations générales">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Client">
-            <Input
-              value={dossier.infos.clientName ?? ''}
-              onChange={(e) => setInfo('clientName', e.target.value)}
-            />
-          </Field>
-          <Field label="Téléphone">
-            <Input
-              value={dossier.infos.phone ?? ''}
-              onChange={(e) => setInfo('phone', e.target.value)}
-            />
-          </Field>
-          <Field label="Email">
-            <Input
-              value={dossier.infos.email ?? ''}
-              onChange={(e) => setInfo('email', e.target.value)}
-            />
-          </Field>
-          <Field label="Adresse du chantier">
-            <Input
-              value={dossier.infos.address ?? ''}
-              onChange={(e) => setInfo('address', e.target.value)}
-            />
-          </Field>
-          <Field label="Type de bien">
-            <Input
-              value={dossier.infos.propertyType ?? ''}
-              onChange={(e) => setInfo('propertyType', e.target.value)}
-            />
-          </Field>
-          <Field label="Surface (m²)">
-            <Input
-              type="number"
-              value={dossier.infos.surface ?? ''}
-              onChange={(e) =>
-                setInfo('surface', e.target.value ? Number(e.target.value) : undefined)
-              }
-            />
-          </Field>
-          <Field label="Budget (€)">
-            <Input
-              type="number"
-              value={dossier.infos.budget ?? ''}
-              onChange={(e) =>
-                setInfo('budget', e.target.value ? Number(e.target.value) : undefined)
-              }
-            />
-          </Field>
-          <Field label="Durée annoncée">
-            <Input
-              value={dossier.infos.duration ?? ''}
-              onChange={(e) => setInfo('duration', e.target.value)}
-            />
-          </Field>
-          <Field label="Date de début">
-            <Input
-              type="date"
-              value={dossier.infos.startDate ?? ''}
-              onChange={(e) => setInfo('startDate', e.target.value || undefined)}
-            />
-          </Field>
+      {isRecap ? (
+        <Recap dossier={dossier} />
+      ) : (
+        <div className="space-y-6">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
+            {chapter!.title}
+          </h2>
+          {chapter!.id === 'projet' && (
+            <ChapterProjet dossier={dossier} name={name} setName={setName} patch={patch} />
+          )}
+          {chapter!.id === 'travaux' && <ChapterTravaux dossier={dossier} patch={patch} />}
+          {chapter!.id === 'achats' && <ChapterAchats dossier={dossier} patch={patch} />}
+          {chapter!.id === 'choix' && <ChapterChoix dossier={dossier} patch={patch} />}
+          {chapter!.id === 'documents' && <ChapterDocuments dossier={dossier} patch={patch} />}
+          {chapter!.id === 'planning' && <ChapterPlanning dossier={dossier} patch={patch} />}
         </div>
-      </Block>
-
-      {/* Feuille de route */}
-      <Block
-        title="Feuille de route"
-        hint="Construite à partir du devis. Renommez, réorganisez, ajoutez ou supprimez."
-      >
-        <ul className="space-y-2">
-          {dossier.roadmap.map((step, i) => (
-            <li key={step.id} className="flex items-center gap-2">
-              <span className="w-6 text-center font-mono text-xs text-muted-foreground">
-                {i + 1}
-              </span>
-              <Input
-                value={step.label}
-                onChange={(e) =>
-                  patch({
-                    roadmap: dossier.roadmap.map((s) =>
-                      s.id === step.id ? { ...s, label: e.target.value } : s,
-                    ),
-                  })
-                }
-              />
-              <IconBtn
-                label="Monter"
-                disabled={i === 0}
-                onClick={() => patch({ roadmap: move(dossier.roadmap, i, i - 1) })}
-              >
-                <ArrowUp aria-hidden />
-              </IconBtn>
-              <IconBtn
-                label="Descendre"
-                disabled={i === dossier.roadmap.length - 1}
-                onClick={() => patch({ roadmap: move(dossier.roadmap, i, i + 1) })}
-              >
-                <ArrowDown aria-hidden />
-              </IconBtn>
-              <IconBtn
-                label="Supprimer"
-                onClick={() => patch({ roadmap: dossier.roadmap.filter((s) => s.id !== step.id) })}
-              >
-                <Trash2 aria-hidden />
-              </IconBtn>
-            </li>
-          ))}
-        </ul>
-        <Button
-          size="sm"
-          variant="outline"
-          className="mt-3"
-          onClick={() =>
-            patch({
-              roadmap: [
-                ...dossier.roadmap,
-                { id: `step-${crypto.randomUUID().slice(0, 8)}`, label: 'Nouvelle étape' },
-              ],
-            })
-          }
-        >
-          <Plus aria-hidden /> Ajouter une étape
-        </Button>
-      </Block>
-
-      {/* Planning */}
-      <Block title="Planning" hint="Proposé à partir des étapes, du début et de la durée.">
-        <Button size="sm" variant="outline" onClick={recomputePlanning}>
-          <CalendarDays aria-hidden /> Proposer un planning
-        </Button>
-        {dossier.planning.length > 0 && (
-          <ul className="mt-3 divide-y divide-border overflow-hidden rounded-lg border border-border">
-            {dossier.planning.map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center justify-between gap-3 bg-surface px-3 py-2 text-sm"
-              >
-                <span className="text-foreground">{t.label}</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {fmtDateShort(t.start)} → {fmtDateShort(t.end)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Block>
-
-      {/* Commandes */}
-      <Block title="Commandes" hint="Détectées dans le devis. Tout reste modifiable.">
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dossier.orders.map((o) => (
-            <div key={o.id} className="space-y-2 rounded-lg border border-border bg-surface p-3">
-              <Input
-                value={o.label}
-                onChange={(e) =>
-                  patch({
-                    orders: dossier.orders.map((x) =>
-                      x.id === o.id ? { ...x, label: e.target.value } : x,
-                    ),
-                  })
-                }
-              />
-              <div className="flex gap-2">
-                <Input
-                  value={o.fournisseur ?? ''}
-                  placeholder="Fournisseur"
-                  onChange={(e) =>
-                    patch({
-                      orders: dossier.orders.map((x) =>
-                        x.id === o.id ? { ...x, fournisseur: e.target.value } : x,
-                      ),
-                    })
-                  }
-                />
-                <Input
-                  type="number"
-                  value={o.montant ?? ''}
-                  placeholder="Montant"
-                  onChange={(e) =>
-                    patch({
-                      orders: dossier.orders.map((x) =>
-                        x.id === o.id
-                          ? { ...x, montant: e.target.value ? Number(e.target.value) : undefined }
-                          : x,
-                      ),
-                    })
-                  }
-                />
-              </div>
-              <select
-                value={o.statut}
-                onChange={(e) =>
-                  patch({
-                    orders: dossier.orders.map((x) =>
-                      x.id === o.id ? { ...x, statut: e.target.value as OrderStatus } : x,
-                    ),
-                  })
-                }
-                className={`${selectCls} w-full`}
-              >
-                {ORDER_STATUSES.map((s) => (
-                  <option key={s} value={s}>
-                    {ORDER_STATUS_LABEL[s]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
-      </Block>
-
-      {/* Choix client */}
-      <Block title="Choix client" hint="Ces fiches alimenteront l’espace client.">
-        <div className="grid gap-2 sm:grid-cols-2">
-          {dossier.selections.map((s) => (
-            <div key={s.id} className="space-y-2 rounded-lg border border-border bg-surface p-3">
-              <span className="text-xs font-medium uppercase tracking-wide text-gold-700">
-                {s.categorie}
-              </span>
-              <Input
-                value={s.label}
-                onChange={(e) =>
-                  patch({
-                    selections: dossier.selections.map((x) =>
-                      x.id === s.id ? { ...x, label: e.target.value } : x,
-                    ),
-                  })
-                }
-              />
-              <select
-                value={s.statut}
-                onChange={(e) =>
-                  patch({
-                    selections: dossier.selections.map((x) =>
-                      x.id === s.id ? { ...x, statut: e.target.value as SelectionStatus } : x,
-                    ),
-                  })
-                }
-                className={`${selectCls} w-full`}
-              >
-                {SELECTION_STATUSES.map((st) => (
-                  <option key={st} value={st}>
-                    {SELECTION_STATUS_LABEL[st]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ))}
-        </div>
-      </Block>
-
-      {/* Documents */}
-      <Block title="Documents" hint="PHÉNIX ne bloque jamais : chaque document a un état.">
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-          {dossier.documents.map((d) => (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center justify-between gap-2 bg-surface px-3 py-2"
-            >
-              <span className="text-sm text-foreground">{d.label}</span>
-              <div className="flex items-center gap-2">
-                <DocumentStatusBadge status={d.status} />
-                <select
-                  value={d.status}
-                  onChange={(e) =>
-                    patch({
-                      documents: dossier.documents.map((x) =>
-                        x.id === d.id ? { ...x, status: e.target.value as DocumentStatus } : x,
-                      ),
-                    })
-                  }
-                  className={selectCls}
-                >
-                  {DOCUMENT_STATUSES.map((s) => (
-                    <option key={s} value={s}>
-                      {DOCUMENT_STATUS_LABEL[s]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Block>
-
-      {/* Questions */}
-      {dossier.questions.length > 0 && (
-        <Block
-          title="Questions de PHÉNIX"
-          hint="PHÉNIX n’invente jamais : répondez maintenant ou plus tard."
-        >
-          <ul className="space-y-2">
-            {dossier.questions.map((q) => (
-              <li key={q.id} className="rounded-lg border border-border bg-surface p-3">
-                <p className="text-sm text-foreground">{q.question}</p>
-                <div className="mt-2 flex gap-2">
-                  <Input
-                    value={q.answer ?? ''}
-                    placeholder="Votre réponse (optionnel)…"
-                    onChange={(e) =>
-                      patch({
-                        questions: dossier.questions.map((x) =>
-                          x.id === q.id
-                            ? {
-                                ...x,
-                                answer: e.target.value,
-                                answered: e.target.value.trim().length > 0,
-                              }
-                            : x,
-                        ),
-                        infos:
-                          q.field && e.target.value
-                            ? { ...dossier.infos, [q.field]: e.target.value }
-                            : dossier.infos,
-                      })
-                    }
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Block>
       )}
 
-      {/* Validation */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-5">
-          <p className="text-sm text-muted-foreground">
-            {unanswered > 0
-              ? `${unanswered} question(s) sans réponse — vous pourrez y revenir plus tard.`
-              : 'Tout est prêt. Vous pouvez créer le projet.'}
-          </p>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={onCancel}>
-              Annuler
-            </Button>
-            <Button
-              onClick={() => onValidate({ projectName: name.trim() || 'Nouveau projet', dossier })}
-              disabled={name.trim().length === 0}
-            >
-              <CheckCircle2 aria-hidden /> Valider et créer le projet
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex items-center justify-between gap-2 pt-2">
+        <Button variant="ghost" onClick={goPrev}>
+          <ArrowLeft aria-hidden />
+          {step === 0 ? 'Retour' : 'Précédent'}
+        </Button>
+        {isRecap ? (
+          <Button
+            onClick={() => onValidate({ projectName: name.trim() || 'Nouveau projet', dossier })}
+            disabled={name.trim().length === 0}
+          >
+            <CheckCircle2 aria-hidden /> Valider et démarrer le chantier
+          </Button>
+        ) : (
+          <Button onClick={goNext}>
+            {step === CHAPTERS.length - 1 ? 'Terminer' : 'Chapitre suivant'}
+            <ArrowRight aria-hidden />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
-function move<T>(arr: T[], from: number, to: number): T[] {
-  const next = [...arr];
-  const [item] = next.splice(from, 1);
-  next.splice(to, 0, item!);
-  return next;
-}
-
-function Block({
-  title,
-  hint,
-  children,
+/* --- Chrome ------------------------------------------------------------- */
+function ChapterRail({
+  current,
+  onJump,
 }: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
+  current: number;
+  onJump: (i: number) => void;
 }): React.JSX.Element {
   return (
+    <ol className="flex flex-wrap items-center gap-x-1 gap-y-2 text-sm">
+      {CHAPTERS.map((c, i) => {
+        const done = i < current;
+        const active = i === current;
+        return (
+          <li key={c.id} className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onJump(i)}
+              className={
+                active
+                  ? 'rounded-full bg-primary px-3 py-1 font-medium text-primary-foreground'
+                  : done
+                    ? 'rounded-full px-3 py-1 text-gold-700 hover:underline'
+                    : 'rounded-full px-3 py-1 text-muted-foreground hover:text-foreground'
+              }
+            >
+              {c.label}
+            </button>
+            {i < CHAPTERS.length - 1 && <span className="text-muted-foreground">·</span>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function Prepared({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
     <Card>
-      <CardContent className="space-y-3 p-5">
-        <div>
-          <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
-            {title}
-          </h2>
-          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-        </div>
+      <CardContent className="space-y-4 p-5">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Ce que PHÉNIX a déjà préparé
+        </p>
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+function ToVerify({ children }: { children: React.ReactNode }): React.JSX.Element | null {
+  return (
+    <section className="space-y-2">
+      <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gold-700 [&_svg]:size-4">
+        <Lightbulb aria-hidden />
+        Ce que PHÉNIX vous recommande de vérifier
+      </p>
+      <div className="space-y-2">{children}</div>
+    </section>
+  );
+}
+
+function Reco({ text, action }: { text: string; action?: React.ReactNode }): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gold-200 bg-gold-50 px-3 py-2.5">
+      <p className="text-sm text-ink-700">{text}</p>
+      {action}
+    </div>
+  );
+}
+
+function QuestionFix({
+  question,
+  onAnswer,
+}: {
+  question: PreparationQuestion;
+  onAnswer: (id: string, value: string) => void;
+}): React.JSX.Element {
+  const [v, setV] = useState(question.answer ?? '');
+  return (
+    <div className="space-y-2 rounded-lg border border-gold-200 bg-gold-50 px-3 py-2.5">
+      <p className="text-sm text-ink-700">{question.question}</p>
+      <div className="flex gap-2">
+        <Input value={v} onChange={(e) => setV(e.target.value)} placeholder="Préciser…" />
+        <Button size="sm" onClick={() => v.trim() && onAnswer(question.id, v.trim())}>
+          Préciser
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -484,27 +241,499 @@ function Field({
   );
 }
 
-function IconBtn({
-  label,
-  disabled,
-  onClick,
-  children,
+/* --- Chapitres ---------------------------------------------------------- */
+type PatchFn = (next: Partial<ProjectDossier>) => void;
+
+function ChapterProjet({
+  dossier,
+  name,
+  setName,
+  patch,
 }: {
-  label: string;
-  disabled?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  dossier: ProjectDossier;
+  name: string;
+  setName: (v: string) => void;
+  patch: PatchFn;
 }): React.JSX.Element {
+  const i = dossier.infos;
+  const setInfo = <K extends keyof ProjectDossier['infos']>(
+    key: K,
+    value: ProjectDossier['infos'][K],
+  ) => patch({ infos: { ...dossier.infos, [key]: value } });
+
+  const answer = (id: string, value: string) => {
+    const q = dossier.questions.find((x) => x.id === id);
+    patch({
+      questions: dossier.questions.map((x) =>
+        x.id === id ? { ...x, answered: true, answer: value } : x,
+      ),
+      infos: q?.field ? { ...dossier.infos, [q.field]: value } : dossier.infos,
+    });
+  };
+
+  const recos = dossier.questions.filter((q) => !q.answered && q.field && q.field !== 'startDate');
+
   return (
-    <Button
-      size="icon"
-      variant="ghost"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </Button>
+    <>
+      <Prepared>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nom du projet">
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Client">
+            <Input
+              value={i.clientName ?? ''}
+              onChange={(e) => setInfo('clientName', e.target.value)}
+            />
+          </Field>
+          <Field label="Téléphone">
+            <Input value={i.phone ?? ''} onChange={(e) => setInfo('phone', e.target.value)} />
+          </Field>
+          <Field label="Email">
+            <Input value={i.email ?? ''} onChange={(e) => setInfo('email', e.target.value)} />
+          </Field>
+          <Field label="Adresse du chantier">
+            <Input value={i.address ?? ''} onChange={(e) => setInfo('address', e.target.value)} />
+          </Field>
+          <Field label="Type de bien">
+            <Input
+              value={i.propertyType ?? ''}
+              onChange={(e) => setInfo('propertyType', e.target.value)}
+            />
+          </Field>
+          <Field label="Surface (m²)">
+            <Input
+              type="number"
+              value={i.surface ?? ''}
+              onChange={(e) =>
+                setInfo('surface', e.target.value ? Number(e.target.value) : undefined)
+              }
+            />
+          </Field>
+          <Field label="Budget (€) — devis signé">
+            <Input
+              type="number"
+              value={i.budget ?? ''}
+              onChange={(e) =>
+                setInfo('budget', e.target.value ? Number(e.target.value) : undefined)
+              }
+            />
+          </Field>
+        </div>
+      </Prepared>
+
+      {recos.length > 0 && (
+        <ToVerify>
+          {recos.map((q) => (
+            <QuestionFix key={q.id} question={q} onAnswer={answer} />
+          ))}
+        </ToVerify>
+      )}
+    </>
+  );
+}
+
+function ChapterTravaux({
+  dossier,
+  patch,
+}: {
+  dossier: ProjectDossier;
+  patch: PatchFn;
+}): React.JSX.Element {
+  const move = (from: number, to: number) => {
+    const next = [...dossier.roadmap];
+    const [it] = next.splice(from, 1);
+    next.splice(to, 0, it!);
+    patch({ roadmap: next });
+  };
+  const hasNettoyage = dossier.roadmap.some((s) => /nettoyage/i.test(s.label));
+
+  return (
+    <>
+      <Prepared>
+        <ul className="space-y-2">
+          {dossier.roadmap.map((step, idx) => (
+            <li key={step.id} className="flex items-center gap-2">
+              <span className="w-6 text-center font-mono text-xs text-muted-foreground">
+                {idx + 1}
+              </span>
+              <Input
+                value={step.label}
+                onChange={(e) =>
+                  patch({
+                    roadmap: dossier.roadmap.map((s) =>
+                      s.id === step.id ? { ...s, label: e.target.value } : s,
+                    ),
+                  })
+                }
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Monter"
+                disabled={idx === 0}
+                onClick={() => move(idx, idx - 1)}
+              >
+                <ArrowUp aria-hidden />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Descendre"
+                disabled={idx === dossier.roadmap.length - 1}
+                onClick={() => move(idx, idx + 1)}
+              >
+                <ArrowDown aria-hidden />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label="Retirer"
+                onClick={() => patch({ roadmap: dossier.roadmap.filter((s) => s.id !== step.id) })}
+              >
+                <Trash2 aria-hidden />
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            patch({
+              roadmap: [...dossier.roadmap, { id: `step-${uid()}`, label: 'Nouvelle étape' }],
+            })
+          }
+        >
+          <Plus aria-hidden /> Ajouter une étape
+        </Button>
+      </Prepared>
+
+      <ToVerify>
+        <Reco text="Vérifiez l'ordre des étapes — vous pouvez en renommer, en ajouter ou en retirer." />
+        {!hasNettoyage && (
+          <Reco
+            text="Je vous conseille d'ajouter une étape Nettoyage avant la réception."
+            action={
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const rec = [...dossier.roadmap];
+                  const at = Math.max(0, rec.length - 1);
+                  rec.splice(at, 0, { id: `step-${uid()}`, label: 'Nettoyage' });
+                  patch({ roadmap: rec });
+                }}
+              >
+                Ajouter
+              </Button>
+            }
+          />
+        )}
+      </ToVerify>
+    </>
+  );
+}
+
+function ChapterAchats({
+  dossier,
+  patch,
+}: {
+  dossier: ProjectDossier;
+  patch: PatchFn;
+}): React.JSX.Element {
+  const setOrder = (id: string, next: Partial<Order>) =>
+    patch({ orders: dossier.orders.map((o) => (o.id === id ? { ...o, ...next } : o)) });
+  const alerts = buildOrderAlerts(dossier).filter((a) => a.severity !== 'success');
+
+  return (
+    <>
+      <Prepared>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {dossier.orders.map((o) => (
+            <div key={o.id} className="space-y-2 rounded-lg border border-border bg-surface p-3">
+              <Input value={o.label} onChange={(e) => setOrder(o.id, { label: e.target.value })} />
+              <div className="flex gap-2">
+                <Input
+                  value={o.fournisseur ?? ''}
+                  placeholder="Fournisseur"
+                  onChange={(e) => setOrder(o.id, { fournisseur: e.target.value })}
+                />
+                <Input
+                  type="number"
+                  value={o.montant ?? ''}
+                  placeholder="Montant"
+                  onChange={(e) =>
+                    setOrder(o.id, { montant: e.target.value ? Number(e.target.value) : undefined })
+                  }
+                />
+              </div>
+              <select
+                value={o.statut}
+                onChange={(e) => setOrder(o.id, { statut: e.target.value as OrderStatus })}
+                className={`${selectCls} w-full`}
+              >
+                {ORDER_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {ORDER_STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            patch({
+              orders: [
+                ...dossier.orders,
+                { id: `ord-${uid()}`, label: 'Nouvelle commande', statut: 'a_commander' },
+              ],
+            })
+          }
+        >
+          <Plus aria-hidden /> Ajouter une commande
+        </Button>
+      </Prepared>
+
+      <ToVerify>
+        {alerts.map((a) => (
+          <Reco key={a.id} text={a.message} />
+        ))}
+        <Reco text="Vérifiez les montants issus du devis et ajoutez les commandes que j'aurais pu manquer." />
+      </ToVerify>
+    </>
+  );
+}
+
+function ChapterChoix({
+  dossier,
+  patch,
+}: {
+  dossier: ProjectDossier;
+  patch: PatchFn;
+}): React.JSX.Element {
+  const setSel = (id: string, next: Partial<ClientSelection>) =>
+    patch({ selections: dossier.selections.map((s) => (s.id === id ? { ...s, ...next } : s)) });
+  const aChoisir = dossier.selections.filter((s) => s.statut === 'a_choisir').length;
+
+  return (
+    <>
+      <Prepared>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {dossier.selections.map((s) => (
+            <div key={s.id} className="space-y-2 rounded-lg border border-border bg-surface p-3">
+              <Input
+                value={s.categorie}
+                onChange={(e) => setSel(s.id, { categorie: e.target.value })}
+                className="text-xs font-medium uppercase tracking-wide"
+              />
+              <Input value={s.label} onChange={(e) => setSel(s.id, { label: e.target.value })} />
+              <select
+                value={s.statut}
+                onChange={(e) => setSel(s.id, { statut: e.target.value as SelectionStatus })}
+                className={`${selectCls} w-full`}
+              >
+                {SELECTION_STATUSES.map((st) => (
+                  <option key={st} value={st}>
+                    {SELECTION_STATUS_LABEL[st]}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() =>
+            patch({
+              selections: [
+                ...dossier.selections,
+                {
+                  id: `sel-${uid()}`,
+                  categorie: 'Choix',
+                  label: 'Nouveau choix',
+                  statut: 'a_choisir',
+                },
+              ],
+            })
+          }
+        >
+          <Plus aria-hidden /> Ajouter un choix
+        </Button>
+      </Prepared>
+
+      <ToVerify>
+        <Reco
+          text={`${aChoisir} choix devront être faits par votre client — je les afficherai dans son espace.`}
+        />
+      </ToVerify>
+    </>
+  );
+}
+
+function ChapterDocuments({
+  dossier,
+  patch,
+}: {
+  dossier: ProjectDossier;
+  patch: PatchFn;
+}): React.JSX.Element {
+  const setDoc = (id: string, status: DocumentStatus) =>
+    patch({ documents: dossier.documents.map((d) => (d.id === id ? { ...d, status } : d)) });
+  const toAsk = dossier.documents.filter(
+    (d) => d.status === 'manquant' || d.status === 'a_fournir',
+  );
+
+  return (
+    <>
+      <Prepared>
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+          {dossier.documents.map((d) => (
+            <li
+              key={d.id}
+              className="flex flex-wrap items-center justify-between gap-2 bg-surface px-3 py-2"
+            >
+              <span className="text-sm text-foreground">{d.label}</span>
+              <div className="flex items-center gap-2">
+                <DocumentStatusBadge status={d.status} />
+                <select
+                  value={d.status}
+                  onChange={(e) => setDoc(d.id, e.target.value as DocumentStatus)}
+                  className="h-9 rounded-md border border-input bg-surface px-2 text-sm text-foreground"
+                >
+                  {DOCUMENT_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {DOCUMENT_STATUS_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Prepared>
+
+      {toAsk.length > 0 && (
+        <ToVerify>
+          {toAsk.map((d) => (
+            <Reco
+              key={d.id}
+              text={
+                d.status === 'manquant'
+                  ? `Le ${d.label} est recommandé mais absent du dossier.`
+                  : `Le ${d.label} sera à fournir plus tard.`
+              }
+              action={
+                <Button size="sm" variant="outline" onClick={() => setDoc(d.id, 'demande_client')}>
+                  Le demander au client
+                </Button>
+              }
+            />
+          ))}
+        </ToVerify>
+      )}
+    </>
+  );
+}
+
+function ChapterPlanning({
+  dossier,
+  patch,
+}: {
+  dossier: ProjectDossier;
+  patch: PatchFn;
+}): React.JSX.Element {
+  const setStart = (value: string | undefined) =>
+    patch({ infos: { ...dossier.infos, startDate: value } });
+  const recompute = () => {
+    const start = dossier.infos.startDate ?? new Date().toISOString().slice(0, 10);
+    patch({
+      planning: buildPlanning(dossier.roadmap, start, parseDurationDays(dossier.infos.duration)),
+    });
+  };
+
+  return (
+    <>
+      <Prepared>
+        <p className="text-sm text-muted-foreground">
+          J'ai préparé vos {dossier.roadmap.length} étapes. Donnez-moi la date de début et je cale
+          un planning prévisionnel.
+        </p>
+        <div className="flex flex-wrap items-end gap-3">
+          <Field label="Date de début">
+            <Input
+              type="date"
+              value={dossier.infos.startDate ?? ''}
+              onChange={(e) => setStart(e.target.value || undefined)}
+            />
+          </Field>
+          <Field label="Durée annoncée">
+            <Input
+              value={dossier.infos.duration ?? ''}
+              onChange={(e) => patch({ infos: { ...dossier.infos, duration: e.target.value } })}
+            />
+          </Field>
+          <Button variant="outline" onClick={recompute}>
+            <CalendarDays aria-hidden /> Proposer un planning
+          </Button>
+        </div>
+
+        {dossier.planning.length > 0 && (
+          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+            {dossier.planning.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center justify-between gap-3 bg-surface px-3 py-2 text-sm"
+              >
+                <span className="text-foreground">{t.label}</span>
+                <span className="font-mono text-xs text-muted-foreground">
+                  {fmtDateShort(t.start)} → {fmtDateShort(t.end)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Prepared>
+
+      {!dossier.infos.startDate && (
+        <ToVerify>
+          <Reco text="Je n'ai pas encore la date de début souhaitée — précisez-la pour un planning précis." />
+        </ToVerify>
+      )}
+    </>
+  );
+}
+
+function Recap({ dossier }: { dossier: ProjectDossier }): React.JSX.Element {
+  const toAsk = dossier.documents.filter((d) => d.status === 'demande_client').length;
+  const open = dossier.questions.filter((q) => !q.answered).length;
+  return (
+    <Card>
+      <CardContent className="space-y-3 p-6 text-center">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-6">
+          <CheckCircle2 aria-hidden />
+        </span>
+        <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
+          Tout est prêt.
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          {dossier.roadmap.length} étapes · {dossier.orders.length} commandes ·{' '}
+          {dossier.selections.length} choix client · {dossier.documents.length} documents
+          {toAsk > 0 ? ` (${toAsk} à demander au client)` : ''}.
+        </p>
+        {open > 0 && (
+          <p className="text-sm text-muted-foreground">
+            J'ai noté {open} point(s) à préciser — vous pourrez y revenir à tout moment.
+          </p>
+        )}
+        <p className="text-sm text-foreground">
+          En validant, je crée le chantier et j'ouvre l'espace de votre client.
+        </p>
+      </CardContent>
+    </Card>
   );
 }

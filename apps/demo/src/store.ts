@@ -130,7 +130,7 @@ export const demo = {
 
   /**
    * Crée le projet À PARTIR de la proposition validée par l'humain (PHÉNIX
-   * Start). « L'IA prépare, l'humain valide » : rien n'est créé avant cet appel.
+   * Start). « PHÉNIX prépare, vous validez » : rien n'est créé avant cet appel.
    * Passe par les ports core (projet, membres, événements) ; le dossier préparé
    * est persisté à part (hors colonne vertébrale).
    */

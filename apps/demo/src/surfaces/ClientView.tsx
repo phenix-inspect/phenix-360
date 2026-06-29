@@ -188,9 +188,7 @@ function Assistant({
       <CardContent className="space-y-3 p-6">
         <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
           <MessageCircle aria-hidden />
-          <h2 className="font-serif text-lg font-semibold tracking-tight">
-            Une question sur votre chantier ?
-          </h2>
+          <h2 className="font-serif text-lg font-semibold tracking-tight">Demandez à PHÉNIX</h2>
         </div>
         <div className="flex gap-2">
           <Input

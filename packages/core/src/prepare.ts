@@ -249,7 +249,7 @@ export const PREPARATION_STAGES: { icon: string; label: string }[] = [
   { icon: '🎨', label: 'Détection des choix client' },
   { icon: '📅', label: 'Construction du planning' },
   { icon: '📂', label: 'Vérification des documents' },
-  { icon: '🤖', label: "Préparation de l'assistant PHÉNIX" },
+  { icon: '✨', label: 'PHÉNIX mémorise votre chantier' },
 ];
 
 /* -------------------------------------------------------------------------- *
