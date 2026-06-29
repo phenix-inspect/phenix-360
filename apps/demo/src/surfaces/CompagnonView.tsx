@@ -14,6 +14,7 @@ import {
 } from '@phenix360/ui';
 import {
   EVENT_TYPE_LABEL,
+  buildChantierAttention,
   sortByDate,
   teamQueue,
   userId,
@@ -36,6 +37,7 @@ import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { RoadmapProgress } from '../components/RoadmapProgress';
 import { DossierPanel } from '../components/DossierPanel';
+import { AttentionPanel } from '../components/AttentionPanel';
 import { Composer, type ComposerKind } from '../components/Composer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -61,6 +63,32 @@ export function CompagnonView({
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
   const [composer, setComposer] = useState<ComposerKind | null>(null);
+  const [tab, setTab] = useState<'suivi' | 'preparation'>('suivi');
+
+  const attention = buildChantierAttention(dossier, events);
+
+  const askDocument = async (docId: string) => {
+    if (!dossier) return;
+    const doc = dossier.documents.find((d) => d.id === docId);
+    if (!doc) return;
+    demo.saveDossier(project.id, {
+      ...dossier,
+      documents: dossier.documents.map((d) =>
+        d.id === docId ? { ...d, status: 'demande_client' } : d,
+      ),
+    });
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'demande',
+      visibility: 'client',
+      state: 'ouverte',
+      content: {
+        question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${doc.label} ?`,
+        destinataire: 'client',
+      },
+    });
+  };
 
   const suivi = (
     <SuiviTab snap={snap} project={project} actor={actor} events={events} onCompose={setComposer} />
@@ -77,8 +105,14 @@ export function CompagnonView({
         {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
       </div>
 
+      <AttentionPanel
+        items={attention}
+        onAskDocument={(docId) => void askDocument(docId)}
+        onOpenPreparation={() => setTab('preparation')}
+      />
+
       {dossier ? (
-        <Tabs defaultValue="suivi">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'suivi' | 'preparation')}>
           <TabsList>
             <TabsTrigger value="suivi">Suivi</TabsTrigger>
             <TabsTrigger value="preparation">Préparation</TabsTrigger>

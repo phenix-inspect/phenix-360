@@ -16,6 +16,8 @@
  * propre feuille de route, construite à partir du devis.
  */
 import type { IsoDateTime } from './ids.js';
+import type { Event } from './event.js';
+import { pendingClientDecisions } from './views.js';
 
 /* -------------------------------------------------------------------------- *
  * Feuille de route (étapes propres au projet)
@@ -414,6 +416,99 @@ export function buildOrderAlerts(
 
   const rank: Record<OrderAlertSeverity, number> = { warning: 0, info: 1, success: 2 };
   return alerts.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 6);
+}
+
+/* -------------------------------------------------------------------------- *
+ * SYNTHÈSE « PHÉNIX surveille votre chantier » (accueil Compagnon)
+ * -------------------------------------------------------------------------- *
+ * Une seule lecture, claire : « Voici ce qui mérite votre attention
+ * aujourd'hui. » Agrège commandes, documents, questions, décisions client et
+ * prochaines échéances. Sélecteur pur — la logique vit ici, jamais dans l'UI.
+ */
+export type AttentionKind = 'commande' | 'document' | 'question' | 'decision' | 'echeance';
+
+export interface AttentionItem {
+  id: string;
+  kind: AttentionKind;
+  severity: OrderAlertSeverity;
+  message: string;
+  /** Document concerné (permet l'action « Demander au client »). */
+  docId?: string;
+}
+
+const ATTENTION_RANK: Record<OrderAlertSeverity, number> = { warning: 0, info: 1, success: 2 };
+
+export function buildChantierAttention(
+  dossier: ProjectDossier | null,
+  events: Event[],
+  nowMs: number = Date.now(),
+): AttentionItem[] {
+  const items: AttentionItem[] = [];
+
+  if (dossier) {
+    // Commandes (réutilise le moteur d'alertes).
+    for (const a of buildOrderAlerts(dossier, nowMs)) {
+      items.push({ id: `cmd-${a.id}`, kind: 'commande', severity: a.severity, message: a.message });
+    }
+
+    // Documents à demander.
+    for (const d of dossier.documents) {
+      if (d.status === 'manquant') {
+        items.push({
+          id: `doc-${d.id}`,
+          kind: 'document',
+          severity: 'warning',
+          message: `Document recommandé manquant : ${d.label}.`,
+          docId: d.id,
+        });
+      } else if (d.status === 'a_fournir') {
+        items.push({
+          id: `doc-${d.id}`,
+          kind: 'document',
+          severity: 'info',
+          message: `À fournir plus tard : ${d.label}.`,
+          docId: d.id,
+        });
+      }
+    }
+
+    // Questions PHÉNIX en attente.
+    for (const q of dossier.questions) {
+      if (!q.answered) {
+        items.push({ id: `q-${q.id}`, kind: 'question', severity: 'info', message: q.question });
+      }
+    }
+
+    // Prochaines échéances du planning (≤ 14 jours).
+    const soon = dossier.planning
+      .map((t) => ({ t, d: days(new Date(`${t.start}T00:00:00`).getTime(), nowMs) }))
+      .filter((x) => x.d >= 0 && x.d <= 14)
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 3);
+    for (const { t, d } of soon) {
+      items.push({
+        id: `ech-${t.id}`,
+        kind: 'echeance',
+        severity: 'info',
+        message:
+          d === 0
+            ? `La phase ${t.label} démarre aujourd'hui.`
+            : `La phase ${t.label} démarre dans ${d} jour(s).`,
+      });
+    }
+  }
+
+  // Décisions client en attente.
+  for (const dec of pendingClientDecisions(events)) {
+    items.push({
+      id: `dec-${dec.eventId}`,
+      kind: 'decision',
+      severity: 'warning',
+      message: `Décision en attente du client : ${dec.question}`,
+    });
+  }
+
+  return items.sort((a, b) => ATTENTION_RANK[a.severity] - ATTENTION_RANK[b.severity]);
 }
 
 /* -------------------------------------------------------------------------- *
