@@ -794,6 +794,9 @@ export interface OrderAlert {
 }
 
 const days = (a: number, b: number): number => Math.round((a - b) / DAY_MS);
+/** Date courte en français (« 7 juillet ») pour les messages de briefing. */
+const frShortDate = (iso: string): string =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
 const weeksOrDays = (d: number): string =>
   d >= 14 && d % 7 === 0
     ? `${d / 7} semaines`
@@ -1184,6 +1187,22 @@ export function buildChantierAttention(
           docId: d.id,
         });
       }
+    }
+
+    // Décisions client DATÉES dont l'échéance approche ou est dépassée : ce sont
+    // des alertes prioritaires (sans elles, le planning glisse).
+    for (const dec of buildClientDecisions(dossier, nowMs)) {
+      if (dec.status !== 'proche' && dec.status !== 'en_retard') continue;
+      const cat = dec.categorie.toLowerCase();
+      items.push({
+        id: `cdec-${dec.id}`,
+        kind: 'decision',
+        severity: 'warning',
+        message:
+          dec.status === 'en_retard'
+            ? `Décision client en retard : ${cat}${dec.decideAvant ? ` (échéance dépassée du ${frShortDate(dec.decideAvant)})` : ''}.`
+            : `Décision client à obtenir : ${cat}${dec.decideAvant ? ` (avant le ${frShortDate(dec.decideAvant)})` : ''}.`,
+      });
     }
 
     // Questions PHÉNIX en attente.

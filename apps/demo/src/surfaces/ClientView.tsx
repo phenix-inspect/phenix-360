@@ -72,7 +72,7 @@ export function ClientView({
     });
   };
 
-  const requestModification = async (d: ClientDecision) => {
+  const requestModification = async (d: ClientDecision, message: string) => {
     if (!dossier) return;
     demo.saveDossier(project.id, {
       ...dossier,
@@ -87,7 +87,7 @@ export function ClientView({
       visibility: 'client',
       state: 'ouverte',
       content: {
-        question: `Modification demandée sur le choix ${d.categorie.toLowerCase()} : ${d.label}`,
+        question: `Modification demandée sur ${d.categorie.toLowerCase()} : ${message}`,
         destinataire: 'equipe',
       },
     });
@@ -109,7 +109,7 @@ export function ClientView({
         <ClientDecisionBanner
           decision={clientDecision}
           onValidate={() => validateDecision(clientDecision)}
-          onModify={() => requestModification(clientDecision)}
+          onModify={(message) => requestModification(clientDecision, message)}
         />
       ) : (
         <SmartBanner project={project} events={events} actor={actor} />

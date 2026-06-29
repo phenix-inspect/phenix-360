@@ -27,10 +27,10 @@ const KIND_LABEL: Record<AttentionKind, string> = {
   echeance: 'Échéance',
 };
 
-/** Vrais risques bloquants d'abord : commande, décision client, document. */
+/** Priorité : décisions client, puis commandes critiques, puis documents bloquants. */
 const KIND_RANK: Record<AttentionKind, number> = {
-  commande: 0,
-  decision: 1,
+  decision: 0,
+  commande: 1,
   document: 2,
   question: 3,
   echeance: 4,
@@ -122,6 +122,7 @@ export function AttentionPanel({
                   </Button>
                 ) : item.kind === 'commande' ||
                   item.kind === 'question' ||
+                  item.kind === 'decision' ||
                   item.kind === 'echeance' ? (
                   <Button
                     size="sm"
