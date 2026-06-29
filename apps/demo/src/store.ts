@@ -13,15 +13,19 @@
 import { useSyncExternalStore } from 'react';
 import {
   InMemoryBackend,
+  userId as toUserId,
   type BackendState,
   type DemandeResolution,
+  type EventActor,
   type EventId,
   type KeyValueStore,
   type NewEvent,
   type NewMember,
   type NewProject,
+  type ProjectDossier,
   type ProjectId,
   type ProjectPatch,
+  type ProjectProposal,
   type UserId,
 } from '@phenix360/core';
 import { buildDemoSeed } from './seed';
@@ -29,6 +33,7 @@ import { buildDemoSeed } from './seed';
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
 const ACTIVE_KEY = 'phenix-demo:active:v1';
+const DOSSIERS_KEY = 'phenix-demo:dossiers:v1';
 const SEEDED_KEY = 'phenix-demo:seeded:v1';
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
@@ -53,6 +58,8 @@ export interface DemoSnapshot extends BackendState {
   /** userId → nom affichable (détail de démo, hors core). */
   people: Record<string, string>;
   activeProjectId: ProjectId | null;
+  /** projectId → dossier préparé par PHÉNIX Start (hors colonne vertébrale). */
+  dossiers: Record<string, ProjectDossier>;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -67,6 +74,7 @@ function build(): DemoSnapshot {
     ...(kv.load() ?? emptyState()),
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
+    dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
   };
 }
 
@@ -120,12 +128,82 @@ export const demo = {
   resolveDemande: (id: EventId, resolution: DemandeResolution) =>
     mutate(backend.resolveDemande(id, resolution)),
 
+  /**
+   * Crée le projet À PARTIR de la proposition validée par l'humain (PHÉNIX
+   * Start). « L'IA prépare, l'humain valide » : rien n'est créé avant cet appel.
+   * Passe par les ports core (projet, membres, événements) ; le dossier préparé
+   * est persisté à part (hors colonne vertébrale).
+   */
+  async createFromProposal(proposal: ProjectProposal): Promise<ProjectId> {
+    const clientId = toUserId(crypto.randomUUID());
+    const compaId = toUserId(crypto.randomUUID());
+    const project = await backend.createProject({
+      name: proposal.projectName,
+      status: 'en_preparation',
+      clientId,
+    });
+    await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
+    await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
+
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    people[compaId] = 'Mickaël';
+    people[clientId] = proposal.dossier.infos.clientName ?? 'Client';
+    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+
+    const compaActor: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
+    await backend.appendEvent({
+      projectId: project.id,
+      actor: compaActor,
+      type: 'compte_rendu',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        texte: `Dossier analysé et préparé par PHÉNIX Start — ${proposal.dossier.roadmap.length} étapes, ${proposal.dossier.orders.length} commandes, ${proposal.dossier.selections.length} choix client.`,
+      },
+    });
+
+    // Documents « demandés au client » → une demande apparaît dans l'espace client.
+    for (const doc of proposal.dossier.documents) {
+      if (doc.status === 'demande_client') {
+        await backend.appendEvent({
+          projectId: project.id,
+          actor: compaActor,
+          type: 'demande',
+          visibility: 'client',
+          state: 'ouverte',
+          content: {
+            question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${doc.label} ?`,
+            destinataire: 'client',
+          },
+        });
+      }
+    }
+
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    dossiers[project.id] = proposal.dossier;
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
+    refresh();
+    broadcast();
+    return project.id;
+  },
+
+  /** Met à jour le dossier préparé d'un projet (éditions ultérieures). */
+  saveDossier(projectId: ProjectId, dossier: ProjectDossier): void {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    dossiers[projectId] = dossier;
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
-    const { state, people, activeProjectId } = buildDemoSeed();
+    const { state, people, activeProjectId, dossiers } = buildDemoSeed();
     kv.save(state);
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -136,6 +214,7 @@ export const demo = {
     localStorage.removeItem(STATE_KEY);
     localStorage.removeItem(PEOPLE_KEY);
     localStorage.removeItem(ACTIVE_KEY);
+    localStorage.removeItem(DOSSIERS_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -155,4 +234,13 @@ export function useDemo(): DemoSnapshot {
 export function nameOf(snap: DemoSnapshot, userId: string | null | undefined): string {
   if (!userId) return 'PHÉNIX';
   return snap.people[userId] ?? 'PHÉNIX';
+}
+
+/** Dossier préparé d'un projet (s'il a été créé via PHÉNIX Start). */
+export function dossierOf(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): ProjectDossier | null {
+  if (!projectId) return null;
+  return snap.dossiers[projectId] ?? null;
 }

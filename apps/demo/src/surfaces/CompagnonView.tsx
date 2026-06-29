@@ -6,6 +6,10 @@ import {
   Card,
   CardContent,
   EmptyState,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Timeline,
 } from '@phenix360/ui';
 import {
@@ -13,6 +17,7 @@ import {
   sortByDate,
   teamQueue,
   userId,
+  type Event,
   type EventActor,
   type Project,
 } from '@phenix360/core';
@@ -24,11 +29,13 @@ import {
   NotebookPen,
   Reply,
 } from 'lucide-react';
-import { demo, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDateTime } from '../lib/format';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
+import { RoadmapProgress } from '../components/RoadmapProgress';
+import { DossierPanel } from '../components/DossierPanel';
 import { Composer, type ComposerKind } from '../components/Composer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -52,12 +59,67 @@ export function CompagnonView({
 }): React.JSX.Element {
   const actor = compagnonActor(snap, project);
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
+  const dossier = dossierOf(snap, project.id);
+  const [composer, setComposer] = useState<ComposerKind | null>(null);
+
+  const suivi = (
+    <SuiviTab snap={snap} project={project} actor={actor} events={events} onCompose={setComposer} />
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div>
+          <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
+        </div>
+        <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} compact />
+        {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
+      </div>
+
+      {dossier ? (
+        <Tabs defaultValue="suivi">
+          <TabsList>
+            <TabsTrigger value="suivi">Suivi</TabsTrigger>
+            <TabsTrigger value="preparation">Préparation</TabsTrigger>
+          </TabsList>
+          <TabsContent value="suivi">{suivi}</TabsContent>
+          <TabsContent value="preparation">
+            <DossierPanel project={project} dossier={dossier} actor={actor} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        suivi
+      )}
+
+      <Composer
+        kind={composer}
+        project={project}
+        actor={actor}
+        events={events}
+        onClose={() => setComposer(null)}
+      />
+    </div>
+  );
+}
+
+function SuiviTab({
+  snap,
+  project,
+  actor,
+  events,
+  onCompose,
+}: {
+  snap: DemoSnapshot;
+  project: Project;
+  actor: EventActor;
+  events: Event[];
+  onCompose: (kind: ComposerKind) => void;
+}): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
   const pendingReplies = teamQueue(events).filter(
     (e) => e.content.destinataire === 'equipe',
   ).length;
-
-  const [composer, setComposer] = useState<ComposerKind | null>(null);
 
   const actions: ActionDef[] = [
     { kind: 'compte_rendu', label: 'Nouveau compte rendu', icon: <NotebookPen aria-hidden /> },
@@ -69,20 +131,12 @@ export function CompagnonView({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
-        </div>
-        <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} compact />
-      </div>
-
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {actions.map((a) => (
           <button
             key={a.kind}
             type="button"
-            onClick={() => setComposer(a.kind)}
+            onClick={() => onCompose(a.kind)}
             className="group relative flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left shadow-sm transition-colors duration-base ease-out hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <span className="flex size-10 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-5">
@@ -131,7 +185,7 @@ export function CompagnonView({
               title="Le journal est vide"
               description="Votre première saisie ouvrira le journal du chantier."
               action={
-                <Button onClick={() => setComposer('compte_rendu')}>Nouveau compte rendu</Button>
+                <Button onClick={() => onCompose('compte_rendu')}>Nouveau compte rendu</Button>
               }
             />
           ) : (
@@ -171,14 +225,6 @@ export function CompagnonView({
           )}
         </CardContent>
       </Card>
-
-      <Composer
-        kind={composer}
-        project={project}
-        actor={actor}
-        events={events}
-        onClose={() => setComposer(null)}
-      />
     </div>
   );
 }

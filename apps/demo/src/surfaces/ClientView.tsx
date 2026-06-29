@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
-import { MessageCircle, Send, Sparkles } from 'lucide-react';
+import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
+import { MessageCircle, Palette, Send, Sparkles } from 'lucide-react';
 import {
+  SELECTION_STATUS_LABEL,
   clientFeed,
   nextClientAction,
   pendingClientDecisions,
@@ -11,10 +12,11 @@ import {
   type EventActor,
   type Project,
 } from '@phenix360/core';
-import { demo, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
+import { RoadmapProgress } from '../components/RoadmapProgress';
 import { MomentCard } from '../components/MomentCard';
 import { DecisionResponder } from '../components/DecisionResponder';
 
@@ -33,6 +35,7 @@ export function ClientView({
 }): React.JSX.Element {
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
+  const dossier = dossierOf(snap, project.id);
   const feed = clientFeed(events);
   const decisions = pendingClientDecisions(events);
   const action = nextClientAction(project, events);
@@ -52,9 +55,45 @@ export function ClientView({
       <Card>
         <CardContent className="space-y-5 p-6">
           <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} />
-          <StepProgress current={project.currentStep} />
+          {dossier ? (
+            <RoadmapProgress roadmap={dossier.roadmap} />
+          ) : (
+            <StepProgress current={project.currentStep} />
+          )}
         </CardContent>
       </Card>
+
+      {dossier && dossier.selections.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+            <Palette aria-hidden />
+            <h2 className="font-serif text-lg font-semibold tracking-tight">Vos choix</h2>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {dossier.selections.map((s) => (
+              <div
+                key={s.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-gold-700">
+                    {s.categorie}
+                  </p>
+                  <p className="truncate text-sm text-foreground">{s.label}</p>
+                  {s.detail && <p className="truncate text-xs text-muted-foreground">{s.detail}</p>}
+                </div>
+                <Badge
+                  variant={
+                    s.statut === 'valide' ? 'success' : s.statut === 'propose' ? 'info' : 'neutral'
+                  }
+                >
+                  {SELECTION_STATUS_LABEL[s.statut]}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {otherDecisions.length > 0 && (
         <section className="space-y-2">

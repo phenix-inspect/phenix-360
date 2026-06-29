@@ -9,6 +9,7 @@
  */
 import {
   attachmentId,
+  buildPlanning,
   currentStep,
   eventId,
   projectId,
@@ -18,13 +19,16 @@ import {
   type Event,
   type EventActor,
   type Project,
+  type ProjectDossier,
   type ProjectMember,
+  type RoadmapStep,
 } from '@phenix360/core';
 
 export interface DemoSeed {
   state: BackendState;
   people: Record<string, string>;
   activeProjectId: string;
+  dossiers: Record<string, ProjectDossier>;
 }
 
 const uuid = (): string => globalThis.crypto.randomUUID();
@@ -199,9 +203,93 @@ export function buildDemoSeed(): DemoSeed {
     },
   ];
 
+  const roadmap: RoadmapStep[] = [
+    'Dépose',
+    'Gros œuvre',
+    'Plomberie',
+    'Électricité',
+    'Plâtrerie',
+    'Carrelage & faïence',
+    'Peinture',
+    'Sols',
+    'Cuisine',
+    'Réception',
+  ].map((label, i) => ({ id: `step-${i + 1}`, label }));
+
+  const startDate = new Date(Date.now() - 18 * 86_400_000).toISOString().slice(0, 10);
+  const dossier: ProjectDossier = {
+    infos: {
+      clientName: 'Mme Martin',
+      phone: '06 22 14 88 03',
+      email: 'm.martin@email.fr',
+      address: '8 rue Vauban, 69006 Lyon',
+      propertyType: 'Appartement',
+      surface: 78,
+      budget: 64000,
+      duration: '2 mois',
+      startDate,
+    },
+    roadmap,
+    planning: buildPlanning(roadmap, startDate, 60),
+    orders: [
+      {
+        id: 'o1',
+        label: 'Cuisine équipée',
+        fournisseur: 'Mobalpa',
+        montant: 9800,
+        garantie: '5 ans',
+        statut: 'commande',
+      },
+      {
+        id: 'o2',
+        label: 'Carrelage salle de bain',
+        fournisseur: 'Porcelanosa',
+        montant: 2100,
+        statut: 'a_commander',
+      },
+      {
+        id: 'o3',
+        label: 'Robinetterie',
+        fournisseur: 'Grohe',
+        montant: 1250,
+        garantie: '10 ans',
+        statut: 'livre',
+      },
+    ],
+    selections: [
+      {
+        id: 's1',
+        categorie: 'Carrelage',
+        label: 'Salle de bain',
+        statut: 'a_choisir',
+        detail: 'Deux ambiances proposées',
+      },
+      {
+        id: 's2',
+        categorie: 'Peinture',
+        label: 'Séjour & chambres',
+        statut: 'valide',
+        detail: 'Blanc cassé mat',
+      },
+      { id: 's3', categorie: 'Cuisine', label: 'Façades & plan de travail', statut: 'propose' },
+    ],
+    documents: [
+      { id: 'd1', label: 'Devis signé', status: 'fourni', recommande: true },
+      { id: 'd2', label: 'Plans', status: 'fourni' },
+      { id: 'd3', label: 'DPE', status: 'a_fournir', recommande: true },
+      { id: 'd4', label: "Attestation d'assurance", status: 'fourni' },
+    ],
+    questions: [
+      { id: 'q1', question: 'Confirmer la date de réception souhaitée ?', answered: false },
+    ],
+    sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
+    createdAt: new Date().toISOString(),
+  };
+
   return {
     state: { projects: [project], members, events },
     people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin' },
     activeProjectId: pid,
+    dossiers: { [pid]: dossier },
   };
 }
