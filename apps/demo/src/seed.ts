@@ -362,6 +362,146 @@ export function buildDemoSeed(): DemoSeed {
     questions: [
       { id: 'q1', question: 'Confirmer la date de réception souhaitée ?', answered: false },
     ],
+    devis: {
+      reference: 'DEV-2024-0188',
+      date: new Date(Date.now() - 25 * 86_400_000).toISOString().slice(0, 10),
+      lots: [
+        {
+          id: 'lot-go',
+          label: 'Gros œuvre & dépose',
+          stepId: 'step-2',
+          postes: [
+            {
+              id: 'p-go-1',
+              label: 'Démolition & maçonnerie',
+              unite: 'forfait',
+              montantHT: 6500,
+              tva: 10,
+            },
+          ],
+        },
+        {
+          id: 'lot-plomberie',
+          label: 'Plomberie',
+          stepId: 'step-3',
+          orderIds: ['o3'],
+          postes: [
+            {
+              id: 'p-pl-1',
+              label: 'Réseau & évacuations',
+              unite: 'ens.',
+              montantHT: 3800,
+              tva: 10,
+            },
+            {
+              id: 'p-pl-2',
+              label: 'Robinetterie (fourniture & pose)',
+              unite: 'ens.',
+              montantHT: 1250,
+              tva: 10,
+            },
+          ],
+        },
+        {
+          id: 'lot-elec',
+          label: 'Électricité',
+          stepId: 'step-4',
+          postes: [
+            {
+              id: 'p-el-1',
+              label: 'Mise aux normes & points',
+              unite: 'ens.',
+              montantHT: 4200,
+              tva: 10,
+            },
+          ],
+        },
+        {
+          id: 'lot-carrelage',
+          label: 'Carrelage & faïence',
+          stepId: 'step-6',
+          orderIds: ['o2'],
+          selectionIds: ['s1'],
+          postes: [
+            {
+              id: 'p-ca-1',
+              label: 'Carrelage sol salle de bain',
+              quantite: 18,
+              unite: 'm²',
+              prixUnitaireHT: 95,
+              montantHT: 1710,
+              tva: 10,
+              materiau: 'Grès cérame',
+            },
+            { id: 'p-ca-2', label: 'Faïence murale', unite: 'forfait', montantHT: 900, tva: 10 },
+            {
+              id: 'p-ca-3',
+              label: 'Étanchéité sous carrelage',
+              unite: 'forfait',
+              montantHT: 450,
+              tva: 10,
+            },
+          ],
+        },
+        {
+          id: 'lot-peinture',
+          label: 'Peinture',
+          stepId: 'step-7',
+          selectionIds: ['s2'],
+          postes: [
+            {
+              id: 'p-pe-1',
+              label: 'Préparation + 2 couches',
+              quantite: 160,
+              unite: 'm²',
+              prixUnitaireHT: 28,
+              montantHT: 4480,
+              tva: 10,
+            },
+          ],
+        },
+        {
+          id: 'lot-sols',
+          label: 'Revêtements de sol',
+          stepId: 'step-8',
+          postes: [
+            {
+              id: 'p-so-1',
+              label: 'Parquet contrecollé fourniture & pose',
+              quantite: 55,
+              unite: 'm²',
+              prixUnitaireHT: 70,
+              montantHT: 3850,
+              tva: 10,
+              materiau: 'Chêne contrecollé',
+            },
+          ],
+        },
+        {
+          id: 'lot-cuisine',
+          label: 'Cuisine',
+          stepId: 'step-9',
+          orderIds: ['o1'],
+          selectionIds: ['s3'],
+          postes: [
+            {
+              id: 'p-cu-1',
+              label: 'Fourniture cuisine équipée',
+              unite: 'ens.',
+              montantHT: 9800,
+              tva: 20,
+            },
+            {
+              id: 'p-cu-2',
+              label: 'Pose & raccordements',
+              unite: 'forfait',
+              montantHT: 1500,
+              tva: 10,
+            },
+          ],
+        },
+      ],
+    },
     sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
     createdAt: new Date().toISOString(),
   };

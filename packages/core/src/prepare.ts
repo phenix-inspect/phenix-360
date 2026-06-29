@@ -24,6 +24,7 @@ import type {
   EventVisibility,
 } from './event.js';
 import { pendingClientDecisions } from './views.js';
+import { buildDevisSummary, devisVigilances, type Devis } from './devis.js';
 import {
   DEFAULT_CALENDAR,
   addCalendarDays,
@@ -463,6 +464,8 @@ export interface ProjectDossier {
   selections: ClientSelection[];
   documents: ProjectDocument[];
   questions: PreparationQuestion[];
+  /** Lecture structurée du devis signé (lots, postes, montants, TVA). */
+  devis?: Devis;
   /** Noms des fichiers déposés (traçabilité de l'analyse). */
   sources: string[];
   createdAt: IsoDateTime;
@@ -1027,6 +1030,12 @@ const days = (a: number, b: number): number => Math.round((a - b) / DAY_MS);
 /** Date courte en français (« 7 juillet ») pour les messages de briefing. */
 const frShortDate = (iso: string): string =>
   new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+const formatEuro = (n: number): string =>
+  new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(n);
 const weeksOrDays = (d: number): string =>
   d >= 14 && d % 7 === 0
     ? `${d / 7} semaines`
@@ -1189,6 +1198,26 @@ export function studyProject(
     if (a.severity === 'warning')
       attention.push({ id: `o-${a.id}`, kind: 'commande', title: a.message });
     else reassuring.push({ id: `o-${a.id}`, kind: 'commande', title: a.message });
+  }
+
+  // Lecture du devis signé (matière première) : ce que PHÉNIX en a extrait.
+  if (dossier.devis) {
+    const ds = buildDevisSummary(dossier.devis);
+    reassuring.push({
+      id: 'devis-lu',
+      kind: 'devis',
+      title: `J'ai lu le devis : ${ds.lots} lots, ${ds.postes} postes, ${formatEuro(ds.totalHT)} HT (${formatEuro(ds.totalTTC)} TTC).`,
+    });
+    if (ds.orders > 0 || ds.selections > 0) {
+      reassuring.push({
+        id: 'devis-liens',
+        kind: 'devis',
+        title: `J'en ai déduit ${ds.orders} commande(s) et ${ds.selections} choix client à préparer.`,
+      });
+    }
+    for (const v of devisVigilances(dossier.devis).slice(0, 2)) {
+      attention.push({ id: v.id, kind: 'devis', title: v.message });
+    }
   }
 
   // Ce qui rassure (confiance).
@@ -1660,6 +1689,205 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
     // startDate volontairement absent → question posée par l'IA.
   };
 
+  const devis: Devis = {
+    reference: 'DEV-2024-0312',
+    date: iso(new Date(Date.now() - 30 * DAY_MS)),
+    lots: [
+      {
+        id: 'lot-depose',
+        label: 'Dépose & démolition',
+        stepId: 'step-1',
+        documentIds: ['doc-diag'],
+        postes: [
+          {
+            id: 'p-depose-1',
+            label: 'Démolition cloisons existantes',
+            unite: 'forfait',
+            montantHT: 3500,
+            tva: 10,
+          },
+          {
+            id: 'p-depose-2',
+            label: 'Évacuation des gravats (benne)',
+            unite: 'forfait',
+            montantHT: 1200,
+            tva: 10,
+          },
+        ],
+      },
+      {
+        id: 'lot-elec',
+        label: 'Électricité',
+        stepId: 'step-2',
+        orderIds: ['ord-radiateurs'],
+        selectionIds: ['sel-luminaires'],
+        postes: [
+          {
+            id: 'p-elec-1',
+            label: 'Mise aux normes tableau + réseau',
+            unite: 'ens.',
+            montantHT: 6200,
+            tva: 10,
+          },
+          {
+            id: 'p-elec-2',
+            label: 'Points lumineux & prises',
+            quantite: 34,
+            unite: 'u',
+            prixUnitaireHT: 75,
+            montantHT: 2550,
+            tva: 10,
+          },
+        ],
+      },
+      {
+        id: 'lot-plomberie',
+        label: 'Plomberie & sanitaires',
+        stepId: 'step-3',
+        orderIds: ['ord-receveur'],
+        selectionIds: ['sel-sanitaires'],
+        postes: [
+          {
+            id: 'p-plomb-1',
+            label: 'Réseau & évacuations',
+            unite: 'ens.',
+            montantHT: 6400,
+            tva: 10,
+          },
+          {
+            id: 'p-plomb-2',
+            label: 'Fourniture & pose sanitaires',
+            unite: 'ens.',
+            montantHT: 2300,
+            tva: 10,
+            materiau: 'Grès émaillé',
+          },
+        ],
+      },
+      {
+        id: 'lot-platrerie',
+        label: 'Plâtrerie & isolation',
+        stepId: 'step-5',
+        postes: [
+          {
+            id: 'p-platre-1',
+            label: 'Cloisons placo BA13',
+            quantite: 85,
+            unite: 'm²',
+            prixUnitaireHT: 42,
+            montantHT: 3570,
+            tva: 10,
+            materiau: 'Placo BA13',
+          },
+          {
+            id: 'p-platre-2',
+            label: 'Doublage isolant',
+            quantite: 60,
+            unite: 'm²',
+            prixUnitaireHT: 38,
+            montantHT: 2280,
+            tva: 10,
+            materiau: 'Laine de verre',
+          },
+        ],
+      },
+      {
+        id: 'lot-carrelage',
+        label: 'Carrelage & faïence',
+        stepId: 'step-7',
+        orderIds: ['ord-carrelage'],
+        selectionIds: ['sel-carrelage', 'sel-faience'],
+        postes: [
+          {
+            id: 'p-carr-1',
+            label: 'Carrelage sol',
+            quantite: 28,
+            unite: 'm²',
+            prixUnitaireHT: 95,
+            montantHT: 2660,
+            tva: 10,
+            materiau: 'Grès cérame',
+          },
+          {
+            id: 'p-carr-2',
+            label: 'Faïence murale',
+            quantite: 22,
+            unite: 'm²',
+            prixUnitaireHT: 78,
+            montantHT: 1716,
+            tva: 10,
+          },
+          {
+            id: 'p-carr-3',
+            label: 'Étanchéité sous carrelage (SPEC)',
+            unite: 'forfait',
+            montantHT: 650,
+            tva: 10,
+          },
+        ],
+      },
+      {
+        id: 'lot-peinture',
+        label: 'Peinture',
+        stepId: 'step-8',
+        selectionIds: ['sel-peinture'],
+        postes: [
+          {
+            id: 'p-peint-1',
+            label: 'Préparation + 2 couches',
+            quantite: 210,
+            unite: 'm²',
+            prixUnitaireHT: 28,
+            montantHT: 5880,
+            tva: 10,
+          },
+        ],
+      },
+      {
+        id: 'lot-sols',
+        label: 'Revêtements de sol',
+        stepId: 'step-9',
+        orderIds: ['ord-parquet'],
+        selectionIds: ['sel-parquet'],
+        postes: [
+          {
+            id: 'p-sol-1',
+            label: 'Parquet chêne fourniture & pose',
+            quantite: 60,
+            unite: 'm²',
+            prixUnitaireHT: 89,
+            montantHT: 5340,
+            tva: 10,
+            materiau: 'Chêne',
+          },
+        ],
+      },
+      {
+        id: 'lot-cuisine',
+        label: 'Cuisine',
+        stepId: 'step-10',
+        orderIds: ['ord-cuisine'],
+        selectionIds: ['sel-cuisine'],
+        postes: [
+          {
+            id: 'p-cuis-1',
+            label: 'Fourniture cuisine équipée',
+            unite: 'ens.',
+            montantHT: 12500,
+            tva: 20,
+          },
+          {
+            id: 'p-cuis-2',
+            label: 'Pose & raccordements',
+            unite: 'forfait',
+            montantHT: 1800,
+            tva: 10,
+          },
+        ],
+      },
+    ],
+  };
+
   const dossier: ProjectDossier = {
     infos,
     roadmap,
@@ -1668,6 +1896,7 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
     selections,
     documents,
     questions,
+    devis,
     sources: files.map((f) => f.name),
     createdAt: new Date().toISOString(),
   };

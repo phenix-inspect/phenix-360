@@ -36,11 +36,13 @@ import {
   MessageSquareWarning,
   Palette,
   Pencil,
+  Receipt,
   Sparkles,
 } from 'lucide-react';
 import { demo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
+import { DevisBreakdown } from './DevisBreakdown';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
 import { SmartPlanningView } from './SmartPlanningView';
@@ -160,6 +162,12 @@ export function DossierPanel({
       />
 
       <Info dossier={dossier} />
+
+      {dossier.devis && (
+        <Section icon={<Receipt aria-hidden />} title="Le devis" count={dossier.devis.lots.length}>
+          <DevisBreakdown devis={dossier.devis} />
+        </Section>
+      )}
 
       <Section
         icon={<ListChecks aria-hidden />}

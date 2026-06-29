@@ -28,6 +28,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
+import { DevisBreakdown } from '../components/DevisBreakdown';
 import { SmartPlanningView } from '../components/SmartPlanningView';
 
 /* -------------------------------------------------------------------------- *
@@ -336,7 +337,21 @@ function ChapterTravaux({
 
   return (
     <>
+      {dossier.devis && (
+        <Prepared>
+          <p className="text-sm text-muted-foreground">
+            J'ai lu votre devis signé et structuré les travaux par lots (postes, montants, TVA,
+            matériaux).
+          </p>
+          <DevisBreakdown devis={dossier.devis} />
+        </Prepared>
+      )}
+
       <Prepared>
+        <p className="text-sm text-muted-foreground">
+          La feuille de route déroule les étapes du chantier — vous pouvez les réordonner, en
+          renommer, en ajouter ou en retirer.
+        </p>
         <ul className="space-y-2">
           {dossier.roadmap.map((step, idx) => (
             <li key={step.id} className="flex items-center gap-2">
