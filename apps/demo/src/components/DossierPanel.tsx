@@ -17,6 +17,7 @@ import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
   buildProjectMemory,
+  optionRef,
   studyProject,
   type ClientDecisionStatus,
   type Event,
@@ -69,6 +70,35 @@ export function DossierPanel({
   const saveOrder = (updated: Order) => {
     patch({ orders: dossier.orders.map((o) => (o.id === updated.id ? updated : o)) });
     setEditing(null);
+  };
+
+  // Le client a délégué : le conducteur (sur recommandation de PHÉNIX) arbitre.
+  // On enregistre le choix final et on le trace au journal.
+  const confirmDelegation = async (selId: string, optionId: string) => {
+    const sel = dossier.selections.find((s) => s.id === selId);
+    const opt = sel?.options?.find((o) => o.id === optionId);
+    const ref = sel ? optionRef(sel, optionId) : '';
+    patch({
+      selections: dossier.selections.map((s) =>
+        s.id === selId ? { ...s, chosenOptionId: optionId, detail: opt?.title ?? s.detail } : s,
+      ),
+    });
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'demande',
+      visibility: 'client',
+      state: 'close',
+      content: {
+        question: `PHÉNIX a retenu la proposition ${ref} après délégation du client.`,
+        destinataire: 'equipe',
+        resolution: {
+          texte: opt?.title ?? '',
+          resolvedBy: actor.userId,
+          resolvedAt: new Date().toISOString(),
+        },
+      },
+    });
   };
 
   const askDocument = async (docId: string, label: string) => {
@@ -143,6 +173,7 @@ export function DossierPanel({
           <ProposalWorkshop
             selections={dossier.selections}
             onChange={(next) => patch({ selections: next })}
+            onConfirmDelegation={(selId, optionId) => void confirmDelegation(selId, optionId)}
           />
         </Section>
       )}

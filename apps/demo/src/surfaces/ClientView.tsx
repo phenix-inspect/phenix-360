@@ -59,7 +59,13 @@ export function ClientView({
       ...dossier,
       selections: dossier.selections.map((s) =>
         s.id === d.id
-          ? { ...s, statut: 'valide', chosenOptionId: optionId, detail: detail ?? s.detail }
+          ? {
+              ...s,
+              statut: 'valide',
+              chosenOptionId: optionId,
+              detail: detail ?? s.detail,
+              delegatedToPhenix: delegated,
+            }
           : s,
       ),
     });

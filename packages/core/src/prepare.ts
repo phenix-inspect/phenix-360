@@ -167,8 +167,10 @@ export interface ClientSelection {
   detail?: string;
   /** Jusqu'à 5 propositions présentées au client (A–E). */
   options?: SelectionOption[];
-  /** Proposition retenue par le client (id), une fois validée. */
+  /** Proposition retenue (id) — par le client, ou par PHÉNIX après délégation. */
   chosenOptionId?: string;
+  /** Le client a délégué le choix à PHÉNIX (reste vrai même après arbitrage). */
+  delegatedToPhenix?: boolean;
 }
 
 /**
@@ -179,6 +181,45 @@ export interface ClientSelection {
  */
 export const PHENIX_DELEGATE_ID = '__phenix_delegate__';
 export const isPhenixDelegate = (optionId?: string): boolean => optionId === PHENIX_DELEGATE_ID;
+
+/** Repère affiché d'une proposition (A, B, C…) selon sa position. */
+export function optionRef(selection: ClientSelection, optionId: string): string {
+  const opts = selection.options ?? [];
+  const i = opts.findIndex((o) => o.id === optionId);
+  if (i < 0) return '';
+  return opts[i]!.ref ?? String.fromCharCode(65 + i);
+}
+
+/**
+ * Le client a délégué : PHÉNIX recommande au conducteur la proposition la plus
+ * cohérente, à confirmer ou ajuster. Sélecteur PUR (démo : règle déterministe ;
+ * une vraie IA croisera style, budget et harmonie du projet — même sortie).
+ */
+export interface DelegationRecommendation {
+  optionId: string;
+  ref: string;
+  title: string;
+  reasons: string[];
+}
+export function recommendDelegatedOption(
+  selection: ClientSelection,
+): DelegationRecommendation | null {
+  const opts = selection.options ?? [];
+  if (opts.length === 0) return null;
+  const idx = Math.min(1, opts.length - 1); // la proposition la plus équilibrée
+  const opt = opts[idx]!;
+  return {
+    optionId: opt.id,
+    ref: opt.ref ?? String.fromCharCode(65 + idx),
+    title: opt.title,
+    reasons: [
+      'cohérente avec le style général du projet',
+      'bon équilibre entre budget et rendu',
+      'facile à entretenir dans le temps',
+      'compatible avec les autres choix du chantier',
+    ],
+  };
+}
 
 /**
  * Mot adapté au type de choix pour présenter les propositions au client (toujours
