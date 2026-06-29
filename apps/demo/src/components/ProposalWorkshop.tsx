@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Badge, Button, Input, Textarea } from '@phenix360/ui';
-import { Check, Image as ImageIcon, Plus, RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
+import { Check, Image as ImageIcon, Plus, Send, Sparkles, Trash2, Upload } from 'lucide-react';
 import {
   isPhenixDelegate,
   proposalNoun,
@@ -9,6 +9,7 @@ import {
   type SelectionOption,
 } from '@phenix360/core';
 import { warmGradient } from './gradient';
+import { fileToImageUrl } from '../lib/image';
 
 const MAX_OPTIONS = 5;
 
@@ -58,6 +59,11 @@ export function ProposalWorkshop({
     });
 
   const sendToClient = (selId: string) => mutate(selId, (s) => ({ ...s, statut: 'propose' }));
+
+  const pickPhoto = async (selId: string, optId: string, file: File) => {
+    const imageUrl = await fileToImageUrl(file);
+    setOption(selId, optId, { imageUrl });
+  };
 
   return (
     <div className="space-y-5">
@@ -142,17 +148,31 @@ export function ProposalWorkshop({
                               </span>
                             )}
                           </div>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-xs text-muted-foreground [&_svg]:size-3.5"
-                            onClick={() =>
-                              setOption(s.id, o.id, { imageSeed: crypto.randomUUID() })
-                            }
-                          >
-                            <RefreshCw aria-hidden />
-                            Photo
-                          </Button>
+                          <div className="flex flex-col items-center">
+                            <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground [&_svg]:size-3.5">
+                              <Upload aria-hidden />
+                              {o.imageUrl ? 'Remplacer' : 'Photo'}
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  e.target.value = '';
+                                  if (file) void pickPhoto(s.id, o.id, file);
+                                }}
+                              />
+                            </label>
+                            {o.imageUrl && (
+                              <button
+                                type="button"
+                                className="text-xs text-muted-foreground hover:text-destructive"
+                                onClick={() => setOption(s.id, o.id, { imageUrl: undefined })}
+                              >
+                                Retirer
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         <div className="min-w-0 flex-1 space-y-2">
