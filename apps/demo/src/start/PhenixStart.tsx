@@ -322,7 +322,7 @@ function ReadyScreen({
           <SummaryRow
             label="Durée que j'estime réaliste"
             value={fmtDuree(summary.estimatedDays)}
-            warn={summary.durationMismatch}
+            warn={summary.durationRisk}
           />
           <SummaryRow label="Étapes identifiées" value={String(summary.steps)} />
           <SummaryRow label="Commandes critiques" value={String(summary.criticalOrders)} />

@@ -226,7 +226,7 @@ export function buildDemoSeed(): DemoSeed {
       propertyType: 'Appartement',
       surface: 78,
       budget: 64000,
-      duration: '2 mois',
+      duration: '3 mois',
       startDate,
     },
     roadmap,

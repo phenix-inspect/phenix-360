@@ -17,6 +17,7 @@ export * from './decision.js';
 export * from './views.js';
 export * from './next-action.js';
 export * from './assistant.js';
+export * from './calendar.js';
 export * from './prepare.js';
 export * from './moment.js';
 export * from './data/index.js';

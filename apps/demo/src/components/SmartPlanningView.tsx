@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildSmartPlanning, type PlanningPhase, type ProjectDossier } from '@phenix360/core';
-import { CalendarClock, CheckCircle2, Loader2, Sparkles, TriangleAlert } from 'lucide-react';
+import {
+  CalendarClock,
+  CheckCircle2,
+  Loader2,
+  ShieldCheck,
+  Sparkles,
+  TriangleAlert,
+} from 'lucide-react';
 import { fmtDate, fmtDateShort, fmtDuree } from '../lib/format';
 import { PlanningFrieze } from './PlanningFrieze';
 
 /**
  * Le planning, vu comme un conducteur de travaux le présenterait — jamais un
  * formulaire ni un Gantt technique. PHÉNIX présente d'abord son travail, puis
- * pose UNE seule question naturelle : la date de démarrage. Deux durées
- * distinctes : celle ANNONCÉE au client (cadrage, connue dès le devis) et
- * l'estimation HONNÊTE de PHÉNIX — un écart déclenche une vigilance. Quand la
- * date change, PHÉNIX « recale » visiblement le chantier (le moment magique).
- * Dérivé du dossier (vivant).
+ * pose UNE seule question naturelle : la date de démarrage. La durée ANNONCÉE
+ * au client est l'engagement et prime ; PHÉNIX la confronte à son estimation
+ * réaliste de façon ASYMÉTRIQUE — vigilance seulement si l'engagement paraît
+ * ambitieux, sinon il signale la marge de sécurité. Quand la date change,
+ * PHÉNIX « recale » visiblement le chantier (le moment magique). Dérivé du
+ * dossier (vivant).
  */
 export function SmartPlanningView({
   dossier,
@@ -56,14 +64,28 @@ export function SmartPlanningView({
         />
       )}
 
-      {/* Vigilance : la durée annoncée et mon estimation diffèrent nettement. */}
-      {planning.durationMismatch && planning.announcedLabel && (
-        <p className="flex items-start gap-2 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-gold-900 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-700">
+      {/* Vigilance ASYMÉTRIQUE : la durée annoncée est l'engagement, elle prime.
+          On n'alerte que si elle paraît ambitieuse ; sinon on signale la marge. */}
+      {planning.durationRisk && planning.announcedLabel && (
+        <div className="flex items-start gap-2 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-gold-900 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-700">
           <TriangleAlert aria-hidden />
+          <div>
+            <p className="font-medium">La durée annoncée au client me paraît ambitieuse.</p>
+            <p>
+              Vous avez annoncé {planning.announcedLabel} au client. D'après mon analyse, ce
+              chantier nécessite plutôt {fmtDuree(planning.estimatedDays)}. Je vous conseille de
+              revoir votre planning avant de le valider.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {planning.comfortable && planning.announcedLabel && (
+        <p className="flex items-start gap-2 rounded-xl border border-border bg-paper-50 px-4 py-3 text-sm text-muted-foreground [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+          <ShieldCheck aria-hidden />
           <span>
-            Vous avez annoncé {planning.announcedLabel} au client. D'après mon analyse, ce chantier
-            nécessite plutôt {fmtDuree(planning.estimatedDays)}. Je vous conseille de vérifier le
-            planning avant de le valider.
+            La durée annoncée ({planning.announcedLabel}) vous laisse une marge de sécurité
+            confortable ({fmtDuree(planning.marginDays)}) — de quoi absorber sereinement un imprévu.
           </span>
         </p>
       )}
@@ -243,7 +265,8 @@ function PhaseCard({
         <div className="min-w-0 flex-1">
           <h4 className="font-medium text-foreground">{phase.label}</h4>
           <p className="text-xs text-muted-foreground">
-            Durée estimée : {phase.durationDays} jour{phase.durationDays > 1 ? 's' : ''}
+            Durée estimée : {phase.durationDays} jour{phase.durationDays > 1 ? 's' : ''} ouvré
+            {phase.durationDays > 1 ? 's' : ''}
             {dated && phase.start && phase.end && (
               <>
                 {' '}

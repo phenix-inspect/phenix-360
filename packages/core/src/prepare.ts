@@ -18,6 +18,15 @@
 import type { IsoDateTime } from './ids.js';
 import type { Event } from './event.js';
 import { pendingClientDecisions } from './views.js';
+import {
+  DEFAULT_CALENDAR,
+  addCalendarDays,
+  businessToCalendarDays,
+  nextWorkingDay,
+  nthWorkingDay,
+  previousWorkingDay,
+  type BusinessCalendar,
+} from './calendar.js';
 
 /* -------------------------------------------------------------------------- *
  * Feuille de route (étapes propres au projet)
@@ -382,12 +391,16 @@ export function phaseDurations(dossier: ProjectDossier): PhaseDuration[] {
 }
 
 /**
- * Estimation HONNÊTE de PHÉNIX : durées métier brutes + séchages, SANS mise à
- * l'échelle sur la durée annoncée. C'est le calcul propre de PHÉNIX, confronté
- * ensuite à ce qui a été annoncé au client (deux informations distinctes).
+ * Estimation HONNÊTE de PHÉNIX, en jours CALENDAIRES (comparable à la durée
+ * annoncée). Les durées métier sont en jours ouvrés → converties en calendaire
+ * (week-ends inclus) ; les séchages sont déjà calendaires (incompressibles).
+ * SANS aucune mise à l'échelle sur la durée annoncée : c'est le calcul propre
+ * de PHÉNIX, confronté ensuite à l'engagement pris auprès du client.
  */
 export function estimateRawDays(dossier: ProjectDossier): number {
-  return dossier.roadmap.reduce((a, s) => a + stepDuration(s.label) + stepDrying(s.label), 0);
+  const work = dossier.roadmap.reduce((a, s) => a + stepDuration(s.label), 0);
+  const drying = dossier.roadmap.reduce((a, s) => a + stepDrying(s.label), 0);
+  return businessToCalendarDays(work) + drying;
 }
 
 /** Phrase courte pour une durée (« 9 semaines », « 2 mois », « 10 jours »). */
@@ -399,26 +412,36 @@ export function describeDuration(days: number): string {
 }
 
 /**
- * Confronte la durée ANNONCÉE au client (cadrage, connue dès le devis) et
- * l'estimation HONNÊTE de PHÉNIX. Signale un écart significatif (> 15 %) — la
- * même règle alimente le planning ET la note de lancement (pas de divergence).
+ * Confronte la durée ANNONCÉE au client (notre engagement, connu dès le devis)
+ * et l'estimation réaliste de PHÉNIX. Le raisonnement est ASYMÉTRIQUE : la
+ * durée annoncée prime. PHÉNIX ne cherche pas à finir au plus vite, mais à
+ * tenir l'engagement tout en réalisant un chantier de qualité.
+ *   • estimation ≤ durée annoncée → aucune alerte. L'écart est une MARGE de
+ *     sécurité confortable (imprévus, retards fournisseurs, levée de réserves).
+ *   • estimation > durée annoncée → VIGILANCE : l'engagement paraît ambitieux.
+ * Même règle pour le planning ET la note de lancement (pas de divergence).
  */
-const DURATION_MISMATCH_RATIO = 0.15;
+const DURATION_RISK_RATIO = 0.1; // tolérance avant de juger l'engagement « ambitieux »
+const MARGIN_RATIO = 0.1; // marge à partir de laquelle on la signale comme confortable
 export function durationCheck(dossier: ProjectDossier): {
   announcedLabel: string | null;
   announcedDays: number | null;
   estimatedDays: number;
-  mismatch: boolean;
+  /** L'estimation dépasse nettement la durée annoncée → engagement à risque. */
+  risk: boolean;
+  /** Jours de marge disponibles (durée annoncée − estimation), ≥ 0. */
+  marginDays: number;
+  /** Une marge de sécurité confortable existe (sans aucun risque). */
+  comfortable: boolean;
 } {
   const announcedLabel = dossier.infos.duration ?? null;
   const announcedDays = announcedLabel ? parseDurationDays(announcedLabel) : null;
   const estimatedDays = estimateRawDays(dossier);
-  const mismatch =
-    announcedDays != null && estimatedDays > 0
-      ? Math.abs(estimatedDays - announcedDays) / Math.max(estimatedDays, announcedDays) >
-        DURATION_MISMATCH_RATIO
-      : false;
-  return { announcedLabel, announcedDays, estimatedDays, mismatch };
+  const hasBoth = announcedDays != null && estimatedDays > 0;
+  const risk = hasBoth ? estimatedDays > announcedDays * (1 + DURATION_RISK_RATIO) : false;
+  const marginDays = hasBoth && announcedDays > estimatedDays ? announcedDays - estimatedDays : 0;
+  const comfortable = hasBoth && !risk && marginDays > announcedDays * MARGIN_RATIO;
+  return { announcedLabel, announcedDays, estimatedDays, risk, marginDays, comfortable };
 }
 
 /**
@@ -430,10 +453,12 @@ export function durationCheck(dossier: ProjectDossier): {
 export interface DossierSummary {
   /** Durée annoncée au client (libellé saisi), si connue. */
   announcedLabel: string | null;
-  /** Durée réaliste estimée par PHÉNIX (jours). */
+  /** Durée réaliste estimée par PHÉNIX (jours calendaires). */
   estimatedDays: number;
-  /** L'estimation s'écarte nettement de la durée annoncée. */
-  durationMismatch: boolean;
+  /** L'engagement client paraît ambitieux (estimation > durée annoncée). */
+  durationRisk: boolean;
+  /** Marge de sécurité disponible (jours), si la durée annoncée est confortable. */
+  marginDays: number;
   steps: number;
   /** Commandes à passer dont le délai fournisseur est long (≥ 21 j). */
   criticalOrders: number;
@@ -445,7 +470,7 @@ export interface DossierSummary {
 
 const CRITICAL_DELAY_DAYS = 21;
 export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = []): DossierSummary {
-  const { announcedLabel, estimatedDays, mismatch } = durationCheck(dossier);
+  const { announcedLabel, estimatedDays, risk, marginDays } = durationCheck(dossier);
   const critical = dossier.orders.filter(
     (o) => o.statut === 'a_commander' && (o.delaiJours ?? 0) >= CRITICAL_DELAY_DAYS,
   );
@@ -457,7 +482,8 @@ export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = [
   return {
     announcedLabel,
     estimatedDays,
-    durationMismatch: mismatch,
+    durationRisk: risk,
+    marginDays,
     steps: dossier.roadmap.length,
     criticalOrders: critical.length,
     clientDecisions: aChoisir + pendingClientDecisions(events).length,
@@ -466,24 +492,31 @@ export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = [
 }
 
 /**
- * Dates par étape (« planning daté ») : enchaînement séquentiel à partir de la
- * date de démarrage. [] tant que la date n'est pas fixée. Source commune au
- * planning ET aux alertes/vigilances (pas de dates divergentes).
+ * Dates par étape (« planning daté ») sur le CALENDRIER MÉTIER : les durées
+ * métier s'écoulent en jours ouvrés (week-ends, fériés, ponts sautés), tandis
+ * que les temps de séchage s'écoulent en jours calendaires (incompressibles,
+ * y compris le week-end). [] tant que la date n'est pas fixée. Source commune
+ * au planning ET aux alertes/vigilances (pas de dates divergentes).
  */
-export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
+export function computePhaseDates(
+  dossier: ProjectDossier,
+  cal: BusinessCalendar = DEFAULT_CALENDAR,
+): BasePhase[] {
   const start = dossier.infos.startDate;
   if (!start) return [];
-  let cursor = new Date(`${start}T00:00:00`).getTime();
+  let cursor = nextWorkingDay(start, cal);
   return phaseDurations(dossier).map((d) => {
     const dry = d.drying ?? 0;
     const s = cursor;
-    const e = s + (d.durationDays - 1) * DAY_MS;
-    cursor = e + DAY_MS + dry * DAY_MS;
+    const e = nthWorkingDay(s, d.durationDays, cal); // durée métier en jours ouvrés
+    // Séchage : jours calendaires après la fin des travaux ; on reprend ensuite
+    // au premier jour ouvré disponible.
+    cursor = nextWorkingDay(addCalendarDays(e, dry + 1), cal);
     return {
       stepId: d.stepId,
       label: d.label,
-      start: iso(new Date(s)),
-      end: iso(new Date(e)),
+      start: s,
+      end: e,
       durationDays: d.durationDays,
       drying: d.drying,
     };
@@ -526,10 +559,14 @@ export interface SmartPlanning {
   announcedDays: number | null;
   /** Libellé saisi de la durée annoncée (« 2 mois », « 45 jours ouvrés »). */
   announcedLabel: string | null;
-  /** Estimation HONNÊTE de PHÉNIX (jours), durées métier brutes — pas une saisie. */
+  /** Estimation réaliste de PHÉNIX (jours calendaires) — pas une saisie. */
   estimatedDays: number;
-  /** Vrai si l'estimation de PHÉNIX s'écarte nettement de la durée annoncée. */
-  durationMismatch: boolean;
+  /** Vrai si l'engagement client paraît ambitieux (estimation > durée annoncée). */
+  durationRisk: boolean;
+  /** Marge de sécurité disponible (jours) si la durée annoncée est confortable. */
+  marginDays: number;
+  /** Une marge de sécurité confortable existe (sans risque). */
+  comfortable: boolean;
 }
 
 /**
@@ -544,7 +581,8 @@ export function buildSmartPlanning(
   nowMs: number = Date.now(),
 ): SmartPlanning {
   const durations = phaseDurations(dossier);
-  const { announcedLabel, announcedDays, estimatedDays, mismatch } = durationCheck(dossier);
+  const { announcedLabel, announcedDays, estimatedDays, risk, marginDays, comfortable } =
+    durationCheck(dossier);
   if (durations.length === 0) {
     return {
       dated: false,
@@ -554,7 +592,9 @@ export function buildSmartPlanning(
       announcedDays,
       announcedLabel,
       estimatedDays,
-      durationMismatch: mismatch,
+      durationRisk: risk,
+      marginDays,
+      comfortable,
     };
   }
   const dated = Boolean(dossier.infos.startDate);
@@ -573,9 +613,11 @@ export function buildSmartPlanning(
     const ph = byId.get(sid)!;
     const marker: PlanningOrderMarker = { orderId: o.id, label: o.label, delaiJours: o.delaiJours };
     if (ph.start) {
-      const limit = new Date(`${ph.start}T00:00:00`).getTime() - (o.delaiJours ?? 7) * DAY_MS;
-      marker.commanderAvant = iso(new Date(limit));
-      marker.risk = !ORDER_PLACED.has(o.statut) && limit <= nowMs;
+      // Le délai fournisseur court en jours calendaires ; on cale la date
+      // limite sur un jour ouvré (on ne « commande » pas un dimanche).
+      const limit = previousWorkingDay(addCalendarDays(ph.start, -(o.delaiJours ?? 7)));
+      marker.commanderAvant = limit;
+      marker.risk = !ORDER_PLACED.has(o.statut) && new Date(`${limit}T00:00:00`).getTime() <= nowMs;
     }
     ph.orders.push(marker);
   }
@@ -592,9 +634,7 @@ export function buildSmartPlanning(
       pending: s.statut === 'a_choisir',
     };
     if (ph.start) {
-      marker.figerAvant = iso(
-        new Date(new Date(`${ph.start}T00:00:00`).getTime() - FIGER_BUFFER * DAY_MS),
-      );
+      marker.figerAvant = previousWorkingDay(addCalendarDays(ph.start, -FIGER_BUFFER));
     }
     ph.choices.push(marker);
   }
@@ -607,7 +647,9 @@ export function buildSmartPlanning(
     announcedDays,
     announcedLabel,
     estimatedDays,
-    durationMismatch: mismatch,
+    durationRisk: risk,
+    marginDays,
+    comfortable,
   };
 }
 
@@ -938,25 +980,34 @@ export function studyProject(
     });
   }
 
-  // Cohérence durée annoncée au client ⇆ estimation de PHÉNIX.
+  // Engagement client (durée annoncée) ⇆ estimation de PHÉNIX — asymétrique :
+  // la durée annoncée prime ; on n'alerte que si elle paraît ambitieuse.
   const dur = durationCheck(dossier);
-  if (dur.mismatch && dur.announcedLabel) {
-    attention.push({
-      id: 'duree-incoherente',
-      kind: 'planning',
-      title: `Vous avez annoncé ${dur.announcedLabel} au client ; d'après mon analyse, ce chantier nécessite plutôt ${describeDuration(dur.estimatedDays)}.`,
-    });
-    advice.push({
-      id: 'duree-a',
-      kind: 'planning',
-      title: 'Vérifier le planning avant de le valider : la durée annoncée semble serrée.',
-    });
-  } else if (dur.announcedLabel) {
-    reassuring.push({
-      id: 'duree-ok',
-      kind: 'planning',
-      title: `Mon estimation est cohérente avec la durée annoncée (${dur.announcedLabel}).`,
-    });
+  if (dur.announcedLabel) {
+    if (dur.risk) {
+      attention.push({
+        id: 'duree-ambitieuse',
+        kind: 'planning',
+        title: `Vous avez annoncé ${dur.announcedLabel} au client ; d'après mon analyse, ce chantier nécessite plutôt ${describeDuration(dur.estimatedDays)}.`,
+      });
+      advice.push({
+        id: 'duree-a',
+        kind: 'planning',
+        title: 'Revoir le planning avant de le valider : la durée annoncée paraît ambitieuse.',
+      });
+    } else if (dur.comfortable) {
+      reassuring.push({
+        id: 'duree-marge',
+        kind: 'planning',
+        title: `La durée annoncée (${dur.announcedLabel}) laisse une marge de sécurité confortable (${describeDuration(dur.marginDays)}).`,
+      });
+    } else {
+      reassuring.push({
+        id: 'duree-ok',
+        kind: 'planning',
+        title: `Mon estimation tient dans la durée annoncée au client (${dur.announcedLabel}).`,
+      });
+    }
   }
 
   return {

@@ -36,6 +36,8 @@ export function ClientView({
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
   const dossier = dossierOf(snap, project.id);
+  // Le client ne voit le planning qu'une fois la date de démarrage validée.
+  const dossierDated = Boolean(dossier?.infos.startDate);
   const feed = clientFeed(events);
   const decisions = pendingClientDecisions(events);
   const action = nextClientAction(project, events);
@@ -59,7 +61,7 @@ export function ClientView({
         </CardContent>
       </Card>
 
-      {dossier && (
+      {dossier && dossierDated && (
         <section className="space-y-3">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <CalendarRange aria-hidden />
