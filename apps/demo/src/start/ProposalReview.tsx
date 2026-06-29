@@ -633,41 +633,13 @@ function ChapterPlanning({
   dossier: ProjectDossier;
   patch: PatchFn;
 }): React.JSX.Element {
-  const setStart = (value: string | undefined) =>
-    patch({ infos: { ...dossier.infos, startDate: value } });
-
   return (
-    <>
-      <Prepared>
-        <p className="text-sm text-muted-foreground">
-          J'ai calé un planning à partir de vos {dossier.roadmap.length} étapes (durées par métier,
-          séchages, délais de commande). Donnez-moi la date de début et tout s'ajuste.
-        </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <Field label="Date de début">
-            <Input
-              type="date"
-              value={dossier.infos.startDate ?? ''}
-              onChange={(e) => setStart(e.target.value || undefined)}
-            />
-          </Field>
-          <Field label="Durée annoncée">
-            <Input
-              value={dossier.infos.duration ?? ''}
-              onChange={(e) => patch({ infos: { ...dossier.infos, duration: e.target.value } })}
-            />
-          </Field>
-        </div>
-
-        <SmartPlanningView dossier={dossier} />
-      </Prepared>
-
-      {!dossier.infos.startDate && (
-        <ToVerify>
-          <Reco text="Je n'ai pas encore la date de début souhaitée — précisez-la et je cale tout le planning." />
-        </ToVerify>
-      )}
-    </>
+    <SmartPlanningView
+      dossier={dossier}
+      onSetStartDate={(date) =>
+        patch({ infos: { ...dossier.infos, startDate: date ?? undefined } })
+      }
+    />
   );
 }
 

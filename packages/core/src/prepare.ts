@@ -440,6 +440,8 @@ export interface SmartPlanning {
   startDate: string | null;
   phases: PlanningPhase[];
   endDate: string | null;
+  /** Durée totale estimée (jours), séchages inclus — une estimation, pas une saisie. */
+  estimatedDays: number;
 }
 
 /**
@@ -454,8 +456,9 @@ export function buildSmartPlanning(
   nowMs: number = Date.now(),
 ): SmartPlanning {
   const durations = phaseDurations(dossier);
+  const estimatedDays = durations.reduce((a, d) => a + d.durationDays + (d.drying ?? 0), 0);
   if (durations.length === 0) {
-    return { dated: false, startDate: null, phases: [], endDate: null };
+    return { dated: false, startDate: null, phases: [], endDate: null, estimatedDays: 0 };
   }
   const dated = Boolean(dossier.infos.startDate);
   const datedById = new Map(computePhaseDates(dossier).map((p) => [p.stepId, p]));
@@ -504,6 +507,7 @@ export function buildSmartPlanning(
     startDate: dossier.infos.startDate ?? null,
     phases,
     endDate: dated ? (phases[phases.length - 1]!.end ?? null) : null,
+    estimatedDays,
   };
 }
 
