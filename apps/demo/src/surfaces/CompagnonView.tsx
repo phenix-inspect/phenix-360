@@ -38,6 +38,7 @@ import { PhotoTile } from '../components/PhotoTile';
 import { RoadmapProgress } from '../components/RoadmapProgress';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
+import { HistoriqueView } from '../components/HistoriqueView';
 import { Composer, type ComposerKind } from '../components/Composer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -63,7 +64,7 @@ export function CompagnonView({
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
   const [composer, setComposer] = useState<ComposerKind | null>(null);
-  const [tab, setTab] = useState<'suivi' | 'preparation'>('suivi');
+  const [tab, setTab] = useState<'suivi' | 'preparation' | 'historique'>('suivi');
 
   const attention = buildChantierAttention(dossier, events);
 
@@ -111,20 +112,22 @@ export function CompagnonView({
         onOpenPreparation={() => setTab('preparation')}
       />
 
-      {dossier ? (
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'suivi' | 'preparation')}>
-          <TabsList>
-            <TabsTrigger value="suivi">Suivi</TabsTrigger>
-            <TabsTrigger value="preparation">Préparation</TabsTrigger>
-          </TabsList>
-          <TabsContent value="suivi">{suivi}</TabsContent>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'historique')}>
+        <TabsList>
+          <TabsTrigger value="suivi">Suivi</TabsTrigger>
+          {dossier && <TabsTrigger value="preparation">Préparation</TabsTrigger>}
+          <TabsTrigger value="historique">Historique</TabsTrigger>
+        </TabsList>
+        <TabsContent value="suivi">{suivi}</TabsContent>
+        {dossier && (
           <TabsContent value="preparation">
             <DossierPanel project={project} dossier={dossier} actor={actor} />
           </TabsContent>
-        </Tabs>
-      ) : (
-        suivi
-      )}
+        )}
+        <TabsContent value="historique">
+          <HistoriqueView snap={snap} project={project} />
+        </TabsContent>
+      </Tabs>
 
       <Composer
         kind={composer}

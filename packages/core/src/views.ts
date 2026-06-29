@@ -68,6 +68,27 @@ export function clientFeed(events: Event[]): Event[] {
   return sortByDate(forClient(events), 'desc');
 }
 
+/**
+ * Un événement est un JALON de l'historique (moment majeur de la vie du
+ * chantier) : compte rendu publié, document publié (devis, avenant, contractuel),
+ * ou demande/décision. Les photos n'entrent dans l'historique que si elles sont
+ * épinglées (annotation, hors journal). Vue dérivée — aucune duplication.
+ */
+export function isMilestone(e: Event): boolean {
+  if (isCompteRendu(e)) return isPublished(e);
+  if (isDocument(e)) return isPublished(e);
+  if (isDemande(e)) return true;
+  return false;
+}
+
+/**
+ * Historique du projet : les jalons du journal en ordre chronologique
+ * (du devis signé jusqu'à aujourd'hui). Lecture filtrée du journal.
+ */
+export function projectHistory(events: Event[]): Event[] {
+  return sortByDate(events.filter(isMilestone), 'asc');
+}
+
 /** Décisions en attente du client (anciennes d'abord : on traite la plus vieille). */
 export function pendingClientDecisions(events: Event[]): Decision[] {
   return sortByDate(events.filter(isAwaitingClientDecision), 'asc').map(toDecision);

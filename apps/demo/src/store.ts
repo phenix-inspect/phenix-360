@@ -13,6 +13,7 @@
 import { useSyncExternalStore } from 'react';
 import {
   InMemoryBackend,
+  attachmentId as toAttachmentId,
   userId as toUserId,
   type BackendState,
   type DemandeResolution,
@@ -34,6 +35,7 @@ const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
 const ACTIVE_KEY = 'phenix-demo:active:v1';
 const DOSSIERS_KEY = 'phenix-demo:dossiers:v1';
+const PINS_KEY = 'phenix-demo:pins:v1';
 const SEEDED_KEY = 'phenix-demo:seeded:v1';
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
@@ -60,6 +62,8 @@ export interface DemoSnapshot extends BackendState {
   activeProjectId: ProjectId | null;
   /** projectId → dossier préparé par PHÉNIX Start (hors colonne vertébrale). */
   dossiers: Record<string, ProjectDossier>;
+  /** projectId → eventIds épinglés à l'historique (annotation, hors journal). */
+  pins: Record<string, string[]>;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -75,6 +79,7 @@ function build(): DemoSnapshot {
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
+    pins: readJson<Record<string, string[]>>(PINS_KEY, {}),
   };
 }
 
@@ -151,6 +156,28 @@ export const demo = {
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
 
     const compaActor: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
+
+    // Le devis signé est la pièce fondatrice : il ouvre le journal du chantier.
+    await backend.appendEvent({
+      projectId: project.id,
+      actor: compaActor,
+      type: 'document',
+      visibility: 'client',
+      state: 'publie',
+      content: {
+        attachment: {
+          id: toAttachmentId(crypto.randomUUID()),
+          kind: 'document',
+          bucket: 'demo',
+          storagePath: `${project.id}/devis-signe.pdf`,
+          mimeType: 'application/pdf',
+          fileName: 'Devis-signé.pdf',
+          createdAt: new Date().toISOString(),
+        },
+        libelle: 'Devis signé',
+      },
+    });
+
     await backend.appendEvent({
       projectId: project.id,
       actor: compaActor,
@@ -197,6 +224,22 @@ export const demo = {
     broadcast();
   },
 
+  /**
+   * Épingle / retire un événement de l'historique. C'est une ANNOTATION (on
+   * référence l'événement du journal), jamais une copie — le journal reste la
+   * source unique.
+   */
+  togglePin(projectId: ProjectId, eventId: string): void {
+    const pins = readJson<Record<string, string[]>>(PINS_KEY, {});
+    const current = pins[projectId] ?? [];
+    pins[projectId] = current.includes(eventId)
+      ? current.filter((id) => id !== eventId)
+      : [...current, eventId];
+    localStorage.setItem(PINS_KEY, JSON.stringify(pins));
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
     const { state, people, activeProjectId, dossiers } = buildDemoSeed();
@@ -204,6 +247,7 @@ export const demo = {
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    localStorage.removeItem(PINS_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -215,6 +259,7 @@ export const demo = {
     localStorage.removeItem(PEOPLE_KEY);
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(DOSSIERS_KEY);
+    localStorage.removeItem(PINS_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -243,4 +288,10 @@ export function dossierOf(
 ): ProjectDossier | null {
   if (!projectId) return null;
   return snap.dossiers[projectId] ?? null;
+}
+
+/** Identifiants d'événements épinglés à l'historique d'un projet. */
+export function pinnedOf(snap: DemoSnapshot, projectId: string | null | undefined): Set<string> {
+  if (!projectId) return new Set();
+  return new Set(snap.pins[projectId] ?? []);
 }
