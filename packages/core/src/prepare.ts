@@ -24,7 +24,7 @@ import type {
   EventVisibility,
 } from './event.js';
 import { pendingClientDecisions } from './views.js';
-import { buildDevisSummary, devisVigilances, type Devis } from './devis.js';
+import { buildDevisSummary, devisVigilances, type Avenant, type Devis } from './devis.js';
 import {
   DEFAULT_CALENDAR,
   addCalendarDays,
@@ -466,6 +466,12 @@ export interface ProjectDossier {
   questions: PreparationQuestion[];
   /** Lecture structurée du devis signé (lots, postes, montants, TVA). */
   devis?: Devis;
+  /**
+   * Avenants signés (append-only). Chacun est un nouveau devis lié à l'initial :
+   * il ajoute des postes, peut en remplacer (le poste d'origine reste visible).
+   * On ne modifie JAMAIS le devis initial.
+   */
+  avenants?: Avenant[];
   /** Noms des fichiers déposés (traçabilité de l'analyse). */
   sources: string[];
   createdAt: IsoDateTime;
@@ -1202,12 +1208,19 @@ export function studyProject(
 
   // Lecture du devis signé (matière première) : ce que PHÉNIX en a extrait.
   if (dossier.devis) {
-    const ds = buildDevisSummary(dossier.devis);
+    const ds = buildDevisSummary(dossier.devis, dossier.avenants);
     reassuring.push({
       id: 'devis-lu',
       kind: 'devis',
       title: `J'ai lu le devis : ${ds.lots} lots, ${ds.postes} postes, ${formatEuro(ds.totalHT)} HT (${formatEuro(ds.totalTTC)} TTC).`,
     });
+    if (ds.avenants > 0) {
+      reassuring.push({
+        id: 'devis-avenants',
+        kind: 'devis',
+        title: `${ds.avenants} avenant${ds.avenants > 1 ? 's' : ''} intégré${ds.avenants > 1 ? 's' : ''} au devis : le devis initial reste intact, les montants ci-dessus sont à jour.`,
+      });
+    }
     if (ds.orders > 0 || ds.selections > 0) {
       reassuring.push({
         id: 'devis-liens',

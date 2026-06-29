@@ -18,9 +18,12 @@ import {
   buildClientDecisions,
   buildDecisionContent,
   buildProjectMemory,
+  consolidateDevis,
   decisionVisibility,
   studyProject,
+  type Avenant,
   type ClientDecisionStatus,
+  type DevisPoste,
   type Event,
   type EventActor,
   type Order,
@@ -36,6 +39,7 @@ import {
   MessageSquareWarning,
   Palette,
   Pencil,
+  Plus,
   Receipt,
   Sparkles,
 } from 'lucide-react';
@@ -129,6 +133,75 @@ export function DossierPanel({
     });
   };
 
+  // Matérialiser un avenant : un NOUVEAU devis signé, AJOUTÉ au projet (jamais
+  // une modification du devis initial). On fait évoluer le poste le plus
+  // structurant (version supérieure), on ajoute des travaux supplémentaires, et
+  // on trace tout au journal. Append-only : on ajoute, on ne réécrit jamais.
+  const addAvenant = async () => {
+    if (!dossier.devis) return;
+    const existing = dossier.avenants ?? [];
+    const numero = existing.length + 1;
+
+    // Poste actif le plus cher → candidat à une montée en gamme (remplacement).
+    const consolidated = consolidateDevis(dossier.devis, existing);
+    let target: { lotLabel: string; poste: DevisPoste } | null = null;
+    for (const lot of consolidated.lots) {
+      for (const cp of lot.postes) {
+        if (cp.replacedByNumero != null) continue;
+        if (!target || cp.poste.montantHT > target.poste.montantHT) {
+          target = { lotLabel: lot.label, poste: cp.poste };
+        }
+      }
+    }
+    if (!target) return;
+
+    const upgraded: DevisPoste = {
+      id: `p-av${numero}-up`,
+      label: `${target.poste.label} — montée en gamme`,
+      ...(target.poste.unite ? { unite: target.poste.unite } : {}),
+      ...(target.poste.quantite != null ? { quantite: target.poste.quantite } : {}),
+      ...(target.poste.materiau ? { materiau: target.poste.materiau } : {}),
+      montantHT: Math.round(target.poste.montantHT * 1.15),
+      tva: target.poste.tva,
+      remplacePosteId: target.poste.id,
+    };
+    const added: DevisPoste = {
+      id: `p-av${numero}-add`,
+      label: 'Travaux supplémentaires demandés par le client',
+      unite: 'forfait',
+      montantHT: 1500,
+      tva: 10,
+    };
+    const avenant: Avenant = {
+      id: `av-${numero}`,
+      numero,
+      reference: `AV-${new Date().getFullYear()}-${String(numero).padStart(2, '0')}`,
+      date: new Date().toISOString().slice(0, 10),
+      label: `Montée en gamme « ${target.lotLabel} » + travaux supplémentaires`,
+      lots: [
+        { id: `lot-av${numero}-a`, label: target.lotLabel, postes: [upgraded] },
+        { id: `lot-av${numero}-b`, label: 'Travaux supplémentaires', postes: [added] },
+      ],
+    };
+
+    patch({ avenants: [...existing, avenant] });
+
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'compte_rendu',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        texte:
+          `Avenant n°${numero} signé et intégré (le devis initial reste intact).\n` +
+          `• Poste remplacé : « ${target.poste.label} » (lot ${target.lotLabel}) → reste visible, marqué « remplacé par avenant n°${numero} ».\n` +
+          `• Poste ajouté : « ${added.label} » (${fmtMoney(added.montantHT)} HT).\n` +
+          `• Impact à vérifier : commandes, choix client et planning du lot « ${target.lotLabel} ».`,
+      },
+    });
+  };
+
   const askDocument = async (docId: string, label: string) => {
     patch({
       documents: dossier.documents.map((d) =>
@@ -176,8 +249,22 @@ export function DossierPanel({
       <Info dossier={dossier} />
 
       {dossier.devis && (
-        <Section icon={<Receipt aria-hidden />} title="Le devis" count={dossier.devis.lots.length}>
-          <DevisBreakdown devis={dossier.devis} dossier={dossier} onOpen={openAnchor} />
+        <Section
+          icon={<Receipt aria-hidden />}
+          title="Le devis"
+          count={consolidateDevis(dossier.devis, dossier.avenants).lots.length}
+          action={
+            <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
+              <Plus aria-hidden /> Ajouter un avenant
+            </Button>
+          }
+        >
+          <DevisBreakdown
+            devis={dossier.devis}
+            avenants={dossier.avenants}
+            dossier={dossier}
+            onOpen={openAnchor}
+          />
         </Section>
       )}
 
@@ -692,11 +779,13 @@ function Section({
   icon,
   title,
   count,
+  action,
   children,
 }: {
   icon: React.ReactNode;
   title: string;
   count?: number;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
@@ -705,6 +794,7 @@ function Section({
         {icon}
         <h3 className="text-sm font-medium">{title}</h3>
         {count != null && <span className="text-sm text-muted-foreground">({count})</span>}
+        {action && <div className="ml-auto [&_svg]:size-4 [&_svg]:text-current">{action}</div>}
       </div>
       {children}
     </section>

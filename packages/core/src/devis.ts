@@ -23,6 +23,8 @@ export interface DevisPoste {
   tva: number;
   /** Matériau principal identifié, le cas échéant. */
   materiau?: string;
+  /** Poste (du devis initial ou d'un avenant précédent) que ce poste remplace. */
+  remplacePosteId?: string;
 }
 
 /** Un LOT du devis : un corps d'état regroupant des postes. */
@@ -45,6 +47,125 @@ export interface Devis {
   reference?: string;
   date?: string;
   lots: DevisLot[];
+}
+
+/**
+ * Un AVENANT = un nouveau devis signé, AJOUTÉ au projet (append-only). Il ne
+ * modifie jamais le devis initial : il ajoute des postes, et peut en remplacer
+ * (le poste d'origine reste visible, marqué « remplacé par avenant n°X »).
+ */
+export interface Avenant {
+  id: string;
+  numero: number;
+  reference?: string;
+  date?: string;
+  label?: string;
+  lots: DevisLot[];
+}
+
+/* --------------------- consolidation devis + avenants ---------------------- */
+
+export type PosteOrigin = { kind: 'initial' } | { kind: 'avenant'; numero: number };
+
+export const originLabel = (o: PosteOrigin): string =>
+  o.kind === 'initial' ? 'Devis initial' : `Avenant n°${o.numero}`;
+
+export interface ConsolidatedPoste {
+  poste: DevisPoste;
+  origin: PosteOrigin;
+  /** Numéro de l'avenant qui remplace ce poste (le poste reste visible). */
+  replacedByNumero?: number;
+}
+
+export interface ConsolidatedLot {
+  label: string;
+  stepId?: string;
+  postes: ConsolidatedPoste[];
+  orderIds: string[];
+  selectionIds: string[];
+  documentIds: string[];
+}
+
+export interface ConsolidatedDevis {
+  lots: ConsolidatedLot[];
+  avenants: { numero: number; reference?: string; date?: string; label?: string }[];
+}
+
+/**
+ * Vue consolidée APPEND-ONLY : devis initial + avenants, regroupés par lot.
+ * Chaque poste connaît son origine ; les postes remplacés restent présents,
+ * marqués du numéro d'avenant qui les remplace. On n'écrase jamais rien.
+ */
+export function consolidateDevis(devis?: Devis, avenants: Avenant[] = []): ConsolidatedDevis {
+  const replacedBy = new Map<string, number>();
+  for (const av of avenants) {
+    for (const lot of av.lots) {
+      for (const p of lot.postes) {
+        if (p.remplacePosteId) replacedBy.set(p.remplacePosteId, av.numero);
+      }
+    }
+  }
+
+  const order: string[] = [];
+  const byLabel = new Map<string, ConsolidatedLot>();
+  const ensure = (lot: DevisLot): ConsolidatedLot => {
+    let c = byLabel.get(lot.label);
+    if (!c) {
+      c = {
+        label: lot.label,
+        stepId: lot.stepId,
+        postes: [],
+        orderIds: [],
+        selectionIds: [],
+        documentIds: [],
+      };
+      byLabel.set(lot.label, c);
+      order.push(lot.label);
+    }
+    if (c.stepId == null && lot.stepId != null) c.stepId = lot.stepId;
+    for (const id of lot.orderIds ?? []) if (!c.orderIds.includes(id)) c.orderIds.push(id);
+    for (const id of lot.selectionIds ?? [])
+      if (!c.selectionIds.includes(id)) c.selectionIds.push(id);
+    for (const id of lot.documentIds ?? []) if (!c.documentIds.includes(id)) c.documentIds.push(id);
+    return c;
+  };
+  const add = (lots: DevisLot[], origin: PosteOrigin): void => {
+    for (const lot of lots) {
+      const c = ensure(lot);
+      for (const p of lot.postes) {
+        c.postes.push({ poste: p, origin, replacedByNumero: replacedBy.get(p.id) });
+      }
+    }
+  };
+
+  if (devis) add(devis.lots, { kind: 'initial' });
+  for (const av of avenants) add(av.lots, { kind: 'avenant', numero: av.numero });
+
+  return {
+    lots: order.map((l) => byLabel.get(l)!),
+    avenants: avenants.map((a) => ({
+      numero: a.numero,
+      reference: a.reference,
+      date: a.date,
+      label: a.label,
+    })),
+  };
+}
+
+/** Total HT d'un lot consolidé (postes ACTIFS uniquement, hors remplacés). */
+export const consolidatedLotTotalHT = (lot: ConsolidatedLot): number =>
+  round2(
+    lot.postes.filter((p) => p.replacedByNumero == null).reduce((a, p) => a + p.poste.montantHT, 0),
+  );
+
+/** Totaux du devis consolidé (postes ACTIFS uniquement). */
+export function consolidatedTotals(c: ConsolidatedDevis): DevisTotals {
+  const lots: DevisLot[] = c.lots.map((lot) => ({
+    id: lot.label,
+    label: lot.label,
+    postes: lot.postes.filter((p) => p.replacedByNumero == null).map((p) => p.poste),
+  }));
+  return devisTotals({ lots });
 }
 
 /* ------------------------------- sélecteurs -------------------------------- */
@@ -88,34 +209,44 @@ export interface DevisSummary {
   orders: number;
   selections: number;
   documents: number;
+  /** Avenants intégrés au devis. */
+  avenants: number;
 }
 
-/** Résumé express de la lecture du devis (alimente la note de lancement). */
-export function buildDevisSummary(devis: Devis): DevisSummary {
-  const totals = devisTotals(devis);
+/**
+ * Résumé express de la lecture du devis (alimente la note de lancement) — sur la
+ * vue CONSOLIDÉE (devis initial + avenants, postes actifs). Une seule vérité :
+ * les montants ici correspondent au détail « Le devis ».
+ */
+export function buildDevisSummary(devis?: Devis, avenants: Avenant[] = []): DevisSummary {
+  const c = consolidateDevis(devis, avenants);
+  const totals = consolidatedTotals(c);
   const orders = new Set<string>();
   const selections = new Set<string>();
   const documents = new Set<string>();
   let postes = 0;
-  for (const lot of devis.lots) {
-    postes += lot.postes.length;
-    lot.orderIds?.forEach((id) => orders.add(id));
-    lot.selectionIds?.forEach((id) => selections.add(id));
-    lot.documentIds?.forEach((id) => documents.add(id));
+  for (const lot of c.lots) {
+    postes += lot.postes.filter((p) => p.replacedByNumero == null).length;
+    lot.orderIds.forEach((id) => orders.add(id));
+    lot.selectionIds.forEach((id) => selections.add(id));
+    lot.documentIds.forEach((id) => documents.add(id));
   }
   return {
-    lots: devis.lots.length,
+    lots: c.lots.length,
     postes,
     totalHT: totals.ht,
     totalTTC: totals.ttc,
     orders: orders.size,
     selections: selections.size,
     documents: documents.size,
+    avenants: c.avenants.length,
   };
 }
 
 export interface DevisVigilance {
   id: string;
+  /** Lot concerné (par libellé) — pour rattacher la vigilance à son lot. */
+  lotLabel: string;
   message: string;
 }
 
@@ -130,6 +261,7 @@ export function devisVigilances(devis: Devis): DevisVigilance[] {
     if (sansMontant.length > 0) {
       out.push({
         id: `devis-montant-${lot.id}`,
+        lotLabel: lot.label,
         message: `Lot « ${lot.label} » : ${sansMontant.length} poste(s) sans montant chiffré.`,
       });
     }
@@ -138,6 +270,7 @@ export function devisVigilances(devis: Devis): DevisVigilance[] {
       if (sansQte.length > 0) {
         out.push({
           id: `devis-qte-${lot.id}`,
+          lotLabel: lot.label,
           message: `Lot « ${lot.label} » : quantités à confirmer avant de commander.`,
         });
       }

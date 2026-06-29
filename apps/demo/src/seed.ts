@@ -502,6 +502,48 @@ export function buildDemoSeed(): DemoSeed {
         },
       ],
     },
+    // Avenant n°1 — NOUVEAU devis signé, AJOUTÉ (le devis initial reste intact).
+    // Il fait monter la cuisine en gamme (le poste d'origine reste visible,
+    // marqué « remplacé par avenant n°1 ») et ajoute un poste sanitaire.
+    avenants: [
+      {
+        id: 'av-1',
+        numero: 1,
+        reference: 'AV-2024-01',
+        date: new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10),
+        label: 'Montée en gamme cuisine + WC suspendu',
+        lots: [
+          {
+            id: 'lot-av1-cuisine',
+            label: 'Cuisine',
+            postes: [
+              {
+                id: 'p-av1-cu',
+                label: 'Fourniture cuisine équipée — finition haut de gamme',
+                unite: 'ens.',
+                montantHT: 12400,
+                tva: 20,
+                remplacePosteId: 'p-cu-1',
+              },
+            ],
+          },
+          {
+            id: 'lot-av1-plomberie',
+            label: 'Plomberie',
+            postes: [
+              {
+                id: 'p-av1-wc',
+                label: 'WC suspendu (fourniture & pose)',
+                unite: 'ens.',
+                montantHT: 980,
+                tva: 10,
+                materiau: 'Céramique',
+              },
+            ],
+          },
+        ],
+      },
+    ],
     sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
     createdAt: new Date().toISOString(),
   };
