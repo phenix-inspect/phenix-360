@@ -134,12 +134,41 @@ export const SELECTION_STATUS_LABEL: Record<SelectionStatus, string> = {
   valide: 'Validé',
 };
 
+/** Caractéristique d'une proposition (couleur, matériau, finition…). */
+export interface SelectionOptionAttribute {
+  label: string;
+  value: string;
+}
+
+/**
+ * Une PROPOSITION client (ambiance soigneusement préparée) — brique générique
+ * valable pour tout choix : cuisine, carrelage, parquet, peinture, sanitaires,
+ * luminaires, mobilier, poignées, robinetterie… Jamais un formulaire : une
+ * sélection visuelle. La photo est facultative (tuile éditoriale en attendant).
+ */
+export interface SelectionOption {
+  id: string;
+  /** Repère affiché (A, B, C…). */
+  ref?: string;
+  title: string;
+  description?: string;
+  /** Graine pour la tuile éditoriale déterministe (sans vraie image). */
+  imageSeed?: string;
+  /** Vraie image, quand elle existera. */
+  imageUrl?: string;
+  attributs?: SelectionOptionAttribute[];
+}
+
 export interface ClientSelection {
   id: string;
   categorie: string;
   label: string;
   statut: SelectionStatus;
   detail?: string;
+  /** Jusqu'à 5 propositions présentées au client (A–E). */
+  options?: SelectionOption[];
+  /** Proposition retenue par le client (id), une fois validée. */
+  chosenOptionId?: string;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -565,6 +594,8 @@ export interface ClientDecision {
   /** Date limite de décision (planning daté seulement), sur le calendrier métier. */
   decideAvant: string | null;
   status: ClientDecisionStatus;
+  /** Propositions présentées au client (A–E), le cas échéant. */
+  options: SelectionOption[];
 }
 
 /**
@@ -615,6 +646,7 @@ export function buildClientDecisions(
       stepLabel: phase?.label ?? null,
       decideAvant,
       status,
+      options: s.options ?? [],
     };
   });
 
@@ -1161,6 +1193,9 @@ export function buildChantierAttention(
   nowMs: number = Date.now(),
 ): AttentionItem[] {
   const items: AttentionItem[] = [];
+  // Catégories déjà couvertes par une décision DATÉE → évite le doublon avec une
+  // demande du journal qui concerne exactement le même choix.
+  const decidedCats = new Set<string>();
 
   if (dossier) {
     // Commandes (réutilise le moteur d'alertes).
@@ -1194,6 +1229,7 @@ export function buildChantierAttention(
     for (const dec of buildClientDecisions(dossier, nowMs)) {
       if (dec.status !== 'proche' && dec.status !== 'en_retard') continue;
       const cat = dec.categorie.toLowerCase();
+      decidedCats.add(cat);
       items.push({
         id: `cdec-${dec.id}`,
         kind: 'decision',
@@ -1231,8 +1267,11 @@ export function buildChantierAttention(
     }
   }
 
-  // Décisions client en attente.
+  // Décisions client en attente (journal). On déduplique : si une décision datée
+  // couvre déjà ce choix (même catégorie), on ne répète pas la demande.
   for (const dec of pendingClientDecisions(events)) {
+    const q = dec.question.toLowerCase();
+    if ([...decidedCats].some((c) => q.includes(c))) continue;
     items.push({
       id: `dec-${dec.eventId}`,
       kind: 'decision',

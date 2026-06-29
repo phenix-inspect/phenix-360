@@ -48,11 +48,17 @@ export function ClientView({
     : null;
   const feed = clientFeed(events);
 
-  const validateDecision = async (d: ClientDecision) => {
+  const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
+    const chosen = d.options.find((o) => o.id === optionId);
+    const retenu = chosen?.title ?? d.label;
     demo.saveDossier(project.id, {
       ...dossier,
-      selections: dossier.selections.map((s) => (s.id === d.id ? { ...s, statut: 'valide' } : s)),
+      selections: dossier.selections.map((s) =>
+        s.id === d.id
+          ? { ...s, statut: 'valide', chosenOptionId: optionId, detail: chosen?.title ?? s.detail }
+          : s,
+      ),
     });
     await demo.appendEvent({
       projectId: project.id,
@@ -61,7 +67,7 @@ export function ClientView({
       visibility: 'client',
       state: 'close',
       content: {
-        question: `Choix ${d.categorie.toLowerCase()} validé : ${d.label}`,
+        question: `Choix ${d.categorie.toLowerCase()} validé : ${retenu}`,
         destinataire: 'equipe',
         resolution: {
           texte: 'Validé par le client.',
@@ -108,7 +114,7 @@ export function ClientView({
       {clientDecision ? (
         <ClientDecisionBanner
           decision={clientDecision}
-          onValidate={() => validateDecision(clientDecision)}
+          onValidate={(optionId) => validateDecision(clientDecision, optionId)}
           onModify={(message) => requestModification(clientDecision, message)}
         />
       ) : (

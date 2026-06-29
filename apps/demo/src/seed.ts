@@ -286,7 +286,50 @@ export function buildDemoSeed(): DemoSeed {
         statut: 'valide',
         detail: 'Blanc cassé mat',
       },
-      { id: 's3', categorie: 'Cuisine', label: 'Façades & plan de travail', statut: 'propose' },
+      {
+        id: 's3',
+        categorie: 'Cuisine',
+        label: 'Façades & plan de travail',
+        statut: 'propose',
+        options: [
+          {
+            id: 'A',
+            title: 'Chêne clair & plan de travail sable',
+            description:
+              'Une cuisine chaleureuse et lumineuse, parfaite pour un séjour ouvert et accueillant.',
+            imageSeed: 'cuisine-chene-clair',
+            attributs: [
+              { label: 'Façades', value: 'Chêne clair' },
+              { label: 'Plan', value: 'Quartz sable' },
+              { label: 'Finition', value: 'Mate' },
+            ],
+          },
+          {
+            id: 'B',
+            title: 'Laque mate gris anthracite',
+            description:
+              'Une ambiance contemporaine et graphique, élégante avec des poignées intégrées.',
+            imageSeed: 'cuisine-anthracite',
+            attributs: [
+              { label: 'Façades', value: 'Laque anthracite' },
+              { label: 'Plan', value: 'Céramique gris clair' },
+              { label: 'Finition', value: 'Mate' },
+            ],
+          },
+          {
+            id: 'C',
+            title: 'Noyer foncé & plan pierre',
+            description:
+              'Une cuisine plus intime et premium, jouant sur les matières naturelles et la profondeur.',
+            imageSeed: 'cuisine-noyer',
+            attributs: [
+              { label: 'Façades', value: 'Noyer foncé' },
+              { label: 'Plan', value: 'Pierre veinée' },
+              { label: 'Finition', value: 'Satinée' },
+            ],
+          },
+        ],
+      },
     ],
     documents: [
       { id: 'd1', label: 'Devis signé', status: 'fourni', recommande: true },

@@ -3,11 +3,14 @@ import { Button, Textarea } from '@phenix360/ui';
 import { Sparkles } from 'lucide-react';
 import type { ClientDecision } from '@phenix360/core';
 import { fmtDate } from '../lib/format';
+import { ProposalGallery } from './ProposalGallery';
 
 /**
  * Décision client, vue CLIENT — ultra simple. Le bandeau reste la règle absolue
  * (« Une décision vous attend ») ; au clic, le client voit UNIQUEMENT la
- * décision concernée et deux actions claires. Jamais de délais fournisseurs, de
+ * décision concernée. Quand PHÉNIX a préparé des propositions, il les présente
+ * comme des ambiances soignées (photo + titre + description) ; le client
+ * sélectionne celle qu'il préfère. Jamais de délais fournisseurs, de
  * dépendances, de commandes, de calculs internes ni d'alertes conducteur.
  */
 export function ClientDecisionBanner({
@@ -16,19 +19,23 @@ export function ClientDecisionBanner({
   onModify,
 }: {
   decision: ClientDecision;
-  onValidate: () => Promise<void>;
+  onValidate: (optionId?: string) => Promise<void>;
   onModify: (message: string) => Promise<void>;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [modifying, setModifying] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const cat = decision.categorie.toLowerCase();
+  const hasOptions = decision.options.length > 0;
+  const canValidate = !hasOptions || selectedId != null;
 
   const validate = async () => {
+    if (!canValidate) return;
     setBusy(true);
-    await onValidate();
+    await onValidate(selectedId ?? undefined);
     setBusy(false);
     setOpen(false);
   };
@@ -50,7 +57,7 @@ export function ClientDecisionBanner({
         <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground [&_svg]:size-5">
           <Sparkles aria-hidden />
         </span>
-        <div className="flex-1 space-y-3">
+        <div className="min-w-0 flex-1 space-y-3">
           <div className="space-y-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-gold-700">
               Action requise
@@ -60,8 +67,10 @@ export function ClientDecisionBanner({
             </h2>
             {open ? (
               <p className="text-sm leading-relaxed text-ink-600">
-                Pour conserver le planning prévu, j'ai besoin de votre validation
-                {decision.decideAvant ? (
+                {hasOptions
+                  ? `J'ai préparé plusieurs propositions pour votre ${cat} — choisissez celle que vous préférez.`
+                  : "Pour conserver le planning prévu, j'ai besoin de votre validation"}
+                {!hasOptions && decision.decideAvant && (
                   <>
                     {' '}
                     avant le{' '}
@@ -69,10 +78,10 @@ export function ClientDecisionBanner({
                       {fmtDate(decision.decideAvant)}
                     </span>
                   </>
-                ) : (
-                  ' dès que possible'
                 )}
-                .{decision.detail ? ` Proposition : ${decision.detail}.` : ''}
+                {!hasOptions && !decision.decideAvant && ' dès que possible'}
+                {!hasOptions && '.'}
+                {!hasOptions && decision.detail ? ` Proposition : ${decision.detail}.` : ''}
               </p>
             ) : (
               <p className="text-sm leading-relaxed text-ink-600">
@@ -88,18 +97,27 @@ export function ClientDecisionBanner({
           )}
 
           {open && !modifying && (
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" disabled={busy} onClick={() => void validate()}>
-                Valider le choix proposé
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => setModifying(true)}
-              >
-                Demander une modification
-              </Button>
+            <div className="space-y-4">
+              {hasOptions && (
+                <ProposalGallery
+                  options={decision.options}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+              )}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" disabled={busy || !canValidate} onClick={() => void validate()}>
+                  {hasOptions ? 'Valider cette proposition' : 'Valider le choix proposé'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => setModifying(true)}
+                >
+                  {hasOptions ? 'Je souhaite une modification' : 'Demander une modification'}
+                </Button>
+              </div>
             </div>
           )}
 
