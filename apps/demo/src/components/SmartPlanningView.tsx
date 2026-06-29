@@ -61,9 +61,9 @@ export function SmartPlanningView({
         <p className="flex items-start gap-2 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-gold-900 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-700">
           <TriangleAlert aria-hidden />
           <span>
-            J'estime ce chantier à {fmtDuree(planning.estimatedDays)}, alors que{' '}
-            {planning.announcedLabel} ont été annoncés au client. Je vous conseille de vérifier le
-            planning avant de valider.
+            Vous avez annoncé {planning.announcedLabel} au client. D'après mon analyse, ce chantier
+            nécessite plutôt {fmtDuree(planning.estimatedDays)}. Je vous conseille de vérifier le
+            planning avant de le valider.
           </span>
         </p>
       )}
@@ -122,8 +122,8 @@ function WorkSummary({
           <Bullet>J'ai identifié {planning.phases.length} étapes.</Bullet>
           {planning.announcedLabel ? (
             <Bullet>
-              Vous avez annoncé {planning.announcedLabel} au client — j'ai cadré le planning sur
-              cette durée.
+              Vous avez annoncé {planning.announcedLabel} au client — j'ai pris cette information en
+              compte (échéances, points critiques, comparaison avec mon estimation).
             </Bullet>
           ) : (
             <Bullet>J'estime la durée du chantier à {fmtDuree(planning.estimatedDays)}.</Bullet>

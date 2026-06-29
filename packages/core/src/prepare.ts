@@ -364,24 +364,20 @@ interface PhaseDuration {
 
 /**
  * Durées par étape (toujours disponibles, même sans date de démarrage) :
- * pondérées par métier + tampons de séchage, mises à l'échelle de la durée
- * annoncée. C'est le « planning préparé » (ordre + durées + dépendances).
+ * pondérées par métier + tampons de séchage. Ce sont des durées RÉALISTES — la
+ * durée annoncée au client ne les raccourcit JAMAIS (une cuisine ne se pose pas
+ * deux fois plus vite parce qu'on a annoncé un chantier plus court, les temps de
+ * séchage et les délais fournisseurs sont incompressibles). PHÉNIX adapte le
+ * planning à la réalité, pas l'inverse : l'écart avec la durée annoncée
+ * devient une vigilance (cf. durationCheck), pas une compression.
  */
 export function phaseDurations(dossier: ProjectDossier): PhaseDuration[] {
   if (dossier.roadmap.length === 0) return [];
-  const raw = dossier.roadmap.map((s) => ({
-    s,
-    dur: stepDuration(s.label),
-    dry: stepDrying(s.label),
-  }));
-  const rawTotal = raw.reduce((a, r) => a + r.dur + r.dry, 0) || 1;
-  const target = dossier.infos.duration ? parseDurationDays(dossier.infos.duration) : 0;
-  const factor = target > 0 ? target / rawTotal : 1;
-  return raw.map((r) => ({
-    stepId: r.s.id,
-    label: r.s.label,
-    durationDays: Math.max(1, Math.round(r.dur * factor)),
-    drying: Math.round(r.dry * factor) || undefined,
+  return dossier.roadmap.map((s) => ({
+    stepId: s.id,
+    label: s.label,
+    durationDays: stepDuration(s.label),
+    drying: stepDrying(s.label) || undefined,
   }));
 }
 
@@ -423,6 +419,50 @@ export function durationCheck(dossier: ProjectDossier): {
         DURATION_MISMATCH_RATIO
       : false;
   return { announcedLabel, announcedDays, estimatedDays, mismatch };
+}
+
+/**
+ * Résumé express du dossier, affiché juste après l'analyse du devis — avant même
+ * le planning. En quelques lignes, le conducteur voit si le chantier est
+ * confortable ou tendu : durée annoncée ⇆ durée réaliste, étapes, commandes
+ * critiques, décisions client à obtenir, principal risque. Sélecteur PUR.
+ */
+export interface DossierSummary {
+  /** Durée annoncée au client (libellé saisi), si connue. */
+  announcedLabel: string | null;
+  /** Durée réaliste estimée par PHÉNIX (jours). */
+  estimatedDays: number;
+  /** L'estimation s'écarte nettement de la durée annoncée. */
+  durationMismatch: boolean;
+  steps: number;
+  /** Commandes à passer dont le délai fournisseur est long (≥ 21 j). */
+  criticalOrders: number;
+  /** Choix client à obtenir + décisions client en attente. */
+  clientDecisions: number;
+  /** Risque principal (commande au délai le plus long encore à passer). */
+  mainRisk: string | null;
+}
+
+const CRITICAL_DELAY_DAYS = 21;
+export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = []): DossierSummary {
+  const { announcedLabel, estimatedDays, mismatch } = durationCheck(dossier);
+  const critical = dossier.orders.filter(
+    (o) => o.statut === 'a_commander' && (o.delaiJours ?? 0) >= CRITICAL_DELAY_DAYS,
+  );
+  const worst = critical.reduce<Order | null>(
+    (acc, o) => (acc && (acc.delaiJours ?? 0) >= (o.delaiJours ?? 0) ? acc : o),
+    null,
+  );
+  const aChoisir = dossier.selections.filter((s) => s.statut === 'a_choisir').length;
+  return {
+    announcedLabel,
+    estimatedDays,
+    durationMismatch: mismatch,
+    steps: dossier.roadmap.length,
+    criticalOrders: critical.length,
+    clientDecisions: aChoisir + pendingClientDecisions(events).length,
+    mainRisk: worst ? `${worst.label} (délai ${worst.delaiJours} j)` : null,
+  };
 }
 
 /**
@@ -904,13 +944,12 @@ export function studyProject(
     attention.push({
       id: 'duree-incoherente',
       kind: 'planning',
-      title: `J'estime ce chantier à ${describeDuration(dur.estimatedDays)}, alors que ${dur.announcedLabel} ont été annoncés au client.`,
+      title: `Vous avez annoncé ${dur.announcedLabel} au client ; d'après mon analyse, ce chantier nécessite plutôt ${describeDuration(dur.estimatedDays)}.`,
     });
     advice.push({
       id: 'duree-a',
       kind: 'planning',
-      title:
-        'Vérifier le planning avant validation : la durée annoncée et mon estimation diffèrent.',
+      title: 'Vérifier le planning avant de le valider : la durée annoncée semble serrée.',
     });
   } else if (dur.announcedLabel) {
     reassuring.push({

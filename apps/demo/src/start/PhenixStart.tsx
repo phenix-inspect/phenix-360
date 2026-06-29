@@ -1,16 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { BrandLockup, Button } from '@phenix360/ui';
-import { PREPARATION_STAGES, mockAnalyzeDossier, type ProjectProposal } from '@phenix360/core';
+import {
+  PREPARATION_STAGES,
+  buildDossierSummary,
+  mockAnalyzeDossier,
+  type ProjectProposal,
+} from '@phenix360/core';
 import {
   ArrowRight,
   CheckCircle2,
   FileText,
   Loader2,
+  Pencil,
   Sparkles,
+  TriangleAlert,
   UploadCloud,
   X,
 } from 'lucide-react';
 import { demo } from '../store';
+import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
 
 type Phase = 'drop' | 'analysis' | 'ready' | 'review';
@@ -260,8 +268,13 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
 }
 
 /* -------------------------------------------------------------------------- *
- * 3. « Votre projet est prêt. » — l'effet temps gagné
- * -------------------------------------------------------------------------- */
+ * 3. « Votre projet est prêt. » — résumé express + cadrage de la durée
+ * -------------------------------------------------------------------------- *
+ * PHÉNIX travaille avant le conducteur : il a CHERCHÉ la durée dans le devis
+ * avant de la demander. Et il affiche d'abord un résumé express (durée annoncée
+ * ⇆ durée réaliste, étapes, commandes critiques, décisions, risque principal)
+ * pour qu'en quelques secondes le conducteur sente si le chantier est tendu.
+ */
 const DURATION_PRESETS = ['6 semaines', '2 mois', '3 mois', '45 jours ouvrés'];
 
 function ReadyScreen({
@@ -272,67 +285,143 @@ function ReadyScreen({
   onContinue: (duration: string) => void;
 }): React.JSX.Element {
   const d = proposal.dossier;
-  const [duration, setDuration] = useState(d.infos.duration ?? '');
+  const detected = d.infos.duration ?? null;
+  const [duration, setDuration] = useState(detected ?? '');
+  const [editing, setEditing] = useState(!detected);
+
+  const summary = buildDossierSummary({
+    ...d,
+    infos: { ...d.infos, duration: duration.trim() || undefined },
+  });
 
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 py-10 text-center">
-      <span className="flex size-16 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-8">
-        <Sparkles aria-hidden />
-      </span>
-      <div className="space-y-3">
+    <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 py-10">
+      <div className="flex flex-col items-center gap-3 text-center">
+        <span className="flex size-16 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-8">
+          <Sparkles aria-hidden />
+        </span>
         <h1 className="font-serif text-4xl font-semibold tracking-tight text-foreground">
           Votre projet est prêt.
         </h1>
         <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-          J'ai déjà préparé votre chantier à partir du devis signé. Nous allons maintenant le
-          parcourir ensemble afin de vérifier qu'il correspond parfaitement à votre projet. Vous
-          pourrez tout modifier avant de démarrer le chantier.
+          J'ai préparé votre chantier à partir du devis signé. Voici l'essentiel — nous le
+          parcourrons ensuite ensemble.
         </p>
       </div>
-      <p className="text-sm text-foreground">
-        En quelques secondes, j'ai déjà préparé <strong>{d.roadmap.length} étapes</strong>,{' '}
-        <strong>{d.orders.length} commandes</strong>,{' '}
-        <strong>{d.selections.length} choix client</strong> et trié vos documents.
-      </p>
 
-      {/* Information de cadrage : la durée annoncée au client, connue dès le devis. */}
+      {/* (4) Le résumé express, juste après l'analyse — avant même le planning. */}
       <div className="w-full space-y-3 rounded-2xl border border-border bg-surface p-5 text-left">
-        <div className="space-y-1">
-          <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
-            Quelle durée avez-vous annoncée au client ?
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Cette durée me sert à cadrer le planning (répartition des étapes, commandes à
-            anticiper). La date de démarrage, elle, pourra venir plus tard.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {DURATION_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => setDuration(preset)}
-              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                duration === preset
-                  ? 'border-gold-400 bg-gold-100 font-medium text-gold-800'
-                  : 'border-border bg-paper-50 text-foreground hover:border-gold-300'
-              }`}
-            >
-              {preset}
-            </button>
-          ))}
-        </div>
-        <input
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          placeholder="Ou saisissez librement (ex. 10 semaines)"
-          className="h-10 w-full rounded-lg border border-input bg-paper-50 px-3 text-sm text-foreground"
-        />
+        <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+          J'ai étudié votre dossier.
+        </p>
+        <ul className="space-y-2 text-sm">
+          <SummaryRow
+            label="Durée annoncée au client"
+            value={summary.announcedLabel ?? 'à préciser'}
+          />
+          <SummaryRow
+            label="Durée que j'estime réaliste"
+            value={fmtDuree(summary.estimatedDays)}
+            warn={summary.durationMismatch}
+          />
+          <SummaryRow label="Étapes identifiées" value={String(summary.steps)} />
+          <SummaryRow label="Commandes critiques" value={String(summary.criticalOrders)} />
+          <SummaryRow label="Décisions client à obtenir" value={String(summary.clientDecisions)} />
+          <SummaryRow
+            label="Principal risque"
+            value={summary.mainRisk ?? 'aucun risque majeur détecté'}
+          />
+        </ul>
       </div>
 
-      <Button size="lg" disabled={!duration.trim()} onClick={() => onContinue(duration.trim())}>
-        Découvrons votre projet <ArrowRight aria-hidden />
-      </Button>
+      {/* (1) PHÉNIX a cherché la durée avant de la demander. */}
+      <div className="w-full space-y-3 rounded-2xl border border-border bg-surface p-5 text-left">
+        {detected && !editing ? (
+          <>
+            <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+              J'ai trouvé dans votre devis une durée prévisionnelle de{' '}
+              <span className="text-gold-700">{detected}</span>.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Est-ce bien la durée que vous avez annoncée au client ?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => onContinue(duration.trim())}>
+                <CheckCircle2 aria-hidden /> Oui, c'est exact
+              </Button>
+              <Button variant="outline" onClick={() => setEditing(true)}>
+                <Pencil aria-hidden /> Modifier
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+              {detected
+                ? 'Quelle durée souhaitez-vous retenir ?'
+                : "Je n'ai pas trouvé de durée prévisionnelle dans votre devis."}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {detected
+                ? 'Ajustez la durée annoncée au client.'
+                : 'Quelle durée avez-vous annoncée au client ?'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {DURATION_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setDuration(preset)}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    duration === preset
+                      ? 'border-gold-400 bg-gold-100 font-medium text-gold-800'
+                      : 'border-border bg-paper-50 text-foreground hover:border-gold-300'
+                  }`}
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <input
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              placeholder="Ou saisissez librement (ex. 10 semaines)"
+              className="h-10 w-full rounded-lg border border-input bg-paper-50 px-3 text-sm text-foreground"
+            />
+            <Button
+              size="lg"
+              disabled={!duration.trim()}
+              onClick={() => onContinue(duration.trim())}
+            >
+              Découvrons votre projet <ArrowRight aria-hidden />
+            </Button>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+function SummaryRow({
+  label,
+  value,
+  warn,
+}: {
+  label: string;
+  value: string;
+  warn?: boolean;
+}): React.JSX.Element {
+  return (
+    <li className="flex items-baseline justify-between gap-3 border-b border-border pb-2 last:border-b-0 last:pb-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={`flex items-center gap-1.5 text-right font-medium [&_svg]:size-4 ${
+          warn ? 'text-gold-700' : 'text-foreground'
+        }`}
+      >
+        {warn && <TriangleAlert aria-hidden />}
+        {value}
+      </span>
+    </li>
   );
 }
