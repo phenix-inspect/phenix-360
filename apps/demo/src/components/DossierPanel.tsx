@@ -15,8 +15,10 @@ import {
   ORDER_STATUS_LABEL,
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
+  buildClientDecisions,
   buildProjectMemory,
   studyProject,
+  type ClientDecisionStatus,
   type Event,
   type EventActor,
   type Order,
@@ -29,12 +31,13 @@ import {
   CalendarDays,
   FileText,
   ListChecks,
+  MessageSquareWarning,
   Palette,
   Pencil,
   Sparkles,
 } from 'lucide-react';
 import { demo } from '../store';
-import { fmtDateShort, fmtMoney } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
@@ -131,6 +134,8 @@ export function DossierPanel({
           ))}
         </div>
       </Section>
+
+      <DecisionsSection dossier={dossier} />
 
       <Section
         icon={<Palette aria-hidden />}
@@ -526,6 +531,66 @@ function QuestionsList({
         </li>
       ))}
     </ul>
+  );
+}
+
+const DECISION_BADGE: Record<
+  ClientDecisionStatus,
+  { label: string; variant: 'success' | 'info' | 'warning' | 'danger' | 'neutral' }
+> = {
+  obtenu: { label: 'Obtenue', variant: 'success' },
+  a_obtenir: { label: 'À obtenir', variant: 'neutral' },
+  proche: { label: 'Échéance proche', variant: 'warning' },
+  en_retard: { label: 'En retard', variant: 'danger' },
+};
+
+/**
+ * « Décisions client à obtenir » — chaque décision est datée sur le calendrier
+ * métier (échéance qui tient compte du délai fournisseur si elle déclenche une
+ * commande). On met en avant les décisions encore à obtenir, triées par urgence.
+ */
+function DecisionsSection({ dossier }: { dossier: ProjectDossier }): React.JSX.Element | null {
+  const decisions = buildClientDecisions(dossier);
+  const pending = decisions.filter((d) => d.pending);
+  if (decisions.length === 0) return null;
+
+  return (
+    <Section
+      icon={<MessageSquareWarning aria-hidden />}
+      title="Décisions client à obtenir"
+      count={pending.length}
+    >
+      {pending.length === 0 ? (
+        <p className="rounded-lg border border-border bg-surface p-3 text-sm text-muted-foreground">
+          Toutes les décisions client sont obtenues.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {pending.map((d) => {
+            const badge = DECISION_BADGE[d.status];
+            return (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-surface p-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground">
+                    <span className="font-medium">{d.categorie}</span> — {d.label}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.decideAvant
+                      ? `À décider avant le ${fmtDate(d.decideAvant)}`
+                      : 'À décider — datez le chantier pour connaître l’échéance'}
+                    {d.stepLabel ? ` · pour l’étape « ${d.stepLabel} »` : ''}
+                  </p>
+                </div>
+                <Badge variant={badge.variant}>{badge.label}</Badge>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Section>
   );
 }
 

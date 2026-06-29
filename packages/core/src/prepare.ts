@@ -478,7 +478,7 @@ export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = [
     (acc, o) => (acc && (acc.delaiJours ?? 0) >= (o.delaiJours ?? 0) ? acc : o),
     null,
   );
-  const aChoisir = dossier.selections.filter((s) => s.statut === 'a_choisir').length;
+  const toDecide = dossier.selections.filter((s) => s.statut !== 'valide').length;
   return {
     announcedLabel,
     estimatedDays,
@@ -486,7 +486,7 @@ export function buildDossierSummary(dossier: ProjectDossier, events: Event[] = [
     marginDays,
     steps: dossier.roadmap.length,
     criticalOrders: critical.length,
-    clientDecisions: aChoisir + pendingClientDecisions(events).length,
+    clientDecisions: toDecide + pendingClientDecisions(events).length,
     mainRisk: worst ? `${worst.label} (délai ${worst.delaiJours} j)` : null,
   };
 }
@@ -520,6 +520,105 @@ export function computePhaseDates(
       durationDays: d.durationDays,
       drying: d.drying,
     };
+  });
+}
+
+/* -------------------------------------------------------------------------- *
+ * DÉCISIONS CLIENT DATÉES — chaque choix client a une date limite de décision
+ * -------------------------------------------------------------------------- *
+ * Une décision client n'est pas « à obtenir un jour » : elle a une échéance
+ * précise, calée sur le calendrier métier. Si la décision alimente une commande
+ * (ex. le choix du carrelage déclenche la commande du carrelage), il faut
+ * décider assez tôt pour pouvoir COMMANDER (délai fournisseur) avant l'étape.
+ * Sinon, il suffit de figer le choix un peu avant l'étape. Sélecteur PUR.
+ */
+const FIGER_BUFFER = 14; // jours avant l'étape pour figer un choix sans commande
+const DECISION_ORDER_BUFFER = 3; // jours pour passer commande une fois la décision prise
+const DECISION_SOON_DAYS = 10; // seuil « échéance proche »
+
+/** Date limite de décision, sur le calendrier métier (jour ouvré). */
+function decisionDeadline(
+  stepStart: string,
+  maxOrderDelai: number,
+  cal: BusinessCalendar = DEFAULT_CALENDAR,
+): string {
+  const lead = maxOrderDelai > 0 ? maxOrderDelai + DECISION_ORDER_BUFFER : FIGER_BUFFER;
+  return previousWorkingDay(addCalendarDays(stepStart, -lead), cal);
+}
+
+export type ClientDecisionStatus = 'obtenu' | 'a_obtenir' | 'proche' | 'en_retard';
+
+export interface ClientDecision {
+  id: string;
+  categorie: string;
+  label: string;
+  /** Décision encore à obtenir (choix non figé). */
+  pending: boolean;
+  /** Étape qui consomme la décision. */
+  stepLabel: string | null;
+  /** Date limite de décision (planning daté seulement), sur le calendrier métier. */
+  decideAvant: string | null;
+  status: ClientDecisionStatus;
+}
+
+/**
+ * Les décisions client, DATÉES. Chaque choix est rattaché à l'étape qui le
+ * consomme ; sa date limite tient compte du délai fournisseur si la décision
+ * déclenche une commande. Triées par urgence (échéance la plus proche d'abord).
+ */
+export function buildClientDecisions(
+  dossier: ProjectDossier,
+  nowMs: number = Date.now(),
+  cal: BusinessCalendar = DEFAULT_CALENDAR,
+): ClientDecision[] {
+  const datedById = new Map(computePhaseDates(dossier, cal).map((p) => [p.stepId, p]));
+  const phases = phaseDurations(dossier);
+
+  const decisions = dossier.selections.map((s): ClientDecision => {
+    const hay = `${s.categorie} ${s.label}`.toLowerCase();
+    const rule = SELECTION_STEP.find((m) => m.re.test(hay));
+    const phase = rule ? phases.find((p) => rule.step.test(p.label.toLowerCase())) : undefined;
+    const datedPhase = phase ? datedById.get(phase.stepId) : undefined;
+    // Une décision n'est « obtenue » qu'une fois VALIDÉE : un choix simplement
+    // proposé attend encore la validation du client.
+    const pending = s.statut !== 'valide';
+
+    let decideAvant: string | null = null;
+    if (datedPhase?.start) {
+      const maxDelai = dossier.orders
+        .filter((o) => (o.stepIds ?? []).includes(phase!.stepId))
+        .reduce((m, o) => Math.max(m, o.delaiJours ?? 0), 0);
+      decideAvant = decisionDeadline(datedPhase.start, maxDelai, cal);
+    }
+
+    let status: ClientDecisionStatus = pending ? 'a_obtenir' : 'obtenu';
+    if (pending && decideAvant) {
+      const limit = new Date(`${decideAvant}T00:00:00`).getTime();
+      if (limit <= nowMs) status = 'en_retard';
+      else if (limit - nowMs <= DECISION_SOON_DAYS * DAY_MS) status = 'proche';
+    }
+
+    return {
+      id: s.id,
+      categorie: s.categorie,
+      label: s.label,
+      pending,
+      stepLabel: phase?.label ?? null,
+      decideAvant,
+      status,
+    };
+  });
+
+  const rank: Record<ClientDecisionStatus, number> = {
+    en_retard: 0,
+    proche: 1,
+    a_obtenir: 2,
+    obtenu: 3,
+  };
+  return decisions.sort((a, b) => {
+    if (rank[a.status] !== rank[b.status]) return rank[a.status] - rank[b.status];
+    if (a.decideAvant && b.decideAvant) return a.decideAvant < b.decideAvant ? -1 : 1;
+    return 0;
   });
 }
 
@@ -599,7 +698,6 @@ export function buildSmartPlanning(
   }
   const dated = Boolean(dossier.infos.startDate);
   const datedById = new Map(computePhaseDates(dossier).map((p) => [p.stepId, p]));
-  const FIGER_BUFFER = 14;
 
   const phases: PlanningPhase[] = durations.map((d) => {
     const dd = datedById.get(d.stepId);
@@ -634,7 +732,8 @@ export function buildSmartPlanning(
       pending: s.statut === 'a_choisir',
     };
     if (ph.start) {
-      marker.figerAvant = previousWorkingDay(addCalendarDays(ph.start, -FIGER_BUFFER));
+      const maxDelai = ph.orders.reduce((m, o) => Math.max(m, o.delaiJours ?? 0), 0);
+      marker.figerAvant = decisionDeadline(ph.start, maxDelai);
     }
     ph.choices.push(marker);
   }

@@ -15,14 +15,24 @@
  * (le béton sèche aussi le week-end). Fonctions PURES, sans état partagé.
  */
 
+/**
+ * Réglages d'entreprise du calendrier. Ce ne sont PAS des hypothèses imposées :
+ * chaque entreprise les configure (à terme via un écran de réglages).
+ *   • bridges  : l'entreprise pratique-t-elle les ponts (jour isolé entre un
+ *                férié et le week-end) ?
+ *   • closures : fermetures exceptionnelles et périodes de congés (bornes ISO
+ *                incluses).
+ */
 export interface BusinessCalendar {
-  /** L'entreprise pratique-t-elle les ponts (jour isolé entre férié et week-end) ? */
   bridges: boolean;
-  /** Périodes de fermeture (congés), bornes ISO incluses. */
   closures: { from: string; to: string }[];
 }
 
-export const DEFAULT_CALENDAR: BusinessCalendar = { bridges: true, closures: [] };
+/**
+ * Par défaut : lundi → vendredi + jours fériés français. Les ponts ne sont PAS
+ * activés par défaut (configuration entreprise) ; aucune fermeture supposée.
+ */
+export const DEFAULT_CALENDAR: BusinessCalendar = { bridges: false, closures: [] };
 
 /* --------------------------- utilitaires de dates -------------------------- */
 

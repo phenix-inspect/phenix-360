@@ -33,7 +33,7 @@ export function GrandesEtapes({ dossier }: { dossier: ProjectDossier }): React.J
           </span>
           {planning.endDate && (
             <span className="text-muted-foreground">
-              Fin prévisionnelle :{' '}
+              Fin prévue :{' '}
               <span className="font-medium text-foreground">{fmtDate(planning.endDate)}</span>
             </span>
           )}
