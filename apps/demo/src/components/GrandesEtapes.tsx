@@ -16,7 +16,9 @@ export function GrandesEtapes({ dossier }: { dossier: ProjectDossier }): React.J
     <div className="space-y-3">
       <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
         <p className="font-mono text-xs text-gold-700">
-          Durée estimée : {fmtDuree(planning.estimatedDays)}
+          {planning.announcedLabel
+            ? `Durée annoncée : ${planning.announcedLabel}`
+            : `Durée estimée : ${fmtDuree(planning.estimatedDays)}`}
         </p>
         <PlanningFrieze phases={planning.phases} dated={planning.dated} />
       </div>

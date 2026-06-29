@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { buildSmartPlanning, type PlanningPhase, type ProjectDossier } from '@phenix360/core';
-import { CalendarClock, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
+import { CalendarClock, CheckCircle2, Loader2, Sparkles, TriangleAlert } from 'lucide-react';
 import { fmtDate, fmtDateShort, fmtDuree } from '../lib/format';
 import { PlanningFrieze } from './PlanningFrieze';
 
 /**
  * Le planning, vu comme un conducteur de travaux le présenterait — jamais un
  * formulaire ni un Gantt technique. PHÉNIX présente d'abord son travail, puis
- * pose UNE seule question naturelle : la date de démarrage. La durée est une
- * estimation calculée, pas une saisie. Quand la date change, PHÉNIX « recale »
- * visiblement le chantier (le moment magique). Dérivé du dossier (vivant).
+ * pose UNE seule question naturelle : la date de démarrage. Deux durées
+ * distinctes : celle ANNONCÉE au client (cadrage, connue dès le devis) et
+ * l'estimation HONNÊTE de PHÉNIX — un écart déclenche une vigilance. Quand la
+ * date change, PHÉNIX « recale » visiblement le chantier (le moment magique).
+ * Dérivé du dossier (vivant).
  */
 export function SmartPlanningView({
   dossier,
@@ -54,14 +56,28 @@ export function SmartPlanningView({
         />
       )}
 
+      {/* Vigilance : la durée annoncée et mon estimation diffèrent nettement. */}
+      {planning.durationMismatch && planning.announcedLabel && (
+        <p className="flex items-start gap-2 rounded-xl border border-gold-300 bg-gold-50 px-4 py-3 text-sm text-gold-900 [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-700">
+          <TriangleAlert aria-hidden />
+          <span>
+            J'estime ce chantier à {fmtDuree(planning.estimatedDays)}, alors que{' '}
+            {planning.announcedLabel} ont été annoncés au client. Je vous conseille de vérifier le
+            planning avant de valider.
+          </span>
+        </p>
+      )}
+
       {/* (5) La frise légère et éditoriale — visible dans les deux états. */}
       <section className="space-y-2 rounded-xl border border-border bg-surface p-4">
-        <div className="flex items-baseline justify-between gap-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Le déroulé du chantier
           </p>
           <p className="font-mono text-xs text-gold-700">
-            Durée estimée : {fmtDuree(planning.estimatedDays)}
+            {planning.announcedLabel
+              ? `Durée annoncée au client : ${planning.announcedLabel}`
+              : `Durée estimée : ${fmtDuree(planning.estimatedDays)}`}
           </p>
         </div>
         <PlanningFrieze phases={planning.phases} dated={planning.dated} />
@@ -104,7 +120,14 @@ function WorkSummary({
         </p>
         <ul className="space-y-1.5 text-sm text-muted-foreground">
           <Bullet>J'ai identifié {planning.phases.length} étapes.</Bullet>
-          <Bullet>J'estime la durée du chantier à {fmtDuree(planning.estimatedDays)}.</Bullet>
+          {planning.announcedLabel ? (
+            <Bullet>
+              Vous avez annoncé {planning.announcedLabel} au client — j'ai cadré le planning sur
+              cette durée.
+            </Bullet>
+          ) : (
+            <Bullet>J'estime la durée du chantier à {fmtDuree(planning.estimatedDays)}.</Bullet>
+          )}
           <Bullet>
             Les dépendances techniques et les temps de séchage sont déjà pris en compte.
           </Bullet>

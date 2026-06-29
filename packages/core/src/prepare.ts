@@ -305,6 +305,8 @@ export const parseDurationDays = (duration?: string): number => {
   if (u.startsWith('an')) return n * 365;
   if (u.startsWith('mois')) return n * 30;
   if (u.startsWith('sem')) return n * 7;
+  // Jours « ouvrés / ouvrables » → jours calendaires (5 j travaillés ≈ 7 j).
+  if (/ouvr/i.test(duration)) return Math.round((n * 7) / 5);
   return n;
 };
 
@@ -384,6 +386,46 @@ export function phaseDurations(dossier: ProjectDossier): PhaseDuration[] {
 }
 
 /**
+ * Estimation HONNÊTE de PHÉNIX : durées métier brutes + séchages, SANS mise à
+ * l'échelle sur la durée annoncée. C'est le calcul propre de PHÉNIX, confronté
+ * ensuite à ce qui a été annoncé au client (deux informations distinctes).
+ */
+export function estimateRawDays(dossier: ProjectDossier): number {
+  return dossier.roadmap.reduce((a, s) => a + stepDuration(s.label) + stepDrying(s.label), 0);
+}
+
+/** Phrase courte pour une durée (« 9 semaines », « 2 mois », « 10 jours »). */
+export function describeDuration(days: number): string {
+  if (days <= 0) return '—';
+  if (days < 14) return `${days} jour${days > 1 ? 's' : ''}`;
+  if (days < 60) return `environ ${Math.round(days / 7)} semaines`;
+  return `environ ${Math.round(days / 30)} mois`;
+}
+
+/**
+ * Confronte la durée ANNONCÉE au client (cadrage, connue dès le devis) et
+ * l'estimation HONNÊTE de PHÉNIX. Signale un écart significatif (> 15 %) — la
+ * même règle alimente le planning ET la note de lancement (pas de divergence).
+ */
+const DURATION_MISMATCH_RATIO = 0.15;
+export function durationCheck(dossier: ProjectDossier): {
+  announcedLabel: string | null;
+  announcedDays: number | null;
+  estimatedDays: number;
+  mismatch: boolean;
+} {
+  const announcedLabel = dossier.infos.duration ?? null;
+  const announcedDays = announcedLabel ? parseDurationDays(announcedLabel) : null;
+  const estimatedDays = estimateRawDays(dossier);
+  const mismatch =
+    announcedDays != null && estimatedDays > 0
+      ? Math.abs(estimatedDays - announcedDays) / Math.max(estimatedDays, announcedDays) >
+        DURATION_MISMATCH_RATIO
+      : false;
+  return { announcedLabel, announcedDays, estimatedDays, mismatch };
+}
+
+/**
  * Dates par étape (« planning daté ») : enchaînement séquentiel à partir de la
  * date de démarrage. [] tant que la date n'est pas fixée. Source commune au
  * planning ET aux alertes/vigilances (pas de dates divergentes).
@@ -440,8 +482,14 @@ export interface SmartPlanning {
   startDate: string | null;
   phases: PlanningPhase[];
   endDate: string | null;
-  /** Durée totale estimée (jours), séchages inclus — une estimation, pas une saisie. */
+  /** Durée ANNONCÉE au client (jours) — cadrage connu dès le devis. null si non renseignée. */
+  announcedDays: number | null;
+  /** Libellé saisi de la durée annoncée (« 2 mois », « 45 jours ouvrés »). */
+  announcedLabel: string | null;
+  /** Estimation HONNÊTE de PHÉNIX (jours), durées métier brutes — pas une saisie. */
   estimatedDays: number;
+  /** Vrai si l'estimation de PHÉNIX s'écarte nettement de la durée annoncée. */
+  durationMismatch: boolean;
 }
 
 /**
@@ -456,9 +504,18 @@ export function buildSmartPlanning(
   nowMs: number = Date.now(),
 ): SmartPlanning {
   const durations = phaseDurations(dossier);
-  const estimatedDays = durations.reduce((a, d) => a + d.durationDays + (d.drying ?? 0), 0);
+  const { announcedLabel, announcedDays, estimatedDays, mismatch } = durationCheck(dossier);
   if (durations.length === 0) {
-    return { dated: false, startDate: null, phases: [], endDate: null, estimatedDays: 0 };
+    return {
+      dated: false,
+      startDate: null,
+      phases: [],
+      endDate: null,
+      announcedDays,
+      announcedLabel,
+      estimatedDays,
+      durationMismatch: mismatch,
+    };
   }
   const dated = Boolean(dossier.infos.startDate);
   const datedById = new Map(computePhaseDates(dossier).map((p) => [p.stepId, p]));
@@ -507,7 +564,10 @@ export function buildSmartPlanning(
     startDate: dossier.infos.startDate ?? null,
     phases,
     endDate: dated ? (phases[phases.length - 1]!.end ?? null) : null,
+    announcedDays,
+    announcedLabel,
     estimatedDays,
+    durationMismatch: mismatch,
   };
 }
 
@@ -835,6 +895,28 @@ export function studyProject(
       id: 'planning-ok',
       kind: 'planning',
       title: 'Un planning prévisionnel est calé sur la date de début.',
+    });
+  }
+
+  // Cohérence durée annoncée au client ⇆ estimation de PHÉNIX.
+  const dur = durationCheck(dossier);
+  if (dur.mismatch && dur.announcedLabel) {
+    attention.push({
+      id: 'duree-incoherente',
+      kind: 'planning',
+      title: `J'estime ce chantier à ${describeDuration(dur.estimatedDays)}, alors que ${dur.announcedLabel} ont été annoncés au client.`,
+    });
+    advice.push({
+      id: 'duree-a',
+      kind: 'planning',
+      title:
+        'Vérifier le planning avant validation : la durée annoncée et mon estimation diffèrent.',
+    });
+  } else if (dur.announcedLabel) {
+    reassuring.push({
+      id: 'duree-ok',
+      kind: 'planning',
+      title: `Mon estimation est cohérente avec la durée annoncée (${dur.announcedLabel}).`,
     });
   }
 

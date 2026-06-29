@@ -48,7 +48,21 @@ export function PhenixStart({
 
   if (phase === 'analysis') return <AnalysisScreen onDone={() => void onAnalysisDone()} />;
   if (phase === 'ready' && proposal)
-    return <ReadyScreen proposal={proposal} onContinue={() => setPhase('review')} />;
+    return (
+      <ReadyScreen
+        proposal={proposal}
+        onContinue={(duration) => {
+          setProposal({
+            ...proposal,
+            dossier: {
+              ...proposal.dossier,
+              infos: { ...proposal.dossier.infos, duration },
+            },
+          });
+          setPhase('review');
+        }}
+      />
+    );
   if (phase === 'review' && proposal)
     return (
       <ProposalReview
@@ -248,14 +262,18 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
 /* -------------------------------------------------------------------------- *
  * 3. « Votre projet est prêt. » — l'effet temps gagné
  * -------------------------------------------------------------------------- */
+const DURATION_PRESETS = ['6 semaines', '2 mois', '3 mois', '45 jours ouvrés'];
+
 function ReadyScreen({
   proposal,
   onContinue,
 }: {
   proposal: ProjectProposal;
-  onContinue: () => void;
+  onContinue: (duration: string) => void;
 }): React.JSX.Element {
   const d = proposal.dossier;
+  const [duration, setDuration] = useState(d.infos.duration ?? '');
+
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 py-10 text-center">
       <span className="flex size-16 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-8">
@@ -276,7 +294,43 @@ function ReadyScreen({
         <strong>{d.orders.length} commandes</strong>,{' '}
         <strong>{d.selections.length} choix client</strong> et trié vos documents.
       </p>
-      <Button size="lg" onClick={onContinue}>
+
+      {/* Information de cadrage : la durée annoncée au client, connue dès le devis. */}
+      <div className="w-full space-y-3 rounded-2xl border border-border bg-surface p-5 text-left">
+        <div className="space-y-1">
+          <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+            Quelle durée avez-vous annoncée au client ?
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Cette durée me sert à cadrer le planning (répartition des étapes, commandes à
+            anticiper). La date de démarrage, elle, pourra venir plus tard.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {DURATION_PRESETS.map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              onClick={() => setDuration(preset)}
+              className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                duration === preset
+                  ? 'border-gold-400 bg-gold-100 font-medium text-gold-800'
+                  : 'border-border bg-paper-50 text-foreground hover:border-gold-300'
+              }`}
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+        <input
+          value={duration}
+          onChange={(e) => setDuration(e.target.value)}
+          placeholder="Ou saisissez librement (ex. 10 semaines)"
+          className="h-10 w-full rounded-lg border border-input bg-paper-50 px-3 text-sm text-foreground"
+        />
+      </div>
+
+      <Button size="lg" disabled={!duration.trim()} onClick={() => onContinue(duration.trim())}>
         Découvrons votre projet <ArrowRight aria-hidden />
       </Button>
     </div>
