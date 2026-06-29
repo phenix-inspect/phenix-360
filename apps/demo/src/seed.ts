@@ -294,39 +294,38 @@ export function buildDemoSeed(): DemoSeed {
         options: [
           {
             id: 'A',
-            title: 'Chêne clair & plan de travail sable',
+            title: 'Façades bois clair & plan de travail quartz blanc',
             description:
-              'Une cuisine chaleureuse et lumineuse, parfaite pour un séjour ouvert et accueillant.',
-            imageSeed: 'cuisine-chene-clair',
-            attributs: [
-              { label: 'Façades', value: 'Chêne clair' },
-              { label: 'Plan', value: 'Quartz sable' },
-              { label: 'Finition', value: 'Mate' },
-            ],
+              'Ambiance chaleureuse et lumineuse. Façades en bois clair, plan de travail quartz blanc pour un rendu doux et naturel.',
+            imageSeed: 'cuisine-bois-clair',
           },
           {
             id: 'B',
-            title: 'Laque mate gris anthracite',
+            title: 'Façades blanches & plan de travail noir',
             description:
-              'Une ambiance contemporaine et graphique, élégante avec des poignées intégrées.',
-            imageSeed: 'cuisine-anthracite',
-            attributs: [
-              { label: 'Façades', value: 'Laque anthracite' },
-              { label: 'Plan', value: 'Céramique gris clair' },
-              { label: 'Finition', value: 'Mate' },
-            ],
+              'Ambiance moderne et contrastée. Façades blanches mates, plan de travail noir pour un style élégant et intemporel.',
+            imageSeed: 'cuisine-blanc-noir',
           },
           {
             id: 'C',
-            title: 'Noyer foncé & plan pierre',
+            title: 'Façades vert sauge & plan de travail bois',
             description:
-              'Une cuisine plus intime et premium, jouant sur les matières naturelles et la profondeur.',
-            imageSeed: 'cuisine-noyer',
-            attributs: [
-              { label: 'Façades', value: 'Noyer foncé' },
-              { label: 'Plan', value: 'Pierre veinée' },
-              { label: 'Finition', value: 'Satinée' },
-            ],
+              'Ambiance douce et tendance. Façades vert sauge mates, plan de travail bois clair pour une atmosphère naturelle.',
+            imageSeed: 'cuisine-vert-sauge',
+          },
+          {
+            id: 'D',
+            title: 'Façades gris anthracite & plan de travail marbre clair',
+            description:
+              'Ambiance chic et contemporaine. Façades gris anthracite, plan de travail marbre clair pour un rendu raffiné.',
+            imageSeed: 'cuisine-anthracite-marbre',
+          },
+          {
+            id: 'E',
+            title: 'Façades beige sable & plan de travail pierre',
+            description:
+              'Ambiance douce et minérale. Façades beige sable, plan de travail pierre pour un style épuré et harmonieux.',
+            imageSeed: 'cuisine-beige-pierre',
           },
         ],
       },

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Textarea } from '@phenix360/ui';
-import { Sparkles } from 'lucide-react';
+import { Lock, Sparkles } from 'lucide-react';
 import type { ClientDecision } from '@phenix360/core';
 import { fmtDate } from '../lib/format';
 import { ProposalGallery } from './ProposalGallery';
@@ -66,23 +66,29 @@ export function ClientDecisionBanner({
               {open ? `Votre validation ${cat} est attendue` : 'Une décision vous attend'}
             </h2>
             {open ? (
-              <p className="text-sm leading-relaxed text-ink-600">
-                {hasOptions
-                  ? `J'ai préparé plusieurs propositions pour votre ${cat} — choisissez celle que vous préférez.`
-                  : "Pour conserver le planning prévu, j'ai besoin de votre validation"}
-                {!hasOptions && decision.decideAvant && (
-                  <>
-                    {' '}
-                    avant le{' '}
+              <div className="space-y-1 text-sm leading-relaxed text-ink-600">
+                {decision.decideAvant && (
+                  <p>
+                    Pour conserver le planning prévu, j'ai besoin de votre validation avant le{' '}
                     <span className="font-medium text-foreground">
                       {fmtDate(decision.decideAvant)}
                     </span>
-                  </>
+                    .
+                  </p>
                 )}
-                {!hasOptions && !decision.decideAvant && ' dès que possible'}
-                {!hasOptions && '.'}
-                {!hasOptions && decision.detail ? ` Proposition : ${decision.detail}.` : ''}
-              </p>
+                {hasOptions ? (
+                  <p>
+                    J'ai préparé plusieurs propositions pour votre {cat} — choisissez celle qui vous
+                    plaît.
+                  </p>
+                ) : (
+                  <p>
+                    {decision.detail
+                      ? `Proposition : ${decision.detail}.`
+                      : 'Indiquez-moi votre préférence.'}
+                  </p>
+                )}
+              </div>
             ) : (
               <p className="text-sm leading-relaxed text-ink-600">
                 J'ai besoin de votre validation sur votre {cat}.
@@ -107,7 +113,7 @@ export function ClientDecisionBanner({
               )}
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy || !canValidate} onClick={() => void validate()}>
-                  {hasOptions ? 'Valider cette proposition' : 'Valider le choix proposé'}
+                  {hasOptions ? 'Valider mon choix' : 'Valider le choix proposé'}
                 </Button>
                 <Button
                   size="sm"
@@ -118,6 +124,10 @@ export function ClientDecisionBanner({
                   {hasOptions ? 'Je souhaite une modification' : 'Demander une modification'}
                 </Button>
               </div>
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5">
+                <Lock aria-hidden />
+                Votre choix sera enregistré et partagé avec l'équipe projet.
+              </p>
             </div>
           )}
 

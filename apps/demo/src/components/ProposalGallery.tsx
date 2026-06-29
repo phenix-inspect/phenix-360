@@ -1,15 +1,21 @@
-import { Check, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import { cn } from '@phenix360/ui';
 import type { SelectionOption } from '@phenix360/core';
 import { warmGradient } from './gradient';
 
 /**
- * Galerie de PROPOSITIONS client — brique GÉNÉRIQUE (cuisine, carrelage,
- * parquet, peinture, sanitaires, luminaires, mobilier, poignées…). PHÉNIX
- * présente plusieurs ambiances soigneusement préparées : grande photo +
- * titre + description + caractéristiques. Le client sélectionne celle qu'il
- * préfère — jamais un formulaire. La photo est éditoriale (dégradé déterministe)
- * tant qu'aucune vraie image n'est fournie.
+ * Galerie de PROPOSITIONS client — brique 100 % GÉNÉRIQUE (cuisine, carrelage,
+ * parquet, peinture, robinetterie, sanitaires, luminaires, mobilier, poignées…).
+ * Présentation ÉDITORIALE, façon catalogue d'architecte d'intérieur : une grande
+ * photo à gauche, les informations à droite, une lecture fluide. Le client coche
+ * la proposition (A–E) qui lui plaît — jamais un formulaire. La photo est
+ * éditoriale (dégradé déterministe) tant qu'aucune vraie image n'est fournie ;
+ * `imageUrl` bascule automatiquement sur la photo réelle.
+ *
+ * Note d'architecture : les `SelectionOption` seront à terme GÉNÉRÉES par PHÉNIX
+ * (photos du projet + style + bibliothèque de références), le conducteur ne fera
+ * que les ajuster. Ce composant n'en dépend pas : il affiche des options, d'où
+ * qu'elles viennent.
  */
 export function ProposalGallery({
   options,
@@ -21,70 +27,71 @@ export function ProposalGallery({
   onSelect: (id: string) => void;
 }): React.JSX.Element {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <ul className="space-y-3">
       {options.slice(0, 5).map((opt, i) => {
         const selected = opt.id === selectedId;
         const ref = opt.ref ?? String.fromCharCode(65 + i); // A, B, C…
         const seed = opt.imageSeed ?? `${opt.id}-${opt.title}`;
+        const attrs = opt.attributs?.map((a) => a.value).join(' · ');
         return (
-          <button
-            key={opt.id}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onSelect(opt.id)}
-            className={cn(
-              'group overflow-hidden rounded-xl border bg-surface text-left transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              selected ? 'border-primary shadow-gold' : 'border-border hover:border-gold-300',
-            )}
-          >
-            <div
-              className="relative aspect-[4/3] w-full overflow-hidden"
-              style={warmGradient(seed)}
+          <li key={opt.id}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onSelect(opt.id)}
+              className={cn(
+                'flex w-full items-center gap-4 rounded-2xl border p-3 text-left transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                selected
+                  ? 'border-primary shadow-gold'
+                  : 'border-border bg-surface hover:border-gold-300',
+              )}
             >
-              {opt.imageUrl ? (
-                <img src={opt.imageUrl} alt={opt.title} className="size-full object-cover" />
-              ) : (
+              <div className="flex shrink-0 items-center gap-2">
                 <span
                   aria-hidden
-                  className="absolute inset-0 flex items-center justify-center text-paper-0 [&_svg]:size-12"
-                  style={{ opacity: 0.18 }}
+                  className={cn(
+                    'flex size-5 items-center justify-center rounded-full border-2',
+                    selected ? 'border-primary' : 'border-input',
+                  )}
                 >
-                  <ImageIcon />
+                  {selected && <span className="size-2.5 rounded-full bg-primary" />}
                 </span>
-              )}
-              <span className="absolute left-3 top-3 flex size-7 items-center justify-center rounded-full bg-paper-0/85 font-mono text-xs font-semibold text-ink-800">
-                {ref}
-              </span>
-              {selected && (
-                <span className="absolute right-3 top-3 flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground [&_svg]:size-4">
-                  <Check aria-hidden />
+                <span className="flex size-7 items-center justify-center rounded-full bg-gold-100 font-mono text-xs font-semibold text-gold-800">
+                  {ref}
                 </span>
-              )}
-            </div>
+              </div>
 
-            <div className="space-y-1.5 p-3">
-              <p className="font-serif text-base font-semibold tracking-tight text-foreground">
-                {opt.title}
-              </p>
-              {opt.description && (
-                <p className="text-sm leading-relaxed text-muted-foreground">{opt.description}</p>
-              )}
-              {opt.attributs && opt.attributs.length > 0 && (
-                <ul className="flex flex-wrap gap-1.5 pt-0.5">
-                  {opt.attributs.map((a) => (
-                    <li
-                      key={a.label}
-                      className="rounded-full border border-border bg-paper-50 px-2 py-0.5 text-xs text-muted-foreground"
-                    >
-                      <span className="text-gold-700">{a.label}</span> : {a.value}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </button>
+              <div
+                className="relative aspect-[4/3] w-32 shrink-0 overflow-hidden rounded-xl sm:w-44"
+                style={opt.imageUrl ? undefined : warmGradient(seed)}
+              >
+                {opt.imageUrl ? (
+                  <img src={opt.imageUrl} alt={opt.title} className="size-full object-cover" />
+                ) : (
+                  <span
+                    aria-hidden
+                    className="absolute inset-0 flex items-center justify-center text-paper-0 [&_svg]:size-10"
+                    style={{ opacity: 0.18 }}
+                  >
+                    <ImageIcon />
+                  </span>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-1">
+                <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+                  {opt.title}
+                </p>
+                {opt.description && (
+                  <p className="text-sm leading-relaxed text-muted-foreground">{opt.description}</p>
+                )}
+                {attrs && <p className="text-xs uppercase tracking-wide text-gold-700">{attrs}</p>}
+              </div>
+            </button>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
