@@ -1,6 +1,11 @@
 import { Badge, Button, Input, Textarea } from '@phenix360/ui';
 import { Image as ImageIcon, Plus, RefreshCw, Send, Trash2 } from 'lucide-react';
-import { proposalNoun, type ClientSelection, type SelectionOption } from '@phenix360/core';
+import {
+  isPhenixDelegate,
+  proposalNoun,
+  type ClientSelection,
+  type SelectionOption,
+} from '@phenix360/core';
 import { warmGradient } from './gradient';
 
 const MAX_OPTIONS = 5;
@@ -71,7 +76,9 @@ export function ProposalWorkshop({
                 }
               >
                 {s.statut === 'valide'
-                  ? 'Validé par le client'
+                  ? isPhenixDelegate(s.chosenOptionId)
+                    ? 'Confié à PHÉNIX'
+                    : 'Validé par le client'
                   : s.statut === 'propose'
                     ? 'Envoyé au client'
                     : 'À envoyer'}

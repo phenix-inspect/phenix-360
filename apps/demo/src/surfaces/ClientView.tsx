@@ -5,6 +5,7 @@ import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
   clientFeed,
+  isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
   runAssistant,
@@ -50,13 +51,15 @@ export function ClientView({
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
+    const cat = d.categorie.toLowerCase();
+    const delegated = isPhenixDelegate(optionId);
     const chosen = d.options.find((o) => o.id === optionId);
-    const retenu = chosen?.title ?? d.label;
+    const detail = delegated ? 'Choix confié à PHÉNIX' : (chosen?.title ?? undefined);
     demo.saveDossier(project.id, {
       ...dossier,
       selections: dossier.selections.map((s) =>
         s.id === d.id
-          ? { ...s, statut: 'valide', chosenOptionId: optionId, detail: chosen?.title ?? s.detail }
+          ? { ...s, statut: 'valide', chosenOptionId: optionId, detail: detail ?? s.detail }
           : s,
       ),
     });
@@ -67,10 +70,12 @@ export function ClientView({
       visibility: 'client',
       state: 'close',
       content: {
-        question: `Choix ${d.categorie.toLowerCase()} validé : ${retenu}`,
+        question: delegated
+          ? `Le client a confié le choix ${cat} à PHÉNIX.`
+          : `Choix ${cat} validé : ${chosen?.title ?? d.label}`,
         destinataire: 'equipe',
         resolution: {
-          texte: 'Validé par le client.',
+          texte: delegated ? 'Choix délégué à PHÉNIX.' : 'Validé par le client.',
           resolvedBy: actor.userId,
           resolvedAt: new Date().toISOString(),
         },

@@ -172,6 +172,15 @@ export interface ClientSelection {
 }
 
 /**
+ * Proposition SIGNATURE « Je laisse PHÉNIX choisir pour moi » — toujours offerte,
+ * en dernière position, sur CHAQUE décision client, HORS limite des 5. Transforme
+ * la confiance (« fais comme tu veux ») en fonctionnalité : le client délègue le
+ * choix à PHÉNIX, la décision est validée, et plus aucun rappel n'est envoyé.
+ */
+export const PHENIX_DELEGATE_ID = '__phenix_delegate__';
+export const isPhenixDelegate = (optionId?: string): boolean => optionId === PHENIX_DELEGATE_ID;
+
+/**
  * Mot adapté au type de choix pour présenter les propositions au client (toujours
  * féminin → « celle que vous préférez ») :
  *   • cuisine / décoration / mobilier      → « ambiances »
