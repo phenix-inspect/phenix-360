@@ -419,6 +419,216 @@ export function buildOrderAlerts(
 }
 
 /* -------------------------------------------------------------------------- *
+ * LA NOTE DE LANCEMENT — le « cerveau » de PHÉNIX avant le démarrage
+ * -------------------------------------------------------------------------- *
+ * Comme un conducteur de travaux senior qui aurait étudié le dossier avant la
+ * réunion de lancement et laissé sa note de passation. Équilibrée : ce qui est
+ * déjà préparé, ce qui rassure, ce qui mérite l'attention, ce qu'il conseille
+ * de faire ensuite. Sélecteur PUR : recalculé à chaque évolution (avenant,
+ * document, commande…) → la note reste VIVANTE, jamais une photo du jour 1.
+ * Règles déterministes (démo) ; une vraie IA viendra derrière, même sortie.
+ */
+export type NoteKind =
+  'commande' | 'document' | 'choix' | 'planning' | 'technique' | 'devis' | 'budget' | 'oubli';
+
+export interface NoteFinding {
+  id: string;
+  kind: NoteKind;
+  title: string;
+}
+
+export type NoteAction = { type: 'document'; docId: string } | { type: 'preparation' };
+
+export interface NoteAdvice extends NoteFinding {
+  action?: NoteAction;
+}
+
+export interface LaunchNote {
+  prepared: {
+    roadmap: number;
+    orders: number;
+    selections: number;
+    documents: number;
+    hasPlanning: boolean;
+  };
+  reassuring: NoteFinding[];
+  attention: NoteFinding[];
+  advice: NoteAdvice[];
+}
+
+export function studyProject(
+  dossier: ProjectDossier | null,
+  events: Event[],
+  nowMs: number = Date.now(),
+): LaunchNote {
+  const reassuring: NoteFinding[] = [];
+  const attention: NoteFinding[] = [];
+  const advice: NoteAdvice[] = [];
+
+  if (!dossier) {
+    return {
+      prepared: { roadmap: 0, orders: 0, selections: 0, documents: 0, hasPlanning: false },
+      reassuring,
+      attention,
+      advice,
+    };
+  }
+
+  const labels = dossier.roadmap.map((s) => s.label.toLowerCase());
+  const hasStep = (re: RegExp): boolean => labels.some((l) => re.test(l));
+
+  // Commandes : on réutilise le moteur d'alertes (vivant).
+  for (const a of buildOrderAlerts(dossier, nowMs)) {
+    if (a.severity === 'warning')
+      attention.push({ id: `o-${a.id}`, kind: 'commande', title: a.message });
+    else reassuring.push({ id: `o-${a.id}`, kind: 'commande', title: a.message });
+  }
+
+  // Ce qui rassure (confiance).
+  if (dossier.roadmap.length > 0 && dossier.orders.length > 0) {
+    reassuring.push({
+      id: 'coherence',
+      kind: 'devis',
+      title: 'Le devis est cohérent avec la feuille de route.',
+    });
+  }
+  const withMontant = dossier.orders.filter((o) => o.montant != null);
+  if (dossier.infos.budget && withMontant.length >= 2) {
+    reassuring.push({
+      id: 'budget',
+      kind: 'budget',
+      title: `Le budget se répartit proprement sur ${withMontant.length} postes de commande.`,
+    });
+  }
+
+  // Vigilances techniques & oublis fréquents.
+  const sdb =
+    dossier.selections.some((s) =>
+      /bain|douche|sanitaire|fa[iï]ence/i.test(`${s.categorie} ${s.label}`),
+    ) || hasStep(/carrelage|fa[iï]ence/);
+  if (sdb && !hasStep(/[ée]tanch/)) {
+    attention.push({
+      id: 'etanch',
+      kind: 'technique',
+      title: "Salle de bain : je ne vois pas d'étanchéité prévue avant le carrelage.",
+    });
+    advice.push({
+      id: 'etanch-a',
+      kind: 'technique',
+      title: "Vérifier l'étanchéité de la salle de bain avec le plombier avant la pose.",
+    });
+  }
+  if (hasStep(/carrelage|\bsol|parquet/) && !hasStep(/chape|ragr[ée]|pr[ée]paration/)) {
+    attention.push({
+      id: 'chape',
+      kind: 'technique',
+      title: 'Pose de sol prévue sans préparation (chape / ragréage) détectée dans le devis.',
+    });
+  }
+  if (!hasStep(/gravats|benne|[ée]vacuation/)) {
+    attention.push({
+      id: 'gravats',
+      kind: 'oubli',
+      title: 'Aucune évacuation des gravats détectée dans le devis.',
+    });
+    advice.push({
+      id: 'gravats-a',
+      kind: 'oubli',
+      title: "Prévoir l'évacuation des gravats (benne) dès le début du chantier.",
+    });
+  }
+  if (!hasStep(/nettoyage/)) {
+    attention.push({
+      id: 'nettoyage',
+      kind: 'oubli',
+      title: 'Pas d’étape de nettoyage de fin de chantier prévue.',
+    });
+  }
+
+  // Documents manquants → attention + conseil actionnable.
+  for (const d of dossier.documents) {
+    if (d.status === 'manquant') {
+      attention.push({
+        id: `doc-${d.id}`,
+        kind: 'document',
+        title: `${d.label} : recommandé mais absent du dossier.`,
+      });
+      advice.push({
+        id: `doc-a-${d.id}`,
+        kind: 'document',
+        title: `Demander ${d.label} au client.`,
+        action: { type: 'document', docId: d.id },
+      });
+    }
+  }
+
+  // Choix client à obtenir.
+  const aChoisir = dossier.selections.filter((s) => s.statut === 'a_choisir').length;
+  if (aChoisir > 0) {
+    attention.push({
+      id: 'choix',
+      kind: 'choix',
+      title: `${aChoisir} choix client restent à obtenir au bon moment.`,
+    });
+    advice.push({
+      id: 'choix-a',
+      kind: 'choix',
+      title: 'Obtenir les choix client avant les phases concernées.',
+    });
+  }
+  for (const dec of pendingClientDecisions(events)) {
+    attention.push({
+      id: `dec-${dec.eventId}`,
+      kind: 'choix',
+      title: `Décision client en attente : ${dec.question}`,
+    });
+  }
+
+  // Conseil de tête si des commandes sont tendues.
+  if (attention.some((a) => a.kind === 'commande')) {
+    advice.unshift({
+      id: 'cmd-a',
+      kind: 'commande',
+      title: 'Lancer cette semaine les commandes dont le délai est tendu.',
+      action: { type: 'preparation' },
+    });
+  }
+
+  // Planning.
+  if (!dossier.infos.startDate) {
+    attention.push({
+      id: 'startdate',
+      kind: 'planning',
+      title: "La date de début n'est pas encore fixée.",
+    });
+    advice.push({
+      id: 'startdate-a',
+      kind: 'planning',
+      title: 'Fixer la date de début pour caler le planning et les commandes.',
+    });
+  } else {
+    reassuring.push({
+      id: 'planning-ok',
+      kind: 'planning',
+      title: 'Un planning prévisionnel est calé sur la date de début.',
+    });
+  }
+
+  return {
+    prepared: {
+      roadmap: dossier.roadmap.length,
+      orders: dossier.orders.length,
+      selections: dossier.selections.length,
+      documents: dossier.documents.length,
+      hasPlanning: dossier.planning.length > 0,
+    },
+    reassuring: reassuring.slice(0, 5),
+    attention: attention.slice(0, 6),
+    advice: advice.slice(0, 6),
+  };
+}
+
+/* -------------------------------------------------------------------------- *
  * SYNTHÈSE « PHÉNIX surveille votre chantier » (accueil Compagnon)
  * -------------------------------------------------------------------------- *
  * Une seule lecture, claire : « Voici ce qui mérite votre attention

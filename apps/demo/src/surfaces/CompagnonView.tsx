@@ -64,7 +64,11 @@ export function CompagnonView({
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
   const [composer, setComposer] = useState<ComposerKind | null>(null);
-  const [tab, setTab] = useState<'suivi' | 'preparation' | 'historique'>('suivi');
+  // À l'ouverture d'un chantier en préparation, on accueille par la note de
+  // lancement (onglet Préparation) ; sinon, le suivi du jour.
+  const [tab, setTab] = useState<'suivi' | 'preparation' | 'historique'>(
+    dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi',
+  );
 
   const attention = buildChantierAttention(dossier, events);
 
@@ -121,7 +125,7 @@ export function CompagnonView({
         <TabsContent value="suivi">{suivi}</TabsContent>
         {dossier && (
           <TabsContent value="preparation">
-            <DossierPanel project={project} dossier={dossier} actor={actor} />
+            <DossierPanel project={project} dossier={dossier} actor={actor} events={events} />
           </TabsContent>
         )}
         <TabsContent value="historique">

@@ -15,22 +15,19 @@ import {
   ORDER_STATUS_LABEL,
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
-  buildOrderAlerts,
   buildProjectMemory,
+  studyProject,
+  type Event,
   type EventActor,
   type Order,
-  type OrderAlert,
   type OrderStatus,
   type Project,
   type ProjectDossier,
 } from '@phenix360/core';
 import {
-  AlertTriangle,
   Banknote,
   CalendarDays,
-  CheckCircle2,
   FileText,
-  Info as InfoIcon,
   ListChecks,
   Palette,
   Pencil,
@@ -40,19 +37,22 @@ import { demo } from '../store';
 import { fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
+import { LaunchNotePanel } from './LaunchNotePanel';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
   project,
   dossier,
   actor,
+  events,
 }: {
   project: Project;
   dossier: ProjectDossier;
   actor: EventActor;
+  events: Event[];
 }): React.JSX.Element {
   const memory = buildProjectMemory(dossier);
-  const alerts = buildOrderAlerts(dossier);
+  const note = studyProject(dossier, events);
   const [editing, setEditing] = useState<Order | null>(null);
 
   const patch = (next: Partial<ProjectDossier>) =>
@@ -90,9 +90,15 @@ export function DossierPanel({
 
   return (
     <div className="space-y-6">
-      <Info dossier={dossier} />
+      <LaunchNotePanel
+        note={note}
+        onAskDocument={(docId) => {
+          const d = dossier.documents.find((x) => x.id === docId);
+          if (d) void askDocument(d.id, d.label);
+        }}
+      />
 
-      {alerts.length > 0 && <AlertsSection alerts={alerts} />}
+      <Info dossier={dossier} />
 
       <Section
         icon={<ListChecks aria-hidden />}
@@ -218,44 +224,6 @@ export function DossierPanel({
         />
       )}
     </div>
-  );
-}
-
-function AlertsSection({ alerts }: { alerts: OrderAlert[] }): React.JSX.Element {
-  const icon = (s: OrderAlert['severity']) =>
-    s === 'warning' ? (
-      <AlertTriangle aria-hidden />
-    ) : s === 'success' ? (
-      <CheckCircle2 aria-hidden />
-    ) : (
-      <InfoIcon aria-hidden />
-    );
-  const tone = (s: OrderAlert['severity']) =>
-    s === 'warning'
-      ? 'border-gold-200 bg-gold-50 text-gold-800'
-      : s === 'success'
-        ? 'border-border bg-surface text-success'
-        : 'border-border bg-surface text-info';
-  return (
-    <Card className="border-gold-200 bg-gold-50">
-      <CardContent className="space-y-2 p-5">
-        <div className="flex items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:text-gold-700">
-          <Sparkles aria-hidden />
-          <h3 className="text-sm font-semibold">PHÉNIX surveille vos commandes</h3>
-        </div>
-        <ul className="space-y-2">
-          {alerts.map((a) => (
-            <li
-              key={a.id}
-              className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 ${tone(a.severity)}`}
-            >
-              {icon(a.severity)}
-              <span>{a.message}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
   );
 }
 
