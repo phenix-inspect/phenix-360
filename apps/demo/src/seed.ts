@@ -278,6 +278,29 @@ export function buildDemoSeed(): DemoSeed {
         label: 'Salle de bain',
         statut: 'a_choisir',
         detail: 'Deux ambiances proposées',
+        options: [
+          {
+            id: 'A',
+            title: 'Grès effet pierre, grand format',
+            description:
+              'Carreaux grand format effet pierre, pose minérale et contemporaine pour une salle de bain apaisante.',
+            imageSeed: 'carrelage-pierre',
+          },
+          {
+            id: 'B',
+            title: 'Zellige blanc nacré',
+            description:
+              'Zelliges faits main aux reflets nacrés, pour une ambiance artisanale et lumineuse.',
+            imageSeed: 'carrelage-zellige',
+          },
+          {
+            id: 'C',
+            title: 'Terrazzo doux ton sable',
+            description:
+              'Terrazzo aux éclats fins sur fond sable, un parti pris graphique et chaleureux.',
+            imageSeed: 'carrelage-terrazzo',
+          },
+        ],
       },
       {
         id: 's2',

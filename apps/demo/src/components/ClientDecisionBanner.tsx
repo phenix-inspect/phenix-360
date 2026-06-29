@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Textarea } from '@phenix360/ui';
 import { Lock, Sparkles } from 'lucide-react';
-import type { ClientDecision } from '@phenix360/core';
+import { proposalNoun, type ClientDecision } from '@phenix360/core';
 import { fmtDate } from '../lib/format';
 import { ProposalGallery } from './ProposalGallery';
 
@@ -78,8 +78,8 @@ export function ClientDecisionBanner({
                 )}
                 {hasOptions ? (
                   <p>
-                    J'ai préparé plusieurs propositions pour votre {cat} — choisissez celle qui vous
-                    plaît.
+                    J'ai préparé plusieurs {proposalNoun(decision.categorie)} pour votre {cat}.
+                    Sélectionnez celle que vous préférez.
                   </p>
                 ) : (
                   <p>

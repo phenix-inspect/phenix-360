@@ -42,6 +42,7 @@ import { RoadmapProgress } from './RoadmapProgress';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
 import { SmartPlanningView } from './SmartPlanningView';
+import { ProposalWorkshop } from './ProposalWorkshop';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -136,6 +137,15 @@ export function DossierPanel({
       </Section>
 
       <DecisionsSection dossier={dossier} />
+
+      {dossier.selections.some((s) => (s.options?.length ?? 0) > 0) && (
+        <Section icon={<Sparkles aria-hidden />} title="Propositions préparées par PHÉNIX">
+          <ProposalWorkshop
+            selections={dossier.selections}
+            onChange={(next) => patch({ selections: next })}
+          />
+        </Section>
+      )}
 
       <Section
         icon={<Palette aria-hidden />}

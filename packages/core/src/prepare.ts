@@ -171,6 +171,23 @@ export interface ClientSelection {
   chosenOptionId?: string;
 }
 
+/**
+ * Mot adapté au type de choix pour présenter les propositions au client (toujours
+ * féminin → « celle que vous préférez ») :
+ *   • cuisine / décoration / mobilier      → « ambiances »
+ *   • carrelage / parquet / peinture       → « propositions »
+ *   • robinetterie / sanitaires / luminaires → « options »
+ */
+export function proposalNoun(categorie: string): 'ambiances' | 'propositions' | 'options' {
+  const c = categorie.toLowerCase();
+  if (/cuisine|d[ée]co|mobilier|meuble|dressing|am[ée]nagement/.test(c)) return 'ambiances';
+  if (
+    /robinet|sanitaire|vasque|douche|luminaire|[ée]clairage|poign[ée]e|interrupteur|prise/.test(c)
+  )
+    return 'options';
+  return 'propositions';
+}
+
 /* -------------------------------------------------------------------------- *
  * Documents (jamais bloquant — chaque document a un état)
  * -------------------------------------------------------------------------- */
