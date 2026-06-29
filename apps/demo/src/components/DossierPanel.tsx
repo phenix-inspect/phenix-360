@@ -16,12 +16,14 @@ import {
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
+  avenantImpact,
   buildDecisionContent,
   buildProjectMemory,
   consolidateDevis,
   decisionVisibility,
   studyProject,
   type Avenant,
+  type AvenantImpact,
   type ClientDecisionStatus,
   type DevisPoste,
   type Event,
@@ -42,6 +44,7 @@ import {
   Plus,
   Receipt,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { demo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
@@ -67,6 +70,8 @@ export function DossierPanel({
   const memory = buildProjectMemory(dossier);
   const note = studyProject(dossier, events);
   const [editing, setEditing] = useState<Order | null>(null);
+  // Avenant fraîchement déposé → PHÉNIX affiche sa mini-note d'intégration.
+  const [integratedNumero, setIntegratedNumero] = useState<number | null>(null);
 
   const patch = (next: Partial<ProjectDossier>) =>
     demo.saveDossier(project.id, { ...dossier, ...next });
@@ -133,10 +138,12 @@ export function DossierPanel({
     });
   };
 
-  // Matérialiser un avenant : un NOUVEAU devis signé, AJOUTÉ au projet (jamais
-  // une modification du devis initial). On fait évoluer le poste le plus
-  // structurant (version supérieure), on ajoute des travaux supplémentaires, et
-  // on trace tout au journal. Append-only : on ajoute, on ne réécrit jamais.
+  // Déposer un avenant signé : un NOUVEAU devis signé est remis, PHÉNIX l'analyse
+  // et l'INTÈGRE au chantier (jamais une modification du devis initial). Pour la
+  // démo, le « fichier déposé » est scénarisé : montée en gamme du poste le plus
+  // structurant + travaux supplémentaires. PHÉNIX recalcule alors les impacts
+  // (commandes, choix, documents, planning, budget, vigilances) et trace tout au
+  // journal. Append-only : on ajoute, on ne réécrit jamais.
   const addAvenant = async () => {
     if (!dossier.devis) return;
     const existing = dossier.avenants ?? [];
@@ -185,6 +192,26 @@ export function DossierPanel({
     };
 
     patch({ avenants: [...existing, avenant] });
+    setIntegratedNumero(numero);
+
+    // PHÉNIX recalcule les impacts de l'avenant (source unique : même sélecteur
+    // que la mini-note affichée à l'écran).
+    const impact = avenantImpact(dossier.devis, existing, avenant);
+    const sign = impact.deltaHT >= 0 ? '+' : '−';
+    const lines = [
+      `Avenant n°${numero} déposé et intégré par PHÉNIX (le devis initial reste intact).`,
+      `• ${impact.postesRemplaces} poste(s) remplacé(s), ${impact.postesAjoutes} poste(s) ajouté(s).`,
+      `• Budget : ${sign}${fmtMoney(Math.abs(impact.deltaHT))} HT.`,
+      impact.commandesAMettreAJour > 0
+        ? `• ${impact.commandesAMettreAJour} commande(s) à mettre à jour.`
+        : null,
+      impact.choixAObtenir > 0 ? `• ${impact.choixAObtenir} choix client à obtenir.` : null,
+      impact.documentsNecessaires > 0
+        ? `• ${impact.documentsNecessaires} document(s) nécessaire(s).`
+        : null,
+      impact.vigilances > 0 ? `• ${impact.vigilances} vigilance(s) à lever.` : null,
+      impact.impactPlanning ? '• Impact planning à vérifier.' : null,
+    ].filter(Boolean);
 
     await demo.appendEvent({
       projectId: project.id,
@@ -192,13 +219,7 @@ export function DossierPanel({
       type: 'compte_rendu',
       visibility: 'interne',
       state: 'publie',
-      content: {
-        texte:
-          `Avenant n°${numero} signé et intégré (le devis initial reste intact).\n` +
-          `• Poste remplacé : « ${target.poste.label} » (lot ${target.lotLabel}) → reste visible, marqué « remplacé par avenant n°${numero} ».\n` +
-          `• Poste ajouté : « ${added.label} » (${fmtMoney(added.montantHT)} HT).\n` +
-          `• Impact à vérifier : commandes, choix client et planning du lot « ${target.lotLabel} ».`,
-      },
+      content: { texte: lines.join('\n') },
     });
   };
 
@@ -234,6 +255,11 @@ export function DossierPanel({
     window.setTimeout(() => el.classList.remove('ring-2', 'ring-gold-400', 'ring-offset-2'), 1600);
   };
 
+  const integrated =
+    integratedNumero != null
+      ? (dossier.avenants ?? []).find((a) => a.numero === integratedNumero)
+      : undefined;
+
   return (
     <div className="space-y-6">
       <div id="note-lancement">
@@ -255,10 +281,20 @@ export function DossierPanel({
           count={consolidateDevis(dossier.devis, dossier.avenants).lots.length}
           action={
             <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
-              <Plus aria-hidden /> Ajouter un avenant
+              <Plus aria-hidden /> Déposer un avenant signé
             </Button>
           }
         >
+          {integrated && (
+            <AvenantIntegrationNote
+              impact={avenantImpact(
+                dossier.devis,
+                (dossier.avenants ?? []).filter((a) => a.numero < integrated.numero),
+                integrated,
+              )}
+              onClose={() => setIntegratedNumero(null)}
+            />
+          )}
           <DevisBreakdown
             devis={dossier.devis}
             avenants={dossier.avenants}
@@ -772,6 +808,69 @@ function DecisionsSection({ dossier }: { dossier: ProjectDossier }): React.JSX.E
         </ul>
       )}
     </Section>
+  );
+}
+
+/**
+ * Mini-note d'intégration : juste après le dépôt d'un avenant, PHÉNIX confirme
+ * ce qu'il a recalculé. Lecture du sélecteur `avenantImpact` (aucune logique
+ * ici). On n'affiche que les impacts pertinents (lignes non nulles).
+ */
+function AvenantIntegrationNote({
+  impact,
+  onClose,
+}: {
+  impact: AvenantImpact;
+  onClose: () => void;
+}): React.JSX.Element {
+  const sign = impact.deltaHT >= 0 ? '+' : '−';
+  const plural = (n: number): string => (n > 1 ? 's' : '');
+  const lines: string[] = [
+    `${impact.postesRemplaces} poste${plural(impact.postesRemplaces)} remplacé${plural(impact.postesRemplaces)}`,
+    `${impact.postesAjoutes} poste${plural(impact.postesAjoutes)} ajouté${plural(impact.postesAjoutes)}`,
+    `${sign}${fmtMoney(Math.abs(impact.deltaHT))} HT`,
+  ];
+  if (impact.commandesAMettreAJour > 0)
+    lines.push(
+      `${impact.commandesAMettreAJour} commande${plural(impact.commandesAMettreAJour)} à mettre à jour`,
+    );
+  if (impact.choixAObtenir > 0) lines.push(`${impact.choixAObtenir} choix client à obtenir`);
+  if (impact.documentsNecessaires > 0)
+    lines.push(
+      `${impact.documentsNecessaires} document${plural(impact.documentsNecessaires)} nécessaire${plural(impact.documentsNecessaires)}`,
+    );
+  if (impact.vigilances > 0)
+    lines.push(`${impact.vigilances} vigilance${plural(impact.vigilances)} à lever`);
+  if (impact.impactPlanning) lines.push('impact planning à vérifier');
+
+  return (
+    <div className="mb-3 rounded-xl border border-gold-300 bg-gold-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="flex items-center gap-1.5 font-medium text-gold-800 [&_svg]:size-4">
+          <Sparkles aria-hidden />
+          J'ai intégré l'avenant n°{impact.numero}.
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Fermer"
+          className="text-muted-foreground hover:text-foreground [&_svg]:size-4"
+        >
+          <X aria-hidden />
+        </button>
+      </div>
+      <ul className="mt-2 space-y-1 text-sm text-foreground">
+        {lines.map((l) => (
+          <li key={l} className="flex items-start gap-1.5">
+            <span className="mt-1.5 size-1 shrink-0 rounded-full bg-gold-600" />
+            {l}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Le devis initial reste intact — l'avenant s'ajoute, rien n'est réécrit.
+      </p>
+    </div>
   );
 }
 

@@ -168,6 +168,101 @@ export function consolidatedTotals(c: ConsolidatedDevis): DevisTotals {
   return devisTotals({ lots });
 }
 
+/* ----------------------- impact d'un avenant déposé ------------------------ */
+
+/**
+ * Impact RECALCULÉ d'un avenant fraîchement déposé : ce que PHÉNIX en déduit
+ * pour le chantier. Sélecteur PUR, dérivé du devis initial + des avenants
+ * précédents (état AVANT) confronté au nouvel avenant. On n'écrase rien : on
+ * mesure seulement l'écart introduit par cet avenant.
+ */
+export interface AvenantImpact {
+  numero: number;
+  /** Postes du devis (initial ou avenant antérieur) remplacés par cet avenant. */
+  postesRemplaces: number;
+  /** Postes apportés par l'avenant (lignes ajoutées au document). */
+  postesAjoutes: number;
+  /** Variation de montant HT introduite par l'avenant (ajouts − remplacés). */
+  deltaHT: number;
+  /** Variation de montant TTC introduite par l'avenant. */
+  deltaTTC: number;
+  /** Commandes liées à un lot dont un poste est remplacé → à mettre à jour. */
+  commandesAMettreAJour: number;
+  /** Nouveaux choix client introduits par l'avenant (à obtenir). */
+  choixAObtenir: number;
+  /** Documents nouvellement nécessaires d'après l'avenant. */
+  documentsNecessaires: number;
+  /** L'avenant touche un lot rattaché au planning → impact à vérifier. */
+  impactPlanning: boolean;
+  /** Vigilances métier nouvelles issues des postes de l'avenant. */
+  vigilances: number;
+}
+
+export function avenantImpact(
+  devis: Devis | undefined,
+  before: Avenant[],
+  avenant: Avenant,
+): AvenantImpact {
+  // État AVANT cet avenant (devis initial + avenants antérieurs).
+  const base = consolidateDevis(devis, before);
+  const baseByLabel = new Map(base.lots.map((l) => [l.label, l]));
+  const basePostes = new Map<string, DevisPoste>();
+  for (const lot of devis?.lots ?? []) for (const p of lot.postes) basePostes.set(p.id, p);
+  for (const av of before)
+    for (const lot of av.lots) for (const p of lot.postes) basePostes.set(p.id, p);
+
+  let postesRemplaces = 0;
+  let postesAjoutes = 0;
+  let addedHT = 0;
+  let removedHT = 0;
+  let addedTTC = 0;
+  let removedTTC = 0;
+  const ordersToUpdate = new Set<string>();
+  const newChoices = new Set<string>();
+  const newDocuments = new Set<string>();
+  let impactPlanning = false;
+
+  for (const lot of avenant.lots) {
+    const baseLot = baseByLabel.get(lot.label);
+    if (baseLot?.stepId != null || lot.stepId != null) impactPlanning = true;
+    for (const id of lot.selectionIds ?? []) newChoices.add(id);
+    for (const id of lot.documentIds ?? []) newDocuments.add(id);
+
+    let lotHasReplacement = false;
+    for (const p of lot.postes) {
+      postesAjoutes += 1;
+      addedHT += p.montantHT;
+      addedTTC += p.montantHT * (1 + p.tva / 100);
+      if (p.remplacePosteId) {
+        lotHasReplacement = true;
+        const old = basePostes.get(p.remplacePosteId);
+        if (old) {
+          postesRemplaces += 1;
+          removedHT += old.montantHT;
+          removedTTC += old.montantHT * (1 + old.tva / 100);
+        }
+      }
+    }
+    // Une commande rattachée à un lot dont un poste change doit être mise à jour.
+    if (lotHasReplacement) for (const id of baseLot?.orderIds ?? []) ordersToUpdate.add(id);
+  }
+
+  const vigilances = devisVigilances({ lots: avenant.lots }).length;
+
+  return {
+    numero: avenant.numero,
+    postesRemplaces,
+    postesAjoutes,
+    deltaHT: round2(addedHT - removedHT),
+    deltaTTC: round2(addedTTC - removedTTC),
+    commandesAMettreAJour: ordersToUpdate.size,
+    choixAObtenir: newChoices.size,
+    documentsNecessaires: newDocuments.size,
+    impactPlanning,
+    vigilances,
+  };
+}
+
 /* ------------------------------- sélecteurs -------------------------------- */
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
