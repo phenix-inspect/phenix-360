@@ -343,7 +343,7 @@ function ChapterTravaux({
             J'ai lu votre devis signé et structuré les travaux par lots (postes, montants, TVA,
             matériaux).
           </p>
-          <DevisBreakdown devis={dossier.devis} />
+          <DevisBreakdown devis={dossier.devis} dossier={dossier} />
         </Prepared>
       )}
 

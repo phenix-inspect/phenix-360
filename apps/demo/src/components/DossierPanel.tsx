@@ -151,21 +151,33 @@ export function DossierPanel({
   const stepLabels = (ids?: string[]): string[] =>
     (ids ?? []).map((id) => dossier.roadmap.find((s) => s.id === id)?.label ?? id);
 
+  // Depuis un poste de devis : on amène le conducteur jusqu'à ce que PHÉNIX a
+  // préparé (commande, choix, document, vigilance), avec un bref surlignage.
+  const openAnchor = (anchor: string) => {
+    const el = document.getElementById(anchor);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('ring-2', 'ring-gold-400', 'ring-offset-2');
+    window.setTimeout(() => el.classList.remove('ring-2', 'ring-gold-400', 'ring-offset-2'), 1600);
+  };
+
   return (
     <div className="space-y-6">
-      <LaunchNotePanel
-        note={note}
-        onAskDocument={(docId) => {
-          const d = dossier.documents.find((x) => x.id === docId);
-          if (d) void askDocument(d.id, d.label);
-        }}
-      />
+      <div id="note-lancement">
+        <LaunchNotePanel
+          note={note}
+          onAskDocument={(docId) => {
+            const d = dossier.documents.find((x) => x.id === docId);
+            if (d) void askDocument(d.id, d.label);
+          }}
+        />
+      </div>
 
       <Info dossier={dossier} />
 
       {dossier.devis && (
         <Section icon={<Receipt aria-hidden />} title="Le devis" count={dossier.devis.lots.length}>
-          <DevisBreakdown devis={dossier.devis} />
+          <DevisBreakdown devis={dossier.devis} dossier={dossier} onOpen={openAnchor} />
         </Section>
       )}
 
@@ -189,13 +201,14 @@ export function DossierPanel({
       <Section icon={<Banknote aria-hidden />} title="Commandes" count={dossier.orders.length}>
         <div className="grid gap-3 sm:grid-cols-2">
           {dossier.orders.map((o) => (
-            <OrderCard
-              key={o.id}
-              order={o}
-              steps={stepLabels(o.stepIds)}
-              onStatus={(s) => setOrderStatus(o.id, s)}
-              onEdit={() => setEditing(o)}
-            />
+            <div key={o.id} id={`order-${o.id}`} className="rounded-xl">
+              <OrderCard
+                order={o}
+                steps={stepLabels(o.stepIds)}
+                onStatus={(s) => setOrderStatus(o.id, s)}
+                onEdit={() => setEditing(o)}
+              />
+            </div>
           ))}
         </div>
       </Section>
@@ -220,7 +233,11 @@ export function DossierPanel({
       >
         <div className="grid gap-2 sm:grid-cols-2">
           {dossier.selections.map((s) => (
-            <div key={s.id} className="rounded-lg border border-border bg-surface p-3">
+            <div
+              key={s.id}
+              id={`selection-${s.id}`}
+              className="rounded-lg border border-border bg-surface p-3"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium uppercase tracking-wide text-gold-700">
                   {s.categorie}
@@ -245,6 +262,7 @@ export function DossierPanel({
           {dossier.documents.map((d) => (
             <li
               key={d.id}
+              id={`document-${d.id}`}
               className="flex flex-wrap items-center justify-between gap-2 bg-surface px-3 py-2"
             >
               <span className="text-sm text-foreground">{d.label}</span>
