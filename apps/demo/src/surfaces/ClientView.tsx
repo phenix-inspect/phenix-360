@@ -4,7 +4,9 @@ import { CalendarRange, MessageCircle, Palette, Send, Sparkles } from 'lucide-re
 import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
+  buildDecisionContent,
   clientFeed,
+  decisionVisibility,
   isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
@@ -51,10 +53,11 @@ export function ClientView({
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
-    const cat = d.categorie.toLowerCase();
+    const sel = dossier.selections.find((s) => s.id === d.id);
+    if (!sel) return;
     const delegated = isPhenixDelegate(optionId);
     const chosen = d.options.find((o) => o.id === optionId);
-    const detail = delegated ? 'Choix confié à PHÉNIX' : (chosen?.title ?? undefined);
+    const detail = delegated ? 'Choix confié à PHÉNIX' : chosen?.title;
     demo.saveDossier(project.id, {
       ...dossier,
       selections: dossier.selections.map((s) =>
@@ -65,48 +68,52 @@ export function ClientView({
               chosenOptionId: optionId,
               detail: detail ?? s.detail,
               delegatedToPhenix: delegated,
+              modificationRequested: false,
             }
           : s,
       ),
     });
+    const content = buildDecisionContent({
+      kind: delegated ? 'deleguee' : 'validee',
+      origin: 'client',
+      selection: sel,
+      statutApres: 'valide',
+      optionId,
+    });
     await demo.appendEvent({
       projectId: project.id,
       actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'close',
-      content: {
-        question: delegated
-          ? `Le client a confié le choix ${cat} à PHÉNIX.`
-          : `Choix ${cat} validé : ${chosen?.title ?? d.label}`,
-        destinataire: 'equipe',
-        resolution: {
-          texte: delegated ? 'Choix délégué à PHÉNIX.' : 'Validé par le client.',
-          resolvedBy: actor.userId,
-          resolvedAt: new Date().toISOString(),
-        },
-      },
+      type: 'decision',
+      visibility: decisionVisibility(content.kind),
+      state: 'publie',
+      content,
     });
   };
 
   const requestModification = async (d: ClientDecision, message: string) => {
     if (!dossier) return;
+    const sel = dossier.selections.find((s) => s.id === d.id);
+    if (!sel) return;
     demo.saveDossier(project.id, {
       ...dossier,
       selections: dossier.selections.map((s) =>
-        s.id === d.id ? { ...s, statut: 'a_choisir' } : s,
+        s.id === d.id ? { ...s, statut: 'a_choisir', modificationRequested: true } : s,
       ),
+    });
+    const content = buildDecisionContent({
+      kind: 'modification',
+      origin: 'client',
+      selection: sel,
+      statutApres: 'a_choisir',
+      message,
     });
     await demo.appendEvent({
       projectId: project.id,
       actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'ouverte',
-      content: {
-        question: `Modification demandée sur ${d.categorie.toLowerCase()} : ${message}`,
-        destinataire: 'equipe',
-      },
+      type: 'decision',
+      visibility: decisionVisibility('modification'),
+      state: 'publie',
+      content,
     });
   };
   const decisions = pendingClientDecisions(events);

@@ -1,4 +1,4 @@
-import { FileText, Heart, MessageCircle, NotebookPen } from 'lucide-react';
+import { FileText, Heart, MessageCircle, NotebookPen, Sparkles } from 'lucide-react';
 import { ROLE_LABEL, type Event } from '@phenix360/core';
 import { Avatar } from './Avatar';
 import { PhotoTile } from './PhotoTile';
@@ -38,8 +38,20 @@ export function MomentCard({
         <div className="space-y-1.5">
           {event.type !== 'photo' && (
             <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-gold-700 [&_svg]:size-3.5">
-              {event.type === 'document' ? <FileText aria-hidden /> : <NotebookPen aria-hidden />}
-              {event.type === 'document' ? 'Document' : 'Compte rendu'}
+              {event.type === 'document' ? (
+                <FileText aria-hidden />
+              ) : event.type === 'decision' ? (
+                <Sparkles aria-hidden />
+              ) : (
+                <NotebookPen aria-hidden />
+              )}
+              {event.type === 'document'
+                ? 'Document'
+                : event.type === 'decision'
+                  ? 'Décision'
+                  : event.type === 'demande'
+                    ? 'Demande'
+                    : 'Compte rendu'}
             </span>
           )}
           <h3 className="font-serif text-lg font-semibold tracking-tight text-foreground">

@@ -9,6 +9,7 @@ import { captureId, eventId, projectId, userId } from '../ids.js';
 import type { EventActor } from '../actor.js';
 import type {
   CompteRenduContent,
+  DecisionEventContent,
   DemandeContent,
   DocumentContent,
   Event,
@@ -56,6 +57,8 @@ export function mapEventRow(r: EventRow): Event {
       return { ...envelope, type: 'document', content: r.content as DocumentContent };
     case 'demande':
       return { ...envelope, type: 'demande', content: r.content as DemandeContent };
+    case 'decision':
+      return { ...envelope, type: 'decision', content: r.content as DecisionEventContent };
   }
 }
 

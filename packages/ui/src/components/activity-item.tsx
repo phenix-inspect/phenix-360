@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { EyeOff, FileText, HelpCircle, Image, NotebookPen } from 'lucide-react';
+import { EyeOff, FileText, HelpCircle, Image, NotebookPen, Sparkles } from 'lucide-react';
 import type { ActorRole, EventType, EventVisibility } from '@phenix360/core';
 import { ROLE_LABEL } from '@phenix360/core';
 import { cn } from '../lib/cn.js';
@@ -21,6 +21,7 @@ const TYPE_ICON: Record<EventType, React.ReactNode> = {
   photo: <Image aria-hidden="true" />,
   document: <FileText aria-hidden="true" />,
   demande: <HelpCircle aria-hidden="true" />,
+  decision: <Sparkles aria-hidden="true" />,
 };
 
 export const Timeline = React.forwardRef<HTMLOListElement, React.HTMLAttributes<HTMLOListElement>>(

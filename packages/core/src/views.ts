@@ -9,6 +9,7 @@
 import type { DocumentEvent, Event, PhotoEvent, DemandeEvent } from './event.js';
 import {
   isCompteRendu,
+  isDecision,
   isDemande,
   isDocument,
   isPhoto,
@@ -78,6 +79,7 @@ export function isMilestone(e: Event): boolean {
   if (isCompteRendu(e)) return isPublished(e);
   if (isDocument(e)) return isPublished(e);
   if (isDemande(e)) return true;
+  if (isDecision(e)) return true;
   return false;
 }
 

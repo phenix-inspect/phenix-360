@@ -18,7 +18,7 @@ import type { Event } from './event.js';
 import { isDocument, isVisibleToClient } from './event.js';
 import { currentStep } from './views.js';
 import { PROJECT_STEP_LABEL } from './project.js';
-import { ORDER_STATUS_LABEL, type Order } from './prepare.js';
+import { ORDER_STATUS_LABEL, describeDecisionEvent, type Order } from './prepare.js';
 
 export interface AssistantSource {
   type: string;
@@ -106,6 +106,10 @@ const excerptOf = (e: Event): string => {
       return e.content.legende ?? 'Photo du chantier';
     case 'document':
       return e.content.libelle;
+    case 'decision': {
+      const d = describeDecisionEvent(e.content);
+      return `${d.title} — ${d.description}`;
+    }
   }
 };
 

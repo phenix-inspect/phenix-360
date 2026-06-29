@@ -24,7 +24,7 @@ import type { ProjectStep } from './project.js';
 /* -------------------------------------------------------------------------- *
  * Énumérations d'enveloppe
  * -------------------------------------------------------------------------- */
-export const EVENT_TYPES = ['compte_rendu', 'photo', 'document', 'demande'] as const;
+export const EVENT_TYPES = ['compte_rendu', 'photo', 'document', 'demande', 'decision'] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const EVENT_TYPE_LABEL: Record<EventType, string> = {
@@ -32,6 +32,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   photo: 'Photo',
   document: 'Document',
   demande: 'Demande',
+  decision: 'Décision',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -94,12 +95,48 @@ export interface DemandeContent {
   resolution?: DemandeResolution;
 }
 
+/* -------------------------------------------------------------------------- *
+ * DÉCISION — cycle de vie d'un choix client, tracé au journal (source unique)
+ * -------------------------------------------------------------------------- *
+ * Chaque action importante d'une décision client écrit UN événement structuré
+ * (jamais du texte libre dupliqué). L'auteur et la date sont portés par
+ * l'enveloppe ; le contenu porte l'origine, le choix concerné, le statut
+ * avant/après et la proposition retenue. Toutes les vues LISENT ces champs.
+ */
+export type DecisionEventKind =
+  | 'envoyee' // décision envoyée au client
+  | 'renvoyee' // proposition renvoyée au client après modification
+  | 'validee' // choix validé par le client
+  | 'deleguee' // choix confié à PHÉNIX
+  | 'modification' // modification demandée par le client
+  | 'reco_confirmee'; // recommandation PHÉNIX confirmée par le conducteur
+
+/** À l'origine de l'action (distinct de l'auteur technique de l'enveloppe). */
+export type DecisionOrigin = 'client' | 'conducteur' | 'phenix';
+
+export interface DecisionEventContent {
+  kind: DecisionEventKind;
+  origin: DecisionOrigin;
+  /** Choix concerné (id + catégorie). */
+  selectionId: string;
+  categorie: string;
+  /** Statut du choix avant / après l'action. */
+  statutAvant: string;
+  statutApres: string;
+  /** Proposition retenue, le cas échéant. */
+  optionId?: string;
+  optionLabel?: string;
+  /** Message libre (ex. demande de modification du client). */
+  message?: string;
+}
+
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
 export interface EventContentByType {
   compte_rendu: CompteRenduContent;
   photo: PhotoContent;
   document: DocumentContent;
   demande: DemandeContent;
+  decision: DecisionEventContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -137,9 +174,13 @@ export interface DemandeEvent extends EventEnvelope {
   type: 'demande';
   content: DemandeContent;
 }
+export interface DecisionEvent extends EventEnvelope {
+  type: 'decision';
+  content: DecisionEventContent;
+}
 
 /** L'événement du journal — colonne vertébrale du produit. */
-export type Event = CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent;
+export type Event = CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent | DecisionEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type
@@ -148,6 +189,7 @@ export const isCompteRendu = (e: Event): e is CompteRenduEvent => e.type === 'co
 export const isPhoto = (e: Event): e is PhotoEvent => e.type === 'photo';
 export const isDocument = (e: Event): e is DocumentEvent => e.type === 'document';
 export const isDemande = (e: Event): e is DemandeEvent => e.type === 'demande';
+export const isDecision = (e: Event): e is DecisionEvent => e.type === 'decision';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';

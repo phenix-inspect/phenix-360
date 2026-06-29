@@ -16,8 +16,9 @@ import {
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
+  buildDecisionContent,
   buildProjectMemory,
-  optionRef,
+  decisionVisibility,
   studyProject,
   type ClientDecisionStatus,
   type Event,
@@ -72,32 +73,57 @@ export function DossierPanel({
     setEditing(null);
   };
 
+  // Le conducteur envoie (ou renvoie) les propositions au client.
+  const sendProposals = async (selId: string) => {
+    const sel = dossier.selections.find((s) => s.id === selId);
+    if (!sel) return;
+    const kind = sel.modificationRequested ? 'renvoyee' : 'envoyee';
+    patch({
+      selections: dossier.selections.map((s) =>
+        s.id === selId ? { ...s, statut: 'propose', modificationRequested: false } : s,
+      ),
+    });
+    const content = buildDecisionContent({
+      kind,
+      origin: 'conducteur',
+      selection: sel,
+      statutApres: 'propose',
+    });
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'decision',
+      visibility: decisionVisibility(kind),
+      state: 'publie',
+      content,
+    });
+  };
+
   // Le client a délégué : le conducteur (sur recommandation de PHÉNIX) arbitre.
   // On enregistre le choix final et on le trace au journal.
   const confirmDelegation = async (selId: string, optionId: string) => {
     const sel = dossier.selections.find((s) => s.id === selId);
-    const opt = sel?.options?.find((o) => o.id === optionId);
-    const ref = sel ? optionRef(sel, optionId) : '';
+    if (!sel) return;
+    const opt = sel.options?.find((o) => o.id === optionId);
     patch({
       selections: dossier.selections.map((s) =>
         s.id === selId ? { ...s, chosenOptionId: optionId, detail: opt?.title ?? s.detail } : s,
       ),
     });
+    const content = buildDecisionContent({
+      kind: 'reco_confirmee',
+      origin: 'phenix',
+      selection: sel,
+      statutApres: sel.statut,
+      optionId,
+    });
     await demo.appendEvent({
       projectId: project.id,
       actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'close',
-      content: {
-        question: `PHÉNIX a retenu la proposition ${ref} après délégation du client.`,
-        destinataire: 'equipe',
-        resolution: {
-          texte: opt?.title ?? '',
-          resolvedBy: actor.userId,
-          resolvedAt: new Date().toISOString(),
-        },
-      },
+      type: 'decision',
+      visibility: decisionVisibility('reco_confirmee'),
+      state: 'publie',
+      content,
     });
   };
 
@@ -173,6 +199,7 @@ export function DossierPanel({
           <ProposalWorkshop
             selections={dossier.selections}
             onChange={(next) => patch({ selections: next })}
+            onSend={(selId) => void sendProposals(selId)}
             onConfirmDelegation={(selId, optionId) => void confirmDelegation(selId, optionId)}
           />
         </Section>

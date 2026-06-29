@@ -14,6 +14,8 @@ import { useSyncExternalStore } from 'react';
 import {
   InMemoryBackend,
   attachmentId as toAttachmentId,
+  buildDecisionContent,
+  decisionVisibility,
   userId as toUserId,
   type BackendState,
   type DemandeResolution,
@@ -189,25 +191,22 @@ export const demo = {
       },
     });
 
-    // Choix proposés au client → on trace « décision envoyée au client » au journal
-    // (le client la validera depuis son espace). Interne : c'est un jalon de suivi.
+    // Choix proposés au client → « décision envoyée au client » tracée au journal
+    // (événement structuré, source unique ; le client validera depuis son espace).
     for (const sel of proposal.dossier.selections) {
       if (sel.statut === 'propose') {
         await backend.appendEvent({
           projectId: project.id,
           actor: compaActor,
-          type: 'demande',
-          visibility: 'interne',
-          state: 'close',
-          content: {
-            question: `Décision envoyée au client : choix ${sel.categorie.toLowerCase()} (${sel.label}).`,
-            destinataire: 'equipe',
-            resolution: {
-              texte: 'En attente de validation du client.',
-              resolvedBy: compaId,
-              resolvedAt: new Date().toISOString(),
-            },
-          },
+          type: 'decision',
+          visibility: decisionVisibility('envoyee'),
+          state: 'publie',
+          content: buildDecisionContent({
+            kind: 'envoyee',
+            origin: 'phenix',
+            selection: sel,
+            statutApres: 'propose',
+          }),
         });
       }
     }

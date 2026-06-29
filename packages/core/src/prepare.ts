@@ -16,7 +16,13 @@
  * propre feuille de route, construite à partir du devis.
  */
 import type { IsoDateTime } from './ids.js';
-import type { Event } from './event.js';
+import type {
+  DecisionEventContent,
+  DecisionEventKind,
+  DecisionOrigin,
+  Event,
+  EventVisibility,
+} from './event.js';
 import { pendingClientDecisions } from './views.js';
 import {
   DEFAULT_CALENDAR,
@@ -171,6 +177,8 @@ export interface ClientSelection {
   chosenOptionId?: string;
   /** Le client a délégué le choix à PHÉNIX (reste vrai même après arbitrage). */
   delegatedToPhenix?: boolean;
+  /** Le client a demandé une modification : à renvoyer par le conducteur. */
+  modificationRequested?: boolean;
 }
 
 /**
@@ -260,6 +268,88 @@ export function recommendDelegatedOption(
     reasonKeys,
     reasons: reasonKeys.map((k) => RECO_REASONS[k]),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * JOURNAL — fabrique et projection des événements de DÉCISION (source unique)
+ * -------------------------------------------------------------------------- *
+ * Une seule fabrique construit le contenu structuré ; un seul projecteur le rend
+ * lisible. Toutes les vues lisent ces champs, aucune ne recopie de texte.
+ */
+
+/** Visibilité par type d'action : ce que le client voit dans son récit. */
+const DECISION_VISIBILITY: Record<DecisionEventKind, EventVisibility> = {
+  envoyee: 'interne', // mécanique conducteur (le client le vit via le bandeau)
+  renvoyee: 'interne',
+  reco_confirmee: 'interne',
+  validee: 'client', // action du client → visible dans son récit
+  deleguee: 'client',
+  modification: 'client',
+};
+export const decisionVisibility = (kind: DecisionEventKind): EventVisibility =>
+  DECISION_VISIBILITY[kind];
+
+/** Construit le contenu structuré d'un événement de décision (fabrique unique). */
+export function buildDecisionContent(args: {
+  kind: DecisionEventKind;
+  origin: DecisionOrigin;
+  selection: ClientSelection;
+  statutApres: SelectionStatus;
+  optionId?: string;
+  message?: string;
+}): DecisionEventContent {
+  const { kind, origin, selection, statutApres, optionId, message } = args;
+  const opt = optionId ? (selection.options ?? []).find((o) => o.id === optionId) : undefined;
+  const optionLabel = isPhenixDelegate(optionId) ? 'PHÉNIX décide' : opt?.title;
+  return {
+    kind,
+    origin,
+    selectionId: selection.id,
+    categorie: selection.categorie,
+    statutAvant: selection.statut,
+    statutApres,
+    ...(optionId ? { optionId } : {}),
+    ...(optionLabel ? { optionLabel } : {}),
+    ...(message ? { message } : {}),
+  };
+}
+
+/** Projette un événement de décision en titre + description (lecture unique). */
+export function describeDecisionEvent(c: DecisionEventContent): {
+  title: string;
+  description: string;
+} {
+  const cat = c.categorie.toLowerCase();
+  const retenu = c.optionLabel ? ` : ${c.optionLabel}` : '';
+  switch (c.kind) {
+    case 'envoyee':
+      return {
+        title: 'Décision envoyée au client',
+        description: `Choix ${cat} — propositions transmises.`,
+      };
+    case 'renvoyee':
+      return {
+        title: 'Propositions renvoyées au client',
+        description: `Choix ${cat} — mises à jour après modification.`,
+      };
+    case 'validee':
+      return { title: 'Choix validé par le client', description: `Choix ${cat}${retenu}.` };
+    case 'deleguee':
+      return {
+        title: 'Choix confié à PHÉNIX',
+        description: `Le client a confié le choix ${cat} à PHÉNIX.`,
+      };
+    case 'modification':
+      return {
+        title: 'Modification demandée par le client',
+        description: `Choix ${cat}${c.message ? ` : ${c.message}` : ''}.`,
+      };
+    case 'reco_confirmee':
+      return {
+        title: 'Recommandation PHÉNIX confirmée',
+        description: `Choix ${cat}${retenu} retenu après délégation du client.`,
+      };
+  }
 }
 
 /**

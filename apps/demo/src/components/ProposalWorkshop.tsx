@@ -24,10 +24,12 @@ const MAX_OPTIONS = 5;
 export function ProposalWorkshop({
   selections,
   onChange,
+  onSend,
   onConfirmDelegation,
 }: {
   selections: ClientSelection[];
   onChange: (next: ClientSelection[]) => void;
+  onSend: (selectionId: string) => void;
   onConfirmDelegation: (selectionId: string, optionId: string) => void;
 }): React.JSX.Element | null {
   const prepared = selections.filter((s) => (s.options?.length ?? 0) > 0);
@@ -57,8 +59,6 @@ export function ProposalWorkshop({
         ],
       };
     });
-
-  const sendToClient = (selId: string) => mutate(selId, (s) => ({ ...s, statut: 'propose' }));
 
   const pickPhoto = async (selId: string, optId: string, file: File) => {
     const imageUrl = await fileToImageUrl(file);
@@ -93,7 +93,13 @@ export function ProposalWorkshop({
               </div>
               <Badge
                 variant={
-                  s.statut === 'valide' ? 'success' : s.statut === 'propose' ? 'info' : 'neutral'
+                  s.statut === 'valide'
+                    ? 'success'
+                    : s.statut === 'propose'
+                      ? 'info'
+                      : s.modificationRequested
+                        ? 'warning'
+                        : 'neutral'
                 }
               >
                 {s.statut === 'valide'
@@ -102,7 +108,9 @@ export function ProposalWorkshop({
                     : 'Validé par le client'
                   : s.statut === 'propose'
                     ? 'Envoyé au client'
-                    : 'À envoyer'}
+                    : s.modificationRequested
+                      ? 'Modification demandée'
+                      : 'À envoyer'}
               </Badge>
             </div>
 
@@ -213,13 +221,11 @@ export function ProposalWorkshop({
                     Ajouter une proposition
                     {options.length >= MAX_OPTIONS ? ' (max 5)' : ''}
                   </Button>
-                  <Button
-                    size="sm"
-                    disabled={options.length === 0}
-                    onClick={() => sendToClient(s.id)}
-                  >
+                  <Button size="sm" disabled={options.length === 0} onClick={() => onSend(s.id)}>
                     <Send aria-hidden />
-                    {s.statut === 'propose' ? 'Renvoyer au client' : 'Envoyer au client'}
+                    {s.statut === 'propose' || s.modificationRequested
+                      ? 'Renvoyer au client'
+                      : 'Envoyer au client'}
                   </Button>
                 </div>
               </>

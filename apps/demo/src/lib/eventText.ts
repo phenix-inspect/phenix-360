@@ -1,4 +1,4 @@
-import { PROJECT_STEP_LABEL, type Event } from '@phenix360/core';
+import { PROJECT_STEP_LABEL, describeDecisionEvent, type Event } from '@phenix360/core';
 
 /** Titre lisible d'un événement (présentation — dérivé du contenu typé). */
 export function eventTitle(e: Event): string {
@@ -13,6 +13,8 @@ export function eventTitle(e: Event): string {
       return e.content.libelle;
     case 'demande':
       return e.content.destinataire === 'client' ? 'Une décision vous attend' : 'Demande';
+    case 'decision':
+      return describeDecisionEvent(e.content).title;
   }
 }
 
@@ -25,6 +27,8 @@ export function eventDescription(e: Event): string | undefined {
       return e.content.resolution
         ? `${e.content.question} → ${e.content.resolution.texte}`
         : e.content.question;
+    case 'decision':
+      return describeDecisionEvent(e.content).description;
     case 'photo':
       return undefined;
     case 'document':
