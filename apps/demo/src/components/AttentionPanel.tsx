@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button, Card, CardContent } from '@phenix360/ui';
 import {
   Banknote,
@@ -26,12 +27,25 @@ const KIND_LABEL: Record<AttentionKind, string> = {
   echeance: 'Échéance',
 };
 
+/** Vrais risques bloquants d'abord : commande, décision client, document. */
+const KIND_RANK: Record<AttentionKind, number> = {
+  commande: 0,
+  decision: 1,
+  document: 2,
+  question: 3,
+  echeance: 4,
+};
+const SEVERITY_RANK = { warning: 0, info: 1, success: 2 } as const;
+
 const dot = (s: AttentionItem['severity']): string =>
   s === 'warning' ? 'bg-gold-500' : s === 'success' ? 'bg-success' : 'bg-info';
 
+const DEFAULT_VISIBLE = 3;
+
 /**
- * « PHÉNIX surveille votre chantier » — synthèse prioritaire de l'accueil
- * Compagnon. Pas un tableau technique : ce qui mérite l'attention aujourd'hui.
+ * « PHÉNIX surveille votre chantier » — briefing de chef de chantier : en 5
+ * secondes, les 3 priorités du jour. Les risques bloquants remontent ; les
+ * éléments rassurants sont condensés en une ligne. « Voir tout » déplie le reste.
  */
 export function AttentionPanel({
   items,
@@ -42,7 +56,19 @@ export function AttentionPanel({
   onAskDocument: (docId: string) => void;
   onOpenPreparation: () => void;
 }): React.JSX.Element {
-  const actionable = items.filter((i) => i.severity !== 'success').length;
+  const [expanded, setExpanded] = useState(false);
+
+  const actionable = items
+    .filter((i) => i.severity !== 'success')
+    .sort(
+      (a, b) =>
+        SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
+        KIND_RANK[a.kind] - KIND_RANK[b.kind],
+    );
+  const securedCount = items.filter((i) => i.severity === 'success').length;
+
+  const visible = expanded ? actionable : actionable.slice(0, DEFAULT_VISIBLE);
+  const hidden = actionable.length - visible.length;
 
   return (
     <Card className="border-gold-200 bg-gold-50 shadow-gold">
@@ -56,21 +82,21 @@ export function AttentionPanel({
               PHÉNIX surveille votre chantier
             </h2>
             <p className="text-sm text-muted-foreground">
-              {actionable > 0
+              {actionable.length > 0
                 ? 'Voici ce qui mérite votre attention aujourd’hui.'
                 : 'Tout est sous contrôle aujourd’hui.'}
             </p>
           </div>
         </div>
 
-        {items.length === 0 ? (
+        {actionable.length === 0 && securedCount === 0 ? (
           <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-3 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:text-success">
             <CheckCircle2 aria-hidden />
             Aucune action urgente — votre chantier est bien préparé.
           </div>
         ) : (
           <ul className="space-y-2">
-            {items.map((item) => (
+            {visible.map((item) => (
               <li
                 key={item.id}
                 className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3 py-2.5"
@@ -109,6 +135,24 @@ export function AttentionPanel({
               </li>
             ))}
           </ul>
+        )}
+
+        {securedCount > 0 && (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-success">
+            <CheckCircle2 aria-hidden />
+            {securedCount} phase{securedCount > 1 ? 's' : ''}{' '}
+            {securedCount > 1 ? 'sont sécurisées' : 'est sécurisée'} côté commandes.
+          </p>
+        )}
+
+        {(hidden > 0 || (expanded && actionable.length > DEFAULT_VISIBLE)) && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-sm font-medium text-gold-700 underline-offset-4 hover:underline"
+          >
+            {expanded ? 'Réduire' : `Voir tout (${actionable.length})`}
+          </button>
         )}
       </CardContent>
     </Card>
