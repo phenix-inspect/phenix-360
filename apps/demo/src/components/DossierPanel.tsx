@@ -38,6 +38,7 @@ import { fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
+import { SmartPlanningView } from './SmartPlanningView';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -108,25 +109,13 @@ export function DossierPanel({
         <RoadmapProgress roadmap={dossier.roadmap} />
       </Section>
 
-      {dossier.planning.length > 0 && (
+      {dossier.infos.startDate && (
         <Section
           icon={<CalendarDays aria-hidden />}
-          title="Planning proposé"
-          count={dossier.planning.length}
+          title="Planning prévisionnel"
+          count={dossier.roadmap.length}
         >
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-            {dossier.planning.map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center justify-between gap-3 bg-surface px-3 py-2 text-sm"
-              >
-                <span className="text-foreground">{t.label}</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {fmtDateShort(t.start)} → {fmtDateShort(t.end)}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <SmartPlanningView dossier={dossier} />
         </Section>
       )}
 

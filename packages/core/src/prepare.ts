@@ -287,6 +287,184 @@ export function buildPlanning(
   });
 }
 
+/* -------------------------------------------------------------------------- *
+ * PLANNING INTELLIGENT — une conséquence de tout ce qui a été préparé
+ * -------------------------------------------------------------------------- *
+ * Pas une table de dates : un planning DÉRIVÉ (sélecteur pur, vivant) qui tient
+ * compte des dépendances métier (ordre des lots + durées réalistes), des temps
+ * de séchage incompressibles, des délais de commande (« à commander avant »),
+ * et des choix client à figer avant chaque étape. Durées heuristiques (démo) —
+ * une vraie IA pourra les affiner, même sortie.
+ */
+export const parseDurationDays = (duration?: string): number => {
+  if (!duration) return 60;
+  const m = duration.match(/(\d+)\s*(mois|semaine|jour|an)/i);
+  if (!m) return 60;
+  const n = Number(m[1]);
+  const u = (m[2] ?? '').toLowerCase();
+  if (u.startsWith('an')) return n * 365;
+  if (u.startsWith('mois')) return n * 30;
+  if (u.startsWith('sem')) return n * 7;
+  return n;
+};
+
+const STEP_DURATION: { re: RegExp; days: number }[] = [
+  { re: /d[ée]pose|d[ée]molition/, days: 3 },
+  { re: /gros|ma[çc]onn|structure|dalle|chape/, days: 12 },
+  { re: /plomberie/, days: 6 },
+  { re: /[ée]lectric/, days: 6 },
+  { re: /isolation/, days: 4 },
+  { re: /pl[âa]tr|placo|cloison/, days: 8 },
+  { re: /menuiser/, days: 4 },
+  { re: /carrelage|fa[iï]ence/, days: 7 },
+  { re: /peinture/, days: 6 },
+  { re: /\bsol|parquet|rev[êe]tement/, days: 4 },
+  { re: /cuisine/, days: 3 },
+  { re: /nettoyage/, days: 2 },
+  { re: /r[ée]ception|livraison/, days: 1 },
+];
+const stepDuration = (label: string): number =>
+  STEP_DURATION.find((d) => d.re.test(label.toLowerCase()))?.days ?? 5;
+const stepDrying = (label: string): number => {
+  const l = label.toLowerCase();
+  if (/gros|dalle|chape/.test(l)) return 5; // séchage dalle/chape
+  if (/pl[âa]tr|enduit/.test(l)) return 2; // séchage enduits
+  if (/carrelage/.test(l)) return 2; // séchage colle
+  return 0;
+};
+
+/** Rattache un choix client à l'étape qui le consomme (par mots-clés). */
+const SELECTION_STEP: { re: RegExp; step: RegExp }[] = [
+  { re: /carrelage/, step: /carrelage/ },
+  { re: /fa[iï]ence/, step: /carrelage|fa[iï]ence/ },
+  { re: /cuisine/, step: /cuisine/ },
+  { re: /parquet|sol/, step: /\bsol|parquet|rev[êe]tement/ },
+  { re: /peinture/, step: /peinture/ },
+  { re: /sanitaire|robinet|vasque|douche|wc/, step: /plomberie|sanitaire/ },
+  { re: /luminaire|[ée]clairage/, step: /[ée]lectric/ },
+];
+
+interface BasePhase {
+  stepId: string;
+  label: string;
+  start: string;
+  end: string;
+  durationDays: number;
+  drying?: number;
+}
+
+/**
+ * Dates par étape : enchaînement séquentiel (dépendances), durées pondérées par
+ * métier + tampons de séchage, mis à l'échelle de la durée annoncée. Source
+ * commune au planning ET aux alertes/vigilances (pas de dates divergentes).
+ */
+export function computePhaseDates(dossier: ProjectDossier): BasePhase[] {
+  const start = dossier.infos.startDate;
+  if (!start || dossier.roadmap.length === 0) return [];
+  const startMs = new Date(`${start}T00:00:00`).getTime();
+  const raw = dossier.roadmap.map((s) => ({
+    s,
+    dur: stepDuration(s.label),
+    dry: stepDrying(s.label),
+  }));
+  const rawTotal = raw.reduce((a, r) => a + r.dur + r.dry, 0) || 1;
+  const target = dossier.infos.duration ? parseDurationDays(dossier.infos.duration) : 0;
+  const factor = target > 0 ? target / rawTotal : 1;
+  let cursor = startMs;
+  return raw.map((r) => {
+    const dur = Math.max(1, Math.round(r.dur * factor));
+    const dry = Math.round(r.dry * factor);
+    const s = cursor;
+    const e = s + (dur - 1) * DAY_MS;
+    cursor = e + DAY_MS + dry * DAY_MS;
+    return {
+      stepId: r.s.id,
+      label: r.s.label,
+      start: iso(new Date(s)),
+      end: iso(new Date(e)),
+      durationDays: dur,
+      drying: dry || undefined,
+    };
+  });
+}
+
+export interface PlanningOrderMarker {
+  orderId: string;
+  label: string;
+  /** Date limite pour commander (début d'étape − délai fournisseur). */
+  commanderAvant: string;
+  /** Trop tard / trop tendu et commande pas encore passée. */
+  risk: boolean;
+}
+export interface PlanningChoiceMarker {
+  selectionId: string;
+  categorie: string;
+  label: string;
+  /** Date limite pour figer le choix (avant de pouvoir commander/poser). */
+  figerAvant: string;
+  /** Choix encore à faire. */
+  pending: boolean;
+}
+export interface PlanningPhase extends BasePhase {
+  orders: PlanningOrderMarker[];
+  choices: PlanningChoiceMarker[];
+}
+export interface SmartPlanning {
+  startDate: string | null;
+  phases: PlanningPhase[];
+  endDate: string | null;
+}
+
+/** Le planning intelligent : phases datées + jalons commande/choix à anticiper. */
+export function buildSmartPlanning(
+  dossier: ProjectDossier,
+  nowMs: number = Date.now(),
+): SmartPlanning {
+  const base = computePhaseDates(dossier);
+  if (base.length === 0) {
+    return { startDate: dossier.infos.startDate ?? null, phases: [], endDate: null };
+  }
+  const phases: PlanningPhase[] = base.map((b) => ({ ...b, orders: [], choices: [] }));
+  const byId = new Map(phases.map((p) => [p.stepId, p]));
+  const FIGER_BUFFER = 14;
+
+  for (const o of dossier.orders) {
+    const sid = (o.stepIds ?? []).find((id) => byId.has(id));
+    if (!sid) continue;
+    const ph = byId.get(sid)!;
+    const phStart = new Date(`${ph.start}T00:00:00`).getTime();
+    const lead = o.delaiJours ?? 7;
+    const limit = phStart - lead * DAY_MS;
+    ph.orders.push({
+      orderId: o.id,
+      label: o.label,
+      commanderAvant: iso(new Date(limit)),
+      risk: !ORDER_PLACED.has(o.statut) && limit <= nowMs,
+    });
+  }
+
+  for (const s of dossier.selections) {
+    const hay = `${s.categorie} ${s.label}`.toLowerCase();
+    const rule = SELECTION_STEP.find((m) => m.re.test(hay));
+    const ph = rule ? phases.find((p) => rule.step.test(p.label.toLowerCase())) : undefined;
+    if (!ph) continue;
+    const phStart = new Date(`${ph.start}T00:00:00`).getTime();
+    ph.choices.push({
+      selectionId: s.id,
+      categorie: s.categorie,
+      label: s.label,
+      figerAvant: iso(new Date(phStart - FIGER_BUFFER * DAY_MS)),
+      pending: s.statut === 'a_choisir',
+    });
+  }
+
+  return {
+    startDate: dossier.infos.startDate ?? null,
+    phases,
+    endDate: phases[phases.length - 1]!.end,
+  };
+}
+
 /** Mémoire du projet = lecture du dossier (alimente l'assistant). */
 export function buildProjectMemory(dossier: ProjectDossier): ProjectMemory {
   return {
@@ -340,8 +518,8 @@ export function buildOrderAlerts(
 ): OrderAlert[] {
   const alerts: OrderAlert[] = [];
   const stepStart = new Map<string, number>();
-  for (const t of dossier.planning) {
-    if (t.stepId) stepStart.set(t.stepId, new Date(`${t.start}T00:00:00`).getTime());
+  for (const ph of computePhaseDates(dossier)) {
+    stepStart.set(ph.stepId, new Date(`${ph.start}T00:00:00`).getTime());
   }
   const stepLabel = (id: string): string =>
     dossier.roadmap.find((s) => s.id === id)?.label ?? 'cette étape';
@@ -690,20 +868,20 @@ export function buildChantierAttention(
     }
 
     // Prochaines échéances du planning (≤ 14 jours).
-    const soon = dossier.planning
-      .map((t) => ({ t, d: days(new Date(`${t.start}T00:00:00`).getTime(), nowMs) }))
+    const soon = computePhaseDates(dossier)
+      .map((ph) => ({ ph, d: days(new Date(`${ph.start}T00:00:00`).getTime(), nowMs) }))
       .filter((x) => x.d >= 0 && x.d <= 14)
       .sort((a, b) => a.d - b.d)
       .slice(0, 3);
-    for (const { t, d } of soon) {
+    for (const { ph, d } of soon) {
       items.push({
-        id: `ech-${t.id}`,
+        id: `ech-${ph.stepId}`,
         kind: 'echeance',
         severity: 'info',
         message:
           d === 0
-            ? `La phase ${t.label} démarre aujourd'hui.`
-            : `La phase ${t.label} démarre dans ${d} jour(s).`,
+            ? `La phase ${ph.label} démarre aujourd'hui.`
+            : `La phase ${ph.label} démarre dans ${d} jour(s).`,
       });
     }
   }

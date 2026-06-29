@@ -8,7 +8,6 @@ import {
   SELECTION_STATUS_LABEL,
   SELECTION_STATUSES,
   buildOrderAlerts,
-  buildPlanning,
   type ClientSelection,
   type DocumentStatus,
   type Order,
@@ -23,14 +22,13 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  CalendarDays,
   CheckCircle2,
   Lightbulb,
   Plus,
   Trash2,
 } from 'lucide-react';
-import { fmtDateShort, fmtMoney } from '../lib/format';
 import { DocumentStatusBadge } from '../components/DocumentStatusBadge';
+import { SmartPlanningView } from '../components/SmartPlanningView';
 
 /* -------------------------------------------------------------------------- *
  * Le conducteur ne remplit pas un logiciel : il DÉCOUVRE ce que PHÉNIX a déjà
@@ -48,18 +46,6 @@ const CHAPTERS: { id: ChapterId; label: string; title: string }[] = [
   { id: 'documents', label: 'Documents', title: 'Les documents' },
   { id: 'planning', label: 'Le planning', title: 'Le planning' },
 ];
-
-const parseDurationDays = (duration?: string): number => {
-  if (!duration) return 60;
-  const m = duration.match(/(\d+)\s*(mois|semaine|jour|an)/i);
-  if (!m) return 60;
-  const n = Number(m[1]);
-  const unit = (m[2] ?? '').toLowerCase();
-  if (unit.startsWith('an')) return n * 365;
-  if (unit.startsWith('mois')) return n * 30;
-  if (unit.startsWith('sem')) return n * 7;
-  return n;
-};
 
 const selectCls = 'h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground';
 const uid = (): string => crypto.randomUUID().slice(0, 8);
@@ -649,19 +635,13 @@ function ChapterPlanning({
 }): React.JSX.Element {
   const setStart = (value: string | undefined) =>
     patch({ infos: { ...dossier.infos, startDate: value } });
-  const recompute = () => {
-    const start = dossier.infos.startDate ?? new Date().toISOString().slice(0, 10);
-    patch({
-      planning: buildPlanning(dossier.roadmap, start, parseDurationDays(dossier.infos.duration)),
-    });
-  };
 
   return (
     <>
       <Prepared>
         <p className="text-sm text-muted-foreground">
-          J'ai préparé vos {dossier.roadmap.length} étapes. Donnez-moi la date de début et je cale
-          un planning prévisionnel.
+          J'ai calé un planning à partir de vos {dossier.roadmap.length} étapes (durées par métier,
+          séchages, délais de commande). Donnez-moi la date de début et tout s'ajuste.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Date de début">
@@ -677,31 +657,14 @@ function ChapterPlanning({
               onChange={(e) => patch({ infos: { ...dossier.infos, duration: e.target.value } })}
             />
           </Field>
-          <Button variant="outline" onClick={recompute}>
-            <CalendarDays aria-hidden /> Proposer un planning
-          </Button>
         </div>
 
-        {dossier.planning.length > 0 && (
-          <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-            {dossier.planning.map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center justify-between gap-3 bg-surface px-3 py-2 text-sm"
-              >
-                <span className="text-foreground">{t.label}</span>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {fmtDateShort(t.start)} → {fmtDateShort(t.end)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <SmartPlanningView dossier={dossier} />
       </Prepared>
 
       {!dossier.infos.startDate && (
         <ToVerify>
-          <Reco text="Je n'ai pas encore la date de début souhaitée — précisez-la pour un planning précis." />
+          <Reco text="Je n'ai pas encore la date de début souhaitée — précisez-la et je cale tout le planning." />
         </ToVerify>
       )}
     </>
