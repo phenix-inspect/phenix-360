@@ -552,8 +552,14 @@ export interface ClientDecision {
   id: string;
   categorie: string;
   label: string;
-  /** Décision encore à obtenir (choix non figé). */
+  /** Détail du choix proposé (le cas échéant). */
+  detail: string | null;
+  /** Statut brut du choix (a_choisir / propose / valide). */
+  selectionStatus: SelectionStatus;
+  /** Décision encore à obtenir (choix non validé). */
   pending: boolean;
+  /** Le client peut agir : un choix lui a été PROPOSÉ (à valider ou amender). */
+  clientActionable: boolean;
   /** Étape qui consomme la décision. */
   stepLabel: string | null;
   /** Date limite de décision (planning daté seulement), sur le calendrier métier. */
@@ -602,7 +608,10 @@ export function buildClientDecisions(
       id: s.id,
       categorie: s.categorie,
       label: s.label,
+      detail: s.detail ?? null,
+      selectionStatus: s.statut,
       pending,
+      clientActionable: s.statut === 'propose',
       stepLabel: phase?.label ?? null,
       decideAvant,
       status,

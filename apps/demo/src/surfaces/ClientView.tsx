@@ -3,17 +3,20 @@ import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/
 import { CalendarRange, MessageCircle, Palette, Send, Sparkles } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
+  buildClientDecisions,
   clientFeed,
   nextClientAction,
   pendingClientDecisions,
   runAssistant,
   userId,
   type AssistantResult,
+  type ClientDecision,
   type EventActor,
   type Project,
 } from '@phenix360/core';
 import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
+import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
 import { GrandesEtapes } from '../components/GrandesEtapes';
@@ -38,7 +41,57 @@ export function ClientView({
   const dossier = dossierOf(snap, project.id);
   // Le client ne voit le planning qu'une fois la date de démarrage validée.
   const dossierDated = Boolean(dossier?.infos.startDate);
+  // Décision client la plus urgente que le client peut traiter (un choix
+  // proposé à valider). Prioritaire sur le bandeau intelligent générique.
+  const clientDecision = dossier
+    ? (buildClientDecisions(dossier).find((d) => d.clientActionable) ?? null)
+    : null;
   const feed = clientFeed(events);
+
+  const validateDecision = async (d: ClientDecision) => {
+    if (!dossier) return;
+    demo.saveDossier(project.id, {
+      ...dossier,
+      selections: dossier.selections.map((s) => (s.id === d.id ? { ...s, statut: 'valide' } : s)),
+    });
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'demande',
+      visibility: 'client',
+      state: 'close',
+      content: {
+        question: `Choix ${d.categorie.toLowerCase()} validé : ${d.label}`,
+        destinataire: 'equipe',
+        resolution: {
+          texte: 'Validé par le client.',
+          resolvedBy: actor.userId,
+          resolvedAt: new Date().toISOString(),
+        },
+      },
+    });
+  };
+
+  const requestModification = async (d: ClientDecision) => {
+    if (!dossier) return;
+    demo.saveDossier(project.id, {
+      ...dossier,
+      selections: dossier.selections.map((s) =>
+        s.id === d.id ? { ...s, statut: 'a_choisir' } : s,
+      ),
+    });
+    await demo.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'demande',
+      visibility: 'client',
+      state: 'ouverte',
+      content: {
+        question: `Modification demandée sur le choix ${d.categorie.toLowerCase()} : ${d.label}`,
+        destinataire: 'equipe',
+      },
+    });
+  };
   const decisions = pendingClientDecisions(events);
   const action = nextClientAction(project, events);
   // La décision prioritaire est déjà portée par le bandeau : on liste le reste.
@@ -52,7 +105,15 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
-      <SmartBanner project={project} events={events} actor={actor} />
+      {clientDecision ? (
+        <ClientDecisionBanner
+          decision={clientDecision}
+          onValidate={() => validateDecision(clientDecision)}
+          onModify={() => requestModification(clientDecision)}
+        />
+      ) : (
+        <SmartBanner project={project} events={events} actor={actor} />
+      )}
 
       <Card>
         <CardContent className="space-y-5 p-6">

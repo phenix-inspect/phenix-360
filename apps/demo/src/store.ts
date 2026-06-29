@@ -189,6 +189,29 @@ export const demo = {
       },
     });
 
+    // Choix proposés au client → on trace « décision envoyée au client » au journal
+    // (le client la validera depuis son espace). Interne : c'est un jalon de suivi.
+    for (const sel of proposal.dossier.selections) {
+      if (sel.statut === 'propose') {
+        await backend.appendEvent({
+          projectId: project.id,
+          actor: compaActor,
+          type: 'demande',
+          visibility: 'interne',
+          state: 'close',
+          content: {
+            question: `Décision envoyée au client : choix ${sel.categorie.toLowerCase()} (${sel.label}).`,
+            destinataire: 'equipe',
+            resolution: {
+              texte: 'En attente de validation du client.',
+              resolvedBy: compaId,
+              resolvedAt: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    }
+
     // Documents « demandés au client » → une demande apparaît dans l'espace client.
     for (const doc of proposal.dossier.documents) {
       if (doc.status === 'demande_client') {
