@@ -18,6 +18,7 @@ import type { Event } from './event.js';
 import { isDocument, isVisibleToClient } from './event.js';
 import { currentStep } from './views.js';
 import { PROJECT_STEP_LABEL } from './project.js';
+import { ORDER_STATUS_LABEL, type Order } from './prepare.js';
 
 export interface AssistantSource {
   type: string;
@@ -53,6 +54,8 @@ export interface AssistantInput {
   question: string;
   /** Journal complet du projet (la visibilité client est appliquée ici). */
   events: Event[];
+  /** Commandes du projet — enrichissent la mémoire (matériaux, garanties…). */
+  orders?: Order[];
   synthesize?: Synthesize;
   /** Garde-fou « jamais bloqué » : transmettre directement à l'équipe. */
   forceDemande?: boolean;
@@ -106,12 +109,35 @@ const excerptOf = (e: Event): string => {
   }
 };
 
-/** Construit le contexte à partir du journal visible au client. */
-export function retrieveContext(question: string, events: Event[]): AssistantSource[] {
+const orderExcerpt = (o: Order): string =>
+  `${o.label}${o.fournisseur ? ` — ${o.fournisseur}` : ''}` +
+  `${o.reference ? `, réf. ${o.reference}` : ''}` +
+  `${o.garantie ? `, garantie ${o.garantie}` : ''} : ${ORDER_STATUS_LABEL[o.statut]}.`;
+
+/** Construit le contexte à partir du journal visible au client + des commandes. */
+export function retrieveContext(
+  question: string,
+  events: Event[],
+  orders: Order[] = [],
+): AssistantSource[] {
   const visible = events.filter(isVisibleToClient);
   const q = stripAccents(question).toLowerCase();
   const qTokens = tokenize(question);
   const sources: AssistantSource[] = [];
+
+  // Mémoire des commandes (matériaux, fournisseurs, garanties, statuts).
+  const scoredOrders = orders
+    .map((o) => ({
+      o,
+      score: [...tokenize(`${o.label} ${o.fournisseur ?? ''} ${o.reference ?? ''}`)].filter((t) =>
+        qTokens.has(t),
+      ).length,
+    }))
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  for (const { o } of scoredOrders.slice(0, 3)) {
+    sources.push({ type: 'commande', excerpt: orderExcerpt(o) });
+  }
 
   // Intention « avancement » : lecture structurée de l'étape courante.
   if (['avanc', 'etape', 'ou en est', 'stade'].some((k) => q.includes(k))) {
@@ -151,7 +177,7 @@ export async function runAssistant(input: AssistantInput): Promise<AssistantResu
     return demandeIntent(input.question, 'Votre demande est transmise à l’équipe PHÉNIX.');
   }
 
-  const sources = retrieveContext(input.question, input.events);
+  const sources = retrieveContext(input.question, input.events, input.orders);
   if (sources.length === 0) {
     return demandeIntent(
       input.question,

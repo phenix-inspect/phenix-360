@@ -163,7 +163,8 @@ function Assistant({
     if (!question.trim()) return;
     setBusy(true);
     const events = snap.events.filter((e) => e.projectId === project.id);
-    const res = await runAssistant({ question: question.trim(), events });
+    const orders = dossierOf(snap, project.id)?.orders ?? [];
+    const res = await runAssistant({ question: question.trim(), events, orders });
     setResult(res);
     setBusy(false);
   };

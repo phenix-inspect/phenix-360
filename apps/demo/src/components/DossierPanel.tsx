@@ -1,17 +1,41 @@
 import { useState } from 'react';
-import { Badge, Button, Card, CardContent, Input } from '@phenix360/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+} from '@phenix360/ui';
 import {
   ORDER_STATUS_LABEL,
   ORDER_STATUSES,
   SELECTION_STATUS_LABEL,
+  buildOrderAlerts,
   buildProjectMemory,
   type EventActor,
   type Order,
+  type OrderAlert,
   type OrderStatus,
   type Project,
   type ProjectDossier,
 } from '@phenix360/core';
-import { Banknote, CalendarDays, FileText, ListChecks, Palette, Sparkles } from 'lucide-react';
+import {
+  AlertTriangle,
+  Banknote,
+  CalendarDays,
+  CheckCircle2,
+  FileText,
+  Info as InfoIcon,
+  ListChecks,
+  Palette,
+  Pencil,
+  Sparkles,
+} from 'lucide-react';
 import { demo } from '../store';
 import { fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
@@ -28,12 +52,19 @@ export function DossierPanel({
   actor: EventActor;
 }): React.JSX.Element {
   const memory = buildProjectMemory(dossier);
+  const alerts = buildOrderAlerts(dossier);
+  const [editing, setEditing] = useState<Order | null>(null);
 
   const patch = (next: Partial<ProjectDossier>) =>
     demo.saveDossier(project.id, { ...dossier, ...next });
 
   const setOrderStatus = (id: string, statut: OrderStatus) =>
     patch({ orders: dossier.orders.map((o) => (o.id === id ? { ...o, statut } : o)) });
+
+  const saveOrder = (updated: Order) => {
+    patch({ orders: dossier.orders.map((o) => (o.id === updated.id ? updated : o)) });
+    setEditing(null);
+  };
 
   const askDocument = async (docId: string, label: string) => {
     patch({
@@ -54,9 +85,14 @@ export function DossierPanel({
     });
   };
 
+  const stepLabels = (ids?: string[]): string[] =>
+    (ids ?? []).map((id) => dossier.roadmap.find((s) => s.id === id)?.label ?? id);
+
   return (
     <div className="space-y-6">
       <Info dossier={dossier} />
+
+      {alerts.length > 0 && <AlertsSection alerts={alerts} />}
 
       <Section
         icon={<ListChecks aria-hidden />}
@@ -91,7 +127,13 @@ export function DossierPanel({
       <Section icon={<Banknote aria-hidden />} title="Commandes" count={dossier.orders.length}>
         <div className="grid gap-3 sm:grid-cols-2">
           {dossier.orders.map((o) => (
-            <OrderCard key={o.id} order={o} onStatus={(s) => setOrderStatus(o.id, s)} />
+            <OrderCard
+              key={o.id}
+              order={o}
+              steps={stepLabels(o.stepIds)}
+              onStatus={(s) => setOrderStatus(o.id, s)}
+              onEdit={() => setEditing(o)}
+            />
           ))}
         </div>
       </Section>
@@ -166,7 +208,54 @@ export function DossierPanel({
           équipes.
         </p>
       </Section>
+
+      {editing && (
+        <OrderEditor
+          order={editing}
+          roadmap={dossier.roadmap}
+          onSave={saveOrder}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
+  );
+}
+
+function AlertsSection({ alerts }: { alerts: OrderAlert[] }): React.JSX.Element {
+  const icon = (s: OrderAlert['severity']) =>
+    s === 'warning' ? (
+      <AlertTriangle aria-hidden />
+    ) : s === 'success' ? (
+      <CheckCircle2 aria-hidden />
+    ) : (
+      <InfoIcon aria-hidden />
+    );
+  const tone = (s: OrderAlert['severity']) =>
+    s === 'warning'
+      ? 'border-gold-200 bg-gold-50 text-gold-800'
+      : s === 'success'
+        ? 'border-border bg-surface text-success'
+        : 'border-border bg-surface text-info';
+  return (
+    <Card className="border-gold-200 bg-gold-50">
+      <CardContent className="space-y-2 p-5">
+        <div className="flex items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:text-gold-700">
+          <Sparkles aria-hidden />
+          <h3 className="text-sm font-semibold">PHÉNIX surveille vos commandes</h3>
+        </div>
+        <ul className="space-y-2">
+          {alerts.map((a) => (
+            <li
+              key={a.id}
+              className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-sm [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 ${tone(a.severity)}`}
+            >
+              {icon(a.severity)}
+              <span>{a.message}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -199,10 +288,14 @@ function Info({ dossier }: { dossier: ProjectDossier }): React.JSX.Element {
 
 function OrderCard({
   order,
+  steps,
   onStatus,
+  onEdit,
 }: {
   order: Order;
+  steps: string[];
   onStatus: (s: OrderStatus) => void;
+  onEdit: () => void;
 }): React.JSX.Element {
   return (
     <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
@@ -216,20 +309,220 @@ function OrderCard({
       </div>
       <p className="text-xs text-muted-foreground">
         {order.fournisseur ?? 'Fournisseur à définir'}
-        {order.garantie ? ` · Garantie ${order.garantie}` : ''}
+        {order.reference ? ` · réf. ${order.reference}` : ''}
+        {order.quantite != null ? ` · ×${order.quantite}` : ''}
       </p>
-      <select
-        value={order.statut}
-        onChange={(e) => onStatus(e.target.value as OrderStatus)}
-        className="h-8 w-full rounded-md border border-input bg-surface px-2 text-xs text-foreground"
-      >
-        {ORDER_STATUSES.map((s) => (
-          <option key={s} value={s}>
-            {ORDER_STATUS_LABEL[s]}
-          </option>
-        ))}
-      </select>
+      {(order.dateLivraisonReelle || order.dateLivraisonEstimee) && (
+        <p className="text-xs text-muted-foreground">
+          {order.dateLivraisonReelle
+            ? `Livrée le ${fmtDateShort(order.dateLivraisonReelle)}`
+            : `Livraison estimée ${fmtDateShort(order.dateLivraisonEstimee!)}`}
+          {order.garantie ? ` · Garantie ${order.garantie}` : ''}
+        </p>
+      )}
+      {steps.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {steps.map((s) => (
+            <span
+              key={s}
+              className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="flex items-center gap-2">
+        <select
+          value={order.statut}
+          onChange={(e) => onStatus(e.target.value as OrderStatus)}
+          className="h-8 flex-1 rounded-md border border-input bg-surface px-2 text-xs text-foreground"
+        >
+          {ORDER_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {ORDER_STATUS_LABEL[s]}
+            </option>
+          ))}
+        </select>
+        <Button size="sm" variant="outline" onClick={onEdit}>
+          <Pencil aria-hidden /> Détails
+        </Button>
+      </div>
     </div>
+  );
+}
+
+function OrderEditor({
+  order,
+  roadmap,
+  onSave,
+  onClose,
+}: {
+  order: Order;
+  roadmap: ProjectDossier['roadmap'];
+  onSave: (order: Order) => void;
+  onClose: () => void;
+}): React.JSX.Element {
+  const [o, setO] = useState<Order>(order);
+  const set = <K extends keyof Order>(key: K, value: Order[K]) =>
+    setO((p) => ({ ...p, [key]: value }));
+  const num = (v: string): number | undefined => (v ? Number(v) : undefined);
+  const toggleStep = (id: string) =>
+    set(
+      'stepIds',
+      (o.stepIds ?? []).includes(id)
+        ? (o.stepIds ?? []).filter((x) => x !== id)
+        : [...(o.stepIds ?? []), id],
+    );
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{o.label || 'Commande'}</DialogTitle>
+          <DialogDescription>
+            Fiche commande — toutes les informations sont modifiables.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <F label="Désignation" full>
+            <Input value={o.label} onChange={(e) => set('label', e.target.value)} />
+          </F>
+          <F label="Fournisseur">
+            <Input
+              value={o.fournisseur ?? ''}
+              onChange={(e) => set('fournisseur', e.target.value)}
+            />
+          </F>
+          <F label="Référence">
+            <Input value={o.reference ?? ''} onChange={(e) => set('reference', e.target.value)} />
+          </F>
+          <F label="Quantité">
+            <Input
+              type="number"
+              value={o.quantite ?? ''}
+              onChange={(e) => set('quantite', num(e.target.value))}
+            />
+          </F>
+          <F label="Montant (€)">
+            <Input
+              type="number"
+              value={o.montant ?? ''}
+              onChange={(e) => set('montant', num(e.target.value))}
+            />
+          </F>
+          <F label="Statut">
+            <select
+              value={o.statut}
+              onChange={(e) => set('statut', e.target.value as OrderStatus)}
+              className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
+            >
+              {ORDER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {ORDER_STATUS_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </F>
+          <F label="Délai annoncé (jours)">
+            <Input
+              type="number"
+              value={o.delaiJours ?? ''}
+              onChange={(e) => set('delaiJours', num(e.target.value))}
+            />
+          </F>
+          <F label="Numéro de suivi">
+            <Input
+              value={o.numeroSuivi ?? ''}
+              onChange={(e) => set('numeroSuivi', e.target.value)}
+            />
+          </F>
+          <F label="Date de commande">
+            <Input
+              type="date"
+              value={o.dateCommande ?? ''}
+              onChange={(e) => set('dateCommande', e.target.value || undefined)}
+            />
+          </F>
+          <F label="Livraison estimée">
+            <Input
+              type="date"
+              value={o.dateLivraisonEstimee ?? ''}
+              onChange={(e) => set('dateLivraisonEstimee', e.target.value || undefined)}
+            />
+          </F>
+          <F label="Livraison réelle">
+            <Input
+              type="date"
+              value={o.dateLivraisonReelle ?? ''}
+              onChange={(e) => set('dateLivraisonReelle', e.target.value || undefined)}
+            />
+          </F>
+          <F label="Garantie">
+            <Input value={o.garantie ?? ''} onChange={(e) => set('garantie', e.target.value)} />
+          </F>
+          <F label="Devis fournisseur">
+            <Input
+              value={o.devisFournisseur ?? ''}
+              onChange={(e) => set('devisFournisseur', e.target.value)}
+              placeholder="lien ou fichier"
+            />
+          </F>
+          <F label="Bon de commande">
+            <Input
+              value={o.bonCommande ?? ''}
+              onChange={(e) => set('bonCommande', e.target.value)}
+              placeholder="lien ou fichier"
+            />
+          </F>
+          <F label="Facture">
+            <Input
+              value={o.facture ?? ''}
+              onChange={(e) => set('facture', e.target.value)}
+              placeholder="lien ou fichier"
+            />
+          </F>
+          <F label="Notice">
+            <Input
+              value={o.notice ?? ''}
+              onChange={(e) => set('notice', e.target.value)}
+              placeholder="lien ou fichier"
+            />
+          </F>
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="text-sm text-muted-foreground">Étapes servies par cette commande</span>
+          <div className="flex flex-wrap gap-2">
+            {roadmap.map((step) => {
+              const on = (o.stepIds ?? []).includes(step.id);
+              return (
+                <button
+                  key={step.id}
+                  type="button"
+                  onClick={() => toggleStep(step.id)}
+                  className={`rounded-full border px-3 py-1 text-sm transition-colors duration-base ${
+                    on
+                      ? 'border-primary bg-gold-100 text-gold-800'
+                      : 'border-border bg-surface text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {step.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="ghost" onClick={onClose}>
+            Annuler
+          </Button>
+          <Button onClick={() => onSave(o)}>Enregistrer la commande</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -300,5 +593,22 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+function F({
+  label,
+  full,
+  children,
+}: {
+  label: string;
+  full?: boolean;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <label className={`flex flex-col gap-1.5 text-sm ${full ? 'sm:col-span-2' : ''}`}>
+      <span className="text-muted-foreground">{label}</span>
+      {children}
+    </label>
   );
 }

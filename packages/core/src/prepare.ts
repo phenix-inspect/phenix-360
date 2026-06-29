@@ -41,31 +41,74 @@ export interface PlanningTask {
 /* -------------------------------------------------------------------------- *
  * Commandes (fiches d'achat détectées dans le devis)
  * -------------------------------------------------------------------------- */
-export const ORDER_STATUSES = ['a_commander', 'commande', 'expedie', 'livre', 'pose'] as const;
+export const ORDER_STATUSES = [
+  'a_commander',
+  'commandee',
+  'en_preparation',
+  'expediee',
+  'livree',
+  'posee',
+  'terminee',
+] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   a_commander: 'À commander',
-  commande: 'Commandé',
-  expedie: 'Expédié',
-  livre: 'Livré',
-  pose: 'Posé',
+  commandee: 'Commandée',
+  en_preparation: 'En préparation',
+  expediee: 'Expédiée',
+  livree: 'Livrée',
+  posee: 'Posée',
+  terminee: 'Terminée',
 };
 
+/** Statuts considérés comme « la commande est passée » (≠ à commander). */
+export const ORDER_PLACED: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
+  'commandee',
+  'en_preparation',
+  'expediee',
+  'livree',
+  'posee',
+  'terminee',
+]);
+/** Statuts considérés comme « réceptionnée ». */
+export const ORDER_RECEIVED: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
+  'livree',
+  'posee',
+  'terminee',
+]);
+
+/**
+ * Une COMMANDE est un objet vivant (pilier de PHÉNIX 360), reliée à une ou
+ * plusieurs étapes de la feuille de route pour permettre l'anticipation.
+ */
 export interface Order {
   id: string;
   label: string;
   fournisseur?: string;
   reference?: string;
+  quantite?: number;
   montant?: number;
-  /** Date prévisionnelle de commande (ISO). */
-  datePrevisionnelle?: string;
-  /** Date de livraison prévue (ISO). */
-  livraison?: string;
+  /** Lien vers le devis fournisseur (URL/fichier). */
+  devisFournisseur?: string;
+  /** Bon de commande (URL/fichier). */
+  bonCommande?: string;
+  /** Facture (URL/fichier). */
+  facture?: string;
+  /** Notice / documentation (URL/fichier). */
+  notice?: string;
   garantie?: string;
-  /** Notice disponible (présence). */
-  notice?: boolean;
-  /** Facture disponible (présence). */
-  facture?: boolean;
+  /** Numéro de suivi transporteur. */
+  numeroSuivi?: string;
+  /** Date de commande (ISO YYYY-MM-DD). */
+  dateCommande?: string;
+  /** Délai annoncé par le fournisseur, en jours. */
+  delaiJours?: number;
+  /** Date estimée de livraison (ISO). */
+  dateLivraisonEstimee?: string;
+  /** Date réelle de livraison (ISO). */
+  dateLivraisonReelle?: string;
+  /** Étapes de la feuille de route servies par cette commande. */
+  stepIds?: string[];
   statut: OrderStatus;
 }
 
@@ -202,7 +245,6 @@ export const PREPARATION_STAGES: { icon: string; label: string }[] = [
   { icon: '🔨', label: 'Détection des travaux' },
   { icon: '📦', label: 'Détection des commandes' },
   { icon: '🎨', label: 'Détection des choix client' },
-  { icon: '👷', label: 'Détection des intervenants' },
   { icon: '📅', label: 'Construction du planning' },
   { icon: '📂', label: 'Vérification des documents' },
   { icon: '🤖', label: "Préparation de l'assistant PHÉNIX" },
@@ -249,12 +291,129 @@ export function buildProjectMemory(dossier: ProjectDossier): ProjectMemory {
     travaux: dossier.roadmap.map((s) => s.label),
     materiaux: dossier.orders.map((o) => o.label),
     choix: dossier.selections.map((s) => `${s.categorie} : ${s.label}`),
-    commandes: dossier.orders.map((o) =>
-      o.fournisseur ? `${o.label} (${o.fournisseur})` : o.label,
+    commandes: dossier.orders.map(
+      (o) =>
+        `${o.label}${o.fournisseur ? ` — ${o.fournisseur}` : ''}${o.reference ? ` (réf. ${o.reference})` : ''} : ${ORDER_STATUS_LABEL[o.statut]}`,
     ),
     documents: dossier.documents.filter((d) => d.status === 'fourni').map((d) => d.label),
     garanties: dossier.orders.filter((o) => o.garantie).map((o) => `${o.label} : ${o.garantie}`),
   };
+}
+
+/* -------------------------------------------------------------------------- *
+ * IA PROACTIVE sur les commandes — anticiper les oublis et les retards
+ * -------------------------------------------------------------------------- *
+ * PHÉNIX ne se contente pas d'enregistrer les commandes : il les surveille en
+ * croisant le planning (dates d'étapes), les délais fournisseurs et l'état réel
+ * des commandes. Sélecteur pur — la logique vit ici, jamais dans l'UI.
+ */
+export type OrderAlertSeverity = 'warning' | 'info' | 'success';
+
+export interface OrderAlert {
+  id: string;
+  severity: OrderAlertSeverity;
+  message: string;
+  orderId?: string;
+  stepId?: string;
+}
+
+const days = (a: number, b: number): number => Math.round((a - b) / DAY_MS);
+const weeksOrDays = (d: number): string =>
+  d >= 14 && d % 7 === 0
+    ? `${d / 7} semaines`
+    : d >= 14
+      ? `${Math.round(d / 7)} semaines`
+      : `${d} jour(s)`;
+
+/**
+ * Construit les alertes PHÉNIX sur les commandes. Déterministe (démo) :
+ *  • livraison imminente / dépassée ;
+ *  • étape qui approche alors que la commande n'est pas passée ;
+ *  • délai fournisseur incompatible avec le début d'étape ;
+ *  • phase dont les commandes sont au complet (positif).
+ */
+export function buildOrderAlerts(
+  dossier: ProjectDossier,
+  nowMs: number = Date.now(),
+): OrderAlert[] {
+  const alerts: OrderAlert[] = [];
+  const stepStart = new Map<string, number>();
+  for (const t of dossier.planning) {
+    if (t.stepId) stepStart.set(t.stepId, new Date(`${t.start}T00:00:00`).getTime());
+  }
+  const stepLabel = (id: string): string =>
+    dossier.roadmap.find((s) => s.id === id)?.label ?? 'cette étape';
+
+  for (const o of dossier.orders) {
+    const placed = ORDER_PLACED.has(o.statut);
+    const received = ORDER_RECEIVED.has(o.statut);
+
+    // Livraison imminente / dépassée.
+    if (o.dateLivraisonEstimee && !received) {
+      const d = days(new Date(`${o.dateLivraisonEstimee}T00:00:00`).getTime(), nowMs);
+      if (d >= 0 && d <= 14) {
+        alerts.push({
+          id: `liv-${o.id}`,
+          severity: 'info',
+          orderId: o.id,
+          message: `${o.label} devrait être livrée dans ${d} jour(s).`,
+        });
+      } else if (d < 0) {
+        alerts.push({
+          id: `liv-${o.id}`,
+          severity: 'warning',
+          orderId: o.id,
+          message: `${o.label} : livraison estimée dépassée de ${-d} jour(s).`,
+        });
+      }
+    }
+
+    // Étape qui approche / délai fournisseur incompatible.
+    if (!placed) {
+      for (const sid of o.stepIds ?? []) {
+        const start = stepStart.get(sid);
+        if (start == null) continue;
+        const ds = days(start, nowMs);
+        if (ds < 0) continue;
+        if (o.delaiJours != null && ds < o.delaiJours) {
+          alerts.push({
+            id: `del-${o.id}-${sid}`,
+            severity: 'warning',
+            orderId: o.id,
+            stepId: sid,
+            message: `${o.label} est annoncée à ${weeksOrDays(o.delaiJours)} de délai, mais la phase ${stepLabel(sid)} commence dans ${weeksOrDays(ds)} — à commander rapidement.`,
+          });
+        } else if (ds <= 21) {
+          alerts.push({
+            id: `app-${o.id}-${sid}`,
+            severity: 'warning',
+            orderId: o.id,
+            stepId: sid,
+            message: `Le chantier approche de la phase ${stepLabel(sid)} mais ${o.label} n'est pas encore commandée.`,
+          });
+        }
+      }
+    }
+  }
+
+  // Phases dont toutes les commandes sont passées (positif).
+  for (const step of dossier.roadmap) {
+    const linked = dossier.orders.filter((o) => (o.stepIds ?? []).includes(step.id));
+    if (linked.length > 0 && linked.every((o) => ORDER_PLACED.has(o.statut))) {
+      const start = stepStart.get(step.id);
+      if (start == null || days(start, nowMs) >= -7) {
+        alerts.push({
+          id: `ok-${step.id}`,
+          severity: 'success',
+          stepId: step.id,
+          message: `Les commandes de la phase ${step.label} sont au complet.`,
+        });
+      }
+    }
+  }
+
+  const rank: Record<OrderAlertSeverity, number> = { warning: 0, info: 1, success: 2 };
+  return alerts.sort((a, b) => rank[a.severity] - rank[b.severity]).slice(0, 6);
 }
 
 /* -------------------------------------------------------------------------- *
@@ -323,38 +482,61 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
       id: 'ord-cuisine',
       label: 'Cuisine équipée',
       fournisseur: 'Cuisines Schmidt',
+      reference: 'SCH-PERFORMA-LAQUE',
+      quantite: 1,
       montant: 12500,
       garantie: '5 ans',
-      statut: 'a_commander',
+      delaiJours: 56,
+      dateCommande: iso(new Date(Date.now() - 12 * DAY_MS)),
+      dateLivraisonEstimee: iso(new Date(Date.now() + 9 * DAY_MS)),
+      devisFournisseur: 'devis-cuisine-schmidt.pdf',
+      bonCommande: 'BC-2024-118.pdf',
+      stepIds: ['step-10'],
+      statut: 'commandee',
     },
     {
       id: 'ord-receveur',
       label: 'Receveur & robinetterie',
       fournisseur: 'Grohe',
+      reference: 'GRO-RAINSHOWER',
+      quantite: 1,
       montant: 1850,
       garantie: '10 ans',
+      delaiJours: 21,
+      stepIds: ['step-3'],
       statut: 'a_commander',
     },
     {
       id: 'ord-carrelage',
       label: 'Carrelage & faïence',
       fournisseur: 'Porcelanosa',
+      reference: 'POR-STON-60',
+      quantite: 45,
       montant: 3200,
+      delaiJours: 28,
+      stepIds: ['step-7'],
       statut: 'a_commander',
     },
     {
       id: 'ord-radiateurs',
       label: 'Radiateurs',
       fournisseur: 'Acova',
+      quantite: 5,
       montant: 2400,
       garantie: '2 ans',
+      delaiJours: 42,
+      stepIds: ['step-2'],
       statut: 'a_commander',
     },
     {
       id: 'ord-parquet',
       label: 'Parquet chêne',
       fournisseur: 'Panaget',
+      reference: 'PAN-CHENE-RUSTIQUE',
+      quantite: 60,
       montant: 2800,
+      delaiJours: 14,
+      stepIds: ['step-9'],
       statut: 'a_commander',
     },
   ];
@@ -391,11 +573,6 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
       question:
         "Je n'ai pas trouvé la date de début souhaitée. Quand le chantier doit-il démarrer ?",
       field: 'startDate',
-      answered: false,
-    },
-    {
-      id: 'q-plombier',
-      question: "Je n'ai pas identifié le plombier. Qui interviendra sur le lot plomberie ?",
       answered: false,
     },
     {
