@@ -171,12 +171,17 @@ export function momentVisiblePour(moment: Moment, viewer: AudienceGroup): boolea
   return moment.state === 'publie' && moment.visibleTo.includes(viewer);
 }
 
-/** Chapitre par défaut : le mois de création (« juin 2026 »). */
-function defaultChapter(m: Moment): { key: string; label: string } {
-  const d = new Date(m.createdAt);
+/** Mois d'une date : clé triable (« 2026-06 ») + libellé (« juin 2026 »). */
+export function moisDeDate(date: IsoDateTime): { key: string; label: string } {
+  const d = new Date(date);
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const label = d.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return { key, label };
+}
+
+/** Chapitre par défaut : le mois de création (« juin 2026 »). */
+function defaultChapter(m: Moment): { key: string; label: string } {
+  return moisDeDate(m.createdAt);
 }
 
 /** Une entrée du Fil : un séparateur de chapitre, ou un Moment. */
@@ -287,4 +292,52 @@ export function bibliothequeImages(
     }
   }
   return images.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}
+
+/* ----------------------- filtres simples (brique courante) ----------------- */
+
+/** Filtres de la Bibliothèque (V1 : pièce, mois, coups de cœur). */
+export interface BibliothequeFilters {
+  zoneId?: ZoneId;
+  /** Clé de mois « YYYY-MM » (cf. moisDeDate). */
+  mois?: string;
+  avecCoupDeCoeur?: boolean;
+}
+
+/**
+ * Applique les filtres à la Bibliothèque. Sélecteur PUR. « avec coup de cœur »
+ * = le Moment d'origine a reçu une appréciation (ensemble d'ids fourni par
+ * l'appelant, pour rester sans dépendance). Prêt à accueillir d'autres filtres
+ * (auteur, type, étape) sans refonte.
+ */
+export function filtrerBibliotheque(
+  images: BibliothequeImage[],
+  filters: BibliothequeFilters,
+  momentsAimes: ReadonlySet<string>,
+): BibliothequeImage[] {
+  return images.filter((img) => {
+    if (filters.zoneId && img.zoneId !== filters.zoneId) return false;
+    if (filters.mois && moisDeDate(img.date).key !== filters.mois) return false;
+    if (filters.avecCoupDeCoeur && !momentsAimes.has(img.momentId)) return false;
+    return true;
+  });
+}
+
+/** Mois présents dans une liste d'images (récent → ancien), pour les facettes. */
+export function moisDisponibles(images: BibliothequeImage[]): { key: string; label: string }[] {
+  const map = new Map<string, string>();
+  for (const img of images) {
+    const m = moisDeDate(img.date);
+    if (!map.has(m.key)) map.set(m.key, m.label);
+  }
+  return [...map.entries()]
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1))
+    .map(([key, label]) => ({ key, label }));
+}
+
+/** Pièces (zoneId) présentes dans une liste d'images, pour les facettes. */
+export function zonesDisponibles(images: BibliothequeImage[]): Set<string> {
+  const set = new Set<string>();
+  for (const img of images) if (img.zoneId) set.add(img.zoneId);
+  return set;
 }

@@ -95,7 +95,11 @@ export function FilView({
           }
         />
       ) : view === 'bibliotheque' ? (
-        <BibliothequeView images={images} zoneLabel={zoneLabel} />
+        <BibliothequeView
+          images={images}
+          zones={zones}
+          momentsAimes={new Set(coups.map((c) => c.momentId))}
+        />
       ) : (
         <div className="mx-auto max-w-xl space-y-6">
           {entries.map((entry) =>
