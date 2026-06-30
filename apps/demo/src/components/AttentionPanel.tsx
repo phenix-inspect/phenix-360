@@ -106,7 +106,11 @@ export function AttentionPanel({
             {visible.map((item) => (
               <li
                 key={item.id}
-                className="flex items-start gap-3 rounded-lg border border-border bg-surface px-3 py-2.5"
+                className={`flex items-start gap-3 rounded-lg border border-border bg-surface px-3 py-2.5 ${
+                  item.kind === 'avenant'
+                    ? 'animate-in fade-in-0 slide-in-from-top-1 duration-base'
+                    : ''
+                }`}
               >
                 <span className={`mt-1.5 size-2 shrink-0 rounded-full ${dot(item.severity)}`} />
                 <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground [&_svg]:size-4">
@@ -118,6 +122,14 @@ export function AttentionPanel({
                   </p>
                   <p className="text-sm text-foreground">{item.message}</p>
                 </div>
+                {item.avenant && (
+                  <span
+                    title={`${item.avenant.added} prestation(s) ajoutée(s) · ${item.avenant.replaced} modifiée(s)`}
+                    className="shrink-0 self-center rounded-full border border-border bg-paper-50 px-2 py-0.5 font-mono text-[0.6875rem] text-muted-foreground animate-in fade-in-0 zoom-in-95 duration-base"
+                  >
+                    +{item.avenant.added} / ~{item.avenant.replaced}
+                  </span>
+                )}
                 {item.kind === 'document' && item.docId ? (
                   <Button
                     size="sm"

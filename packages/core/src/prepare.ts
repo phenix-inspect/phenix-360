@@ -1433,6 +1433,8 @@ export interface AttentionItem {
   message: string;
   /** Document concerné (permet l'action « Demander au client »). */
   docId?: string;
+  /** Détail d'impact d'un avenant (badge « +ajoutées / ~modifiées »). */
+  avenant?: { added: number; replaced: number };
 }
 
 const ATTENTION_RANK: Record<OrderAlertSeverity, number> = { warning: 0, info: 1, success: 2 };
@@ -1460,7 +1462,7 @@ export function buildChantierAttention(
           id: `doc-${d.id}`,
           kind: 'document',
           severity: 'warning',
-          message: `Document recommandé manquant : ${d.label}.`,
+          message: `Il manque un document recommandé : ${d.label}.`,
           docId: d.id,
         });
       } else if (d.status === 'a_fournir') {
@@ -1501,22 +1503,40 @@ export function buildChantierAttention(
       }
       const before = (dossier.avenants ?? []).filter((a) => a.numero < av.numero);
       const impact = avenantImpact(dossier.devis, before, av);
+
+      const ajoute = `${impact.postesAjoutes} prestation${impact.postesAjoutes > 1 ? 's' : ''}`;
+      const surScope =
+        impact.impactPlanning && impact.commandesAMettreAJour > 0
+          ? ' Vérifiez son impact sur le planning et les commandes.'
+          : impact.impactPlanning
+            ? ' Vérifiez son impact sur le planning.'
+            : impact.commandesAMettreAJour > 0
+              ? ' Vérifiez son impact sur les commandes.'
+              : '';
       items.push({
         id: `avenant-${av.numero}`,
         kind: 'avenant',
         severity: 'warning',
-        message:
-          `L'avenant n°${av.numero} ajoute ${impact.postesAjoutes} poste(s) et remplace ${impact.postesRemplaces} poste(s).` +
-          (impact.impactPlanning ? " Vérifiez l'impact planning." : ''),
+        message: `L'avenant n°${av.numero} ajoute ${ajoute} et en remplace ${impact.postesRemplaces}.${surScope}`,
+        avenant: { added: impact.postesAjoutes, replaced: impact.postesRemplaces },
       });
-      for (const oid of impact.commandeIds) {
-        const o = dossier.orders.find((x) => x.id === oid);
-        if (!o) continue;
+
+      // Une SEULE alerte commande, même si plusieurs commandes sont concernées
+      // (le détail s'ouvre dans la fiche « Le devis »).
+      if (impact.commandesAMettreAJour === 1) {
+        const o = dossier.orders.find((x) => x.id === impact.commandeIds[0]);
         items.push({
-          id: `avenant-cmd-${av.numero}-${oid}`,
+          id: `avenant-cmd-${av.numero}`,
           kind: 'commande',
           severity: 'warning',
-          message: `La commande « ${o.label} » doit être mise à jour suite à l'avenant n°${av.numero}.`,
+          message: `La commande « ${o?.label ?? 'concernée'} » doit être actualisée suite à l'avenant n°${av.numero}.`,
+        });
+      } else if (impact.commandesAMettreAJour > 1) {
+        items.push({
+          id: `avenant-cmd-${av.numero}`,
+          kind: 'commande',
+          severity: 'warning',
+          message: `${impact.commandesAMettreAJour} commandes doivent être actualisées suite à l'avenant n°${av.numero}.`,
         });
       }
     }
