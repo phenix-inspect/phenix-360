@@ -12,16 +12,24 @@
  */
 import { useSyncExternalStore } from 'react';
 import {
+  DEFAULT_AUDIENCE,
   InMemoryBackend,
   attachmentId as toAttachmentId,
   buildDecisionContent,
+  coupDeCoeurId as toCoupId,
   decisionVisibility,
+  filPhotoId as toFilPhotoId,
+  messageId as toMessageId,
+  momentId as toMomentId,
   userId as toUserId,
   type BackendState,
+  type CoupDeCoeur,
   type DemandeResolution,
   type EventActor,
   type EventId,
   type KeyValueStore,
+  type Message,
+  type Moment,
   type NewEvent,
   type NewMember,
   type NewProject,
@@ -29,7 +37,10 @@ import {
   type ProjectId,
   type ProjectPatch,
   type ProjectProposal,
+  type ProjectZone,
+  type UploadedMedia,
   type UserId,
+  type ZoneId,
 } from '@phenix360/core';
 import { buildDemoSeed } from './seed';
 
@@ -39,6 +50,11 @@ const ACTIVE_KEY = 'phenix-demo:active:v1';
 const DOSSIERS_KEY = 'phenix-demo:dossiers:v1';
 const PINS_KEY = 'phenix-demo:pins:v1';
 const SEEDED_KEY = 'phenix-demo:seeded:v1';
+// Le Fil — agrégat distinct du Journal (persisté à part, par projet).
+const FIL_MOMENTS_KEY = 'phenix-demo:fil-moments:v1';
+const FIL_COUPS_KEY = 'phenix-demo:fil-coups:v1';
+const FIL_MESSAGES_KEY = 'phenix-demo:fil-messages:v1';
+const FIL_ZONES_KEY = 'phenix-demo:fil-zones:v1';
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
@@ -66,6 +82,13 @@ export interface DemoSnapshot extends BackendState {
   dossiers: Record<string, ProjectDossier>;
   /** projectId → eventIds épinglés à l'historique (annotation, hors journal). */
   pins: Record<string, string[]>;
+  /** Le Fil (par projet) — agrégat distinct du Journal. */
+  fil: {
+    moments: Record<string, Moment[]>;
+    coups: Record<string, CoupDeCoeur[]>;
+    messages: Record<string, Message[]>;
+    zones: Record<string, ProjectZone[]>;
+  };
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -82,6 +105,12 @@ function build(): DemoSnapshot {
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
     pins: readJson<Record<string, string[]>>(PINS_KEY, {}),
+    fil: {
+      moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
+      coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
+      messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
+      zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
+    },
   };
 }
 
@@ -262,14 +291,117 @@ export const demo = {
     broadcast();
   },
 
+  /* ------------------------------- Le Fil -------------------------------- */
+
+  /** Ajoute un Moment (brique 1 : mono-photo, publié immédiatement). */
+  addMoment(input: {
+    projectId: ProjectId;
+    actor: EventActor;
+    title: string;
+    media: UploadedMedia;
+    zoneId?: ZoneId;
+    legende?: string;
+  }): void {
+    const now = new Date().toISOString();
+    const photoId = toFilPhotoId(crypto.randomUUID());
+    const moment: Moment = {
+      id: toMomentId(crypto.randomUUID()),
+      projectId: input.projectId,
+      authorId: input.actor.userId,
+      authorRole: input.actor.role,
+      createdAt: now,
+      publishedAt: now,
+      state: 'publie',
+      title: input.title.trim(),
+      visibleTo: DEFAULT_AUDIENCE,
+      photos: [
+        {
+          id: photoId,
+          imageUrl: input.media.imageUrl,
+          bucket: input.media.bucket,
+          storagePath: input.media.storagePath,
+          mimeType: input.media.mimeType,
+          width: input.media.width,
+          height: input.media.height,
+          legende: input.legende?.trim() || undefined,
+          ordre: 0,
+          createdAt: now,
+        },
+      ],
+      coverPhotoId: photoId,
+      ...(input.zoneId ? { zoneId: input.zoneId } : {}),
+    };
+    const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
+    map[input.projectId] = [...(map[input.projectId] ?? []), moment];
+    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /** Supprime un Moment (l'UI ne l'autorise que tant qu'il n'est pas verrouillé). */
+  deleteMoment(projectId: ProjectId, momentId: string): void {
+    const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
+    map[projectId] = (map[projectId] ?? []).filter((m) => m.id !== momentId);
+    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /** Bascule le ♡ coup de cœur d'un utilisateur sur un Moment. */
+  toggleCoupDeCoeur(projectId: ProjectId, momentId: string, actor: EventActor): void {
+    const map = readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {});
+    const current = map[projectId] ?? [];
+    const existing = current.find((c) => c.momentId === momentId && c.userId === actor.userId);
+    map[projectId] = existing
+      ? current.filter((c) => c.id !== existing.id)
+      : [
+          ...current,
+          {
+            id: toCoupId(crypto.randomUUID()),
+            momentId: momentId as CoupDeCoeur['momentId'],
+            userId: actor.userId,
+            userRole: actor.role,
+            createdAt: new Date().toISOString(),
+          },
+        ];
+    localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /** Laisse un message (niveau 1) sous un Moment. */
+  addMessage(projectId: ProjectId, momentId: string, actor: EventActor, texte: string): void {
+    const trimmed = texte.trim();
+    if (!trimmed) return;
+    const map = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {});
+    const message: Message = {
+      id: toMessageId(crypto.randomUUID()),
+      momentId: momentId as Message['momentId'],
+      photoId: null,
+      parentId: null,
+      authorId: actor.userId,
+      authorRole: actor.role,
+      texte: trimmed,
+      createdAt: new Date().toISOString(),
+    };
+    map[projectId] = [...(map[projectId] ?? []), message];
+    localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
-    const { state, people, activeProjectId, dossiers } = buildDemoSeed();
+    const { state, people, activeProjectId, dossiers, fil } = buildDemoSeed();
     kv.save(state);
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     localStorage.removeItem(PINS_KEY);
+    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(fil.moments));
+    localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
+    localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
+    localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -282,6 +414,10 @@ export const demo = {
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(DOSSIERS_KEY);
     localStorage.removeItem(PINS_KEY);
+    localStorage.removeItem(FIL_MOMENTS_KEY);
+    localStorage.removeItem(FIL_COUPS_KEY);
+    localStorage.removeItem(FIL_MESSAGES_KEY);
+    localStorage.removeItem(FIL_ZONES_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -316,4 +452,18 @@ export function dossierOf(
 export function pinnedOf(snap: DemoSnapshot, projectId: string | null | undefined): Set<string> {
   if (!projectId) return new Set();
   return new Set(snap.pins[projectId] ?? []);
+}
+
+/** Le Fil d'un projet (moments + annotations + zones). */
+export function filOf(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): { moments: Moment[]; coups: CoupDeCoeur[]; messages: Message[]; zones: ProjectZone[] } {
+  if (!projectId) return { moments: [], coups: [], messages: [], zones: [] };
+  return {
+    moments: snap.fil.moments[projectId] ?? [],
+    coups: snap.fil.coups[projectId] ?? [],
+    messages: snap.fil.messages[projectId] ?? [],
+    zones: snap.fil.zones[projectId] ?? [],
+  };
 }

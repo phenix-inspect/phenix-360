@@ -8,19 +8,29 @@
  * par le sélecteur core (aucune duplication de logique).
  */
 import {
+  DEFAULT_AUDIENCE,
   attachmentId,
   buildPlanning,
+  coupDeCoeurId,
   currentStep,
   eventId,
+  filPhotoId,
+  messageId,
+  momentId,
   projectId,
   projectMemberId,
   userId,
+  zoneId,
   type BackendState,
+  type CoupDeCoeur,
   type Event,
   type EventActor,
+  type Message,
+  type Moment,
   type Project,
   type ProjectDossier,
   type ProjectMember,
+  type ProjectZone,
   type RoadmapStep,
 } from '@phenix360/core';
 
@@ -29,6 +39,13 @@ export interface DemoSeed {
   people: Record<string, string>;
   activeProjectId: string;
   dossiers: Record<string, ProjectDossier>;
+  /** Le Fil — agrégat distinct du Journal (par projet). */
+  fil: {
+    moments: Record<string, Moment[]>;
+    coups: Record<string, CoupDeCoeur[]>;
+    messages: Record<string, Message[]>;
+    zones: Record<string, ProjectZone[]>;
+  };
 }
 
 const uuid = (): string => globalThis.crypto.randomUUID();
@@ -548,10 +565,86 @@ export function buildDemoSeed(): DemoSeed {
     createdAt: new Date().toISOString(),
   };
 
+  // ----------------------------- Le Fil --------------------------------
+  // Agrégat distinct du Journal : la vie visuelle du chantier. Photos sans
+  // imageUrl → rendu en tuile dégradée premium (la vraie image arrive à l'upload).
+  const zones: ProjectZone[] = ['Séjour', 'Cuisine', 'Salle de bain', 'Chambre', 'Façade'].map(
+    (label, i) => ({ id: zoneId(`zone-${i + 1}`), projectId: pid, label, ordre: i }),
+  );
+  const zoneByLabel = (label: string): ProjectZone => zones.find((z) => z.label === label)!;
+
+  const mkMoment = (n: number, title: string, zoneLabel: string, legende?: string): Moment => {
+    const photoId = filPhotoId(uuid());
+    const at = daysAgo(n);
+    return {
+      id: momentId(uuid()),
+      projectId: pid,
+      authorId: compaId,
+      authorRole: 'compagnon',
+      createdAt: at,
+      publishedAt: at,
+      state: 'publie',
+      title,
+      zoneId: zoneByLabel(zoneLabel).id,
+      visibleTo: DEFAULT_AUDIENCE,
+      photos: [
+        {
+          id: photoId,
+          bucket: 'demo',
+          storagePath: `${pid}/fil/${uuid()}.jpg`,
+          mimeType: 'image/jpeg',
+          width: 1600,
+          height: 1200,
+          ...(legende ? { legende } : {}),
+          ordre: 0,
+          createdAt: at,
+        },
+      ],
+      coverPhotoId: photoId,
+    };
+  };
+
+  // Réparti sur deux mois → deux séparateurs de chapitre dans le Fil.
+  const mCloisons = mkMoment(1, 'Cloisons terminées', 'Séjour', 'Distribution des pièces posée');
+  const mDalle = mkMoment(6, 'Dalle coulée', 'Salle de bain', 'Séchage en cours');
+  const mMur = mkMoment(12, 'Ouverture du mur porteur', 'Cuisine', 'Cuisine ouverte sur le séjour');
+  const mPrepa = mkMoment(22, 'Préparation du chantier', 'Chambre');
+  const mDemarrage = mkMoment(40, 'Démarrage du chantier', 'Façade', 'Installation et protections');
+  const moments: Moment[] = [mCloisons, mDalle, mMur, mPrepa, mDemarrage];
+
+  // Une interaction existante → un Moment verrouillé (mémoire fiable).
+  const coups: CoupDeCoeur[] = [
+    {
+      id: coupDeCoeurId(uuid()),
+      momentId: mMur.id,
+      userId: clientId,
+      userRole: 'client',
+      createdAt: daysAgo(11),
+    },
+  ];
+  const messages: Message[] = [
+    {
+      id: messageId(uuid()),
+      momentId: mDalle.id,
+      photoId: null,
+      parentId: null,
+      authorId: clientId,
+      authorRole: 'client',
+      texte: 'Superbe, hâte de voir la suite !',
+      createdAt: daysAgo(5),
+    },
+  ];
+
   return {
     state: { projects: [project], members, events },
     people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin' },
     activeProjectId: pid,
     dossiers: { [pid]: dossier },
+    fil: {
+      moments: { [pid]: moments },
+      coups: { [pid]: coups },
+      messages: { [pid]: messages },
+      zones: { [pid]: zones },
+    },
   };
 }

@@ -39,6 +39,7 @@ import { RoadmapProgress } from '../components/RoadmapProgress';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { HistoriqueView } from '../components/HistoriqueView';
+import { FilView } from '../components/fil/FilView';
 import { Composer, type ComposerKind } from '../components/Composer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -66,7 +67,7 @@ export function CompagnonView({
   const [composer, setComposer] = useState<ComposerKind | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
-  const [tab, setTab] = useState<'suivi' | 'preparation' | 'historique'>(
+  const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'historique'>(
     dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi',
   );
 
@@ -116,10 +117,14 @@ export function CompagnonView({
         onOpenPreparation={() => setTab('preparation')}
       />
 
-      <Tabs value={tab} onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'historique')}>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'fil' | 'historique')}
+      >
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           {dossier && <TabsTrigger value="preparation">Préparation</TabsTrigger>}
+          <TabsTrigger value="fil">Le Fil</TabsTrigger>
           <TabsTrigger value="historique">Historique</TabsTrigger>
         </TabsList>
         <TabsContent value="suivi">{suivi}</TabsContent>
@@ -128,6 +133,9 @@ export function CompagnonView({
             <DossierPanel project={project} dossier={dossier} actor={actor} events={events} />
           </TabsContent>
         )}
+        <TabsContent value="fil">
+          <FilView snap={snap} project={project} actor={actor} canCompose />
+        </TabsContent>
         <TabsContent value="historique">
           <HistoriqueView snap={snap} project={project} />
         </TabsContent>

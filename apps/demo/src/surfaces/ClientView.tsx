@@ -24,6 +24,7 @@ import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
 import { GrandesEtapes } from '../components/GrandesEtapes';
 import { MomentCard } from '../components/MomentCard';
+import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -145,6 +146,8 @@ export function ClientView({
           {!dossier && <StepProgress current={project.currentStep} />}
         </CardContent>
       </Card>
+
+      <FilView snap={snap} project={project} actor={actor} canCompose={false} />
 
       {dossier && dossierDated && (
         <section className="space-y-3">
