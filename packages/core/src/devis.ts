@@ -61,6 +61,14 @@ export interface Avenant {
   date?: string;
   label?: string;
   lots: DevisLot[];
+  /**
+   * Note d'impact en TEXTE LIBRE. Vide aujourd'hui (la formulation est
+   * déterministe). En V2, l'IA pourra y déposer un message contextuel — p. ex.
+   * « L'avenant modifie la cuisine. Pensez à vérifier les commandes déjà passées
+   * et le planning de pose. ». S'il est présent, il PRIME sur la formulation
+   * déterministe du briefing, sans changer la structure (cf. describeAvenantImpact).
+   */
+  impactNote?: string;
 }
 
 /* --------------------- consolidation devis + avenants ---------------------- */
@@ -178,6 +186,8 @@ export function consolidatedTotals(c: ConsolidatedDevis): DevisTotals {
  */
 export interface AvenantImpact {
   numero: number;
+  /** Note d'impact en texte libre (IA, V2). Si présente, prime sur la formulation déterministe. */
+  note?: string;
   /** Postes du devis (initial ou avenant antérieur) remplacés par cet avenant. */
   postesRemplaces: number;
   /** Postes apportés par l'avenant (lignes ajoutées au document). */
@@ -252,6 +262,7 @@ export function avenantImpact(
   const vigilances = devisVigilances({ lots: avenant.lots }).length;
 
   return {
+    note: avenant.impactNote,
     numero: avenant.numero,
     postesRemplaces,
     postesAjoutes,
@@ -264,6 +275,27 @@ export function avenantImpact(
     impactPlanning,
     vigilances,
   };
+}
+
+/**
+ * Phrase d'impact d'un avenant pour le briefing. SEAM V2 : si une note en texte
+ * libre est présente (générée par l'IA, p. ex. « L'avenant modifie la cuisine.
+ * Pensez à vérifier les commandes déjà passées et le planning de pose. »), elle
+ * prime intégralement ; sinon, formulation déterministe. Le composant ne fige
+ * donc aucune structure — il affiche le texte tel quel.
+ */
+export function describeAvenantImpact(impact: AvenantImpact): string {
+  if (impact.note && impact.note.trim()) return impact.note.trim();
+  const ajoute = `${impact.postesAjoutes} prestation${impact.postesAjoutes > 1 ? 's' : ''}`;
+  const scope =
+    impact.impactPlanning && impact.commandesAMettreAJour > 0
+      ? ' Pensez à vérifier son impact sur le planning et les commandes.'
+      : impact.impactPlanning
+        ? ' Pensez à vérifier son impact sur le planning.'
+        : impact.commandesAMettreAJour > 0
+          ? ' Pensez à vérifier son impact sur les commandes.'
+          : '';
+  return `L'avenant n°${impact.numero} ajoute ${ajoute} et en remplace ${impact.postesRemplaces}.${scope}`;
 }
 
 /* ------------------------------- sélecteurs -------------------------------- */

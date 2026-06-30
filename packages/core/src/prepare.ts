@@ -27,6 +27,7 @@ import { pendingClientDecisions } from './views.js';
 import {
   avenantImpact,
   buildDevisSummary,
+  describeAvenantImpact,
   devisVigilances,
   type Avenant,
   type Devis,
@@ -1488,8 +1489,8 @@ export function buildChantierAttention(
         severity: 'warning',
         message:
           dec.status === 'en_retard'
-            ? `Décision client en retard : ${cat}${dec.decideAvant ? ` (échéance dépassée du ${frShortDate(dec.decideAvant)})` : ''}.`
-            : `Décision client à obtenir : ${cat}${dec.decideAvant ? ` (avant le ${frShortDate(dec.decideAvant)})` : ''}.`,
+            ? `Le choix « ${cat} » est attendu — échéance dépassée${dec.decideAvant ? ` depuis le ${frShortDate(dec.decideAvant)}` : ''}.`
+            : `Le choix « ${cat} » est attendu${dec.decideAvant ? ` avant le ${frShortDate(dec.decideAvant)}` : ''}.`,
       });
     }
 
@@ -1503,21 +1504,13 @@ export function buildChantierAttention(
       }
       const before = (dossier.avenants ?? []).filter((a) => a.numero < av.numero);
       const impact = avenantImpact(dossier.devis, before, av);
-
-      const ajoute = `${impact.postesAjoutes} prestation${impact.postesAjoutes > 1 ? 's' : ''}`;
-      const surScope =
-        impact.impactPlanning && impact.commandesAMettreAJour > 0
-          ? ' Vérifiez son impact sur le planning et les commandes.'
-          : impact.impactPlanning
-            ? ' Vérifiez son impact sur le planning.'
-            : impact.commandesAMettreAJour > 0
-              ? ' Vérifiez son impact sur les commandes.'
-              : '';
+      // Message porté par le sélecteur partagé : formulation déterministe
+      // aujourd'hui, texte libre IA demain (cf. describeAvenantImpact).
       items.push({
         id: `avenant-${av.numero}`,
         kind: 'avenant',
         severity: 'warning',
-        message: `L'avenant n°${av.numero} ajoute ${ajoute} et en remplace ${impact.postesRemplaces}.${surScope}`,
+        message: describeAvenantImpact(impact),
         avenant: { added: impact.postesAjoutes, replaced: impact.postesRemplaces },
       });
 
@@ -1576,7 +1569,7 @@ export function buildChantierAttention(
       id: `dec-${dec.eventId}`,
       kind: 'decision',
       severity: 'warning',
-      message: `Décision en attente du client : ${dec.question}`,
+      message: `Le client doit encore se prononcer : ${dec.question}`,
     });
   }
 

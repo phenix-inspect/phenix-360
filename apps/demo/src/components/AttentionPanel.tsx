@@ -117,19 +117,19 @@ export function AttentionPanel({
                   {KIND_ICON[item.kind]}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {KIND_LABEL[item.kind]}
+                    {item.avenant && (
+                      <span
+                        title={`${item.avenant.added} prestation(s) ajoutée(s) · ${item.avenant.replaced} modifiée(s)`}
+                        className="rounded-full border border-border bg-paper-50 px-2 py-0.5 font-mono text-[0.6875rem] normal-case tracking-normal text-muted-foreground animate-in fade-in-0 zoom-in-95 duration-base"
+                      >
+                        +{item.avenant.added} / ~{item.avenant.replaced}
+                      </span>
+                    )}
                   </p>
                   <p className="text-sm text-foreground">{item.message}</p>
                 </div>
-                {item.avenant && (
-                  <span
-                    title={`${item.avenant.added} prestation(s) ajoutée(s) · ${item.avenant.replaced} modifiée(s)`}
-                    className="shrink-0 self-center rounded-full border border-border bg-paper-50 px-2 py-0.5 font-mono text-[0.6875rem] text-muted-foreground animate-in fade-in-0 zoom-in-95 duration-base"
-                  >
-                    +{item.avenant.added} / ~{item.avenant.replaced}
-                  </span>
-                )}
                 {item.kind === 'document' && item.docId ? (
                   <Button
                     size="sm"
