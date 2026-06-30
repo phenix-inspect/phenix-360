@@ -52,7 +52,7 @@ export function MessageThread({
         <Input
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Laisser un message…"
+          placeholder="Écrire un petit mot…"
           onKeyDown={(e) => {
             if (e.key === 'Enter') send();
           }}

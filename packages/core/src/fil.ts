@@ -233,3 +233,58 @@ export function messagesDuMoment(id: MomentId, messages: Message[]): Message[] {
     .filter((m) => m.momentId === id && m.photoId === null)
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
 }
+
+/* -------------------------------------------------------------------------- *
+ * Bibliothèque d'images — UNE AUTRE VUE sur les mêmes médias
+ * -------------------------------------------------------------------------- *
+ * « 1 partage = 2 vues » : Le Fil raconte l'histoire (chronologie), la
+ * Bibliothèque permet de retrouver une image (classement). AUCUNE duplication :
+ * la Bibliothèque est purement DÉRIVÉE des Moments (même source de données).
+ *
+ * L'entrée porte déjà toutes les dimensions de classement à venir (pièce, date,
+ * auteur, type, étape, favoris) → les filtres des prochaines bricks se
+ * brancheront sans refonte du modèle ni du store.
+ */
+export interface BibliothequeImage {
+  photo: FilPhoto;
+  /** Moment d'origine (la Bibliothèque renvoie toujours vers le Fil). */
+  momentId: MomentId;
+  title: string;
+  /** Dimensions de filtrage (préparées pour les prochaines bricks). */
+  zoneId?: ZoneId;
+  date: IsoDateTime;
+  authorId: UserId;
+  authorRole: ActorRole;
+  type?: 'realisation' | 'avant_apres';
+  etapeImportante?: boolean;
+}
+
+/**
+ * Toutes les images du projet, à plat, récent → ancien. Vue secondaire dérivée
+ * des Moments (jamais un second stockage). Sélecteur pur — prêt à recevoir des
+ * filtres (pièce / date / auteur / type / étape / favoris) sans refonte.
+ */
+export function bibliothequeImages(
+  moments: Moment[],
+  opts: { viewer?: AudienceGroup } = {},
+): BibliothequeImage[] {
+  const viewer = opts.viewer;
+  const visibles = viewer ? moments.filter((m) => momentVisiblePour(m, viewer)) : moments;
+  const images: BibliothequeImage[] = [];
+  for (const m of visibles) {
+    for (const photo of m.photos) {
+      images.push({
+        photo,
+        momentId: m.id,
+        title: m.title,
+        zoneId: m.zoneId,
+        date: m.createdAt,
+        authorId: m.authorId,
+        authorRole: m.authorRole,
+        type: m.type,
+        etapeImportante: m.etapeImportante,
+      });
+    }
+  }
+  return images.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+}

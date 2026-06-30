@@ -64,8 +64,10 @@ export function MomentComposer({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Ajouter un moment</DialogTitle>
-          <DialogDescription>Partagez une photo de l’avancement du chantier.</DialogDescription>
+          <DialogTitle>Partager un moment</DialogTitle>
+          <DialogDescription>
+            Partagez une photo de l’avancement avec votre client.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -126,7 +128,7 @@ export function MomentComposer({
               Annuler
             </Button>
             <Button onClick={publish} disabled={!media || !title.trim()}>
-              Publier
+              Partager
             </Button>
           </div>
         </div>

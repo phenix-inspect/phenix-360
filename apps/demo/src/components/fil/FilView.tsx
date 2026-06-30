@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Button, EmptyState } from '@phenix360/ui';
+import { Button, EmptyState, SegmentedControl } from '@phenix360/ui';
 import {
   aMisCoupDeCoeur,
-  coupsDeCoeurDuMoment,
+  bibliothequeImages,
   filDuChantier,
   messagesDuMoment,
   momentVerrouille,
@@ -13,13 +13,16 @@ import {
 import { ImagePlus, Images } from 'lucide-react';
 import { demo, filOf, nameOf, type DemoSnapshot } from '../../store';
 import { FilMoment } from './FilMoment';
+import { BibliothequeView } from './BibliothequeView';
 import { MomentComposer } from './MomentComposer';
 
 /**
  * Le Fil — espace de vie du chantier. Colonne unique, défilement fluide mais
  * FINI (du plus récent au premier jour), séparateurs de chapitre discrets.
- * Ergonomie Instagram, esprit album premium. Aucune logique métier ici : on lit
- * les sélecteurs de core et on affiche.
+ * Ergonomie Instagram, esprit album premium. « 1 partage = 2 vues » : un
+ * sélecteur bascule entre Le Fil (chronologie) et la Bibliothèque (classement)
+ * sur exactement les mêmes médias. Aucune logique métier ici : on lit les
+ * sélecteurs de core et on affiche.
  */
 export function FilView({
   snap,
@@ -33,11 +36,14 @@ export function FilView({
   canCompose: boolean;
 }): React.JSX.Element {
   const [composing, setComposing] = useState(false);
+  const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
   const { moments, coups, messages, zones } = filOf(snap, project.id);
   const viewer: AudienceGroup = actor.role === 'client' ? 'client' : 'phenix';
   const entries = filDuChantier(moments, { viewer });
+  const images = bibliothequeImages(moments, { viewer });
   const zoneLabel = (id?: string): string | undefined => zones.find((z) => z.id === id)?.label;
   const name = (userId: string): string => nameOf(snap, userId);
+  const vide = entries.length === 0;
 
   return (
     <div className="space-y-5">
@@ -47,32 +53,49 @@ export function FilView({
             <Images aria-hidden />
             <h2 className="font-serif text-xl font-semibold tracking-tight">Le Fil</h2>
           </div>
-          <p className="text-sm text-muted-foreground">L’histoire de votre chantier, en images.</p>
+          <p className="text-sm text-muted-foreground">
+            {view === 'fil'
+              ? 'L’histoire de votre chantier, en images.'
+              : 'Toutes vos photos, prêtes à être retrouvées.'}
+          </p>
         </div>
-        {canCompose && (
-          <Button onClick={() => setComposing(true)}>
-            <ImagePlus aria-hidden /> Ajouter un moment
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          <SegmentedControl
+            value={view}
+            onValueChange={setView}
+            options={[
+              { value: 'fil', label: 'Le Fil' },
+              { value: 'bibliotheque', label: 'Bibliothèque' },
+            ]}
+            aria-label="Changer de vue"
+          />
+          {canCompose && (
+            <Button onClick={() => setComposing(true)}>
+              <ImagePlus aria-hidden /> Partager un moment
+            </Button>
+          )}
+        </div>
       </div>
 
-      {entries.length === 0 ? (
+      {vide ? (
         <EmptyState
           icon={<Images aria-hidden />}
           title="Le Fil commence bientôt"
           description={
             canCompose
-              ? 'Ajoutez une première photo : elle ouvrira l’histoire visuelle du chantier.'
+              ? 'Partagez une première photo : elle ouvrira l’histoire visuelle du chantier.'
               : 'Les premières photos de votre chantier apparaîtront ici très bientôt.'
           }
           action={
             canCompose ? (
               <Button onClick={() => setComposing(true)}>
-                <ImagePlus aria-hidden /> Ajouter un moment
+                <ImagePlus aria-hidden /> Partager un moment
               </Button>
             ) : undefined
           }
         />
+      ) : view === 'bibliotheque' ? (
+        <BibliothequeView images={images} zoneLabel={zoneLabel} />
       ) : (
         <div className="mx-auto max-w-xl space-y-6">
           {entries.map((entry) =>
@@ -90,7 +113,6 @@ export function FilView({
                 moment={entry.moment}
                 zoneLabel={zoneLabel(entry.moment.zoneId)}
                 nameOf={name}
-                coupsCount={coupsDeCoeurDuMoment(entry.moment.id, coups).length}
                 hasCoup={aMisCoupDeCoeur(entry.moment.id, actor.userId, coups)}
                 messages={messagesDuMoment(entry.moment.id, messages)}
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
