@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  Flag,
   ListPlus,
   MessageCircle,
   PenLine,
@@ -23,6 +24,13 @@ import { fmtDateTime } from '../../lib/format';
 import { FilImage } from './FilImage';
 import { PhotoAnnotator, type AnnotationInput } from './PhotoAnnotator';
 
+const ACTION_LABEL: Record<'demande' | 'decision' | 'reserve' | 'sav', string> = {
+  demande: 'Demande',
+  decision: 'Décision',
+  reserve: 'Réserve',
+  sav: 'SAV',
+};
+
 /**
  * Galerie immersive d'un album : plein écran, navigation fluide (flèches,
  * clavier, swipe), compteur et légende par photo. Le client peut laisser un
@@ -39,6 +47,7 @@ export function MomentGallery({
   onSendPhotoMessage,
   onAddAnnotation,
   onCreateDemande,
+  onCreateReserve,
   onClose,
 }: {
   moment: Moment;
@@ -50,6 +59,10 @@ export function MomentGallery({
   onSendPhotoMessage: (photoId: string, texte: string) => void;
   onAddAnnotation: (input: AnnotationInput) => void;
   onCreateDemande: (annotationId: string) => void;
+  onCreateReserve: (
+    annotationId: string,
+    options: { responsable?: string; echeance?: string },
+  ) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
@@ -61,6 +74,10 @@ export function MomentGallery({
   const [draft, setDraft] = useState('');
   const [showAnnotations, setShowAnnotations] = useState(true);
   const [editing, setEditing] = useState(false);
+  // Réserve : annotation pour laquelle on saisit responsable / échéance.
+  const [reserveFor, setReserveFor] = useState<string | null>(null);
+  const [resp, setResp] = useState('');
+  const [ech, setEch] = useState('');
   const touchX = useRef<number | null>(null);
 
   const total = photos.length;
@@ -256,28 +273,79 @@ export function MomentGallery({
             </ul>
           )}
 
-          {/* PONT conducteur : créer une Demande depuis une annotation. */}
+          {/* PONT conducteur : créer une Demande ou une Réserve depuis une annotation. */}
           {canCreateAction && photoAnnotations.length > 0 && (
-            <ul className="space-y-1.5 border-t border-paper-0/15 pt-2">
+            <ul className="space-y-2 border-t border-paper-0/15 pt-2">
               {photoAnnotations.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
-                  <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
-                    <PenLine aria-hidden className="opacity-70" />
-                    <span className="truncate">{annotationLabel(a)}</span>
-                  </span>
-                  {a.action ? (
-                    <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
-                      Demande créée
+                <li key={a.id} className="space-y-1.5 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
+                      <PenLine aria-hidden className="opacity-70" />
+                      <span className="truncate">{annotationLabel(a)}</span>
                     </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onCreateDemande(a.id)}
-                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
-                    >
-                      <ListPlus aria-hidden />
-                      Créer une demande
-                    </button>
+                    {a.action ? (
+                      <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
+                        {ACTION_LABEL[a.action.kind]} créée
+                      </span>
+                    ) : reserveFor === a.id ? null : (
+                      <span className="flex shrink-0 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onCreateDemande(a.id)}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
+                        >
+                          <ListPlus aria-hidden />
+                          Demande
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReserveFor(a.id);
+                            setResp('');
+                            setEch('');
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
+                        >
+                          <Flag aria-hidden />
+                          Réserve
+                        </button>
+                      </span>
+                    )}
+                  </div>
+
+                  {reserveFor === a.id && !a.action && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-paper-0/15 bg-paper-0/5 p-2">
+                      <input
+                        value={resp}
+                        onChange={(e) => setResp(e.target.value)}
+                        placeholder="Responsable (ex. Peintre)"
+                        className="h-9 min-w-[8rem] flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                      />
+                      <input
+                        type="date"
+                        value={ech}
+                        onChange={(e) => setEch(e.target.value)}
+                        aria-label="Échéance"
+                        className="h-9 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onCreateReserve(a.id, { responsable: resp, echeance: ech });
+                          setReserveFor(null);
+                        }}
+                        className="h-9 rounded-lg bg-gold-500 px-3 text-sm font-medium text-primary-foreground"
+                      >
+                        Créer la réserve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReserveFor(null)}
+                        className="h-9 rounded-lg px-2 text-sm hover:bg-paper-0/10"
+                      >
+                        Annuler
+                      </button>
+                    </div>
                   )}
                 </li>
               ))}

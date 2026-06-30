@@ -110,6 +110,8 @@ const excerptOf = (e: Event): string => {
       const d = describeDecisionEvent(e.content);
       return `${d.title} — ${d.description}`;
     }
+    case 'reserve':
+      return `Réserve n°${e.content.numero} : ${e.content.libelle}`;
   }
 };
 

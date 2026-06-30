@@ -281,17 +281,19 @@ function SuiviTab({
                     >
                       {e.state}
                     </Badge>
-                    {e.type === 'demande' && e.content.source?.kind === 'fil' && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onOpenFilPhoto(e.content.source!.momentId, e.content.source!.photoId)
-                        }
-                        className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
-                      >
-                        <ImageIcon aria-hidden /> Voir la photo
-                      </button>
-                    )}
+                    {(() => {
+                      const src =
+                        e.type === 'demande' || e.type === 'reserve' ? e.content.source : undefined;
+                      return src?.kind === 'fil' ? (
+                        <button
+                          type="button"
+                          onClick={() => onOpenFilPhoto(src.momentId, src.photoId)}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
+                        >
+                          <ImageIcon aria-hidden /> Voir la photo
+                        </button>
+                      ) : null;
+                    })()}
                   </span>
                 </ActivityItem>
               ))}

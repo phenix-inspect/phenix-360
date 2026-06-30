@@ -15,6 +15,7 @@ import type {
   Event,
   EventEnvelope,
   PhotoContent,
+  ReserveEventContent,
 } from '../event.js';
 import type { Project } from '../project.js';
 import type { EventRow, ProjectRow } from './rows.js';
@@ -59,6 +60,8 @@ export function mapEventRow(r: EventRow): Event {
       return { ...envelope, type: 'demande', content: r.content as DemandeContent };
     case 'decision':
       return { ...envelope, type: 'decision', content: r.content as DecisionEventContent };
+    case 'reserve':
+      return { ...envelope, type: 'reserve', content: r.content as ReserveEventContent };
   }
 }
 

@@ -300,10 +300,10 @@ export interface Annotation {
   messageId?: MessageId | null;
   /**
    * Action chantier créée depuis cette annotation (pont MANUEL, unidirectionnel).
-   * V1 : 'demande' ; le modèle accueille déjà décision / réserve / sav sans
-   * refonte. `eventId` = l'événement créé dans le Journal.
+   * V1 : 'demande' et 'reserve' ; le modèle accueille déjà décision / sav sans
+   * refonte. `ref` = l'événement créé dans le Journal.
    */
-  action?: { kind: 'demande' | 'decision' | 'reserve' | 'sav'; eventId: string };
+  action?: { kind: 'demande' | 'decision' | 'reserve' | 'sav'; ref: string };
 }
 
 /** Annotations d'une photo (anciennes d'abord, ordre de tracé). */

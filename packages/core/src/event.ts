@@ -24,7 +24,14 @@ import type { ProjectStep } from './project.js';
 /* -------------------------------------------------------------------------- *
  * Énumérations d'enveloppe
  * -------------------------------------------------------------------------- */
-export const EVENT_TYPES = ['compte_rendu', 'photo', 'document', 'demande', 'decision'] as const;
+export const EVENT_TYPES = [
+  'compte_rendu',
+  'photo',
+  'document',
+  'demande',
+  'decision',
+  'reserve',
+] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
 export const EVENT_TYPE_LABEL: Record<EventType, string> = {
@@ -33,6 +40,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   document: 'Document',
   demande: 'Demande',
   decision: 'Décision',
+  reserve: 'Réserve',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -88,11 +96,11 @@ export interface DemandeResolution {
 }
 
 /**
- * Provenance d'une demande créée depuis une photo annotée du Fil (pont manuel
- * annotation → action chantier). Ids en chaînes : la colonne vertébrale reste
+ * Provenance d'une action chantier créée depuis une photo annotée du Fil (pont
+ * manuel annotation → action). Ids en chaînes : la colonne vertébrale reste
  * indépendante du module Fil. Lien RETOUR vers la photo / l'annotation.
  */
-export interface DemandeSource {
+export interface FilSource {
   kind: 'fil';
   momentId: string;
   photoId?: string;
@@ -106,7 +114,7 @@ export interface DemandeContent {
   destinataire: DemandeAudience;
   resolution?: DemandeResolution;
   /** Origine (le cas échéant) : photo annotée du Fil. */
-  source?: DemandeSource;
+  source?: FilSource;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -144,6 +152,26 @@ export interface DecisionEventContent {
   message?: string;
 }
 
+/* -------------------------------------------------------------------------- *
+ * RÉSERVE — vrai objet de pilotage, porté par le Journal (cycle : ouverte →
+ * close = levée). Pourra alimenter la réception, le SAV et le suivi de levée.
+ * -------------------------------------------------------------------------- */
+export interface ReserveEventContent {
+  /** Numéro de réserve (incrémental par projet). */
+  numero: number;
+  /** Description de la réserve (« À reprendre avant réception »). */
+  libelle: string;
+  /** Responsable de la levée (texte libre en V1 : « Peintre »…). */
+  responsable?: string;
+  /** Échéance de levée (ISO YYYY-MM-DD). */
+  echeance?: string;
+  /** Levée : qui / quand (renseignés à la levée — module ultérieur). */
+  leveePar?: UserId;
+  leveeAt?: IsoDateTime;
+  /** Origine : photo annotée du Fil (lien retour). */
+  source?: FilSource;
+}
+
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
 export interface EventContentByType {
   compte_rendu: CompteRenduContent;
@@ -151,6 +179,7 @@ export interface EventContentByType {
   document: DocumentContent;
   demande: DemandeContent;
   decision: DecisionEventContent;
+  reserve: ReserveEventContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -192,9 +221,14 @@ export interface DecisionEvent extends EventEnvelope {
   type: 'decision';
   content: DecisionEventContent;
 }
+export interface ReserveEvent extends EventEnvelope {
+  type: 'reserve';
+  content: ReserveEventContent;
+}
 
 /** L'événement du journal — colonne vertébrale du produit. */
-export type Event = CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent | DecisionEvent;
+export type Event =
+  CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent | DecisionEvent | ReserveEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type
@@ -204,6 +238,7 @@ export const isPhoto = (e: Event): e is PhotoEvent => e.type === 'photo';
 export const isDocument = (e: Event): e is DocumentEvent => e.type === 'document';
 export const isDemande = (e: Event): e is DemandeEvent => e.type === 'demande';
 export const isDecision = (e: Event): e is DecisionEvent => e.type === 'decision';
+export const isReserve = (e: Event): e is ReserveEvent => e.type === 'reserve';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';

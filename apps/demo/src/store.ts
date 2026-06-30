@@ -22,6 +22,7 @@ import {
   filPhotoId as toFilPhotoId,
   messageId as toMessageId,
   momentId as toMomentId,
+  nextReserveNumero,
   userId as toUserId,
   type Annotation,
   type AnnotationType,
@@ -542,7 +543,61 @@ export const demo = {
     });
 
     map[projectId] = list.map((a) =>
-      a.id === annotationId ? { ...a, action: { kind: 'demande', eventId: event.id } } : a,
+      a.id === annotationId ? { ...a, action: { kind: 'demande', ref: event.id } } : a,
+    );
+    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * PONT MANUEL annotation → Réserve. Crée une RÉSERVE (vrai objet de pilotage)
+   * dans le Journal — numérotée, datée, avec responsable/échéance et lien retour
+   * vers la photo annotée. Marque l'annotation comme convertie.
+   */
+  async createReserveFromAnnotation(
+    projectId: ProjectId,
+    annotationId: string,
+    actor: EventActor,
+    options: { responsable?: string; echeance?: string } = {},
+  ): Promise<void> {
+    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
+    const list = map[projectId] ?? [];
+    const annotation = list.find((a) => a.id === annotationId);
+    if (!annotation || annotation.action) return;
+
+    const messages = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {})[projectId] ?? [];
+    const linked = annotation.messageId
+      ? messages.find((m) => m.id === annotation.messageId)
+      : undefined;
+    const libelle = (linked?.texte ?? annotation.texte ?? 'Point signalé sur une photo').trim();
+
+    const projectEvents = snapshot.events.filter((e) => e.projectId === projectId);
+    const responsable = options.responsable?.trim();
+    const echeance = options.echeance?.trim();
+
+    const event = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'reserve',
+      visibility: 'interne',
+      state: 'ouverte',
+      content: {
+        numero: nextReserveNumero(projectEvents),
+        libelle,
+        ...(responsable ? { responsable } : {}),
+        ...(echeance ? { echeance } : {}),
+        source: {
+          kind: 'fil',
+          momentId: annotation.momentId,
+          photoId: annotation.photoId,
+          annotationId: annotation.id,
+        },
+      },
+    });
+
+    map[projectId] = list.map((a) =>
+      a.id === annotationId ? { ...a, action: { kind: 'reserve', ref: event.id } } : a,
     );
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
     refresh();

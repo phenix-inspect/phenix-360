@@ -15,6 +15,8 @@ export function eventTitle(e: Event): string {
       return e.content.destinataire === 'client' ? 'Une décision vous attend' : 'Demande';
     case 'decision':
       return describeDecisionEvent(e.content).title;
+    case 'reserve':
+      return `Réserve n°${e.content.numero}`;
   }
 }
 
@@ -31,6 +33,15 @@ export function eventDescription(e: Event): string | undefined {
     }
     case 'decision':
       return describeDecisionEvent(e.content).description;
+    case 'reserve': {
+      const c = e.content;
+      const meta = [
+        c.responsable ? `Responsable : ${c.responsable}` : null,
+        c.echeance ? `échéance ${c.echeance}` : null,
+        c.source?.kind === 'fil' ? 'depuis une photo annotée du Fil' : null,
+      ].filter(Boolean);
+      return meta.length > 0 ? `${c.libelle} · ${meta.join(' · ')}` : c.libelle;
+    }
     case 'photo':
       return undefined;
     case 'document':

@@ -14,9 +14,11 @@ import {
   isDocument,
   isPhoto,
   isPublished,
+  isReserve,
   isVisibleToClient,
   isAwaitingClientDecision,
 } from './event.js';
+import type { ReserveEvent } from './event.js';
 import type { ProjectStep } from './project.js';
 import type { ClientDecisionBanner, Decision } from './decision.js';
 import { toDecision } from './decision.js';
@@ -80,7 +82,19 @@ export function isMilestone(e: Event): boolean {
   if (isDocument(e)) return isPublished(e);
   if (isDemande(e)) return true;
   if (isDecision(e)) return true;
+  if (isReserve(e)) return true;
   return false;
+}
+
+/** Réserves du chantier (récentes d'abord). Lecture filtrée du journal. */
+export function reserveEvents(events: Event[]): ReserveEvent[] {
+  return sortByDate(events.filter(isReserve), 'desc');
+}
+
+/** Prochain numéro de réserve (incrémental par projet). */
+export function nextReserveNumero(events: Event[]): number {
+  const nums = events.filter(isReserve).map((e) => e.content.numero);
+  return (nums.length > 0 ? Math.max(...nums) : 0) + 1;
 }
 
 /**

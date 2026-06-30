@@ -172,6 +172,9 @@ export function FilView({
           onCreateDemande={(annotationId) =>
             void demo.createDemandeFromAnnotation(project.id, annotationId, actor)
           }
+          onCreateReserve={(annotationId, options) =>
+            void demo.createReserveFromAnnotation(project.id, annotationId, actor, options)
+          }
           onClose={() => setGallery(null)}
         />
       )}
