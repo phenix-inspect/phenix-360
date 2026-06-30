@@ -24,7 +24,13 @@ import type {
   EventVisibility,
 } from './event.js';
 import { pendingClientDecisions } from './views.js';
-import { buildDevisSummary, devisVigilances, type Avenant, type Devis } from './devis.js';
+import {
+  avenantImpact,
+  buildDevisSummary,
+  devisVigilances,
+  type Avenant,
+  type Devis,
+} from './devis.js';
 import {
   DEFAULT_CALENDAR,
   addCalendarDays,
@@ -1414,7 +1420,11 @@ export function studyProject(
  * aujourd'hui. » Agrège commandes, documents, questions, décisions client et
  * prochaines échéances. Sélecteur pur — la logique vit ici, jamais dans l'UI.
  */
-export type AttentionKind = 'commande' | 'document' | 'question' | 'decision' | 'echeance';
+export type AttentionKind =
+  'commande' | 'document' | 'question' | 'decision' | 'echeance' | 'avenant';
+
+/** Fenêtre de « fraîcheur » d'un avenant : il remonte au briefing tant qu'il est récent. */
+const AVENANT_RECENT_DAYS = 30;
 
 export interface AttentionItem {
   id: string;
@@ -1479,6 +1489,36 @@ export function buildChantierAttention(
             ? `Décision client en retard : ${cat}${dec.decideAvant ? ` (échéance dépassée du ${frShortDate(dec.decideAvant)})` : ''}.`
             : `Décision client à obtenir : ${cat}${dec.decideAvant ? ` (avant le ${frShortDate(dec.decideAvant)})` : ''}.`,
       });
+    }
+
+    // Impact d'un avenant RÉCEMMENT intégré : PHÉNIX fait remonter ce qui mérite
+    // vraiment l'attention (impact planning, commande à mettre à jour). Même
+    // sélecteur d'impact que la mini-note : une seule source de calcul.
+    for (const av of dossier.avenants ?? []) {
+      if (av.date) {
+        const age = days(nowMs, new Date(`${av.date}T00:00:00`).getTime());
+        if (age > AVENANT_RECENT_DAYS) continue; // avenant ancien → déjà digéré
+      }
+      const before = (dossier.avenants ?? []).filter((a) => a.numero < av.numero);
+      const impact = avenantImpact(dossier.devis, before, av);
+      items.push({
+        id: `avenant-${av.numero}`,
+        kind: 'avenant',
+        severity: 'warning',
+        message:
+          `L'avenant n°${av.numero} ajoute ${impact.postesAjoutes} poste(s) et remplace ${impact.postesRemplaces} poste(s).` +
+          (impact.impactPlanning ? " Vérifiez l'impact planning." : ''),
+      });
+      for (const oid of impact.commandeIds) {
+        const o = dossier.orders.find((x) => x.id === oid);
+        if (!o) continue;
+        items.push({
+          id: `avenant-cmd-${av.numero}-${oid}`,
+          kind: 'commande',
+          severity: 'warning',
+          message: `La commande « ${o.label} » doit être mise à jour suite à l'avenant n°${av.numero}.`,
+        });
+      }
     }
 
     // Questions PHÉNIX en attente.

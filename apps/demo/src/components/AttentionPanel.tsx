@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CheckCircle2,
   FileText,
+  FilePlus2,
   HelpCircle,
   Sparkles,
   Wand2,
@@ -17,6 +18,7 @@ const KIND_ICON: Record<AttentionKind, React.ReactNode> = {
   question: <Sparkles aria-hidden />,
   decision: <HelpCircle aria-hidden />,
   echeance: <CalendarDays aria-hidden />,
+  avenant: <FilePlus2 aria-hidden />,
 };
 
 const KIND_LABEL: Record<AttentionKind, string> = {
@@ -25,15 +27,20 @@ const KIND_LABEL: Record<AttentionKind, string> = {
   question: 'Question',
   decision: 'Décision client',
   echeance: 'Échéance',
+  avenant: 'Avenant',
 };
 
-/** Priorité : décisions client, puis commandes critiques, puis documents bloquants. */
+/**
+ * Priorité : décision client urgente, puis impact avenant, puis commande
+ * critique, puis document bloquant.
+ */
 const KIND_RANK: Record<AttentionKind, number> = {
   decision: 0,
-  commande: 1,
-  document: 2,
-  question: 3,
-  echeance: 4,
+  avenant: 1,
+  commande: 2,
+  document: 3,
+  question: 4,
+  echeance: 5,
 };
 const SEVERITY_RANK = { warning: 0, info: 1, success: 2 } as const;
 
@@ -123,7 +130,8 @@ export function AttentionPanel({
                 ) : item.kind === 'commande' ||
                   item.kind === 'question' ||
                   item.kind === 'decision' ||
-                  item.kind === 'echeance' ? (
+                  item.kind === 'echeance' ||
+                  item.kind === 'avenant' ? (
                   <Button
                     size="sm"
                     variant="ghost"

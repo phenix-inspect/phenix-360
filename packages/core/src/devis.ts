@@ -188,6 +188,8 @@ export interface AvenantImpact {
   deltaTTC: number;
   /** Commandes liées à un lot dont un poste est remplacé → à mettre à jour. */
   commandesAMettreAJour: number;
+  /** Ids des commandes à mettre à jour (pour relier au briefing / aux fiches). */
+  commandeIds: string[];
   /** Nouveaux choix client introduits par l'avenant (à obtenir). */
   choixAObtenir: number;
   /** Documents nouvellement nécessaires d'après l'avenant. */
@@ -256,6 +258,7 @@ export function avenantImpact(
     deltaHT: round2(addedHT - removedHT),
     deltaTTC: round2(addedTTC - removedTTC),
     commandesAMettreAJour: ordersToUpdate.size,
+    commandeIds: [...ordersToUpdate],
     choixAObtenir: newChoices.size,
     documentsNecessaires: newDocuments.size,
     impactPlanning,
