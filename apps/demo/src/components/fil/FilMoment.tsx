@@ -4,6 +4,7 @@ import {
   ROLE_LABEL,
   messagesDuMoment,
   momentCover,
+  type Annotation,
   type Message,
   type Moment,
 } from '@phenix360/core';
@@ -13,6 +14,7 @@ import { FilImage } from './FilImage';
 import { CoupDeCoeurButton } from './CoupDeCoeurButton';
 import { MessageThread } from './MessageThread';
 import { MomentGallery } from './MomentGallery';
+import { type AnnotationInput } from './PhotoAnnotator';
 
 /**
  * Un Moment, présenté comme une PAGE D'ALBUM : grande photo, puis auteur,
@@ -26,11 +28,13 @@ export function FilMoment({
   nameOf,
   hasCoup,
   messages,
+  annotations,
   locked,
   canDelete,
   onToggleCoup,
   onSendMessage,
   onSendPhotoMessage,
+  onAddAnnotation,
   onDelete,
 }: {
   moment: Moment;
@@ -39,11 +43,14 @@ export function FilMoment({
   hasCoup: boolean;
   /** Tous les messages du Moment (niveaux 1 et 2). */
   messages: Message[];
+  /** Toutes les annotations du Moment. */
+  annotations: Annotation[];
   locked: boolean;
   canDelete: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
+  onAddAnnotation: (input: AnnotationInput) => void;
   onDelete: () => void;
 }): React.JSX.Element {
   const cover = momentCover(moment);
@@ -77,8 +84,10 @@ export function FilMoment({
         <MomentGallery
           moment={moment}
           messages={messages}
+          annotations={annotations}
           nameOf={nameOf}
           onSendPhotoMessage={onSendPhotoMessage}
+          onAddAnnotation={onAddAnnotation}
           onClose={() => setGallery(false)}
         />
       )}

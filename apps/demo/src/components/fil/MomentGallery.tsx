@@ -1,14 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, MessageCircle, Send, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  MessageCircle,
+  PenLine,
+  Send,
+  X,
+} from 'lucide-react';
 import {
   ROLE_LABEL,
+  annotationsDePhoto,
   comptesMessagesParPhoto,
   messagesDePhoto,
+  type Annotation,
   type Message,
   type Moment,
 } from '@phenix360/core';
 import { fmtDateTime } from '../../lib/format';
 import { FilImage } from './FilImage';
+import { PhotoAnnotator, type AnnotationInput } from './PhotoAnnotator';
 
 /**
  * Galerie immersive d'un album : plein écran, navigation fluide (flèches,
@@ -19,14 +31,18 @@ import { FilImage } from './FilImage';
 export function MomentGallery({
   moment,
   messages,
+  annotations,
   nameOf,
   onSendPhotoMessage,
+  onAddAnnotation,
   onClose,
 }: {
   moment: Moment;
   messages: Message[];
+  annotations: Annotation[];
   nameOf: (userId: string) => string;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
+  onAddAnnotation: (input: AnnotationInput) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
@@ -36,6 +52,8 @@ export function MomentGallery({
   );
   const [index, setIndex] = useState(start);
   const [draft, setDraft] = useState('');
+  const [showAnnotations, setShowAnnotations] = useState(true);
+  const [editing, setEditing] = useState(false);
   const touchX = useRef<number | null>(null);
 
   const total = photos.length;
@@ -59,6 +77,7 @@ export function MomentGallery({
   if (!current) return <></>;
 
   const photoMessages = messagesDePhoto(current.id, messages);
+  const photoAnnotations = annotationsDePhoto(current.id, annotations);
   const send = (): void => {
     const t = draft.trim();
     if (!t) return;
@@ -74,16 +93,17 @@ export function MomentGallery({
       aria-modal="true"
       aria-label={moment.title}
       onTouchStart={(e) => {
+        if (editing) return;
         touchX.current = e.touches[0]?.clientX ?? null;
       }}
       onTouchEnd={(e) => {
-        if (touchX.current == null) return;
+        if (editing || touchX.current == null) return;
         const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
         if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
         touchX.current = null;
       }}
     >
-      {/* Barre haute : titre + compteur (+ repère messages) + fermer */}
+      {/* Barre haute : titre + compteur (+ repères) + actions */}
       <div className="flex items-center justify-between gap-3 p-4 text-paper-0">
         <div className="min-w-0">
           <p className="truncate font-serif text-lg font-semibold tracking-tight">{moment.title}</p>
@@ -97,23 +117,65 @@ export function MomentGallery({
                 {photoMessages.length}
               </span>
             )}
+            {photoAnnotations.length > 0 && (
+              <span className="inline-flex items-center gap-1 [&_svg]:size-3.5">
+                <PenLine aria-hidden />
+                {photoAnnotations.length}
+              </span>
+            )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Fermer"
-          className="inline-flex size-10 shrink-0 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-        >
-          <X aria-hidden />
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {photoAnnotations.length > 0 && !editing && (
+            <button
+              type="button"
+              onClick={() => setShowAnnotations((v) => !v)}
+              aria-label={showAnnotations ? 'Masquer les annotations' : 'Afficher les annotations'}
+              aria-pressed={showAnnotations}
+              className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+            >
+              {showAnnotations ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setEditing((v) => !v);
+              setShowAnnotations(true);
+            }}
+            aria-label={editing ? 'Terminer l’annotation' : 'Annoter la photo'}
+            aria-pressed={editing}
+            className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm transition-colors duration-base [&_svg]:size-4 ${
+              editing ? 'bg-gold-500 text-primary-foreground' : 'text-paper-0 hover:bg-paper-0/10'
+            }`}
+          >
+            <PenLine aria-hidden />
+            {editing ? 'Terminer' : 'Annoter'}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+          >
+            <X aria-hidden />
+          </button>
+        </div>
       </div>
 
       {/* Image */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-2">
         <div className="relative max-h-full w-full max-w-3xl">
-          <div className="mx-auto aspect-[4/5] max-h-[58vh] w-full overflow-hidden rounded-xl">
+          <div className="relative mx-auto aspect-[4/5] max-h-[58vh] w-full overflow-hidden rounded-xl">
             <FilImage photo={current} />
+            <PhotoAnnotator
+              key={current.id}
+              photo={current}
+              annotations={photoAnnotations}
+              show={showAnnotations}
+              editing={editing}
+              onAdd={onAddAnnotation}
+            />
           </div>
         </div>
 

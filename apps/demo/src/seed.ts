@@ -9,6 +9,7 @@
  */
 import {
   DEFAULT_AUDIENCE,
+  annotationId,
   attachmentId,
   buildPlanning,
   coupDeCoeurId,
@@ -21,6 +22,7 @@ import {
   projectMemberId,
   userId,
   zoneId,
+  type Annotation,
   type BackendState,
   type CoupDeCoeur,
   type Event,
@@ -45,6 +47,7 @@ export interface DemoSeed {
     coups: Record<string, CoupDeCoeur[]>;
     messages: Record<string, Message[]>;
     zones: Record<string, ProjectZone[]>;
+    annotations: Record<string, Annotation[]>;
   };
 }
 
@@ -635,6 +638,16 @@ export function buildDemoSeed(): DemoSeed {
       createdAt: daysAgo(11),
     },
   ];
+  const msgPrise: Message = {
+    id: messageId(uuid()),
+    momentId: mDalle.id,
+    photoId: mDalle.photos[1]!.id,
+    parentId: null,
+    authorId: clientId,
+    authorRole: 'client',
+    texte: 'Cette prise peut-elle être déplacée ?',
+    createdAt: daysAgo(5),
+  };
   const messages: Message[] = [
     // Niveau 1 : message du Moment.
     {
@@ -647,16 +660,29 @@ export function buildDemoSeed(): DemoSeed {
       texte: 'Superbe, hâte de voir la suite !',
       createdAt: daysAgo(5),
     },
-    // Niveau 2 : message attaché à UNE photo précise de l'album.
+    // Niveau 2 : message attaché à UNE photo précise de l'album (annoté).
+    msgPrise,
+  ];
+
+  // Annotation seedée : un cercle autour d'une zone, rattaché au message ci-dessus
+  // (« cercle rouge + commentaire »). Coordonnées normalisées (0..1).
+  const annotations: Annotation[] = [
     {
-      id: messageId(uuid()),
+      id: annotationId(uuid()),
+      projectId: pid,
       momentId: mDalle.id,
       photoId: mDalle.photos[1]!.id,
-      parentId: null,
+      type: 'cercle',
+      points: [
+        { x: 0.32, y: 0.4 },
+        { x: 0.6, y: 0.66 },
+      ],
+      color: '#d4452f',
       authorId: clientId,
       authorRole: 'client',
-      texte: 'Cette prise peut-elle être déplacée ?',
+      visibleTo: DEFAULT_AUDIENCE,
       createdAt: daysAgo(5),
+      messageId: msgPrise.id,
     },
   ];
 
@@ -670,6 +696,7 @@ export function buildDemoSeed(): DemoSeed {
       coups: { [pid]: coups },
       messages: { [pid]: messages },
       zones: { [pid]: zones },
+      annotations: { [pid]: annotations },
     },
   };
 }

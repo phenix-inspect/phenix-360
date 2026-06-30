@@ -36,7 +36,7 @@ export function FilView({
 }): React.JSX.Element {
   const [composing, setComposing] = useState(false);
   const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
-  const { moments, coups, messages, zones } = filOf(snap, project.id);
+  const { moments, coups, messages, zones, annotations } = filOf(snap, project.id);
   const viewer: AudienceGroup = actor.role === 'client' ? 'client' : 'phenix';
   const entries = filDuChantier(moments, { viewer });
   const images = bibliothequeImages(moments, { viewer });
@@ -118,6 +118,7 @@ export function FilView({
                 nameOf={name}
                 hasCoup={aMisCoupDeCoeur(entry.moment.id, actor.userId, coups)}
                 messages={messages.filter((m) => m.momentId === entry.moment.id)}
+                annotations={annotations.filter((a) => a.momentId === entry.moment.id)}
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
                 canDelete={canCompose}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
@@ -126,6 +127,13 @@ export function FilView({
                 }
                 onSendPhotoMessage={(photoId, texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte, photoId)
+                }
+                onAddAnnotation={(input) =>
+                  demo.addAnnotation(project.id, {
+                    momentId: entry.moment.id,
+                    actor,
+                    ...input,
+                  })
                 }
                 onDelete={() => demo.deleteMoment(project.id, entry.moment.id)}
               />

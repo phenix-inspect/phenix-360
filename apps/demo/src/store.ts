@@ -14,6 +14,7 @@ import { useSyncExternalStore } from 'react';
 import {
   DEFAULT_AUDIENCE,
   InMemoryBackend,
+  annotationId as toAnnotationId,
   attachmentId as toAttachmentId,
   buildDecisionContent,
   coupDeCoeurId as toCoupId,
@@ -22,6 +23,8 @@ import {
   messageId as toMessageId,
   momentId as toMomentId,
   userId as toUserId,
+  type Annotation,
+  type AnnotationType,
   type BackendState,
   type CoupDeCoeur,
   type DemandeResolution,
@@ -56,6 +59,7 @@ const FIL_MOMENTS_KEY = 'phenix-demo:fil-moments:v1';
 const FIL_COUPS_KEY = 'phenix-demo:fil-coups:v1';
 const FIL_MESSAGES_KEY = 'phenix-demo:fil-messages:v1';
 const FIL_ZONES_KEY = 'phenix-demo:fil-zones:v1';
+const FIL_ANNOTATIONS_KEY = 'phenix-demo:fil-annotations:v1';
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
@@ -89,6 +93,7 @@ export interface DemoSnapshot extends BackendState {
     coups: Record<string, CoupDeCoeur[]>;
     messages: Record<string, Message[]>;
     zones: Record<string, ProjectZone[]>;
+    annotations: Record<string, Annotation[]>;
   };
 }
 
@@ -111,6 +116,7 @@ function build(): DemoSnapshot {
       coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
       messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
       zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
+      annotations: readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {}),
     },
   };
 }
@@ -406,6 +412,78 @@ export const demo = {
     broadcast();
   },
 
+  /**
+   * Ajoute une ANNOTATION sur une photo (calque indépendant — l'image d'origine
+   * n'est jamais modifiée). Si `note` est fournie, on crée aussi un message
+   * (niveau 2) rattaché à l'annotation (commentaire contextualisé).
+   */
+  addAnnotation(
+    projectId: ProjectId,
+    input: {
+      momentId: string;
+      photoId: string;
+      actor: EventActor;
+      type: AnnotationType;
+      points: { x: number; y: number }[];
+      color?: string;
+      texte?: string;
+      numero?: number;
+      note?: string;
+    },
+  ): void {
+    const now = new Date().toISOString();
+    let linkedMessageId: Annotation['messageId'] = null;
+
+    const note = input.note?.trim();
+    if (note) {
+      const msgMap = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {});
+      const message: Message = {
+        id: toMessageId(crypto.randomUUID()),
+        momentId: input.momentId as Message['momentId'],
+        photoId: input.photoId as Message['photoId'],
+        parentId: null,
+        authorId: input.actor.userId,
+        authorRole: input.actor.role,
+        texte: note,
+        createdAt: now,
+      };
+      msgMap[projectId] = [...(msgMap[projectId] ?? []), message];
+      localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(msgMap));
+      linkedMessageId = message.id;
+    }
+
+    const annotation: Annotation = {
+      id: toAnnotationId(crypto.randomUUID()),
+      projectId,
+      momentId: input.momentId as Annotation['momentId'],
+      photoId: input.photoId as Annotation['photoId'],
+      type: input.type,
+      points: input.points,
+      color: input.color ?? '#d4452f',
+      ...(input.texte ? { texte: input.texte } : {}),
+      ...(input.numero != null ? { numero: input.numero } : {}),
+      authorId: input.actor.userId,
+      authorRole: input.actor.role,
+      visibleTo: DEFAULT_AUDIENCE,
+      createdAt: now,
+      messageId: linkedMessageId,
+    };
+    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
+    map[projectId] = [...(map[projectId] ?? []), annotation];
+    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /** Supprime une annotation (le calque ; l'image d'origine est intacte). */
+  deleteAnnotation(projectId: ProjectId, annotationId: string): void {
+    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
+    map[projectId] = (map[projectId] ?? []).filter((a) => a.id !== annotationId);
+    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
     const { state, people, activeProjectId, dossiers, fil } = buildDemoSeed();
@@ -418,6 +496,7 @@ export const demo = {
     localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
     localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
     localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
+    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(fil.annotations));
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -434,6 +513,7 @@ export const demo = {
     localStorage.removeItem(FIL_COUPS_KEY);
     localStorage.removeItem(FIL_MESSAGES_KEY);
     localStorage.removeItem(FIL_ZONES_KEY);
+    localStorage.removeItem(FIL_ANNOTATIONS_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -474,12 +554,19 @@ export function pinnedOf(snap: DemoSnapshot, projectId: string | null | undefine
 export function filOf(
   snap: DemoSnapshot,
   projectId: string | null | undefined,
-): { moments: Moment[]; coups: CoupDeCoeur[]; messages: Message[]; zones: ProjectZone[] } {
-  if (!projectId) return { moments: [], coups: [], messages: [], zones: [] };
+): {
+  moments: Moment[];
+  coups: CoupDeCoeur[];
+  messages: Message[];
+  zones: ProjectZone[];
+  annotations: Annotation[];
+} {
+  if (!projectId) return { moments: [], coups: [], messages: [], zones: [], annotations: [] };
   return {
     moments: snap.fil.moments[projectId] ?? [],
     coups: snap.fil.coups[projectId] ?? [],
     messages: snap.fil.messages[projectId] ?? [],
     zones: snap.fil.zones[projectId] ?? [],
+    annotations: snap.fil.annotations[projectId] ?? [],
   };
 }

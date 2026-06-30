@@ -23,6 +23,7 @@ export type FilPhotoId = Brand<string, 'FilPhotoId'>;
 export type CoupDeCoeurId = Brand<string, 'CoupDeCoeurId'>;
 export type MessageId = Brand<string, 'MessageId'>;
 export type ZoneId = Brand<string, 'ZoneId'>;
+export type AnnotationId = Brand<string, 'AnnotationId'>;
 
 /** Horodatage ISO 8601 (UTC). Stocké en `timestamptz`, transporté en chaîne. */
 export type IsoDateTime = string;
@@ -38,3 +39,4 @@ export const filPhotoId = (v: string): FilPhotoId => v as FilPhotoId;
 export const coupDeCoeurId = (v: string): CoupDeCoeurId => v as CoupDeCoeurId;
 export const messageId = (v: string): MessageId => v as MessageId;
 export const zoneId = (v: string): ZoneId => v as ZoneId;
+export const annotationId = (v: string): AnnotationId => v as AnnotationId;
