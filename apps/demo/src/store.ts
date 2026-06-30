@@ -376,15 +376,24 @@ export const demo = {
     broadcast();
   },
 
-  /** Laisse un message (niveau 1) sous un Moment. */
-  addMessage(projectId: ProjectId, momentId: string, actor: EventActor, texte: string): void {
+  /**
+   * Laisse un message sous un Moment. `photoId` null = message du Moment
+   * (niveau 1) ; renseigné = message attaché à une PHOTO précise (niveau 2).
+   */
+  addMessage(
+    projectId: ProjectId,
+    momentId: string,
+    actor: EventActor,
+    texte: string,
+    photoId: string | null = null,
+  ): void {
     const trimmed = texte.trim();
     if (!trimmed) return;
     const map = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {});
     const message: Message = {
       id: toMessageId(crypto.randomUUID()),
       momentId: momentId as Message['momentId'],
-      photoId: null,
+      photoId: photoId as Message['photoId'],
       parentId: null,
       authorId: actor.userId,
       authorRole: actor.role,

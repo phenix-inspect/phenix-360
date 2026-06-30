@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Images, Trash2 } from 'lucide-react';
-import { ROLE_LABEL, momentCover, type Message, type Moment } from '@phenix360/core';
+import {
+  ROLE_LABEL,
+  messagesDuMoment,
+  momentCover,
+  type Message,
+  type Moment,
+} from '@phenix360/core';
 import { Avatar } from '../Avatar';
 import { fmtDate } from '../../lib/format';
 import { FilImage } from './FilImage';
@@ -24,22 +30,27 @@ export function FilMoment({
   canDelete,
   onToggleCoup,
   onSendMessage,
+  onSendPhotoMessage,
   onDelete,
 }: {
   moment: Moment;
   zoneLabel?: string;
   nameOf: (userId: string) => string;
   hasCoup: boolean;
+  /** Tous les messages du Moment (niveaux 1 et 2). */
   messages: Message[];
   locked: boolean;
   canDelete: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
+  onSendPhotoMessage: (photoId: string, texte: string) => void;
   onDelete: () => void;
 }): React.JSX.Element {
   const cover = momentCover(moment);
   const count = moment.photos.length;
   const [gallery, setGallery] = useState(false);
+  // La carte du Fil reste sobre : seuls les messages du Moment (niveau 1).
+  const messagesMoment = messagesDuMoment(moment.id, messages);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -62,7 +73,15 @@ export function FilMoment({
         )}
       </button>
 
-      {gallery && <MomentGallery moment={moment} onClose={() => setGallery(false)} />}
+      {gallery && (
+        <MomentGallery
+          moment={moment}
+          messages={messages}
+          nameOf={nameOf}
+          onSendPhotoMessage={onSendPhotoMessage}
+          onClose={() => setGallery(false)}
+        />
+      )}
 
       <div className="space-y-5 p-6">
         {/* Auteur + date (+ pièce discrète) */}
@@ -106,7 +125,7 @@ export function FilMoment({
         </div>
 
         <div className="border-t border-border pt-4">
-          <MessageThread messages={messages} nameOf={nameOf} onSend={onSendMessage} />
+          <MessageThread messages={messagesMoment} nameOf={nameOf} onSend={onSendMessage} />
         </div>
       </div>
     </article>

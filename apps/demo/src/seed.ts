@@ -636,6 +636,7 @@ export function buildDemoSeed(): DemoSeed {
     },
   ];
   const messages: Message[] = [
+    // Niveau 1 : message du Moment.
     {
       id: messageId(uuid()),
       momentId: mDalle.id,
@@ -644,6 +645,17 @@ export function buildDemoSeed(): DemoSeed {
       authorId: clientId,
       authorRole: 'client',
       texte: 'Superbe, hâte de voir la suite !',
+      createdAt: daysAgo(5),
+    },
+    // Niveau 2 : message attaché à UNE photo précise de l'album.
+    {
+      id: messageId(uuid()),
+      momentId: mDalle.id,
+      photoId: mDalle.photos[1]!.id,
+      parentId: null,
+      authorId: clientId,
+      authorRole: 'client',
+      texte: 'Cette prise peut-elle être déplacée ?',
       createdAt: daysAgo(5),
     },
   ];

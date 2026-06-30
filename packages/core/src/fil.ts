@@ -239,6 +239,22 @@ export function messagesDuMoment(id: MomentId, messages: Message[]): Message[] {
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
 }
 
+/** Messages attachés à une PHOTO précise (niveau 2), anciens d'abord. */
+export function messagesDePhoto(photoId: FilPhotoId, messages: Message[]): Message[] {
+  return messages
+    .filter((m) => m.photoId === photoId)
+    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+}
+
+/** Nombre de messages par photo (repères discrets dans la galerie). */
+export function comptesMessagesParPhoto(messages: Message[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const m of messages) {
+    if (m.photoId) counts.set(m.photoId, (counts.get(m.photoId) ?? 0) + 1);
+  }
+  return counts;
+}
+
 /* -------------------------------------------------------------------------- *
  * Bibliothèque d'images — UNE AUTRE VUE sur les mêmes médias
  * -------------------------------------------------------------------------- *

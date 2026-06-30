@@ -4,7 +4,6 @@ import {
   aMisCoupDeCoeur,
   bibliothequeImages,
   filDuChantier,
-  messagesDuMoment,
   momentVerrouille,
   type AudienceGroup,
   type EventActor,
@@ -118,12 +117,15 @@ export function FilView({
                 zoneLabel={zoneLabel(entry.moment.zoneId)}
                 nameOf={name}
                 hasCoup={aMisCoupDeCoeur(entry.moment.id, actor.userId, coups)}
-                messages={messagesDuMoment(entry.moment.id, messages)}
+                messages={messages.filter((m) => m.momentId === entry.moment.id)}
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
                 canDelete={canCompose}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)
+                }
+                onSendPhotoMessage={(photoId, texte) =>
+                  demo.addMessage(project.id, entry.moment.id, actor, texte, photoId)
                 }
                 onDelete={() => demo.deleteMoment(project.id, entry.moment.id)}
               />

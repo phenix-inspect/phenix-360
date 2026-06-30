@@ -1,18 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
-import type { Moment } from '@phenix360/core';
+import { ChevronLeft, ChevronRight, MessageCircle, Send, X } from 'lucide-react';
+import {
+  ROLE_LABEL,
+  comptesMessagesParPhoto,
+  messagesDePhoto,
+  type Message,
+  type Moment,
+} from '@phenix360/core';
+import { fmtDateTime } from '../../lib/format';
 import { FilImage } from './FilImage';
 
 /**
  * Galerie immersive d'un album : plein écran, navigation fluide (flèches,
- * clavier, swipe), compteur et légende par photo. Premium et mobile-friendly.
- * Pas de message par photo à ce stade (brique suivante).
+ * clavier, swipe), compteur et légende par photo. Le client peut laisser un
+ * message ATTACHÉ à la photo affichée (niveau 2) — un commentaire contextualisé,
+ * pas une discussion sociale. Repère discret du nombre de messages par photo.
  */
 export function MomentGallery({
   moment,
+  messages,
+  nameOf,
+  onSendPhotoMessage,
   onClose,
 }: {
   moment: Moment;
+  messages: Message[];
+  nameOf: (userId: string) => string;
+  onSendPhotoMessage: (photoId: string, texte: string) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
@@ -21,6 +35,7 @@ export function MomentGallery({
     photos.findIndex((p) => p.id === moment.coverPhotoId),
   );
   const [index, setIndex] = useState(start);
+  const [draft, setDraft] = useState('');
   const touchX = useRef<number | null>(null);
 
   const total = photos.length;
@@ -36,8 +51,20 @@ export function MomentGallery({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  // On efface le brouillon quand on change de photo (un message = une photo).
+  useEffect(() => setDraft(''), [index]);
+
+  const counts = comptesMessagesParPhoto(messages);
   const current = photos[index];
   if (!current) return <></>;
+
+  const photoMessages = messagesDePhoto(current.id, messages);
+  const send = (): void => {
+    const t = draft.trim();
+    if (!t) return;
+    onSendPhotoMessage(current.id, t);
+    setDraft('');
+  };
 
   return (
     <div
@@ -56,12 +83,20 @@ export function MomentGallery({
         touchX.current = null;
       }}
     >
-      {/* Barre haute : titre + compteur + fermer */}
+      {/* Barre haute : titre + compteur (+ repère messages) + fermer */}
       <div className="flex items-center justify-between gap-3 p-4 text-paper-0">
         <div className="min-w-0">
           <p className="truncate font-serif text-lg font-semibold tracking-tight">{moment.title}</p>
-          <p className="text-xs opacity-80">
-            {index + 1} / {total}
+          <p className="flex items-center gap-2 text-xs opacity-80">
+            <span>
+              {index + 1} / {total}
+            </span>
+            {photoMessages.length > 0 && (
+              <span className="inline-flex items-center gap-1 [&_svg]:size-3.5">
+                <MessageCircle aria-hidden />
+                {photoMessages.length}
+              </span>
+            )}
           </p>
         </div>
         <button
@@ -77,7 +112,7 @@ export function MomentGallery({
       {/* Image */}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-2">
         <div className="relative max-h-full w-full max-w-3xl">
-          <div className="mx-auto aspect-[4/5] max-h-[72vh] w-full overflow-hidden rounded-xl">
+          <div className="mx-auto aspect-[4/5] max-h-[58vh] w-full overflow-hidden rounded-xl">
             <FilImage photo={current} />
           </div>
         </div>
@@ -104,26 +139,65 @@ export function MomentGallery({
         )}
       </div>
 
-      {/* Légende + pastilles */}
+      {/* Légende + pastilles (repère messages) + messages de la photo */}
       <div className="space-y-3 p-4 text-paper-0">
         {current.legende && (
-          <p className="mx-auto max-w-3xl text-center text-sm opacity-90">{current.legende}</p>
+          <p className="mx-auto max-w-2xl text-center text-sm opacity-90">{current.legende}</p>
         )}
         {total > 1 && (
           <div className="flex items-center justify-center gap-1.5">
-            {photos.map((p, i) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setIndex(i)}
-                aria-label={`Aller à la photo ${i + 1}`}
-                className={`size-1.5 rounded-full transition-colors duration-base ${
-                  i === index ? 'bg-paper-0' : 'bg-paper-0/35'
-                }`}
-              />
-            ))}
+            {photos.map((p, i) => {
+              const hasMsg = (counts.get(p.id) ?? 0) > 0;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setIndex(i)}
+                  aria-label={`Aller à la photo ${i + 1}`}
+                  className={`size-1.5 rounded-full transition-colors duration-base ${
+                    i === index ? 'bg-paper-0' : hasMsg ? 'bg-gold-400' : 'bg-paper-0/35'
+                  }`}
+                />
+              );
+            })}
           </div>
         )}
+
+        <div className="mx-auto w-full max-w-2xl space-y-2">
+          {photoMessages.length > 0 && (
+            <ul className="max-h-28 space-y-1.5 overflow-y-auto">
+              {photoMessages.map((m) => (
+                <li key={m.id} className="text-sm">
+                  <span className="font-medium">{nameOf(m.authorId)}</span>{' '}
+                  <span className="text-xs opacity-70">
+                    {ROLE_LABEL[m.authorRole]} · {fmtDateTime(m.createdAt)}
+                  </span>
+                  <p className="opacity-90">{m.texte}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') send();
+              }}
+              placeholder="Écrire un petit mot sur cette photo…"
+              className="h-10 flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+            />
+            <button
+              type="button"
+              onClick={send}
+              disabled={!draft.trim()}
+              aria-label="Envoyer"
+              className="inline-flex size-10 items-center justify-center rounded-lg border border-paper-0/20 text-paper-0 transition-colors duration-base hover:bg-paper-0/10 disabled:opacity-40 [&_svg]:size-4"
+            >
+              <Send aria-hidden />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
