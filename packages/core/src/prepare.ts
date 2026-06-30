@@ -1522,14 +1522,14 @@ export function buildChantierAttention(
           id: `avenant-cmd-${av.numero}`,
           kind: 'commande',
           severity: 'warning',
-          message: `La commande « ${o?.label ?? 'concernée'} » doit être actualisée suite à l'avenant n°${av.numero}.`,
+          message: `La commande « ${o?.label ?? 'concernée'} » est à actualiser suite à l'avenant n°${av.numero}.`,
         });
       } else if (impact.commandesAMettreAJour > 1) {
         items.push({
           id: `avenant-cmd-${av.numero}`,
           kind: 'commande',
           severity: 'warning',
-          message: `${impact.commandesAMettreAJour} commandes doivent être actualisées suite à l'avenant n°${av.numero}.`,
+          message: `${impact.commandesAMettreAJour} commandes sont à actualiser suite à l'avenant n°${av.numero}.`,
         });
       }
     }
