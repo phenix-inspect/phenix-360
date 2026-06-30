@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, EmptyState, SegmentedControl } from '@phenix360/ui';
 import {
   aMisCoupDeCoeur,
@@ -7,6 +7,7 @@ import {
   momentVerrouille,
   type AudienceGroup,
   type EventActor,
+  type Moment,
   type Project,
 } from '@phenix360/core';
 import { ImagePlus, Images } from 'lucide-react';
@@ -14,14 +15,16 @@ import { demo, filOf, nameOf, type DemoSnapshot } from '../../store';
 import { FilMoment } from './FilMoment';
 import { BibliothequeView } from './BibliothequeView';
 import { MomentComposer } from './MomentComposer';
+import { MomentGallery } from './MomentGallery';
 
 /**
  * Le Fil — espace de vie du chantier. Colonne unique, défilement fluide mais
  * FINI (du plus récent au premier jour), séparateurs de chapitre discrets.
  * Ergonomie Instagram, esprit album premium. « 1 partage = 2 vues » : un
  * sélecteur bascule entre Le Fil (chronologie) et la Bibliothèque (classement)
- * sur exactement les mêmes médias. Aucune logique métier ici : on lit les
- * sélecteurs de core et on affiche.
+ * sur exactement les mêmes médias. La galerie immersive est rendue ici (une
+ * seule), ce qui permet l'ouverture ciblée d'une photo (lien retour depuis le
+ * Journal). Aucune logique métier ici : on lit les sélecteurs de core.
  */
 export function FilView({
   snap,
@@ -36,6 +39,7 @@ export function FilView({
 }): React.JSX.Element {
   const [composing, setComposing] = useState(false);
   const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
+  const [gallery, setGallery] = useState<{ moment: Moment; photoId?: string } | null>(null);
   const { moments, coups, messages, zones, annotations } = filOf(snap, project.id);
   const viewer: AudienceGroup = actor.role === 'client' ? 'client' : 'phenix';
   const entries = filDuChantier(moments, { viewer });
@@ -43,6 +47,15 @@ export function FilView({
   const zoneLabel = (id?: string): string | undefined => zones.find((z) => z.id === id)?.label;
   const name = (userId: string): string => nameOf(snap, userId);
   const vide = entries.length === 0;
+
+  // Lien retour « Voir la photo » depuis le Journal : ouvre la galerie ciblée.
+  const target = snap.filTarget;
+  useEffect(() => {
+    if (!target) return;
+    const m = moments.find((x) => x.id === target.momentId);
+    if (m) setGallery({ moment: m, ...(target.photoId ? { photoId: target.photoId } : {}) });
+    demo.clearFilTarget();
+  }, [target, moments]);
 
   return (
     <div className="space-y-5">
@@ -118,23 +131,13 @@ export function FilView({
                 nameOf={name}
                 hasCoup={aMisCoupDeCoeur(entry.moment.id, actor.userId, coups)}
                 messages={messages.filter((m) => m.momentId === entry.moment.id)}
-                annotations={annotations.filter((a) => a.momentId === entry.moment.id)}
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
                 canDelete={canCompose}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)
                 }
-                onSendPhotoMessage={(photoId, texte) =>
-                  demo.addMessage(project.id, entry.moment.id, actor, texte, photoId)
-                }
-                onAddAnnotation={(input) =>
-                  demo.addAnnotation(project.id, {
-                    momentId: entry.moment.id,
-                    actor,
-                    ...input,
-                  })
-                }
+                onOpenGallery={() => setGallery({ moment: entry.moment })}
                 onDelete={() => demo.deleteMoment(project.id, entry.moment.id)}
               />
             ),
@@ -149,6 +152,27 @@ export function FilView({
           actor={actor}
           zones={zones}
           onClose={() => setComposing(false)}
+        />
+      )}
+
+      {gallery && (
+        <MomentGallery
+          moment={gallery.moment}
+          messages={messages.filter((m) => m.momentId === gallery.moment.id)}
+          annotations={annotations.filter((a) => a.momentId === gallery.moment.id)}
+          nameOf={name}
+          canCreateAction={canCompose}
+          {...(gallery.photoId ? { initialPhotoId: gallery.photoId } : {})}
+          onSendPhotoMessage={(photoId, texte) =>
+            demo.addMessage(project.id, gallery.moment.id, actor, texte, photoId)
+          }
+          onAddAnnotation={(input) =>
+            demo.addAnnotation(project.id, { momentId: gallery.moment.id, actor, ...input })
+          }
+          onCreateDemande={(annotationId) =>
+            void demo.createDemandeFromAnnotation(project.id, annotationId, actor)
+          }
+          onClose={() => setGallery(null)}
         />
       )}
     </div>

@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Eye,
   EyeOff,
+  ListPlus,
   MessageCircle,
   PenLine,
   Send,
@@ -33,22 +34,28 @@ export function MomentGallery({
   messages,
   annotations,
   nameOf,
+  canCreateAction,
+  initialPhotoId,
   onSendPhotoMessage,
   onAddAnnotation,
+  onCreateDemande,
   onClose,
 }: {
   moment: Moment;
   messages: Message[];
   annotations: Annotation[];
   nameOf: (userId: string) => string;
+  canCreateAction: boolean;
+  initialPhotoId?: string;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
   onAddAnnotation: (input: AnnotationInput) => void;
+  onCreateDemande: (annotationId: string) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
   const start = Math.max(
     0,
-    photos.findIndex((p) => p.id === moment.coverPhotoId),
+    photos.findIndex((p) => p.id === (initialPhotoId ?? moment.coverPhotoId)),
   );
   const [index, setIndex] = useState(start);
   const [draft, setDraft] = useState('');
@@ -78,6 +85,15 @@ export function MomentGallery({
 
   const photoMessages = messagesDePhoto(current.id, messages);
   const photoAnnotations = annotationsDePhoto(current.id, annotations);
+  const messageById = new Map(messages.map((m) => [m.id, m] as const));
+  const annotationLabel = (a: Annotation): string => {
+    if (a.messageId && messageById.get(a.messageId)) return messageById.get(a.messageId)!.texte;
+    if (a.texte) return a.texte;
+    if (a.type === 'numero') return `Point ${a.numero ?? ''}`.trim();
+    return { cercle: 'Zone entourée', fleche: 'Flèche', trait: 'Tracé', texte: 'Texte' }[
+      a.type
+    ] as string;
+  };
   const send = (): void => {
     const t = draft.trim();
     if (!t) return;
@@ -239,6 +255,35 @@ export function MomentGallery({
               ))}
             </ul>
           )}
+
+          {/* PONT conducteur : créer une Demande depuis une annotation. */}
+          {canCreateAction && photoAnnotations.length > 0 && (
+            <ul className="space-y-1.5 border-t border-paper-0/15 pt-2">
+              {photoAnnotations.map((a) => (
+                <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
+                    <PenLine aria-hidden className="opacity-70" />
+                    <span className="truncate">{annotationLabel(a)}</span>
+                  </span>
+                  {a.action ? (
+                    <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
+                      Demande créée
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onCreateDemande(a.id)}
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
+                    >
+                      <ListPlus aria-hidden />
+                      Créer une demande
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
           <div className="flex gap-2">
             <input
               value={draft}

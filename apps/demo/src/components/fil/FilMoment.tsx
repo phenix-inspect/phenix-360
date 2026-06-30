@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { Images, Trash2 } from 'lucide-react';
 import {
   ROLE_LABEL,
   messagesDuMoment,
   momentCover,
-  type Annotation,
   type Message,
   type Moment,
 } from '@phenix360/core';
@@ -13,14 +11,12 @@ import { fmtDate } from '../../lib/format';
 import { FilImage } from './FilImage';
 import { CoupDeCoeurButton } from './CoupDeCoeurButton';
 import { MessageThread } from './MessageThread';
-import { MomentGallery } from './MomentGallery';
-import { type AnnotationInput } from './PhotoAnnotator';
 
 /**
  * Un Moment, présenté comme une PAGE D'ALBUM : grande photo, puis auteur,
- * titre, légende, coup de cœur et messages — beaucoup de respiration. On
- * emprunte l'ergonomie d'Instagram, mais l'esprit est celui d'un bel album
- * photo, jamais d'une fiche d'application.
+ * titre, légende, coup de cœur et messages — beaucoup de respiration. La galerie
+ * immersive (album + annotations) est pilotée par le parent (FilView) pour
+ * permettre l'ouverture ciblée (lien retour depuis le Journal).
  */
 export function FilMoment({
   moment,
@@ -28,34 +24,28 @@ export function FilMoment({
   nameOf,
   hasCoup,
   messages,
-  annotations,
   locked,
   canDelete,
   onToggleCoup,
   onSendMessage,
-  onSendPhotoMessage,
-  onAddAnnotation,
+  onOpenGallery,
   onDelete,
 }: {
   moment: Moment;
   zoneLabel?: string;
   nameOf: (userId: string) => string;
   hasCoup: boolean;
-  /** Tous les messages du Moment (niveaux 1 et 2). */
+  /** Tous les messages du Moment (la carte n'affiche que le niveau 1). */
   messages: Message[];
-  /** Toutes les annotations du Moment. */
-  annotations: Annotation[];
   locked: boolean;
   canDelete: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
-  onSendPhotoMessage: (photoId: string, texte: string) => void;
-  onAddAnnotation: (input: AnnotationInput) => void;
+  onOpenGallery: () => void;
   onDelete: () => void;
 }): React.JSX.Element {
   const cover = momentCover(moment);
   const count = moment.photos.length;
-  const [gallery, setGallery] = useState(false);
   // La carte du Fil reste sobre : seuls les messages du Moment (niveau 1).
   const messagesMoment = messagesDuMoment(moment.id, messages);
 
@@ -64,7 +54,7 @@ export function FilMoment({
       {/* Grande photo (couverture), cadre net (mobile-friendly) — ouvre la galerie */}
       <button
         type="button"
-        onClick={() => setGallery(true)}
+        onClick={onOpenGallery}
         aria-label={count > 1 ? `Ouvrir l’album (${count} photos)` : 'Agrandir la photo'}
         className="relative block aspect-[4/5] w-full bg-paper-100"
       >
@@ -79,18 +69,6 @@ export function FilMoment({
           </span>
         )}
       </button>
-
-      {gallery && (
-        <MomentGallery
-          moment={moment}
-          messages={messages}
-          annotations={annotations}
-          nameOf={nameOf}
-          onSendPhotoMessage={onSendPhotoMessage}
-          onAddAnnotation={onAddAnnotation}
-          onClose={() => setGallery(false)}
-        />
-      )}
 
       <div className="space-y-5 p-6">
         {/* Auteur + date (+ pièce discrète) */}

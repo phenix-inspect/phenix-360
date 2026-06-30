@@ -95,6 +95,8 @@ export interface DemoSnapshot extends BackendState {
     zones: Record<string, ProjectZone[]>;
     annotations: Record<string, Annotation[]>;
   };
+  /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
+  filTarget: { momentId: string; photoId?: string } | null;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -102,6 +104,8 @@ const backend = new InMemoryBackend(kv);
 const channel = new BroadcastChannel('phenix-demo');
 const listeners = new Set<() => void>();
 
+// Cible transitoire (en mémoire) pour le lien retour « Voir la photo ».
+let filTarget: { momentId: string; photoId?: string } | null = null;
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {
@@ -118,6 +122,7 @@ function build(): DemoSnapshot {
       zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
       annotations: readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {}),
     },
+    filTarget,
   };
 }
 
@@ -160,6 +165,17 @@ export const demo = {
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(id));
     refresh();
     broadcast();
+  },
+
+  /** Demande l'ouverture d'une photo précise du Fil (lien retour depuis le Journal). */
+  openFilPhoto(momentId: string, photoId?: string): void {
+    filTarget = { momentId, ...(photoId ? { photoId } : {}) };
+    refresh();
+  },
+  /** Cible consommée par la galerie. */
+  clearFilTarget(): void {
+    filTarget = null;
+    refresh();
   },
 
   // Ports core (le produit passe par là).
@@ -479,6 +495,55 @@ export const demo = {
   deleteAnnotation(projectId: ProjectId, annotationId: string): void {
     const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
     map[projectId] = (map[projectId] ?? []).filter((a) => a.id !== annotationId);
+    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * PONT MANUEL annotation → Demande (le conducteur décide). Crée une Demande
+   * dans le Journal (le bon module), liée RETOUR à la photo annotée
+   * (content.source), et marque l'annotation comme convertie (action). Le Fil
+   * reste un espace photo ; l'action chantier vit dans le Journal.
+   */
+  async createDemandeFromAnnotation(
+    projectId: ProjectId,
+    annotationId: string,
+    actor: EventActor,
+  ): Promise<void> {
+    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
+    const list = map[projectId] ?? [];
+    const annotation = list.find((a) => a.id === annotationId);
+    if (!annotation || annotation.action) return;
+
+    // Question = le message rattaché, sinon le texte de l'annotation.
+    const messages = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {})[projectId] ?? [];
+    const linked = annotation.messageId
+      ? messages.find((m) => m.id === annotation.messageId)
+      : undefined;
+    const question = (linked?.texte ?? annotation.texte ?? 'Point signalé sur une photo').trim();
+
+    const event = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'demande',
+      visibility: 'client',
+      state: 'ouverte',
+      content: {
+        question,
+        destinataire: 'equipe',
+        source: {
+          kind: 'fil',
+          momentId: annotation.momentId,
+          photoId: annotation.photoId,
+          annotationId: annotation.id,
+        },
+      },
+    });
+
+    map[projectId] = list.map((a) =>
+      a.id === annotationId ? { ...a, action: { kind: 'demande', eventId: event.id } } : a,
+    );
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
     refresh();
     broadcast();

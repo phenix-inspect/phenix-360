@@ -96,8 +96,20 @@ export function CompagnonView({
     });
   };
 
+  const openFilPhoto = (momentId: string, photoId?: string): void => {
+    demo.openFilPhoto(momentId, photoId);
+    setTab('fil');
+  };
+
   const suivi = (
-    <SuiviTab snap={snap} project={project} actor={actor} events={events} onCompose={setComposer} />
+    <SuiviTab
+      snap={snap}
+      project={project}
+      actor={actor}
+      events={events}
+      onCompose={setComposer}
+      onOpenFilPhoto={openFilPhoto}
+    />
   );
 
   return (
@@ -158,12 +170,14 @@ function SuiviTab({
   actor,
   events,
   onCompose,
+  onOpenFilPhoto,
 }: {
   snap: DemoSnapshot;
   project: Project;
   actor: EventActor;
   events: Event[];
   onCompose: (kind: ComposerKind) => void;
+  onOpenFilPhoto: (momentId: string, photoId?: string) => void;
 }): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
   const pendingReplies = teamQueue(events).filter(
@@ -255,7 +269,7 @@ function SuiviTab({
                     ) : undefined
                   }
                 >
-                  <span className="mt-1 inline-block">
+                  <span className="mt-1 flex flex-wrap items-center gap-2">
                     <Badge
                       variant={
                         e.state === 'publie'
@@ -267,6 +281,17 @@ function SuiviTab({
                     >
                       {e.state}
                     </Badge>
+                    {e.type === 'demande' && e.content.source?.kind === 'fil' && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onOpenFilPhoto(e.content.source!.momentId, e.content.source!.photoId)
+                        }
+                        className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
+                      >
+                        <ImageIcon aria-hidden /> Voir la photo
+                      </button>
+                    )}
                   </span>
                 </ActivityItem>
               ))}

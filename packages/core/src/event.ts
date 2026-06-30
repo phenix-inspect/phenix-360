@@ -87,12 +87,26 @@ export interface DemandeResolution {
   resolvedAt: IsoDateTime;
 }
 
+/**
+ * Provenance d'une demande créée depuis une photo annotée du Fil (pont manuel
+ * annotation → action chantier). Ids en chaînes : la colonne vertébrale reste
+ * indépendante du module Fil. Lien RETOUR vers la photo / l'annotation.
+ */
+export interface DemandeSource {
+  kind: 'fil';
+  momentId: string;
+  photoId?: string;
+  annotationId?: string;
+}
+
 export interface DemandeContent {
   /** Besoin du client, formulé via l'assistant (ADR-001 §6). */
   question: string;
   /** Destinataire de l'action attendue (`client` ⇒ décision client). */
   destinataire: DemandeAudience;
   resolution?: DemandeResolution;
+  /** Origine (le cas échéant) : photo annotée du Fil. */
+  source?: DemandeSource;
 }
 
 /* -------------------------------------------------------------------------- *

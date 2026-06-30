@@ -298,6 +298,12 @@ export interface Annotation {
   createdAt: IsoDateTime;
   /** Rattachement éventuel à un message (commentaire de l'annotation). */
   messageId?: MessageId | null;
+  /**
+   * Action chantier créée depuis cette annotation (pont MANUEL, unidirectionnel).
+   * V1 : 'demande' ; le modèle accueille déjà décision / réserve / sav sans
+   * refonte. `eventId` = l'événement créé dans le Journal.
+   */
+  action?: { kind: 'demande' | 'decision' | 'reserve' | 'sav'; eventId: string };
 }
 
 /** Annotations d'une photo (anciennes d'abord, ordre de tracé). */

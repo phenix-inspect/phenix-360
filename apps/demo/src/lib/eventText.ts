@@ -23,10 +23,12 @@ export function eventDescription(e: Event): string | undefined {
   switch (e.type) {
     case 'compte_rendu':
       return e.content.texte;
-    case 'demande':
-      return e.content.resolution
+    case 'demande': {
+      const base = e.content.resolution
         ? `${e.content.question} → ${e.content.resolution.texte}`
         : e.content.question;
+      return e.content.source?.kind === 'fil' ? `${base} · depuis une photo annotée du Fil` : base;
+    }
     case 'decision':
       return describeDecisionEvent(e.content).description;
     case 'photo':
