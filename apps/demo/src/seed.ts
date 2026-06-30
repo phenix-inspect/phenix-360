@@ -573,9 +573,25 @@ export function buildDemoSeed(): DemoSeed {
   );
   const zoneByLabel = (label: string): ProjectZone => zones.find((z) => z.label === label)!;
 
-  const mkMoment = (n: number, title: string, zoneLabel: string, legende?: string): Moment => {
-    const photoId = filPhotoId(uuid());
+  const mkMoment = (
+    n: number,
+    title: string,
+    zoneLabel: string,
+    legendes: string[] = [],
+  ): Moment => {
     const at = daysAgo(n);
+    const nb = Math.max(1, legendes.length);
+    const photos = Array.from({ length: nb }, (_, i) => ({
+      id: filPhotoId(uuid()),
+      bucket: 'demo',
+      storagePath: `${pid}/fil/${uuid()}.jpg`,
+      mimeType: 'image/jpeg',
+      width: 1600,
+      height: 1200,
+      ...(legendes[i] ? { legende: legendes[i] } : {}),
+      ordre: i,
+      createdAt: at,
+    }));
     return {
       id: momentId(uuid()),
       projectId: pid,
@@ -587,29 +603,26 @@ export function buildDemoSeed(): DemoSeed {
       title,
       zoneId: zoneByLabel(zoneLabel).id,
       visibleTo: DEFAULT_AUDIENCE,
-      photos: [
-        {
-          id: photoId,
-          bucket: 'demo',
-          storagePath: `${pid}/fil/${uuid()}.jpg`,
-          mimeType: 'image/jpeg',
-          width: 1600,
-          height: 1200,
-          ...(legende ? { legende } : {}),
-          ordre: 0,
-          createdAt: at,
-        },
-      ],
-      coverPhotoId: photoId,
+      photos,
+      coverPhotoId: photos[0]!.id,
     };
   };
 
   // Réparti sur deux mois → deux séparateurs de chapitre dans le Fil.
-  const mCloisons = mkMoment(1, 'Cloisons terminées', 'Séjour', 'Distribution des pièces posée');
-  const mDalle = mkMoment(6, 'Dalle coulée', 'Salle de bain', 'Séchage en cours');
-  const mMur = mkMoment(12, 'Ouverture du mur porteur', 'Cuisine', 'Cuisine ouverte sur le séjour');
+  const mCloisons = mkMoment(1, 'Cloisons terminées', 'Séjour', ['Distribution des pièces posée']);
+  // Un ALBUM multi-photos (3 photos) → badge « 3 photos » + galerie immersive.
+  const mDalle = mkMoment(6, 'Dalle coulée', 'Salle de bain', [
+    'Coffrage et ferraillage',
+    'Coulage en cours',
+    'Surface talochée, séchage',
+  ]);
+  const mMur = mkMoment(12, 'Ouverture du mur porteur', 'Cuisine', [
+    'Cuisine ouverte sur le séjour',
+  ]);
   const mPrepa = mkMoment(22, 'Préparation du chantier', 'Chambre');
-  const mDemarrage = mkMoment(40, 'Démarrage du chantier', 'Façade', 'Installation et protections');
+  const mDemarrage = mkMoment(40, 'Démarrage du chantier', 'Façade', [
+    'Installation et protections',
+  ]);
   const moments: Moment[] = [mCloisons, mDalle, mMur, mPrepa, mDemarrage];
 
   // Une interaction existante → un Moment verrouillé (mémoire fiable).

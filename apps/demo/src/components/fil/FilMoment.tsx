@@ -1,10 +1,12 @@
-import { Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Images, Trash2 } from 'lucide-react';
 import { ROLE_LABEL, momentCover, type Message, type Moment } from '@phenix360/core';
 import { Avatar } from '../Avatar';
 import { fmtDate } from '../../lib/format';
 import { FilImage } from './FilImage';
 import { CoupDeCoeurButton } from './CoupDeCoeurButton';
 import { MessageThread } from './MessageThread';
+import { MomentGallery } from './MomentGallery';
 
 /**
  * Un Moment, présenté comme une PAGE D'ALBUM : grande photo, puis auteur,
@@ -36,13 +38,31 @@ export function FilMoment({
   onDelete: () => void;
 }): React.JSX.Element {
   const cover = momentCover(moment);
+  const count = moment.photos.length;
+  const [gallery, setGallery] = useState(false);
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
-      {/* Grande photo, cadre net (mobile-friendly) */}
-      <div className="relative aspect-[4/5] w-full bg-paper-100">
+      {/* Grande photo (couverture), cadre net (mobile-friendly) — ouvre la galerie */}
+      <button
+        type="button"
+        onClick={() => setGallery(true)}
+        aria-label={count > 1 ? `Ouvrir l’album (${count} photos)` : 'Agrandir la photo'}
+        className="relative block aspect-[4/5] w-full bg-paper-100"
+      >
         {cover && <FilImage photo={cover} />}
-      </div>
+        {count > 1 && (
+          <span
+            className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-paper-0 [&_svg]:size-3.5"
+            style={{ backgroundColor: 'rgba(19,16,9,0.55)' }}
+          >
+            <Images aria-hidden />
+            {count} photos
+          </span>
+        )}
+      </button>
+
+      {gallery && <MomentGallery moment={moment} onClose={() => setGallery(false)} />}
 
       <div className="space-y-5 p-6">
         {/* Auteur + date (+ pièce discrète) */}

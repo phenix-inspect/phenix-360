@@ -27,6 +27,7 @@ import {
   type DemandeResolution,
   type EventActor,
   type EventId,
+  type FilPhoto,
   type KeyValueStore,
   type Message,
   type Moment,
@@ -293,17 +294,36 @@ export const demo = {
 
   /* ------------------------------- Le Fil -------------------------------- */
 
-  /** Ajoute un Moment (brique 1 : mono-photo, publié immédiatement). */
+  /**
+   * Partage un Moment (publié immédiatement). Une OU plusieurs photos (album) :
+   * `medias` dans l'ordre d'affichage, `coverIndex` désigne la couverture. La
+   * légende du Moment est portée par la photo de couverture.
+   */
   addMoment(input: {
     projectId: ProjectId;
     actor: EventActor;
     title: string;
-    media: UploadedMedia;
+    medias: UploadedMedia[];
+    coverIndex?: number;
     zoneId?: ZoneId;
     legende?: string;
   }): void {
+    if (input.medias.length === 0) return;
     const now = new Date().toISOString();
-    const photoId = toFilPhotoId(crypto.randomUUID());
+    const coverIdx = Math.min(Math.max(input.coverIndex ?? 0, 0), input.medias.length - 1);
+    const legende = input.legende?.trim();
+    const photos: FilPhoto[] = input.medias.map((m, i) => ({
+      id: toFilPhotoId(crypto.randomUUID()),
+      imageUrl: m.imageUrl,
+      bucket: m.bucket,
+      storagePath: m.storagePath,
+      mimeType: m.mimeType,
+      width: m.width,
+      height: m.height,
+      ...(i === coverIdx && legende ? { legende } : {}),
+      ordre: i,
+      createdAt: now,
+    }));
     const moment: Moment = {
       id: toMomentId(crypto.randomUUID()),
       projectId: input.projectId,
@@ -314,21 +334,8 @@ export const demo = {
       state: 'publie',
       title: input.title.trim(),
       visibleTo: DEFAULT_AUDIENCE,
-      photos: [
-        {
-          id: photoId,
-          imageUrl: input.media.imageUrl,
-          bucket: input.media.bucket,
-          storagePath: input.media.storagePath,
-          mimeType: input.media.mimeType,
-          width: input.media.width,
-          height: input.media.height,
-          legende: input.legende?.trim() || undefined,
-          ordre: 0,
-          createdAt: now,
-        },
-      ],
-      coverPhotoId: photoId,
+      photos,
+      coverPhotoId: photos[coverIdx]!.id,
       ...(input.zoneId ? { zoneId: input.zoneId } : {}),
     };
     const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
