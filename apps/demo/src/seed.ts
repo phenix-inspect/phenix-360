@@ -665,10 +665,13 @@ export function buildDemoSeed(): DemoSeed {
   ];
 
   // Annotation seedée : un cercle autour d'une zone, rattaché au message ci-dessus
-  // (« cercle rouge + commentaire »). Coordonnées normalisées (0..1).
+  // (« cercle rouge + commentaire »). Coordonnées normalisées (0..1). Elle a été
+  // convertie en RÉSERVE (pont annotation → réserve) → `action`.
+  const annId = annotationId(uuid());
+  const reserveId = eventId(uuid());
   const annotations: Annotation[] = [
     {
-      id: annotationId(uuid()),
+      id: annId,
       projectId: pid,
       momentId: mDalle.id,
       photoId: mDalle.photos[1]!.id,
@@ -683,8 +686,37 @@ export function buildDemoSeed(): DemoSeed {
       visibleTo: DEFAULT_AUDIENCE,
       createdAt: daysAgo(5),
       messageId: msgPrise.id,
+      action: { kind: 'reserve', ref: reserveId },
     },
   ];
+
+  // Réserve OUVERTE seedée (interne, invisible au client), créée depuis la photo
+  // annotée ci-dessus : prête à être LEVÉE côté conducteur. Ajoutée au journal.
+  const echeanceLevee = new Date(Date.now() + 10 * 86_400_000).toISOString().slice(0, 10);
+  events.push({
+    id: reserveId,
+    projectId: pid,
+    type: 'reserve',
+    actor: compagnon,
+    visibility: 'interne',
+    state: 'ouverte',
+    captureId: null,
+    createdAt: daysAgo(2),
+    publishedBy: compaId,
+    publishedAt: daysAgo(2),
+    content: {
+      numero: 1,
+      libelle: 'Cette prise peut-elle être déplacée ?',
+      responsable: 'Électricien',
+      echeance: echeanceLevee,
+      source: {
+        kind: 'fil',
+        momentId: mDalle.id,
+        photoId: mDalle.photos[1]!.id,
+        annotationId: annId,
+      },
+    },
+  });
 
   return {
     state: { projects: [project], members, events },

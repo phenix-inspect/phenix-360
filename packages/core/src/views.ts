@@ -12,13 +12,14 @@ import {
   isDecision,
   isDemande,
   isDocument,
+  isLevee,
   isPhoto,
   isPublished,
   isReserve,
   isVisibleToClient,
   isAwaitingClientDecision,
 } from './event.js';
-import type { ReserveEvent } from './event.js';
+import type { LeveeEvent, ReserveEvent } from './event.js';
 import type { ProjectStep } from './project.js';
 import type { ClientDecisionBanner, Decision } from './decision.js';
 import { toDecision } from './decision.js';
@@ -83,6 +84,7 @@ export function isMilestone(e: Event): boolean {
   if (isDemande(e)) return true;
   if (isDecision(e)) return true;
   if (isReserve(e)) return true;
+  if (isLevee(e)) return true;
   return false;
 }
 
@@ -95,6 +97,28 @@ export function reserveEvents(events: Event[]): ReserveEvent[] {
 export function nextReserveNumero(events: Event[]): number {
   const nums = events.filter(isReserve).map((e) => e.content.numero);
   return (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+}
+
+/**
+ * Levée d'une réserve, le cas échéant. Append-only : la levée est un événement
+ * AJOUTÉ pointant vers la réserve (jamais une mutation). On retient la plus
+ * ancienne (la première levée fait foi).
+ */
+export function leveeDeReserve(reserve: ReserveEvent, events: Event[]): LeveeEvent | undefined {
+  return sortByDate(
+    events.filter(isLevee).filter((e) => e.content.reserveId === reserve.id),
+    'asc',
+  )[0];
+}
+
+/** Statut DÉRIVÉ d'une réserve : `levee` si une levée existe, sinon `ouverte`. */
+export function reserveStatut(reserve: ReserveEvent, events: Event[]): 'ouverte' | 'levee' {
+  return leveeDeReserve(reserve, events) ? 'levee' : 'ouverte';
+}
+
+/** Réserves encore ouvertes (aucune levée enregistrée). Récentes d'abord. */
+export function reservesOuvertes(events: Event[]): ReserveEvent[] {
+  return reserveEvents(events).filter((r) => reserveStatut(r, events) === 'ouverte');
 }
 
 /**

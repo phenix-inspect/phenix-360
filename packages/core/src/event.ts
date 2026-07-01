@@ -31,6 +31,7 @@ export const EVENT_TYPES = [
   'demande',
   'decision',
   'reserve',
+  'levee',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -41,6 +42,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   demande: 'Demande',
   decision: 'Décision',
   reserve: 'Réserve',
+  levee: 'Levée de réserve',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -153,8 +155,12 @@ export interface DecisionEventContent {
 }
 
 /* -------------------------------------------------------------------------- *
- * RÉSERVE — vrai objet de pilotage, porté par le Journal (cycle : ouverte →
- * close = levée). Pourra alimenter la réception, le SAV et le suivi de levée.
+ * RÉSERVE — vrai objet de pilotage, porté par le Journal. Cycle : `ouverte` →
+ * `levée`. La levée n'est JAMAIS une mutation de la réserve : c'est un événement
+ * `levee` AJOUTÉ (append-only) qui pointe vers elle. La réserve garde donc à vie
+ * sa photo source, son annotation source et son origine ; le statut « levée »
+ * est une LECTURE dérivée (présence d'un événement de levée). Pourra alimenter
+ * la réception et le SAV.
  * -------------------------------------------------------------------------- */
 export interface ReserveEventContent {
   /** Numéro de réserve (incrémental par projet). */
@@ -165,11 +171,40 @@ export interface ReserveEventContent {
   responsable?: string;
   /** Échéance de levée (ISO YYYY-MM-DD). */
   echeance?: string;
-  /** Levée : qui / quand (renseignés à la levée — module ultérieur). */
-  leveePar?: UserId;
-  leveeAt?: IsoDateTime;
   /** Origine : photo annotée du Fil (lien retour). */
   source?: FilSource;
+}
+
+/**
+ * Photo de PREUVE d'une levée de réserve. Mêmes conventions que les photos du
+ * Fil : `imageUrl` (data URL en démo) double `bucket`/`storagePath` (S3 en prod)
+ * — basculer le stockage sans toucher au modèle. L'image d'origine de la réserve
+ * n'est jamais modifiée : la preuve est une pièce ajoutée.
+ */
+export interface LeveePreuve {
+  imageUrl: string;
+  bucket: string;
+  storagePath: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * LEVÉE D'UNE RÉSERVE — événement AJOUTÉ qui ferme proprement une réserve
+ * (append-only : on ne supprime ni ne modifie jamais la réserve). L'auteur et la
+ * date de levée sont portés par l'enveloppe (`actor` / `createdAt`). Le contenu
+ * porte le lien vers la réserve, la note et la photo de preuve.
+ */
+export interface LeveeEventContent {
+  /** Réserve levée (id de l'événement réserve d'origine). */
+  reserveId: string;
+  /** Numéro de la réserve levée (repris pour l'affichage, sans relire). */
+  reserveNumero: number;
+  /** Note courte de levée (« Prise déplacée et reprise validée »). */
+  note?: string;
+  /** Photo de preuve de la levée (le cas échéant). */
+  preuve?: LeveePreuve;
 }
 
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
@@ -180,6 +215,7 @@ export interface EventContentByType {
   demande: DemandeContent;
   decision: DecisionEventContent;
   reserve: ReserveEventContent;
+  levee: LeveeEventContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -225,10 +261,20 @@ export interface ReserveEvent extends EventEnvelope {
   type: 'reserve';
   content: ReserveEventContent;
 }
+export interface LeveeEvent extends EventEnvelope {
+  type: 'levee';
+  content: LeveeEventContent;
+}
 
 /** L'événement du journal — colonne vertébrale du produit. */
 export type Event =
-  CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent | DecisionEvent | ReserveEvent;
+  | CompteRenduEvent
+  | PhotoEvent
+  | DocumentEvent
+  | DemandeEvent
+  | DecisionEvent
+  | ReserveEvent
+  | LeveeEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type
@@ -239,6 +285,7 @@ export const isDocument = (e: Event): e is DocumentEvent => e.type === 'document
 export const isDemande = (e: Event): e is DemandeEvent => e.type === 'demande';
 export const isDecision = (e: Event): e is DecisionEvent => e.type === 'decision';
 export const isReserve = (e: Event): e is ReserveEvent => e.type === 'reserve';
+export const isLevee = (e: Event): e is LeveeEvent => e.type === 'levee';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';

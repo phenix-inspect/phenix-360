@@ -604,6 +604,57 @@ export const demo = {
     broadcast();
   },
 
+  /**
+   * LEVÉE d'une réserve (append-only). On n'efface ni ne modifie jamais la
+   * réserve : on AJOUTE au Journal un événement `levee` qui pointe vers elle,
+   * avec une note et une photo de preuve facultatives. L'auteur et la date de
+   * levée sont portés par l'enveloppe. Le statut « levée » se LIT ensuite
+   * (présence de cet événement) — la réserve garde son origine intacte.
+   */
+  async leverReserve(
+    projectId: ProjectId,
+    reserveEventId: string,
+    actor: EventActor,
+    options: { note?: string; preuve?: UploadedMedia } = {},
+  ): Promise<void> {
+    const reserve = snapshot.events.find((e) => e.id === reserveEventId && e.type === 'reserve');
+    if (!reserve || reserve.type !== 'reserve') return;
+    // Idempotence : une réserve déjà levée ne se relève pas.
+    const dejaLevee = snapshot.events.some(
+      (e) => e.type === 'levee' && e.content.reserveId === reserveEventId,
+    );
+    if (dejaLevee) return;
+
+    const note = options.note?.trim();
+    const m = options.preuve;
+    const preuve = m
+      ? {
+          imageUrl: m.imageUrl,
+          bucket: m.bucket,
+          storagePath: m.storagePath,
+          mimeType: m.mimeType,
+          ...(m.width != null ? { width: m.width } : {}),
+          ...(m.height != null ? { height: m.height } : {}),
+        }
+      : undefined;
+
+    await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'levee',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        reserveId: reserveEventId,
+        reserveNumero: reserve.content.numero,
+        ...(note ? { note } : {}),
+        ...(preuve ? { preuve } : {}),
+      },
+    });
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
     const { state, people, activeProjectId, dossiers, fil } = buildDemoSeed();

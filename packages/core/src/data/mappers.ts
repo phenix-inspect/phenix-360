@@ -14,6 +14,7 @@ import type {
   DocumentContent,
   Event,
   EventEnvelope,
+  LeveeEventContent,
   PhotoContent,
   ReserveEventContent,
 } from '../event.js';
@@ -62,6 +63,8 @@ export function mapEventRow(r: EventRow): Event {
       return { ...envelope, type: 'decision', content: r.content as DecisionEventContent };
     case 'reserve':
       return { ...envelope, type: 'reserve', content: r.content as ReserveEventContent };
+    case 'levee':
+      return { ...envelope, type: 'levee', content: r.content as LeveeEventContent };
   }
 }
 

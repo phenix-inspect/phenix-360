@@ -112,6 +112,10 @@ const excerptOf = (e: Event): string => {
     }
     case 'reserve':
       return `Réserve n°${e.content.numero} : ${e.content.libelle}`;
+    case 'levee':
+      return `Levée de la réserve n°${e.content.reserveNumero}${
+        e.content.note ? ` : ${e.content.note}` : ''
+      }`;
   }
 };
 

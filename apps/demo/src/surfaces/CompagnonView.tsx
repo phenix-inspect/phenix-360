@@ -15,15 +15,18 @@ import {
 import {
   EVENT_TYPE_LABEL,
   buildChantierAttention,
+  reserveStatut,
   sortByDate,
   teamQueue,
   userId,
   type Event,
   type EventActor,
   type Project,
+  type ReserveEvent,
 } from '@phenix360/core';
 import {
   CalendarClock,
+  CircleCheck,
   FileText,
   HelpCircle,
   Image as ImageIcon,
@@ -40,6 +43,7 @@ import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { HistoriqueView } from '../components/HistoriqueView';
 import { FilView } from '../components/fil/FilView';
+import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -65,6 +69,7 @@ export function CompagnonView({
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
   const [composer, setComposer] = useState<ComposerKind | null>(null);
+  const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
   const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'historique'>(
@@ -109,6 +114,7 @@ export function CompagnonView({
       events={events}
       onCompose={setComposer}
       onOpenFilPhoto={openFilPhoto}
+      onLeverReserve={setLever}
     />
   );
 
@@ -160,6 +166,8 @@ export function CompagnonView({
         events={events}
         onClose={() => setComposer(null)}
       />
+
+      {lever && <ReserveLeveeDialog reserve={lever} actor={actor} onClose={() => setLever(null)} />}
     </div>
   );
 }
@@ -171,6 +179,7 @@ function SuiviTab({
   events,
   onCompose,
   onOpenFilPhoto,
+  onLeverReserve,
 }: {
   snap: DemoSnapshot;
   project: Project;
@@ -178,6 +187,7 @@ function SuiviTab({
   events: Event[];
   onCompose: (kind: ComposerKind) => void;
   onOpenFilPhoto: (momentId: string, photoId?: string) => void;
+  onLeverReserve: (reserve: ReserveEvent) => void;
 }): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
   const pendingReplies = teamQueue(events).filter(
@@ -253,50 +263,78 @@ function SuiviTab({
             />
           ) : (
             <Timeline>
-              {events.map((e) => (
-                <ActivityItem
-                  key={e.id}
-                  type={e.type}
-                  title={eventTitle(e)}
-                  description={eventDescription(e)}
-                  date={fmtDateTime(e.createdAt)}
-                  author={nameOf(snap, e.actor.userId)}
-                  authorRole={e.actor.role}
-                  visibility={e.visibility}
-                  media={
-                    e.type === 'photo' ? (
-                      <PhotoTile photo={e} size="thumb" className="w-28" />
-                    ) : undefined
-                  }
-                >
-                  <span className="mt-1 flex flex-wrap items-center gap-2">
-                    <Badge
-                      variant={
-                        e.state === 'publie'
-                          ? 'success'
-                          : e.state === 'brouillon'
-                            ? 'warning'
-                            : 'neutral'
-                      }
-                    >
-                      {e.state}
-                    </Badge>
-                    {(() => {
-                      const src =
-                        e.type === 'demande' || e.type === 'reserve' ? e.content.source : undefined;
-                      return src?.kind === 'fil' ? (
+              {events.map((e) => {
+                const statut = e.type === 'reserve' ? reserveStatut(e, events) : null;
+                return (
+                  <ActivityItem
+                    key={e.id}
+                    type={e.type}
+                    title={eventTitle(e)}
+                    description={eventDescription(e)}
+                    date={fmtDateTime(e.createdAt)}
+                    author={nameOf(snap, e.actor.userId)}
+                    authorRole={e.actor.role}
+                    visibility={e.visibility}
+                    media={
+                      e.type === 'photo' ? (
+                        <PhotoTile photo={e} size="thumb" className="w-28" />
+                      ) : e.type === 'levee' && e.content.preuve ? (
+                        <img
+                          src={e.content.preuve.imageUrl}
+                          alt="Photo de preuve de la levée"
+                          className="aspect-[4/3] w-28 rounded-lg border border-border object-cover"
+                        />
+                      ) : undefined
+                    }
+                  >
+                    <span className="mt-1 flex flex-wrap items-center gap-2">
+                      {e.type === 'reserve' ? (
+                        <Badge variant={statut === 'levee' ? 'success' : 'warning'}>
+                          {statut === 'levee' ? 'levée' : 'ouverte'}
+                        </Badge>
+                      ) : e.type === 'levee' ? (
+                        <Badge variant="success">levée</Badge>
+                      ) : (
+                        <Badge
+                          variant={
+                            e.state === 'publie'
+                              ? 'success'
+                              : e.state === 'brouillon'
+                                ? 'warning'
+                                : 'neutral'
+                          }
+                        >
+                          {e.state}
+                        </Badge>
+                      )}
+                      {(() => {
+                        const src =
+                          e.type === 'demande' || e.type === 'reserve'
+                            ? e.content.source
+                            : undefined;
+                        return src?.kind === 'fil' ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenFilPhoto(src.momentId, src.photoId)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
+                          >
+                            <ImageIcon aria-hidden /> Voir la photo
+                          </button>
+                        ) : null;
+                      })()}
+                      {e.type === 'reserve' && statut === 'ouverte' && (
                         <button
                           type="button"
-                          onClick={() => onOpenFilPhoto(src.momentId, src.photoId)}
+                          onClick={() => onLeverReserve(e)}
                           className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
                         >
-                          <ImageIcon aria-hidden /> Voir la photo
+                          <CircleCheck aria-hidden /> Lever la réserve
                         </button>
-                      ) : null;
-                    })()}
-                  </span>
-                </ActivityItem>
-              ))}
+                      )}
+                    </span>
+                  </ActivityItem>
+                );
+              })}
             </Timeline>
           )}
         </CardContent>
