@@ -45,6 +45,54 @@ export type AudienceGroup = (typeof AUDIENCE_GROUPS)[number];
 /** Audience par défaut d'un Moment : tout le monde (le conducteur affinera plus tard). */
 export const DEFAULT_AUDIENCE: AudienceGroup[] = ['phenix', 'artisans', 'client'];
 
+/**
+ * Audience INTERNE — le Moment est **privé par défaut** (conducteur + artisans),
+ * invisible au client tant qu'il n'est pas explicitement PARTAGÉ. C'est la règle
+ * fondatrice « privé par défaut → Partager → Espace client » : le conducteur vit
+ * son chantier en interne, puis choisit ce qu'il publie.
+ */
+export const INTERNAL_AUDIENCE: AudienceGroup[] = ['phenix', 'artisans'];
+
+/** Audience d'un Moment partagé au client = interne + client. */
+export const SHARED_AUDIENCE: AudienceGroup[] = ['phenix', 'artisans', 'client'];
+
+/* -------------------------------------------------------------------------- *
+ * Type de Moment — la NATURE de ce que le conducteur vit sur le chantier
+ * -------------------------------------------------------------------------- *
+ * Le Moment est la brique FONDAMENTALE : le conducteur ne « saisit » pas, il
+ * crée un Moment de chantier. Son `type` détermine ce que PHÉNIX en génère (CR
+ * de réunion, fiche de visite, bon de livraison…). Union volontairement fermée,
+ * prête à accueillir pré-réception / réception / SAV dans les phases suivantes.
+ */
+export const MOMENT_TYPES = [
+  'reunion',
+  'visite',
+  'livraison',
+  'note',
+  'decision',
+  'etape',
+] as const;
+export type MomentType = (typeof MOMENT_TYPES)[number];
+
+export const MOMENT_TYPE_LABEL: Record<MomentType, string> = {
+  reunion: 'Réunion de chantier',
+  visite: 'Visite de chantier',
+  livraison: 'Livraison',
+  note: 'Note de chantier',
+  decision: 'Décision',
+  etape: 'Étape franchie',
+};
+
+/** Libellé court (pour les puces / chips discrètes). */
+export const MOMENT_TYPE_SHORT: Record<MomentType, string> = {
+  reunion: 'Réunion',
+  visite: 'Visite',
+  livraison: 'Livraison',
+  note: 'Note',
+  decision: 'Décision',
+  etape: 'Étape',
+};
+
 /* -------------------------------------------------------------------------- *
  * Photo du Fil
  * -------------------------------------------------------------------------- */
@@ -64,9 +112,30 @@ export interface FilPhoto {
   createdAt: IsoDateTime;
 }
 
+/** Une signature apposée sur un Moment (réservé — UI en phase réception). */
+export interface MomentSignature {
+  intervenant: string;
+  role?: string;
+  imageUrl?: string;
+  signedAt: IsoDateTime;
+}
+
+/** Géolocalisation d'un Moment (réservé — capturé automatiquement plus tard). */
+export interface MomentGeoloc {
+  lat: number;
+  lng: number;
+  label?: string;
+}
+
 /* -------------------------------------------------------------------------- *
- * Moment — l'unité du Fil (une belle photo, ou un album)
- * -------------------------------------------------------------------------- */
+ * Moment — la BRIQUE FONDAMENTALE de PHÉNIX (un instant de chantier vécu)
+ * -------------------------------------------------------------------------- *
+ * Le conducteur ne remplit pas de formulaire : il crée un Moment. Tout le reste
+ * (document, compte rendu, réserve, levée, historique, partage, réponse client)
+ * en découle. Le Fil client n'est qu'une PROJECTION des Moments partagés — un
+ * seul modèle, jamais deux. Interne par défaut (`INTERNAL_AUDIENCE`), publié au
+ * client seulement s'il est explicitement partagé.
+ */
 export interface Moment {
   id: MomentId;
   projectId: ProjectId;
@@ -76,19 +145,31 @@ export interface Moment {
   publishedAt: IsoDateTime | null;
   state: 'brouillon' | 'publie';
 
+  /**
+   * Type de Moment — sa nature (réunion, visite, livraison…). Optionnel pour la
+   * compatibilité des Moments déjà stockés ; `momentTypeOf` fournit le défaut.
+   */
+  type?: MomentType;
+
   /** Le cœur du Moment : un titre simple (« Cuisine installée »). */
   title: string;
+  /** Observations libres du conducteur — le récit du Moment. */
+  observations?: string;
+  /** Intervenants présents (noms libres en V1). */
+  intervenants?: string[];
   /** Localisation dans le projet (affichée discrètement, filtrable plus tard). */
   zoneId?: ZoneId;
-  /** Qui voit ce Moment (défaut : tout le monde). */
+  /** Qui voit ce Moment (interne par défaut ; + client une fois partagé). */
   visibleTo: AudienceGroup[];
 
-  /** 1 photo en brique 1 ; le tableau est prêt pour l'album. */
+  /** 1 photo au minimum en V1 ; le tableau est prêt pour l'album. */
   photos: FilPhoto[];
   coverPhotoId: FilPhotoId;
 
-  /* — Réservés (déclarés, non exploités en brique 1) — */
-  type?: 'realisation' | 'avant_apres';
+  /* — Réservés (modèle prêt, UI en phases suivantes) — */
+  meteo?: string;
+  geoloc?: MomentGeoloc;
+  signatures?: MomentSignature[];
   etapeImportante?: boolean;
   summary?: string;
 }
@@ -170,6 +251,19 @@ export function momentVerrouille(id: MomentId, coups: CoupDeCoeur[], messages: M
 /** Le client voit-il ce Moment ? (audience + publié). */
 export function momentVisiblePour(moment: Moment, viewer: AudienceGroup): boolean {
   return moment.state === 'publie' && moment.visibleTo.includes(viewer);
+}
+
+/** Type effectif d'un Moment (défaut : note) — source unique du défaut. */
+export function momentTypeOf(moment: Moment): MomentType {
+  return moment.type ?? 'note';
+}
+
+/**
+ * Ce Moment est-il PARTAGÉ au client ? Règle unique : publié + audience client.
+ * Le Fil client = l'ensemble des Moments pour lesquels ceci est vrai.
+ */
+export function momentPartageClient(moment: Moment): boolean {
+  return momentVisiblePour(moment, 'client');
 }
 
 /** Mois d'une date : clé triable (« 2026-06 ») + libellé (« juin 2026 »). */
@@ -349,7 +443,7 @@ export interface BibliothequeImage {
   date: IsoDateTime;
   authorId: UserId;
   authorRole: ActorRole;
-  type?: 'realisation' | 'avant_apres';
+  type?: MomentType;
   etapeImportante?: boolean;
 }
 

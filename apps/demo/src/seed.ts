@@ -9,6 +9,8 @@
  */
 import {
   DEFAULT_AUDIENCE,
+  INTERNAL_AUDIENCE,
+  SHARED_AUDIENCE,
   annotationId,
   attachmentId,
   buildPlanning,
@@ -29,6 +31,7 @@ import {
   type EventActor,
   type Message,
   type Moment,
+  type MomentType,
   type Project,
   type ProjectDossier,
   type ProjectMember,
@@ -600,11 +603,19 @@ export function buildDemoSeed(): DemoSeed {
 
   const mkMoment = (
     n: number,
+    type: MomentType,
     title: string,
     zoneLabel: string,
-    legendes: string[] = [],
+    opts: {
+      legendes?: string[];
+      observations?: string;
+      intervenants?: string[];
+      /** Partagé au client par défaut ; `false` = Moment interne (privé). */
+      shared?: boolean;
+    } = {},
   ): Moment => {
     const at = daysAgo(n);
+    const legendes = opts.legendes ?? [];
     const nb = Math.max(1, legendes.length);
     const photos = Array.from({ length: nb }, (_, i) => ({
       id: filPhotoId(uuid()),
@@ -625,30 +636,47 @@ export function buildDemoSeed(): DemoSeed {
       createdAt: at,
       publishedAt: at,
       state: 'publie',
+      type,
       title,
       zoneId: zoneByLabel(zoneLabel).id,
-      visibleTo: DEFAULT_AUDIENCE,
+      // Interne par défaut sauf partage explicite (règle « privé par défaut »).
+      visibleTo: opts.shared === false ? INTERNAL_AUDIENCE : SHARED_AUDIENCE,
+      ...(opts.observations ? { observations: opts.observations } : {}),
+      ...(opts.intervenants ? { intervenants: opts.intervenants } : {}),
       photos,
       coverPhotoId: photos[0]!.id,
     };
   };
 
   // Réparti sur deux mois → deux séparateurs de chapitre dans le Fil.
-  const mCloisons = mkMoment(1, 'Cloisons terminées', 'Séjour', ['Distribution des pièces posée']);
+  const mCloisons = mkMoment(1, 'etape', 'Cloisons terminées', 'Séjour', {
+    legendes: ['Distribution des pièces posée'],
+  });
+  // Un Moment INTERNE (privé) : réunion de chantier — visible du conducteur seul,
+  // jamais du client tant qu'il n'est pas partagé. Démontre « privé par défaut ».
+  const mReunion = mkMoment(2, 'reunion', 'Réunion de chantier hebdomadaire', 'Séjour', {
+    observations:
+      'Point d’avancement : cloisons terminées, séchage de la dalle conforme. Le plombier interviendra lundi. Aucun aléa signalé.',
+    intervenants: ['Mickaël (conducteur)', 'Plombier', 'Électricien'],
+    shared: false,
+  });
   // Un ALBUM multi-photos (3 photos) → badge « 3 photos » + galerie immersive.
-  const mDalle = mkMoment(6, 'Dalle coulée', 'Salle de bain', [
-    'Coffrage et ferraillage',
-    'Coulage en cours',
-    'Surface talochée, séchage',
-  ]);
-  const mMur = mkMoment(12, 'Ouverture du mur porteur', 'Cuisine', [
-    'Cuisine ouverte sur le séjour',
-  ]);
-  const mPrepa = mkMoment(22, 'Préparation du chantier', 'Chambre');
-  const mDemarrage = mkMoment(40, 'Démarrage du chantier', 'Façade', [
-    'Installation et protections',
-  ]);
-  const moments: Moment[] = [mCloisons, mDalle, mMur, mPrepa, mDemarrage];
+  const mDalle = mkMoment(6, 'etape', 'Dalle coulée', 'Salle de bain', {
+    legendes: ['Coffrage et ferraillage', 'Coulage en cours', 'Surface talochée, séchage'],
+  });
+  const mMur = mkMoment(12, 'etape', 'Ouverture du mur porteur', 'Cuisine', {
+    legendes: ['Cuisine ouverte sur le séjour'],
+  });
+  const mVisite = mkMoment(15, 'visite', 'Visite de chantier avec Mme Martin', 'Chambre', {
+    observations:
+      'Visite sur site : la cliente valide l’implantation des prises et l’emplacement du meuble vasque.',
+    intervenants: ['Mickaël (conducteur)', 'Mme Martin'],
+  });
+  const mPrepa = mkMoment(22, 'visite', 'Préparation du chantier', 'Chambre');
+  const mDemarrage = mkMoment(40, 'etape', 'Démarrage du chantier', 'Façade', {
+    legendes: ['Installation et protections'],
+  });
+  const moments: Moment[] = [mCloisons, mReunion, mDalle, mMur, mVisite, mPrepa, mDemarrage];
 
   // Une interaction existante → un Moment verrouillé (mémoire fiable).
   const coups: CoupDeCoeur[] = [

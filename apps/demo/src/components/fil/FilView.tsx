@@ -83,7 +83,7 @@ export function FilView({
           />
           {canCompose && (
             <Button onClick={() => setComposing(true)}>
-              <ImagePlus aria-hidden /> Partager un moment
+              <ImagePlus aria-hidden /> Créer un moment
             </Button>
           )}
         </div>
@@ -95,13 +95,13 @@ export function FilView({
           title="Le Fil commence bientôt"
           description={
             canCompose
-              ? 'Partagez une première photo : elle ouvrira l’histoire visuelle du chantier.'
-              : 'Les premières photos de votre chantier apparaîtront ici très bientôt.'
+              ? 'Créez un premier moment : il ouvrira l’histoire du chantier.'
+              : 'Les premiers moments de votre chantier apparaîtront ici très bientôt.'
           }
           action={
             canCompose ? (
               <Button onClick={() => setComposing(true)}>
-                <ImagePlus aria-hidden /> Partager un moment
+                <ImagePlus aria-hidden /> Créer un moment
               </Button>
             ) : undefined
           }
@@ -133,12 +133,14 @@ export function FilView({
                 messages={messages.filter((m) => m.momentId === entry.moment.id)}
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
                 canDelete={canCompose}
+                canShare={canCompose}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)
                 }
                 onOpenGallery={() => setGallery({ moment: entry.moment })}
                 onDelete={() => demo.deleteMoment(project.id, entry.moment.id)}
+                onShare={() => demo.shareMoment(project.id, entry.moment.id)}
               />
             ),
           )}

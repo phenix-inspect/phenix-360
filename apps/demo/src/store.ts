@@ -13,6 +13,8 @@
 import { useSyncExternalStore } from 'react';
 import {
   DEFAULT_AUDIENCE,
+  INTERNAL_AUDIENCE,
+  SHARED_AUDIENCE,
   InMemoryBackend,
   annotationId as toAnnotationId,
   askPhenix as corePhenix,
@@ -23,6 +25,7 @@ import {
   filPhotoId as toFilPhotoId,
   messageId as toMessageId,
   momentId as toMomentId,
+  momentPartageClient,
   nextReserveNumero,
   userId as toUserId,
   type Annotation,
@@ -36,6 +39,7 @@ import {
   type KeyValueStore,
   type Message,
   type Moment,
+  type MomentType,
   type NewEvent,
   type NewMember,
   type NewProject,
@@ -366,9 +370,11 @@ export const demo = {
   /* ------------------------------- Le Fil -------------------------------- */
 
   /**
-   * Partage un Moment (publié immédiatement). Une OU plusieurs photos (album) :
-   * `medias` dans l'ordre d'affichage, `coverIndex` désigne la couverture. La
-   * légende du Moment est portée par la photo de couverture.
+   * Crée un MOMENT de chantier — le geste unique du conducteur. Le Moment est
+   * INTERNE par défaut (`INTERNAL_AUDIENCE`) : il n'apparaît dans l'espace client
+   * que si `shareWithClient` est vrai (ou plus tard via `shareMoment`). Une OU
+   * plusieurs photos (album) : `medias` dans l'ordre, `coverIndex` = couverture.
+   * `observations` = le récit libre ; `intervenants` = qui était présent.
    */
   addMoment(input: {
     projectId: ProjectId;
@@ -378,11 +384,17 @@ export const demo = {
     coverIndex?: number;
     zoneId?: ZoneId;
     legende?: string;
+    type?: MomentType;
+    observations?: string;
+    intervenants?: string[];
+    shareWithClient?: boolean;
   }): void {
     if (input.medias.length === 0) return;
     const now = new Date().toISOString();
     const coverIdx = Math.min(Math.max(input.coverIndex ?? 0, 0), input.medias.length - 1);
     const legende = input.legende?.trim();
+    const observations = input.observations?.trim();
+    const intervenants = (input.intervenants ?? []).map((s) => s.trim()).filter(Boolean);
     const photos: FilPhoto[] = input.medias.map((m, i) => ({
       id: toFilPhotoId(crypto.randomUUID()),
       imageUrl: m.imageUrl,
@@ -403,14 +415,32 @@ export const demo = {
       createdAt: now,
       publishedAt: now,
       state: 'publie',
+      type: input.type ?? 'note',
       title: input.title.trim(),
-      visibleTo: DEFAULT_AUDIENCE,
+      visibleTo: input.shareWithClient ? SHARED_AUDIENCE : INTERNAL_AUDIENCE,
       photos,
       coverPhotoId: photos[coverIdx]!.id,
+      ...(observations ? { observations } : {}),
+      ...(intervenants.length ? { intervenants } : {}),
       ...(input.zoneId ? { zoneId: input.zoneId } : {}),
     };
     const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
     map[input.projectId] = [...(map[input.projectId] ?? []), moment];
+    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * PARTAGER un Moment avec le client (ou le repasser en interne). « Partager »
+   * est une ACTION, jamais un nouvel objet : on bascule seulement l'audience du
+   * Moment. Une fois partagé, il apparaît dans le Fil client (projection).
+   */
+  shareMoment(projectId: ProjectId, momentId: string, shared = true): void {
+    const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
+    map[projectId] = (map[projectId] ?? []).map((m) =>
+      m.id === momentId ? { ...m, visibleTo: shared ? SHARED_AUDIENCE : INTERNAL_AUDIENCE } : m,
+    );
     localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
     refresh();
     broadcast();
@@ -680,7 +710,9 @@ export const demo = {
 
     const events = snapshot.events.filter((e) => e.projectId === projectId);
     const dossier = snapshot.dossiers[projectId] ?? null;
-    const moments = snapshot.fil.moments[projectId] ?? [];
+    // PHÉNIX est le concierge du CLIENT : il ne connaît que les Moments partagés
+    // (jamais l'interne). Le Fil client est une projection — la règle est unique.
+    const moments = (snapshot.fil.moments[projectId] ?? []).filter(momentPartageClient);
     const zones = snapshot.fil.zones[projectId] ?? [];
     const history = list.map((m) => ({ role: m.role, texte: m.texte }));
     const reply = corePhenix({ question: texte, events, dossier, moments, zones, history });

@@ -32,9 +32,10 @@ import {
   HelpCircle,
   Image as ImageIcon,
   NotebookPen,
+  Plus,
   Reply,
 } from 'lucide-react';
-import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, filOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDateTime } from '../lib/format';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
@@ -47,6 +48,7 @@ import { FilView } from '../components/fil/FilView';
 import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
+import { MomentComposer } from '../components/fil/MomentComposer';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'compagnon');
@@ -70,7 +72,9 @@ export function CompagnonView({
   const actor = compagnonActor(snap, project);
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
+  const zones = filOf(snap, project.id).zones;
   const [composer, setComposer] = useState<ComposerKind | null>(null);
+  const [creatingMoment, setCreatingMoment] = useState(false);
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
@@ -124,9 +128,14 @@ export function CompagnonView({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div>
-          <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
+          </div>
+          <Button size="lg" onClick={() => setCreatingMoment(true)}>
+            <Plus aria-hidden /> Créer un moment
+          </Button>
         </div>
         <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} compact />
         {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
@@ -188,6 +197,15 @@ export function CompagnonView({
       />
 
       {lever && <ReserveLeveeDialog reserve={lever} actor={actor} onClose={() => setLever(null)} />}
+
+      {creatingMoment && (
+        <MomentComposer
+          project={project}
+          actor={actor}
+          zones={zones}
+          onClose={() => setCreatingMoment(false)}
+        />
+      )}
     </div>
   );
 }

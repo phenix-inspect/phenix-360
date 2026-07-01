@@ -1,8 +1,11 @@
-import { Images, Trash2 } from 'lucide-react';
+import { Images, Lock, Send, Trash2, Users } from 'lucide-react';
 import {
+  MOMENT_TYPE_SHORT,
   ROLE_LABEL,
   messagesDuMoment,
   momentCover,
+  momentPartageClient,
+  momentTypeOf,
   type Message,
   type Moment,
 } from '@phenix360/core';
@@ -13,10 +16,11 @@ import { CoupDeCoeurButton } from './CoupDeCoeurButton';
 import { MessageThread } from './MessageThread';
 
 /**
- * Un Moment, présenté comme une PAGE D'ALBUM : grande photo, puis auteur,
- * titre, légende, coup de cœur et messages — beaucoup de respiration. La galerie
- * immersive (album + annotations) est pilotée par le parent (FilView) pour
- * permettre l'ouverture ciblée (lien retour depuis le Journal).
+ * Un Moment, présenté comme une PAGE D'ALBUM : grande photo, puis type, auteur,
+ * titre, observations, intervenants, coup de cœur et messages — beaucoup de
+ * respiration. Côté conducteur, l'état de partage est visible (interne / partagé)
+ * avec l'action « Partager avec le client ». La galerie immersive est pilotée par
+ * le parent (FilView) pour permettre l'ouverture ciblée (lien retour du Journal).
  */
 export function FilMoment({
   moment,
@@ -26,10 +30,12 @@ export function FilMoment({
   messages,
   locked,
   canDelete,
+  canShare,
   onToggleCoup,
   onSendMessage,
   onOpenGallery,
   onDelete,
+  onShare,
 }: {
   moment: Moment;
   zoneLabel?: string;
@@ -39,13 +45,17 @@ export function FilMoment({
   messages: Message[];
   locked: boolean;
   canDelete: boolean;
+  /** Le conducteur peut voir l'état de partage et publier au client. */
+  canShare: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
   onOpenGallery: () => void;
   onDelete: () => void;
+  onShare: () => void;
 }): React.JSX.Element {
   const cover = momentCover(moment);
   const count = moment.photos.length;
+  const shared = momentPartageClient(moment);
   // La carte du Fil reste sobre : seuls les messages du Moment (niveau 1).
   const messagesMoment = messagesDuMoment(moment.id, messages);
 
@@ -59,6 +69,9 @@ export function FilMoment({
         className="relative block aspect-[4/5] w-full bg-paper-100"
       >
         {cover && <FilImage photo={cover} />}
+        <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-paper-0/90 px-2.5 py-1 text-xs font-medium text-ink-800 shadow-sm">
+          {MOMENT_TYPE_SHORT[momentTypeOf(moment)]}
+        </span>
         {count > 1 && (
           <span
             className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-paper-0 [&_svg]:size-3.5"
@@ -97,15 +110,54 @@ export function FilMoment({
           )}
         </div>
 
-        {/* Titre + légende */}
+        {/* Titre + observations */}
         <div className="space-y-1.5">
           <h3 className="font-serif text-xl font-semibold tracking-tight text-foreground">
             {moment.title}
           </h3>
-          {cover?.legende && (
-            <p className="text-sm leading-relaxed text-muted-foreground">{cover.legende}</p>
+          {moment.observations ? (
+            <p className="text-sm leading-relaxed text-muted-foreground">{moment.observations}</p>
+          ) : (
+            cover?.legende && (
+              <p className="text-sm leading-relaxed text-muted-foreground">{cover.legende}</p>
+            )
           )}
         </div>
+
+        {/* Intervenants présents */}
+        {moment.intervenants && moment.intervenants.length > 0 && (
+          <p className="flex items-center gap-2 text-xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-gold-600">
+            <Users aria-hidden />
+            <span>Présents : {moment.intervenants.join(', ')}</span>
+          </p>
+        )}
+
+        {/* État / action de partage — conducteur uniquement */}
+        {canShare && (
+          <div className="border-t border-border pt-4">
+            {shared ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-success px-2.5 py-1 text-xs font-medium text-success-foreground [&_svg]:size-3.5">
+                <Send aria-hidden />
+                Partagé avec le client
+              </span>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5">
+                  <Lock aria-hidden />
+                  Moment interne
+                </span>
+                <button
+                  type="button"
+                  onClick={onShare}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-1.5 text-xs font-semibold text-paper-0 transition-transform hover:-translate-y-0.5 [&_svg]:size-3.5"
+                >
+                  <Send aria-hidden />
+                  Partager avec le client
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-border pt-4">
           <CoupDeCoeurButton active={hasCoup} onToggle={onToggleCoup} />
