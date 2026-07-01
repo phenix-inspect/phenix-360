@@ -16,6 +16,7 @@ import {
   EVENT_TYPE_LABEL,
   buildChantierAttention,
   reserveStatut,
+  reservesOuvertes,
   sortByDate,
   teamQueue,
   userId,
@@ -43,6 +44,7 @@ import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { HistoriqueView } from '../components/HistoriqueView';
 import { FilView } from '../components/fil/FilView';
+import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
 
@@ -72,11 +74,12 @@ export function CompagnonView({
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
-  const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'historique'>(
+  const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique'>(
     dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi',
   );
 
   const attention = buildChantierAttention(dossier, events);
+  const nbReservesOuvertes = reservesOuvertes(events).length;
 
   const askDocument = async (docId: string) => {
     if (!dossier) return;
@@ -137,12 +140,20 @@ export function CompagnonView({
 
       <Tabs
         value={tab}
-        onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'fil' | 'historique')}
+        onValueChange={(v) =>
+          setTab(v as 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique')
+        }
       >
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           {dossier && <TabsTrigger value="preparation">Préparation</TabsTrigger>}
           <TabsTrigger value="fil">Le Fil</TabsTrigger>
+          <TabsTrigger value="reserves">
+            <span className="flex items-center gap-1.5">
+              Réserves
+              {nbReservesOuvertes > 0 && <Badge variant="warning">{nbReservesOuvertes}</Badge>}
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="historique">Historique</TabsTrigger>
         </TabsList>
         <TabsContent value="suivi">{suivi}</TabsContent>
@@ -153,6 +164,15 @@ export function CompagnonView({
         )}
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />
+        </TabsContent>
+        <TabsContent value="reserves">
+          <ReservesView
+            snap={snap}
+            project={project}
+            events={events}
+            onLeverReserve={setLever}
+            onOpenFilPhoto={openFilPhoto}
+          />
         </TabsContent>
         <TabsContent value="historique">
           <HistoriqueView snap={snap} project={project} />
