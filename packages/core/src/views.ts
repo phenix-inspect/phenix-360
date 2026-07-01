@@ -8,6 +8,7 @@
  */
 import type { DocumentEvent, Event, PhotoEvent, DemandeEvent } from './event.js';
 import {
+  DEMANDE_PRIORITE_RANG,
   isCompteRendu,
   isDecision,
   isDemande,
@@ -65,6 +66,32 @@ export function teamQueue(events: Event[]): DemandeEvent[] {
     events.filter(isDemande).filter((e) => e.state === 'ouverte'),
     'asc',
   );
+}
+
+/** Une demande est ACTIVE tant qu'elle n'est ni répondue ni fermée. */
+export function isDemandeActive(e: DemandeEvent): boolean {
+  return e.state === 'ouverte' || e.state === 'en_cours';
+}
+
+/**
+ * Demandes adressées à l'ÉQUIPE (le poste de pilotage du conducteur), triées
+ * par priorité puis ancienneté. Lecture filtrée du journal — aucune duplication.
+ */
+export function teamDemandes(events: Event[]): DemandeEvent[] {
+  const demandes = events.filter(isDemande).filter((e) => e.content.destinataire === 'equipe');
+  return [...demandes].sort((a, b) => {
+    const active = Number(isDemandeActive(b)) - Number(isDemandeActive(a));
+    if (active !== 0) return active; // actives d'abord
+    const pa = DEMANDE_PRIORITE_RANG[a.content.priorite ?? 'normale'];
+    const pb = DEMANDE_PRIORITE_RANG[b.content.priorite ?? 'normale'];
+    if (pa !== pb) return pa - pb; // plus urgent d'abord
+    return a.createdAt.localeCompare(b.createdAt); // plus ancien d'abord
+  });
+}
+
+/** Nombre de demandes équipe encore à traiter (ouverte / en cours). */
+export function nbDemandesActives(events: Event[]): number {
+  return teamDemandes(events).filter(isDemandeActive).length;
 }
 
 /** Le récit client : tout le journal visible au client, récent d'abord. */

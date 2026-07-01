@@ -138,15 +138,16 @@ export function buildDemoSeed(): DemoSeed {
         libelle: 'Devis plomberie — lot sanitaire',
       },
     },
-    // Demande du client vers l'équipe (à traiter côté compagnon ; invisible au
-    // client tant que non résolue).
+    // Demande du client vers l'équipe, PRISE EN CHARGE (en cours) : priorité,
+    // responsable et timeline renseignés. Invisible au client tant que non
+    // répondue (le travail en cours ne fuit jamais).
     {
       id: eventId(uuid()),
       projectId: pid,
       type: 'demande',
       actor: cliente,
       visibility: 'client',
-      state: 'ouverte',
+      state: 'en_cours',
       captureId: null,
       createdAt: daysAgo(8),
       publishedBy: null,
@@ -155,6 +156,75 @@ export function buildDemoSeed(): DemoSeed {
         question:
           'Serait-il possible d’avancer la livraison de la cuisine si le planning le permet ?',
         destinataire: 'equipe',
+        priorite: 'haute',
+        responsable: 'Conducteur',
+        activites: [
+          {
+            kind: 'ouverture',
+            authorId: clientId,
+            authorRole: 'client',
+            at: daysAgo(8),
+          },
+          {
+            kind: 'statut',
+            authorId: compaId,
+            authorRole: 'compagnon',
+            at: daysAgo(7),
+            to: 'en_cours',
+            from: 'ouverte',
+          },
+          {
+            kind: 'commentaire',
+            authorId: compaId,
+            authorRole: 'compagnon',
+            at: daysAgo(7),
+            texte: 'Je vérifie le délai avec Mobalpa avant de confirmer.',
+          },
+        ],
+      },
+    },
+    // Demande du client vers l'équipe, DÉJÀ RÉPONDUE : le client voit la réponse
+    // (Q&A), le détail interne (timeline) reste côté conducteur.
+    {
+      id: eventId(uuid()),
+      projectId: pid,
+      type: 'demande',
+      actor: cliente,
+      visibility: 'client',
+      state: 'traitee',
+      captureId: null,
+      createdAt: daysAgo(9),
+      publishedBy: null,
+      publishedAt: null,
+      content: {
+        question: 'Les fenêtres seront-elles livrées avant la pose des cloisons ?',
+        destinataire: 'equipe',
+        priorite: 'normale',
+        responsable: 'Conducteur',
+        resolution: {
+          texte: 'Oui : livraison confirmée pour lundi, avant le démarrage des cloisons.',
+          resolvedBy: compaId,
+          resolvedAt: daysAgo(6),
+        },
+        activites: [
+          { kind: 'ouverture', authorId: clientId, authorRole: 'client', at: daysAgo(9) },
+          {
+            kind: 'statut',
+            authorId: compaId,
+            authorRole: 'compagnon',
+            at: daysAgo(8),
+            to: 'en_cours',
+            from: 'ouverte',
+          },
+          {
+            kind: 'reponse',
+            authorId: compaId,
+            authorRole: 'compagnon',
+            at: daysAgo(6),
+            to: 'traitee',
+            texte: 'Oui : livraison confirmée pour lundi, avant le démarrage des cloisons.',
+          },
+        ],
       },
     },
     photo(7, compagnon, 'Coulage de la dalle, séchage en cours', 'Salle de bain'),

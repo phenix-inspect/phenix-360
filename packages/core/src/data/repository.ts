@@ -8,6 +8,8 @@
 import type { CaptureId, EventId, ProjectId, ProjectMemberId, UserId } from '../ids.js';
 import type { EventActor, Role } from '../actor.js';
 import type {
+  DemandeActivite,
+  DemandePriorite,
   DemandeResolution,
   Event,
   EventContentByType,
@@ -63,6 +65,20 @@ export type NewEvent = {
   };
 }[EventType];
 
+/**
+ * Mise à jour du CYCLE DE VIE d'une demande (append-only sur la timeline).
+ * Chaque champ optionnel est appliqué s'il est fourni ; `activite` est TOUJOURS
+ * ajoutée (jamais d'écrasement de l'historique).
+ */
+export interface DemandePatch {
+  state?: EventState;
+  responsable?: string;
+  priorite?: DemandePriorite;
+  resolution?: DemandeResolution;
+  /** Entrée ajoutée à la timeline de la demande. */
+  activite?: DemandeActivite;
+}
+
 export interface EventRepository {
   listEvents(projectId: ProjectId): Promise<Event[]>;
   /** Crée un événement (brouillon ou publié selon `state`). */
@@ -71,6 +87,8 @@ export interface EventRepository {
   publishEvent(id: EventId, publishedBy: UserId): Promise<Event>;
   /** Résout une demande (réponse portée par la demande ; clôt le besoin). */
   resolveDemande(id: EventId, resolution: DemandeResolution): Promise<Event>;
+  /** Fait avancer une demande (statut, responsable, priorité, timeline). */
+  updateDemande(id: EventId, patch: DemandePatch): Promise<Event>;
 }
 
 /** Aperçu agrégé pratique (un backend implémente les deux ports). */

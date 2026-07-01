@@ -28,6 +28,8 @@ import {
   type AnnotationType,
   type BackendState,
   type CoupDeCoeur,
+  type DemandeActivite,
+  type DemandePriorite,
   type DemandeResolution,
   type EventActor,
   type EventId,
@@ -77,6 +79,21 @@ class LocalStorageKeyValueStore implements KeyValueStore {
 function readJson<T>(key: string, fallback: T): T {
   const raw = localStorage.getItem(key);
   return raw ? (JSON.parse(raw) as T) : fallback;
+}
+
+/** Fabrique une entrée de timeline de demande (auteur + horodatage). */
+function demandeActivite(
+  kind: DemandeActivite['kind'],
+  actor: EventActor,
+  extra: Partial<Omit<DemandeActivite, 'kind' | 'authorId' | 'authorRole' | 'at'>> = {},
+): DemandeActivite {
+  return {
+    kind,
+    authorId: actor.userId,
+    authorRole: actor.role,
+    at: new Date().toISOString(),
+    ...extra,
+  };
 }
 
 /** Snapshot exposé à React (immuable entre deux changements). */
@@ -187,6 +204,91 @@ export const demo = {
   publishEvent: (id: EventId, by: UserId) => mutate(backend.publishEvent(id, by)),
   resolveDemande: (id: EventId, resolution: DemandeResolution) =>
     mutate(backend.resolveDemande(id, resolution)),
+
+  /* ------------------------- Demandes (cycle de vie) -------------------------
+   * Toutes append-only : chaque action AJOUTE une entrée à la timeline de la
+   * demande (jamais d'écrasement de l'historique). Le journal reste la source. */
+
+  /** Prend en charge une demande (ouverte → en cours). */
+  async startDemande(id: EventId, actor: EventActor): Promise<void> {
+    const from = snapshot.events.find((e) => e.id === id)?.state;
+    await mutate(
+      backend.updateDemande(id, {
+        state: 'en_cours',
+        activite: demandeActivite('statut', actor, { to: 'en_cours', ...(from ? { from } : {}) }),
+      }),
+    );
+  },
+
+  /** Répond à une demande (→ répondue) : réponse portée + entrée timeline. */
+  async answerDemande(id: EventId, actor: EventActor, texte: string): Promise<void> {
+    const t = texte.trim();
+    if (!t) return;
+    const at = new Date().toISOString();
+    await mutate(
+      backend.updateDemande(id, {
+        state: 'traitee',
+        resolution: { texte: t, resolvedBy: actor.userId, resolvedAt: at },
+        activite: demandeActivite('reponse', actor, { texte: t, to: 'traitee' }),
+      }),
+    );
+  },
+
+  /** Ferme une demande (répondue → fermée). */
+  async closeDemande(id: EventId, actor: EventActor): Promise<void> {
+    const from = snapshot.events.find((e) => e.id === id)?.state;
+    await mutate(
+      backend.updateDemande(id, {
+        state: 'close',
+        activite: demandeActivite('statut', actor, { to: 'close', ...(from ? { from } : {}) }),
+      }),
+    );
+  },
+
+  /** Rouvre une demande (fermée/répondue → ouverte) — geste explicite. */
+  async reopenDemande(id: EventId, actor: EventActor): Promise<void> {
+    const from = snapshot.events.find((e) => e.id === id)?.state;
+    await mutate(
+      backend.updateDemande(id, {
+        state: 'ouverte',
+        activite: demandeActivite('statut', actor, { to: 'ouverte', ...(from ? { from } : {}) }),
+      }),
+    );
+  },
+
+  /** Ajoute un commentaire à la timeline d'une demande. */
+  async commentDemande(id: EventId, actor: EventActor, texte: string): Promise<void> {
+    const t = texte.trim();
+    if (!t) return;
+    await mutate(
+      backend.updateDemande(id, { activite: demandeActivite('commentaire', actor, { texte: t }) }),
+    );
+  },
+
+  /** Assigne un responsable à une demande. */
+  async assignDemande(id: EventId, actor: EventActor, responsable: string): Promise<void> {
+    const r = responsable.trim();
+    await mutate(
+      backend.updateDemande(id, {
+        responsable: r,
+        activite: demandeActivite('assignation', actor, { responsable: r }),
+      }),
+    );
+  },
+
+  /** Change la priorité d'une demande. */
+  async setDemandePriorite(
+    id: EventId,
+    actor: EventActor,
+    priorite: DemandePriorite,
+  ): Promise<void> {
+    await mutate(
+      backend.updateDemande(id, {
+        priorite,
+        activite: demandeActivite('priorite', actor, { priorite }),
+      }),
+    );
+  },
 
   /**
    * Crée le projet À PARTIR de la proposition validée par l'humain (PHÉNIX
