@@ -68,6 +68,9 @@ export const MOMENT_TYPES = [
   'reunion',
   'visite',
   'livraison',
+  'prereception',
+  'reception',
+  'sav',
   'note',
   'decision',
   'etape',
@@ -78,6 +81,9 @@ export const MOMENT_TYPE_LABEL: Record<MomentType, string> = {
   reunion: 'Réunion de chantier',
   visite: 'Visite de chantier',
   livraison: 'Livraison',
+  prereception: 'Pré-réception',
+  reception: 'Réception',
+  sav: 'SAV',
   note: 'Note de chantier',
   decision: 'Décision',
   etape: 'Étape franchie',
@@ -88,6 +94,9 @@ export const MOMENT_TYPE_SHORT: Record<MomentType, string> = {
   reunion: 'Réunion',
   visite: 'Visite',
   livraison: 'Livraison',
+  prereception: 'Pré-réception',
+  reception: 'Réception',
+  sav: 'SAV',
   note: 'Note',
   decision: 'Décision',
   etape: 'Étape',
@@ -162,9 +171,10 @@ export interface Moment {
   /** Qui voit ce Moment (interne par défaut ; + client une fois partagé). */
   visibleTo: AudienceGroup[];
 
-  /** 1 photo au minimum en V1 ; le tableau est prêt pour l'album. */
+  /** Les photos de la mission (le tableau est prêt pour l'album). Peut être vide
+   *  (une note ou une réunion sans photo reste un Moment valide). */
   photos: FilPhoto[];
-  coverPhotoId: FilPhotoId;
+  coverPhotoId?: FilPhotoId;
 
   /* — Réservés (modèle prêt, UI en phases suivantes) — */
   meteo?: string;

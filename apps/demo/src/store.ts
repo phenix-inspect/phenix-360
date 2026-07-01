@@ -38,6 +38,8 @@ import {
   type FilPhoto,
   type KeyValueStore,
   type Message,
+  type MissionKind,
+  type MissionPreparation,
   type Moment,
   type MomentType,
   type NewEvent,
@@ -71,6 +73,16 @@ const FIL_ZONES_KEY = 'phenix-demo:fil-zones:v1';
 const FIL_ANNOTATIONS_KEY = 'phenix-demo:fil-annotations:v1';
 // PHÉNIX (conversation client) — agrégat léger, distinct du Journal.
 const PHENIX_CONV_KEY = 'phenix-demo:phenix-conv:v1';
+// Gestion du chantier — journal des partages (simulation / aperçu, hors Journal).
+const SHARES_KEY = 'phenix-demo:shares:v1';
+
+/** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
+export interface ShareLog {
+  id: string;
+  missionEventId: string;
+  audiences: string[];
+  at: string;
+}
 
 /** Un message du fil de conversation PHÉNIX (côté client). */
 export interface PhenixMessage {
@@ -131,6 +143,8 @@ export interface DemoSnapshot extends BackendState {
   };
   /** Conversation PHÉNIX (par projet) — fil client, distinct du Journal. */
   phenix: Record<string, PhenixMessage[]>;
+  /** Journal des partages (par projet) — aperçu / simulation, hors Journal. */
+  shares: Record<string, ShareLog[]>;
   /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
   filTarget: { momentId: string; photoId?: string } | null;
   /** Cible transitoire : navigation PHÉNIX dans l'Espace client. */
@@ -163,6 +177,7 @@ function build(): DemoSnapshot {
       annotations: readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {}),
     },
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
+    shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
     filTarget,
     clientTarget,
   };
@@ -684,6 +699,164 @@ export const demo = {
     broadcast();
   },
 
+  /* ------------------------- Gestion du chantier ------------------------- */
+
+  /**
+   * Crée une MISSION (le geste unique du conducteur). Le contexte = un Moment
+   * (type = mission), INTERNE par défaut. PHÉNIX a préparé (`prepared`) ; on
+   * matérialise les FAITS dans le Journal (append-only) : 1 `compte_rendu` (le
+   * fait de la mission, avec sa structure) + N `reserve` (points à reprendre).
+   * Aucune donnée n'atteint le client tant qu'on ne partage pas.
+   */
+  async createMission(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: {
+      kind: MissionKind;
+      medias: UploadedMedia[];
+      recit: string;
+      presents: string[];
+      zoneId?: ZoneId;
+      prepared: MissionPreparation;
+    },
+  ): Promise<{ missionEventId: string; momentId: string }> {
+    const now = new Date().toISOString();
+    const momentId = toMomentId(crypto.randomUUID());
+
+    // 1) Le contexte : un Moment interne (photos + récit + présents).
+    const photos: FilPhoto[] = input.medias.map((m, i) => ({
+      id: toFilPhotoId(crypto.randomUUID()),
+      imageUrl: m.imageUrl,
+      bucket: m.bucket,
+      storagePath: m.storagePath,
+      mimeType: m.mimeType,
+      width: m.width,
+      height: m.height,
+      ordre: i,
+      createdAt: now,
+    }));
+    const recit = input.recit.trim();
+    const presents = input.prepared.presents;
+    const moment: Moment = {
+      id: momentId,
+      projectId,
+      authorId: actor.userId,
+      authorRole: actor.role,
+      createdAt: now,
+      publishedAt: now,
+      state: 'publie',
+      type: input.kind,
+      title: input.prepared.docTitre,
+      visibleTo: INTERNAL_AUDIENCE,
+      photos,
+      ...(photos[0] ? { coverPhotoId: photos[0].id } : {}),
+      ...(recit ? { observations: recit } : {}),
+      ...(presents.length ? { intervenants: presents } : {}),
+      ...(input.zoneId ? { zoneId: input.zoneId } : {}),
+    };
+    const momentsMap = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
+    momentsMap[projectId] = [...(momentsMap[projectId] ?? []), moment];
+    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(momentsMap));
+
+    // 2) Le fait « compte rendu » de la mission (interne).
+    const crEvent = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'compte_rendu',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        texte: input.prepared.corps,
+        missionKind: input.kind,
+        docTitre: input.prepared.docTitre,
+        momentId,
+        ...(presents.length ? { presents } : {}),
+        ...(input.prepared.decisions.length ? { decisions: input.prepared.decisions } : {}),
+        ...(input.prepared.actions.length ? { actions: input.prepared.actions } : {}),
+        ...(input.prepared.manquants.length ? { manquants: input.prepared.manquants } : {}),
+        texteClient: input.prepared.texteClient,
+      },
+    });
+
+    // 3) Les faits « réserve » (append-only, numérotés, liés à la photo source).
+    let numero = nextReserveNumero(snapshot.events.filter((e) => e.projectId === projectId));
+    for (const r of input.prepared.reserves) {
+      await backend.appendEvent({
+        projectId,
+        actor,
+        type: 'reserve',
+        visibility: 'interne',
+        state: 'ouverte',
+        content: {
+          numero,
+          libelle: r.libelle,
+          source: {
+            kind: 'fil',
+            momentId,
+            ...(r.photoId ? { photoId: r.photoId } : {}),
+          },
+        },
+      });
+      numero += 1;
+    }
+
+    refresh();
+    broadcast();
+    return { missionEventId: crEvent.id, momentId };
+  },
+
+  /**
+   * PARTAGER une mission. « Partager » est une ACTION, jamais un objet. Vers le
+   * CLIENT : on émet une projection CLIENT-SAFE (la voix client) + on partage les
+   * photos ; jamais de réserve, responsable ni donnée interne. Vers les autres
+   * audiences (artisan, architecte, BC, MOE, investisseur) : simulation /
+   * journalisation / aperçu (pas d'envoi mail réel, pas de signature réelle).
+   */
+  async shareMission(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: {
+      missionEventId: string;
+      momentId: string;
+      audiences: string[];
+      texteClient: string;
+      docTitre: string;
+    },
+  ): Promise<void> {
+    if (input.audiences.includes('client')) {
+      // Projection CLIENT-SAFE : uniquement un compte rendu en voix client. Le
+      // Moment (photos + récit brut interne) N'EST JAMAIS partagé tel quel — il
+      // contient des observations internes (actions, réserves) qui ne doivent
+      // pas fuiter. Le client ne voit que ce texte reformulé et neutre.
+      await backend.appendEvent({
+        projectId,
+        actor,
+        type: 'compte_rendu',
+        visibility: 'client',
+        state: 'publie',
+        content: {
+          texte: input.texteClient,
+          docTitre: input.docTitre,
+        },
+      });
+    }
+
+    // Journalisation du partage (aperçu / simulation) pour toutes les audiences.
+    const shares = readJson<Record<string, ShareLog[]>>(SHARES_KEY, {});
+    shares[projectId] = [
+      ...(shares[projectId] ?? []),
+      {
+        id: crypto.randomUUID(),
+        missionEventId: input.missionEventId,
+        audiences: input.audiences,
+        at: new Date().toISOString(),
+      },
+    ];
+    localStorage.setItem(SHARES_KEY, JSON.stringify(shares));
+    refresh();
+    broadcast();
+  },
+
   /**
    * PHÉNIX répond au client (B1). Le fil de conversation est un agrégat léger
    * (hors Journal). PHÉNIX ne répond QUE s'il a une donnée fiable ; sinon il
@@ -768,6 +941,7 @@ export const demo = {
     localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(fil.annotations));
     localStorage.removeItem(PHENIX_CONV_KEY);
+    localStorage.removeItem(SHARES_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -786,6 +960,7 @@ export const demo = {
     localStorage.removeItem(FIL_ZONES_KEY);
     localStorage.removeItem(FIL_ANNOTATIONS_KEY);
     localStorage.removeItem(PHENIX_CONV_KEY);
+    localStorage.removeItem(SHARES_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();

@@ -22,6 +22,7 @@ import {
   userId,
   type Event,
   type EventActor,
+  type MissionKind,
   type Project,
   type ReserveEvent,
 } from '@phenix360/core';
@@ -48,7 +49,8 @@ import { FilView } from '../components/fil/FilView';
 import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
-import { MomentComposer } from '../components/fil/MomentComposer';
+import { MissionPicker } from '../components/mission/MissionPicker';
+import { MissionFlow } from '../components/mission/MissionFlow';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'compagnon');
@@ -74,7 +76,8 @@ export function CompagnonView({
   const dossier = dossierOf(snap, project.id);
   const zones = filOf(snap, project.id).zones;
   const [composer, setComposer] = useState<ComposerKind | null>(null);
-  const [creatingMoment, setCreatingMoment] = useState(false);
+  const [missionPicker, setMissionPicker] = useState(false);
+  const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
@@ -133,8 +136,8 @@ export function CompagnonView({
             <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
           </div>
-          <Button size="lg" onClick={() => setCreatingMoment(true)}>
-            <Plus aria-hidden /> Créer un moment
+          <Button size="lg" onClick={() => setMissionPicker(true)}>
+            <Plus aria-hidden /> Nouvelle mission
           </Button>
         </div>
         <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} compact />
@@ -198,12 +201,23 @@ export function CompagnonView({
 
       {lever && <ReserveLeveeDialog reserve={lever} actor={actor} onClose={() => setLever(null)} />}
 
-      {creatingMoment && (
-        <MomentComposer
+      {missionPicker && (
+        <MissionPicker
+          onSelect={(kind) => {
+            setMissionKind(kind);
+            setMissionPicker(false);
+          }}
+          onClose={() => setMissionPicker(false)}
+        />
+      )}
+
+      {missionKind && (
+        <MissionFlow
+          kind={missionKind}
           project={project}
           actor={actor}
           zones={zones}
-          onClose={() => setCreatingMoment(false)}
+          onClose={() => setMissionKind(null)}
         />
       )}
     </div>

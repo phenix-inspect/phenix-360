@@ -72,6 +72,24 @@ export interface CompteRenduContent {
   etapeProposee?: ProjectStep;
   /** Étape confirmée à la validation — jamais un pourcentage (ADR-004 §4). */
   etapeConfirmee?: ProjectStep;
+
+  /* — Gestion du chantier (mission) : champs OPTIONNELS, additifs — */
+  /** Mission dont ce fait est issu (visite, réunion, réception…). */
+  missionKind?: string;
+  /** Titre du document projeté (« PV de réception », « Fiche SAV »…). */
+  docTitre?: string;
+  /** Intervenants présents (réunion / réception). */
+  presents?: string[];
+  /** Décisions prises, extraites par PHÉNIX et validées. */
+  decisions?: string[];
+  /** Actions à suivre. */
+  actions?: { label: string; responsable?: string }[];
+  /** Manquants / dommages relevés (livraison). */
+  manquants?: string[];
+  /** Version cliente (voix client) — utilisée à la projection espace client. */
+  texteClient?: string;
+  /** Lien vers le Moment (contexte) d'origine. */
+  momentId?: string;
 }
 
 export interface PhotoContent {
