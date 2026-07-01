@@ -1,0 +1,1313 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PHÉNIX 360 — Documentation produit</title>
+    <style>
+      :root {
+        --bg: #fbfaf7;
+        --surface: #ffffff;
+        --surface-2: #f6f2ea;
+        --ink: #1a1712;
+        --muted: #726b5d;
+        --line: #ece6d9;
+        --gold: #a9803a;
+        --gold-2: #c99a3d;
+        --gold-soft: #f5ecd8;
+        --green: #3f7a52;
+        --green-soft: #e7f1e9;
+        --amber: #9a6b16;
+        --amber-soft: #f6ecd4;
+        --blue: #3d6a8f;
+        --blue-soft: #e7eef4;
+        --radius: 18px;
+        --shadow: 0 1px 2px rgba(26, 23, 18, 0.04), 0 8px 30px rgba(26, 23, 18, 0.06);
+        --shadow-lg: 0 2px 8px rgba(26, 23, 18, 0.06), 0 24px 60px rgba(26, 23, 18, 0.1);
+        --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', Roboto,
+          Helvetica, Arial, sans-serif;
+        --serif: 'New York', 'Iowan Old Style', 'Palatino Linotype', 'Newsreader', Georgia, serif;
+        --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, 'Menlo', monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      /* ---------- Layout ---------- */
+      .shell {
+        display: grid;
+        grid-template-columns: 268px 1fr;
+        min-height: 100vh;
+      }
+      .sidebar {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        overflow-y: auto;
+        border-right: 1px solid var(--line);
+        background: rgba(251, 250, 247, 0.86);
+        backdrop-filter: saturate(160%) blur(14px);
+        padding: 28px 20px 40px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 8px 22px;
+      }
+      .brand .mark {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        background: linear-gradient(145deg, #2a2318, #0f0c07);
+        display: grid;
+        place-items: center;
+        color: var(--gold-2);
+        font-family: var(--serif);
+        font-weight: 700;
+        box-shadow: var(--shadow);
+      }
+      .brand b {
+        font-family: var(--serif);
+        font-size: 17px;
+        letter-spacing: 0.2px;
+      }
+      .brand small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.3px;
+      }
+      nav.toc {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      nav.toc a {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 12px;
+        border-radius: 10px;
+        color: var(--muted);
+        font-size: 13.5px;
+        font-weight: 500;
+        transition: background 0.2s, color 0.2s;
+      }
+      nav.toc a .n {
+        font-variant-numeric: tabular-nums;
+        font-size: 11px;
+        color: var(--gold);
+        width: 16px;
+      }
+      nav.toc a:hover {
+        background: var(--surface-2);
+        color: var(--ink);
+      }
+      nav.toc a.active {
+        background: var(--gold-soft);
+        color: var(--ink);
+      }
+      nav.toc a.active .n {
+        color: var(--gold);
+      }
+
+      main {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 72px 40px 140px;
+      }
+      section {
+        margin-bottom: 108px;
+        scroll-margin-top: 40px;
+      }
+      .kicker {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.4px;
+        text-transform: uppercase;
+        color: var(--gold);
+        margin-bottom: 14px;
+      }
+      h1 {
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: clamp(38px, 6vw, 64px);
+        line-height: 1.04;
+        letter-spacing: -0.02em;
+        margin: 0 0 18px;
+      }
+      h2 {
+        font-family: var(--serif);
+        font-weight: 600;
+        font-size: clamp(27px, 3.6vw, 38px);
+        letter-spacing: -0.01em;
+        margin: 0 0 10px;
+      }
+      h3 {
+        font-size: 19px;
+        font-weight: 650;
+        margin: 0 0 6px;
+      }
+      .lead {
+        font-size: clamp(17px, 2vw, 20px);
+        color: var(--muted);
+        max-width: 62ch;
+      }
+      p {
+        color: #35302699;
+        color: #3a352c;
+      }
+      .section-intro {
+        color: var(--muted);
+        max-width: 66ch;
+        margin: 0 0 34px;
+      }
+
+      /* ---------- Hero ---------- */
+      .hero {
+        margin-bottom: 96px;
+        padding-top: 12px;
+      }
+      .hero .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 26px;
+      }
+      .pill {
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+      }
+      .pill.gold {
+        background: var(--gold-soft);
+        border-color: transparent;
+        color: var(--amber);
+      }
+
+      /* ---------- Cards / grid ---------- */
+      .grid {
+        display: grid;
+        gap: 18px;
+      }
+      .grid.cols-2 {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .grid.cols-3 {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 22px;
+        box-shadow: var(--shadow);
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+      }
+      .card:hover {
+        transform: translateY(-3px);
+        box-shadow: var(--shadow-lg);
+      }
+      .card .top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .ico {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: var(--gold-soft);
+        color: var(--gold);
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .ico svg {
+        width: 20px;
+        height: 20px;
+      }
+      .badge {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        padding: 3px 9px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .b-ok {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+      .b-soon {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+      .b-plan {
+        background: var(--surface-2);
+        color: var(--muted);
+      }
+      .b-int {
+        background: #efe9df;
+        color: #6b5b3a;
+      }
+      .b-cli {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .fiche dl {
+        margin: 14px 0 0;
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 6px 14px;
+        font-size: 14px;
+      }
+      .fiche dt {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .fiche dd {
+        margin: 0;
+        color: #3a352c;
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        font-size: 12px;
+        padding: 3px 9px;
+        border-radius: 8px;
+        background: var(--surface-2);
+        color: var(--muted);
+      }
+
+      /* ---------- Global map ---------- */
+      .map {
+        background: linear-gradient(180deg, #ffffff, #fbf7ee);
+        border: 1px solid var(--line);
+        border-radius: 24px;
+        padding: 40px 24px;
+        box-shadow: var(--shadow);
+        overflow-x: auto;
+      }
+      .map-rows {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 30px;
+        min-width: 560px;
+      }
+      .map-row {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .node {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        border-radius: 14px;
+        padding: 13px 20px;
+        font-weight: 600;
+        font-size: 14px;
+        min-width: 130px;
+        text-align: center;
+        box-shadow: var(--shadow);
+        transition: transform 0.2s, border-color 0.2s, background 0.2s;
+      }
+      .node small {
+        display: block;
+        font-weight: 500;
+        color: var(--muted);
+        font-size: 11.5px;
+      }
+      .node:hover {
+        transform: translateY(-3px);
+        border-color: var(--gold-2);
+        background: #fffdf8;
+      }
+      .node.core {
+        background: linear-gradient(145deg, #2a2318, #100c07);
+        color: #f4e9d2;
+        border-color: transparent;
+      }
+      .node.core small {
+        color: #d9c493;
+      }
+      .node.accent {
+        background: var(--gold-soft);
+        border-color: transparent;
+      }
+      .connector {
+        width: 1px;
+        height: 22px;
+        background: linear-gradient(var(--gold-2), transparent);
+      }
+      .rail {
+        width: min(520px, 80%);
+        height: 1px;
+        background: var(--line);
+      }
+
+      /* ---------- Flow diagrams ---------- */
+      .flow {
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        align-items: stretch;
+      }
+      .flow .step {
+        display: grid;
+        grid-template-columns: 190px 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+      .flow .node2 {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-weight: 600;
+        text-align: center;
+        box-shadow: var(--shadow);
+      }
+      .flow .node2.gold {
+        background: var(--gold-soft);
+        border-color: transparent;
+        color: var(--amber);
+      }
+      .flow .node2.dark {
+        background: #22201a;
+        color: #f0e6d0;
+        border-color: transparent;
+      }
+      .flow .why {
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .flow .arrow {
+        grid-column: 1;
+        justify-self: center;
+        height: 26px;
+        width: 2px;
+        background: var(--gold-2);
+        position: relative;
+        opacity: 0.55;
+      }
+      .flow .arrow::after {
+        content: '';
+        position: absolute;
+        bottom: -1px;
+        left: -3px;
+        border: 4px solid transparent;
+        border-top-color: var(--gold-2);
+      }
+
+      /* ---------- Data model nesting ---------- */
+      .nest {
+        --pad: 14px;
+      }
+      .nest .lvl {
+        border-left: 2px solid var(--gold-soft);
+        margin-left: 8px;
+        padding-left: 16px;
+        margin-top: 8px;
+      }
+      .obj {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px 14px;
+        font-weight: 600;
+        box-shadow: var(--shadow);
+      }
+      .obj .k {
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--gold);
+        background: var(--gold-soft);
+        padding: 1px 7px;
+        border-radius: 6px;
+      }
+      .obj em {
+        font-style: normal;
+        color: var(--muted);
+        font-weight: 500;
+        font-size: 12.5px;
+      }
+
+      /* ---------- Tabs (workflows) ---------- */
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 26px;
+      }
+      .tab {
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--muted);
+        border-radius: 999px;
+        padding: 8px 15px;
+        font-size: 13px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      .tab:hover {
+        color: var(--ink);
+      }
+      .tab.active {
+        background: #22201a;
+        color: #f4e9d2;
+        border-color: transparent;
+      }
+      .panel {
+        display: none;
+        animation: fade 0.4s ease;
+      }
+      .panel.active {
+        display: block;
+      }
+      @keyframes fade {
+        from {
+          opacity: 0;
+          transform: translateY(6px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      .timeline {
+        position: relative;
+        margin-left: 6px;
+        padding-left: 26px;
+      }
+      .timeline::before {
+        content: '';
+        position: absolute;
+        left: 6px;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background: var(--gold-soft);
+      }
+      .tl-item {
+        position: relative;
+        padding: 0 0 22px;
+      }
+      .tl-item::before {
+        content: '';
+        position: absolute;
+        left: -26px;
+        top: 3px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--surface);
+        border: 2px solid var(--gold-2);
+      }
+      .tl-item b {
+        display: block;
+        font-size: 15px;
+      }
+      .tl-item span {
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+
+      /* ---------- Tables ---------- */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 13px 16px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        background: var(--surface-2);
+        font-size: 12px;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      td b {
+        font-weight: 650;
+      }
+      .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        margin-right: 7px;
+        vertical-align: middle;
+      }
+      .d-yes {
+        background: var(--green);
+      }
+      .d-no {
+        background: #d9d2c4;
+      }
+      .d-part {
+        background: var(--gold-2);
+      }
+
+      /* ---------- Truth callouts ---------- */
+      .truth {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .truth .card b {
+        color: var(--gold);
+      }
+
+      /* ---------- Reveal animation ---------- */
+      .reveal {
+        opacity: 0;
+        transform: translateY(16px);
+        transition: opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+          transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+      }
+      .reveal.in {
+        opacity: 1;
+        transform: none;
+      }
+      .flash {
+        animation: flash 1.3s ease;
+      }
+      @keyframes flash {
+        0%,
+        100% {
+          box-shadow: var(--shadow);
+        }
+        30% {
+          box-shadow: 0 0 0 3px var(--gold-2), var(--shadow-lg);
+        }
+      }
+
+      /* ---------- Mobile ---------- */
+      .menu-btn {
+        display: none;
+      }
+      @media (max-width: 900px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          position: fixed;
+          z-index: 50;
+          left: 0;
+          top: 0;
+          width: 280px;
+          transform: translateX(-102%);
+          transition: transform 0.3s ease;
+          box-shadow: var(--shadow-lg);
+        }
+        .sidebar.open {
+          transform: none;
+        }
+        .menu-btn {
+          display: inline-flex;
+          position: fixed;
+          z-index: 60;
+          top: 16px;
+          left: 16px;
+          width: 44px;
+          height: 44px;
+          border-radius: 12px;
+          border: 1px solid var(--line);
+          background: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(8px);
+          align-items: center;
+          justify-content: center;
+          box-shadow: var(--shadow);
+          cursor: pointer;
+        }
+        main {
+          padding: 78px 20px 100px;
+        }
+        .grid.cols-2,
+        .grid.cols-3,
+        .truth {
+          grid-template-columns: 1fr;
+        }
+        .flow .step {
+          grid-template-columns: 150px 1fr;
+        }
+        .fiche dl {
+          grid-template-columns: 100px 1fr;
+        }
+      }
+      .scrim {
+        display: none;
+      }
+      .scrim.on {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 17, 12, 0.35);
+        z-index: 40;
+      }
+      footer {
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--line);
+        padding-top: 26px;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round"/></svg>
+    </button>
+    <div class="scrim" id="scrim"></div>
+
+    <div class="shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <span class="mark">P</span>
+          <span>
+            <b>PHÉNIX 360</b>
+            <small>Documentation produit</small>
+          </span>
+        </div>
+        <nav class="toc" id="toc">
+          <a href="#top"><span class="n">◆</span> Vue d'ensemble</a>
+          <a href="#carte"><span class="n">1</span> Carte globale</a>
+          <a href="#briques"><span class="n">2</span> Les briques</a>
+          <a href="#flux"><span class="n">3</span> Les communications</a>
+          <a href="#modeles"><span class="n">4</span> Modèles de données</a>
+          <a href="#workflows"><span class="n">5</span> Workflows</a>
+          <a href="#vues"><span class="n">6</span> Les vues</a>
+          <a href="#verite"><span class="n">7</span> Sources de vérité</a>
+          <a href="#visibilite"><span class="n">8</span> Ce qui est visible</a>
+          <a href="#roadmap"><span class="n">9</span> Roadmap</a>
+          <a href="#prochaines"><span class="n">10</span> Prochaines briques</a>
+          <a href="#vision"><span class="n">11</span> Vision finale</a>
+        </nav>
+      </aside>
+
+      <main>
+        <!-- ===================== HERO ===================== -->
+        <section id="top" class="hero reveal">
+          <span class="kicker">Poste de pilotage premium</span>
+          <h1>Tout PHÉNIX 360,<br />sans lire une ligne de code.</h1>
+          <p class="lead">
+            PHÉNIX 360 est le poste de pilotage d'un conducteur de travaux, doublé d'un espace
+            client simple et rassurant. Un seul principe fondateur : le <b>Journal</b> est la
+            source de vérité, tout le reste n'en est qu'une lecture. Ce document présente chaque
+            brique, comment elles se parlent, ce que chacun voit, et où va le produit.
+          </p>
+          <div class="badges">
+            <span class="pill gold">1 conducteur pilote</span>
+            <span class="pill">1 client rassuré</span>
+            <span class="pill">Artisans hors application</span>
+            <span class="pill">Append-only</span>
+            <span class="pill">Aucune duplication</span>
+            <span class="pill">Ce n'est pas un ERP</span>
+          </div>
+        </section>
+
+        <!-- ===================== 1. CARTE GLOBALE ===================== -->
+        <section id="carte" class="reveal">
+          <span class="kicker">01 — Carte globale</span>
+          <h2>L'architecture en un coup d'œil</h2>
+          <p class="section-intro">
+            Le projet est au sommet. Tout descend du <b>Journal</b>. Les modules ne sont pas des
+            silos : ce sont des lectures du même flux. Cliquez sur un bloc pour ouvrir sa fiche.
+          </p>
+          <div class="map">
+            <div class="map-rows">
+              <div class="map-row">
+                <div class="node core" data-target="b-journal">PROJET<small>1 chantier = 1 journal</small></div>
+              </div>
+              <div class="connector"></div>
+              <div class="map-row">
+                <div class="node" data-target="b-journal">Journal<small>colonne vertébrale</small></div>
+                <div class="node" data-target="b-fil">Le Fil<small>photos du chantier</small></div>
+                <div class="node" data-target="b-prep">Préparation<small>PHÉNIX Start</small></div>
+              </div>
+              <div class="map-row">
+                <div class="node" data-target="b-reserves">Réserves<small>points à reprendre</small></div>
+                <div class="node" data-target="b-biblio">Bibliothèque<small>vue dérivée</small></div>
+                <div class="node" data-target="b-decisions">Décisions client<small>choix & validations</small></div>
+              </div>
+              <div class="map-row">
+                <div class="node" data-target="b-levees">Levées<small>preuve + note</small></div>
+                <div class="node" data-target="b-annotations">Annotations<small>sur photo</small></div>
+                <div class="node" data-target="b-historique">Historique<small>jalons</small></div>
+              </div>
+              <div class="rail"></div>
+              <div class="map-row">
+                <div class="node accent" data-target="b-surveille">PHÉNIX surveille votre chantier<small>le radar « quoi faire »</small></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== 2. LES BRIQUES ===================== -->
+        <section id="briques" class="reveal">
+          <span class="kicker">02 — Les briques</span>
+          <h2>Une fiche par module</h2>
+          <p class="section-intro">
+            Pour chaque brique : sa mission, pourquoi elle existe, qui l'utilise, ses entrées /
+            sorties, avec qui elle communique, sa valeur métier, et sa visibilité.
+          </p>
+          <div class="grid cols-2" id="fiches"></div>
+        </section>
+
+        <!-- ===================== 3. COMMUNICATIONS ===================== -->
+        <section id="flux" class="reveal">
+          <span class="kicker">03 — Les communications</span>
+          <h2>Comment l'information circule</h2>
+          <p class="section-intro">
+            Rien n'est recopié : chaque étape écrit ou lit le Journal. Voici les deux grands
+            circuits, chaque flèche expliquée.
+          </p>
+
+          <h3 style="margin-top:8px">Circuit A — De la photo à l'historique (Réserve)</h3>
+          <div class="flow" style="margin:16px 0 40px" id="flowA"></div>
+
+          <h3>Circuit B — De la préparation à la surveillance (Décision)</h3>
+          <div class="flow" id="flowB"></div>
+        </section>
+
+        <!-- ===================== 4. MODELES DE DONNEES ===================== -->
+        <section id="modeles" class="reveal">
+          <span class="kicker">04 — Modèles de données</span>
+          <h2>Les objets, simplement</h2>
+          <p class="section-intro">
+            Sans code : juste ce qui contient quoi. Deux familles cohabitent — l'<b>Événement</b>
+            (le Journal) et le <b>Moment</b> (Le Fil) — reliées par des références, jamais par des
+            copies.
+          </p>
+          <div class="grid cols-2">
+            <div class="card">
+              <h3>L'Événement <em style="color:var(--muted);font-weight:500">— le Journal</em></h3>
+              <div class="nest" style="margin-top:14px">
+                <span class="obj"><span class="k">Event</span> enveloppe commune <em>+ auteur, date, visibilité, statut</em></span>
+                <div class="lvl">
+                  <span class="obj"><span class="k">type</span> compte-rendu · photo · document</span>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">demande</span> question <em>→ réponse</em></span>
+                  </div>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">decision</span> choix client <em>(envoyée, validée…)</em></span>
+                  </div>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">reserve</span> n°, libellé, responsable, échéance</span>
+                  </div>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">levee</span> preuve, note <em>→ pointe vers la réserve</em></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <h3>Le Moment <em style="color:var(--muted);font-weight:500">— Le Fil</em></h3>
+              <div class="nest" style="margin-top:14px">
+                <span class="obj"><span class="k">Moment</span> un instant partagé <em>+ zone, couverture</em></span>
+                <div class="lvl">
+                  <span class="obj"><span class="k">photos[]</span> une ou plusieurs (album)</span>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">annotations[]</span> calque sur la photo</span>
+                    <div class="lvl">
+                      <span class="obj"><span class="k">action</span> → crée une <b>réserve</b> (Journal)</span>
+                    </div>
+                  </div>
+                  <div class="lvl">
+                    <span class="obj"><span class="k">messages[]</span> « un petit mot »</span>
+                  </div>
+                </div>
+              </div>
+              <p style="font-size:13px;color:var(--muted);margin-top:14px">
+                La <b>Bibliothèque</b> n'est pas un objet : c'est la liste des photos de tous les
+                Moments, à plat. « 1 partage = 2 vues ».
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== 5. WORKFLOWS ===================== -->
+        <section id="workflows" class="reveal">
+          <span class="kicker">05 — Workflows</span>
+          <h2>Les parcours, étape par étape</h2>
+          <p class="section-intro">Choisissez un workflow. Chaque étape est une action réelle du produit.</p>
+          <div class="tabs" id="wfTabs"></div>
+          <div id="wfPanels"></div>
+        </section>
+
+        <!-- ===================== 6. LES VUES ===================== -->
+        <section id="vues" class="reveal">
+          <span class="kicker">06 — Les vues</span>
+          <h2>Chaque écran, ce qu'il montre et pourquoi</h2>
+          <p class="section-intro">Une vue ne stocke rien. Elle lit le Journal (et le Fil) et met en forme.</p>
+          <table>
+            <thead>
+              <tr><th>Vue</th><th>Pour qui</th><th>Ce qu'on voit</th><th>Alimentée par</th></tr>
+            </thead>
+            <tbody id="vuesBody"></tbody>
+          </table>
+        </section>
+
+        <!-- ===================== 7. SOURCES DE VERITE ===================== -->
+        <section id="verite" class="reveal">
+          <span class="kicker">07 — Sources de vérité</span>
+          <h2>D'où vient chaque information</h2>
+          <p class="section-intro">
+            Une règle d'or : <b>on ne stocke jamais deux fois la même chose</b>. Un statut n'est
+            pas enregistré, il est calculé à la lecture.
+          </p>
+          <div class="truth">
+            <div class="card"><b>Le Journal</b><p style="margin:8px 0 0">La source unique. Toutes les vues lisent ici. On ajoute, on n'efface pas (append-only).</p></div>
+            <div class="card"><b>Une Réserve</b><p style="margin:8px 0 0">Vit dans le Journal, comme un événement. Sa vue dédiée n'est qu'une lecture filtrée.</p></div>
+            <div class="card"><b>Le statut « levée »</b><p style="margin:8px 0 0">Jamais stocké. Calculé : une réserve est « levée » s'il existe un événement de levée qui la vise.</p></div>
+            <div class="card"><b>L'avancement</b><p style="margin:8px 0 0">Déduit du dernier compte-rendu confirmé. Aucun pourcentage saisi à la main.</p></div>
+            <div class="card"><b>Le Fil</b><p style="margin:8px 0 0">Agrégat distinct du Journal (l'espace de vie photo), persisté à part, relié par références.</p></div>
+            <div class="card"><b>La visibilité client</b><p style="margin:8px 0 0">Une seule règle décide de ce que le client voit. Les vues n'improvisent jamais.</p></div>
+          </div>
+        </section>
+
+        <!-- ===================== 8. VISIBILITE ===================== -->
+        <section id="visibilite" class="reveal">
+          <span class="kicker">08 — Ce qui est visible</span>
+          <h2>Qui voit quoi</h2>
+          <p class="section-intro">
+            <span class="dot d-yes"></span>visible &nbsp; <span class="dot d-part"></span>partiel / conditionnel &nbsp;
+            <span class="dot d-no"></span>masqué. L'artisan n'utilise pas l'application (aujourd'hui et demain).
+          </p>
+          <table>
+            <thead>
+              <tr><th>Brique</th><th>Conducteur</th><th>Client</th><th>Interne</th><th>Artisan</th></tr>
+            </thead>
+            <tbody id="visBody"></tbody>
+          </table>
+        </section>
+
+        <!-- ===================== 9. ROADMAP ===================== -->
+        <section id="roadmap" class="reveal">
+          <span class="kicker">09 — Roadmap</span>
+          <h2>Ce qui est fait, en cours, prévu</h2>
+          <p class="section-intro">
+            ✅ Fait &nbsp; 🟡 En cours &nbsp; ⚪ Prévu. Les hachages renvoient aux commits de la
+            branche de travail (PR #3, non mergée).
+          </p>
+          <div class="timeline" id="roadmapTl"></div>
+        </section>
+
+        <!-- ===================== 10. PROCHAINES BRIQUES ===================== -->
+        <section id="prochaines" class="reveal">
+          <span class="kicker">10 — Prochaines briques</span>
+          <h2>Ce qui reste à construire</h2>
+          <p class="section-intro">Toujours le même filtre : est-ce que ça aide le conducteur seul, ou ça rassure le client ?</p>
+          <div class="grid cols-3" id="nextGrid"></div>
+        </section>
+
+        <!-- ===================== 11. VISION FINALE ===================== -->
+        <section id="vision" class="reveal">
+          <span class="kicker">11 — Vision finale</span>
+          <h2>Tout PHÉNIX 360, en une carte</h2>
+          <p class="section-intro">Les briques, leurs liens, et le principe qui tient tout ensemble.</p>
+          <div class="map">
+            <div class="map-rows">
+              <div class="map-row"><div class="node accent">Préparation → ouvre le chantier</div></div>
+              <div class="connector"></div>
+              <div class="map-row">
+                <div class="node core">JOURNAL<small>source de vérité · append-only</small></div>
+              </div>
+              <div class="connector"></div>
+              <div class="map-row">
+                <div class="node" data-target="b-fil">Le Fil</div>
+                <div class="node" data-target="b-decisions">Décisions</div>
+                <div class="node" data-target="b-reserves">Réserves</div>
+                <div class="node" data-target="b-levees">Levées</div>
+              </div>
+              <div class="map-row">
+                <div class="node" data-target="b-biblio">Bibliothèque</div>
+                <div class="node" data-target="b-annotations">Annotations</div>
+                <div class="node" data-target="b-historique">Historique</div>
+                <div class="node" data-target="b-espace">Espace client</div>
+              </div>
+              <div class="connector"></div>
+              <div class="map-row">
+                <div class="node accent" data-target="b-surveille">PHÉNIX surveille → dit quoi faire</div>
+              </div>
+            </div>
+          </div>
+          <p style="text-align:center;max-width:60ch;margin:34px auto 0;color:var(--muted)">
+            Le conducteur agit, il ne se crée pas de tâches. Le client comprend, sans jamais voir la
+            mécanique. Un journal, des photos, des réserves qu'on lève — et un radar qui veille.
+          </p>
+          <footer>
+            PHÉNIX 360 — Document produit interactif. Généré pour compréhension fonctionnelle. Le
+            code reste la source technique ; ce document, la source de compréhension.
+          </footer>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      /* ---------------- DATA ---------------- */
+      const I = {
+        journal:'M4 5h16M4 12h10M4 19h16', fil:'M4 5h16v14H4zM8 13l3-3 5 5', prep:'M9 5h6M5 9h14v10H5zM9 13h6',
+        reserve:'M6 3v18l6-4 6 4V3z', levee:'M20 6L9 17l-5-5', deci:'M12 3l2.5 5 5.5.8-4 4 .9 5.5L12 21l-4.9 2.3.9-5.5-4-4 5.5-.8z',
+        anno:'M12 20h9M4 17l9-9 3 3-9 9-3 .5z', biblio:'M4 5h6v14H4zM14 5h6v14h-6z', hist:'M3 12a9 9 0 1 0 9-9M3 12l3-2M3 12l2 3M12 8v4l3 2',
+        surveille:'M12 4a8 8 0 1 0 8 8M12 12l4-4M12 12l-2 5', espace:'M4 20a8 8 0 0 1 16 0M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+        avenant:'M8 4h8l4 4v12H4V4zM8 12h8M8 16h5', devis:'M6 3h9l3 3v15H6zM9 9h6M9 13h6M9 17h3', planning:'M4 8h16M7 4v4M17 4v4M4 8v12h16V8'
+      };
+      function svg(p){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="'+p+'"/></svg>';}
+
+      const BRICKS = [
+        {id:'b-journal', name:'Journal', icon:I.journal, status:['b-ok','Cœur'], mission:"Enregistrer chronologiquement toute la vie du chantier.",
+          why:"C'est la colonne vertébrale : une seule vérité, tout le reste n'en est qu'une lecture.",
+          users:['Conducteur'], in:['Compte-rendu','Photo','Document','Demande','Décision','Réserve','Levée'], out:['Toutes les vues'],
+          comm:['Le Fil','Réserves','Décisions','Historique','PHÉNIX surveille'], value:"Traçabilité totale, mémoire fiable, aucune information perdue.", vis:['b-int','Interne (filtré pour le client)']},
+        {id:'b-fil', name:'Le Fil', icon:I.fil, status:['b-ok','Actif'], mission:"Créer le souvenir vivant du chantier, en photos.",
+          why:"Rendre le chantier tangible et rassurant pour le client, sans jargon.",
+          users:['Conducteur','Client'], in:['Photos','Albums','Légendes','Petits mots'], out:['Bibliothèque','Réserves (via annotation)','Livre du chantier (à venir)'],
+          comm:['Journal','Réserves','Bibliothèque','Client'], value:"La preuve d'avancement qui crée la confiance.", vis:['b-cli','Conducteur + Client']},
+        {id:'b-biblio', name:'Bibliothèque', icon:I.biblio, status:['b-soon','À simplifier'], mission:"Retrouver n'importe quelle photo par pièce, mois ou coup de cœur.",
+          why:"Le Fil raconte dans le temps ; la Bibliothèque classe dans l'espace. « 1 partage = 2 vues ».",
+          users:['Conducteur','Client'], in:['Photos des Moments'], out:['Sélection filtrée'],
+          comm:['Le Fil'], value:"Confort de recherche — dérivé, sans aucune duplication.", vis:['b-cli','Conducteur + Client']},
+        {id:'b-annotations', name:'Annotations', icon:I.anno, status:['b-ok','Actif'], mission:"Pointer un détail précis sur une photo (entourer, flèche, note).",
+          why:"Transformer une photo en point d'action sans altérer l'image d'origine.",
+          users:['Conducteur','Client'], in:['Tracé sur la photo','Note'], out:['Réserve','Communication'],
+          comm:['Le Fil','Réserves'], value:"Le moteur des réserves : du visuel à l'action.", vis:['b-cli','Conducteur + Client']},
+        {id:'b-reserves', name:'Réserves', icon:I.reserve, status:['b-ok','Pièce maîtresse'], mission:"Suivre les points à reprendre jusqu'à leur résolution.",
+          why:"C'est le vrai objet de pilotage métier du conducteur.",
+          users:['Conducteur'], in:['Annotation sur photo','Responsable','Échéance'], out:['Levée','Journal','Historique'],
+          comm:['Le Fil','Journal','Levées','Historique'], value:"Rien n'est oublié avant la réception.", vis:['b-int','Interne — jamais exposé au client']},
+        {id:'b-levees', name:'Levées', icon:I.levee, status:['b-ok','Actif'], mission:"Clôturer proprement une réserve, avec preuve.",
+          why:"Fermer une réserve doit laisser une trace : qui, quand, avec quelle preuve.",
+          users:['Conducteur'], in:['Photo de preuve','Note'], out:['Statut « levée » (calculé)','Journal','Historique'],
+          comm:['Réserves','Journal'], value:"Boucle de qualité complète et prouvée.", vis:['b-int','Interne']},
+        {id:'b-decisions', name:'Décisions client', icon:I.deci, status:['b-ok','Actif'], mission:"Faire valider au client ses choix (matériaux, options).",
+          why:"Engager la responsabilité du client et fluidifier ses arbitrages.",
+          users:['Conducteur','Client'], in:['Choix proposés','Validation / modification / délégation'], out:['Journal','Bandeau d\'attention'],
+          comm:['Préparation','Journal','PHÉNIX surveille','Client'], value:"Des décisions tracées, plus de flottement.", vis:['b-cli','Conducteur + Client']},
+        {id:'b-prep', name:'Préparation (PHÉNIX Start)', icon:I.prep, status:['b-soon','À alléger'], mission:"Préparer le dossier chantier avant le démarrage.",
+          why:"« PHÉNIX prépare, vous validez » : le chantier démarre organisé.",
+          users:['Conducteur'], in:['Infos projet','Étapes','Documents','Choix client'], out:['Journal (ouverture)','Décisions'],
+          comm:['Journal','Décisions','Devis','Planning'], value:"Un démarrage carré — mais à dégraisser pour la V1.", vis:['b-int','Conducteur']},
+        {id:'b-historique', name:'Historique', icon:I.hist, status:['b-soon','À fusionner'], mission:"Relire les moments marquants du chantier.",
+          why:"Donner une frise des jalons (devis, décisions, réserves, levées).",
+          users:['Conducteur'], in:['Jalons du Journal'], out:['Frise chronologique'],
+          comm:['Journal'], value:"Mémoire du projet — mais doublon partiel du Journal.", vis:['b-int','Conducteur']},
+        {id:'b-espace', name:'Espace client', icon:I.espace, status:['b-ok','Actif'], mission:"Rassurer le client, simplement.",
+          why:"Le client doit sentir « on s'occupe de tout », sans complexité.",
+          users:['Client'], in:['Journal visible','Fil','Décisions'], out:['Validations','Questions'],
+          comm:['Journal','Le Fil','Décisions'], value:"La moitié premium du positionnement.", vis:['b-cli','Client']},
+        {id:'b-surveille', name:'PHÉNIX surveille votre chantier', icon:I.surveille, status:['b-ok','Signature'], mission:"Dire au conducteur ce qui mérite son attention aujourd'hui.",
+          why:"Remplace les tâches manuelles : le conducteur lit, puis agit.",
+          users:['Conducteur'], in:['Réserves ouvertes','Décisions en attente','Documents manquants','Échéances'], out:['Alertes priorisées'],
+          comm:['Réserves','Décisions','Documents','Journal'], value:"Le radar : la promesse centrale du produit.", vis:['b-int','Conducteur']},
+        {id:'b-avenant', name:'Avenants', icon:I.avenant, status:['b-plan','Repoussé (code prêt)'], mission:"Ajouter un devis modificatif signé et ses impacts.",
+          why:"Gérer les évolutions contractuelles du chantier.",
+          users:['Conducteur'], in:['Nouveau devis signé'], out:['Impacts (prestations, planning)'],
+          comm:['Devis','Journal','PHÉNIX surveille'], value:"Utile plus tard — trop « ERP » pour la V1.", vis:['b-int','Conducteur']},
+        {id:'b-devis', name:'Devis', icon:I.devis, status:['b-plan','Repoussé (code prêt)'], mission:"Structurer le chiffrage par lots et postes.",
+          why:"Base contractuelle et financière du chantier.",
+          users:['Conducteur'], in:['Lots','Postes','Montants'], out:['Vue devis','PDF'],
+          comm:['Préparation','Avenants'], value:"Hors pilotage quotidien — à garder en simple PDF pour la V1.", vis:['b-int','Conducteur']},
+        {id:'b-planning', name:'Planning', icon:I.planning, status:['b-soon','À simplifier'], mission:"Montrer où en est le chantier dans le temps.",
+          why:"Le client veut « où on en est », pas un Gantt daté.",
+          users:['Conducteur','Client'], in:['Étapes','Dates'], out:['Frise d\'avancement'],
+          comm:['Préparation','Espace client'], value:"Garder un stepper sobre ; repousser les dates fermes.", vis:['b-cli','Conducteur + Client']}
+      ];
+
+      const FLOW_A = [
+        ['Photo','Le conducteur prend une photo dans Le Fil.','node2'],
+        ['Le Fil','La photo rejoint un Moment (album ou photo seule).','node2'],
+        ['Annotation','On entoure un détail et on ajoute une note.','node2'],
+        ['Réserve','L\'annotation crée une réserve : un vrai objet de pilotage, numéroté, daté.','node2 gold'],
+        ['Journal','La réserve est écrite dans le Journal (source de vérité).','node2 dark'],
+        ['Vue Réserves','Le conducteur la retrouve dans « à lever ».','node2'],
+        ['Levée','Réparé : il lève la réserve avec photo de preuve + note.','node2 gold'],
+        ['Journal','La levée est ajoutée (append-only) et pointe vers la réserve.','node2 dark'],
+        ['Historique','Création et levée apparaissent comme jalons.','node2']
+      ];
+      const FLOW_B = [
+        ['Préparation','PHÉNIX prépare les choix à valider par le client.','node2'],
+        ['Décision','Un choix est envoyé au client (matériau, option).','node2 gold'],
+        ['Client','Le client voit « une décision vous attend ».','node2'],
+        ['Validation','Il valide, modifie ou délègue à PHÉNIX.','node2'],
+        ['Journal','La décision est tracée comme événement structuré.','node2 dark'],
+        ['PHÉNIX surveille','Tant qu\'elle est en attente, elle remonte dans le radar.','node2 gold']
+      ];
+
+      const WORKFLOWS = [
+        {name:'Décision client', steps:[
+          ['Proposition','PHÉNIX propose un choix (issu de la préparation).'],
+          ['Envoi','La décision part vers le client, tracée au Journal.'],
+          ['Attente','Elle s\'affiche dans le bandeau client et dans « PHÉNIX surveille ».'],
+          ['Réponse','Le client valide, demande une modification, ou délègue.'],
+          ['Trace','Chaque action écrit un événement (jamais du texte dupliqué).'],
+          ['Clôture','Le choix est figé ; le récit continue.']
+        ]},
+        {name:'Réserve', steps:[
+          ['Repérage','Un défaut est visible sur une photo du Fil.'],
+          ['Annotation','On l\'entoure et on note le problème.'],
+          ['Création','L\'annotation devient une réserve (n°, responsable, échéance).'],
+          ['Journal','La réserve vit dans le Journal ; visibilité interne.'],
+          ['Suivi','Elle apparaît dans la vue Réserves « à lever ».']
+        ]},
+        {name:'Levée', steps:[
+          ['Reprise','Le point est corrigé sur le chantier.'],
+          ['Preuve','Le conducteur ajoute une photo de preuve + une note.'],
+          ['Levée','Un événement de levée est ajouté (append-only).'],
+          ['Statut','La réserve passe « levée » — calculé, jamais réécrit.'],
+          ['Mémoire','Création + levée restent visibles dans l\'Historique.']
+        ]},
+        {name:'Album photo', steps:[
+          ['Capture','Une ou plusieurs photos d\'un même instant.'],
+          ['Composition','Choix de la couverture, ordre, légende, pièce.'],
+          ['Partage','Le Moment rejoint Le Fil (chronologie).'],
+          ['Classement','Les mêmes photos apparaissent dans la Bibliothèque.'],
+          ['Vie','Coup de cœur, petit mot, annotation possibles.']
+        ]},
+        {name:'Préparation', steps:[
+          ['Analyse','PHÉNIX Start prépare le dossier (infos, étapes, documents).'],
+          ['Validation','Le conducteur valide la proposition.'],
+          ['Ouverture','Le devis signé ouvre le Journal du chantier.'],
+          ['Choix','Les décisions client sont amorcées.'],
+          ['Démarrage','Le chantier passe « en cours ».']
+        ]},
+        {name:'Avenant', steps:[
+          ['Évolution','Un changement contractuel survient.'],
+          ['Dépôt','Un nouveau devis signé est ajouté (l\'original reste intact).'],
+          ['Impacts','Prestations ajoutées / remplacées sont recalculées.'],
+          ['Alerte','« PHÉNIX surveille » signale la commande à actualiser.'],
+          ['(Repoussé)','Module prêt en code, hors UI pour la V1.']
+        ]},
+        {name:'Documents', steps:[
+          ['Demande','PHÉNIX demande un document au client (ex. DPE).'],
+          ['Dépôt','Le document est ajouté au Journal.'],
+          ['Coffre','Il est retrouvable comme pièce du chantier.'],
+          ['Client','Le devis signé est visible côté client.']
+        ]},
+        {name:'Journal', steps:[
+          ['Saisie','Compte-rendu, photo, document, demande, décision, réserve, levée.'],
+          ['Écriture','Un événement est ajouté — jamais modifié en profondeur.'],
+          ['Visibilité','Une règle unique décide de ce que le client voit.'],
+          ['Lecture','Toutes les vues (Suivi, Historique, Client) lisent ici.']
+        ]},
+        {name:'Assistant', steps:[
+          ['Question','Le client demande « où en est la salle de bain ? ».'],
+          ['Recherche','L\'assistant lit le Journal visible + les documents.'],
+          ['Réponse','Il répond à partir du contexte, ou propose de transmettre.'],
+          ['Transmission','Sinon, la question part à PHÉNIX (le conducteur répond).'],
+          ['(À simplifier)','Reste volontairement sobre — pas un chatbot.']
+        ]}
+      ];
+
+      const VUES = [
+        ['Suivi / Journal (conducteur)','Conducteur','Le fil d\'événements + actions rapides + brouillons à publier.','Journal'],
+        ['PHÉNIX surveille','Conducteur','Les 3 points prioritaires du jour (décisions, réserves, documents).','Journal + Préparation'],
+        ['Le Fil','Conducteur + Client','Les photos du chantier, en chronologie, par mois.','Moments (Le Fil)'],
+        ['Galerie immersive','Conducteur + Client','Une photo en grand, annotations, petit mot.','Moment + annotations'],
+        ['Bibliothèque','Conducteur + Client','Toutes les photos, filtrables par pièce / mois.','Le Fil (dérivé)'],
+        ['Réserves','Conducteur','« À lever » et « levées », avec preuve.','Journal (réserves + levées)'],
+        ['Historique','Conducteur','Les jalons du projet, du devis à aujourd\'hui.','Journal (jalons)'],
+        ['Préparation','Conducteur','Le dossier préparé (infos, étapes, documents, choix).','Dossier PHÉNIX Start'],
+        ['Espace client','Client','Une action attendue, l\'avancement, le récit en photos.','Journal visible + Le Fil'],
+        ['Côte à côte','Démo','Conducteur et client en parallèle (outil de démonstration).','Les deux surfaces']
+      ];
+
+      const VIS = [
+        ['Journal','yes','part','yes','no'],
+        ['Le Fil','yes','yes','no','no'],
+        ['Bibliothèque','yes','yes','no','no'],
+        ['Annotations','yes','yes','no','no'],
+        ['Réserves','yes','no','yes','no'],
+        ['Levées','yes','no','yes','no'],
+        ['Décisions client','yes','yes','no','no'],
+        ['Préparation','yes','part','yes','no'],
+        ['Historique','yes','no','yes','no'],
+        ['PHÉNIX surveille','yes','no','yes','no'],
+        ['Avenants / Devis','yes','part','yes','no'],
+        ['Planning','yes','yes','no','no']
+      ];
+
+      const ROADMAP = [
+        ['ok','Le Fil — socle, albums, galerie, coup de cœur, messages','Espace photo complet du chantier.','1ac479d + série Fil'],
+        ['ok','Annotations sur photo (calque indépendant)','Cercle, flèche, trait, texte, numéro.','1ac479d'],
+        ['ok','Réserves V1 — pont annotation → réserve','Objet de pilotage, lien retour photo.','9f565eb'],
+        ['ok','Levée des réserves — preuve + note (append-only)','Boucle qualité complète.','0153eb6'],
+        ['ok','Vue Réserves — pilotage opérationnel','« À lever » / « levées », lecture pure.','7bfbaa5'],
+        ['ok','Workflow Demandes (construit puis retiré)','Exploration validée puis recentrée.','a721417'],
+        ['ok','Recentrage — suppression des demandes internes','PHÉNIX redevient un poste de pilotage, pas un outil d\'équipe.','0f85c6c'],
+        ['soon','Audit produit & simplification V1','Réduire à 10 écrans, alléger l\'ERP, unifier les photos.','en cours'],
+        ['plan','Livre du chantier (export du Fil)','Souvenir premium à remettre au client.','prévu'],
+        ['plan','Décision depuis une annotation','2ᵉ pont annotation → action.','prévu'],
+        ['plan','Réception & SAV','Suite naturelle des réserves.','prévu']
+      ];
+
+      const NEXT = [
+        ['Livre du chantier','Un bel export du Fil, remis au client en fin de chantier.'],
+        ['Décision ⇐ annotation','Créer une décision client directement depuis une photo annotée.'],
+        ['Réception','Clôturer le chantier : lever les dernières réserves, PV de réception.'],
+        ['SAV','Rouvrir des points après réception, avec le même modèle que les réserves.'],
+        ['Planning intelligent','Replanifier automatiquement selon l\'avancement réel.'],
+        ['Commandes','Suivi matériaux / fournisseurs relié aux étapes.']
+      ];
+
+      /* ---------------- RENDER ---------------- */
+      const el = (h) => { const t=document.createElement('template'); t.innerHTML=h.trim(); return t.content.firstChild; };
+
+      // Fiches
+      const fiches = document.getElementById('fiches');
+      BRICKS.forEach(b => {
+        fiches.appendChild(el(`
+          <div class="card fiche" id="${b.id}">
+            <div class="top">
+              <span class="ico">${svg(b.icon)}</span>
+              <div style="flex:1">
+                <h3>${b.name}</h3>
+              </div>
+              <span class="badge ${b.status[0]}">${b.status[1]}</span>
+            </div>
+            <p style="margin:2px 0 0;font-size:14.5px">${b.mission}</p>
+            <dl>
+              <dt>Pourquoi</dt><dd>${b.why}</dd>
+              <dt>Qui l'utilise</dt><dd>${b.users.join(' · ')}</dd>
+              <dt>Entrées</dt><dd><div class="chips">${b.in.map(x=>`<span class="chip">${x}</span>`).join('')}</div></dd>
+              <dt>Sorties</dt><dd><div class="chips">${b.out.map(x=>`<span class="chip">${x}</span>`).join('')}</div></dd>
+              <dt>Communique</dt><dd>${b.comm.join(' · ')}</dd>
+              <dt>Valeur</dt><dd>${b.value}</dd>
+              <dt>Visibilité</dt><dd><span class="badge ${b.vis[0]}">${b.vis[1]}</span></dd>
+            </dl>
+          </div>`));
+      });
+
+      // Flows
+      function renderFlow(container, steps){
+        const c = document.getElementById(container);
+        steps.forEach((s,i)=>{
+          if(i>0) c.appendChild(el('<div class="arrow"></div>'));
+          c.appendChild(el(`<div class="step"><div class="${s[2]}">${s[0]}</div><div class="why">${s[1]}</div></div>`));
+        });
+      }
+      renderFlow('flowA', FLOW_A);
+      renderFlow('flowB', FLOW_B);
+
+      // Workflows tabs
+      const tabs = document.getElementById('wfTabs');
+      const panels = document.getElementById('wfPanels');
+      WORKFLOWS.forEach((w,i)=>{
+        tabs.appendChild(el(`<button class="tab ${i===0?'active':''}" data-i="${i}">${w.name}</button>`));
+        const tl = w.steps.map(s=>`<div class="tl-item"><b>${s[0]}</b><span>${s[1]}</span></div>`).join('');
+        panels.appendChild(el(`<div class="panel ${i===0?'active':''}" data-i="${i}"><div class="timeline">${tl}</div></div>`));
+      });
+      tabs.addEventListener('click', e=>{
+        const t=e.target.closest('.tab'); if(!t) return;
+        document.querySelectorAll('#wfTabs .tab').forEach(x=>x.classList.remove('active'));
+        document.querySelectorAll('#wfPanels .panel').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        document.querySelector('#wfPanels .panel[data-i="'+t.dataset.i+'"]').classList.add('active');
+      });
+
+      // Vues
+      const vb=document.getElementById('vuesBody');
+      VUES.forEach(v=>vb.appendChild(el(`<tr><td><b>${v[0]}</b></td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td></tr>`)));
+
+      // Visibilité
+      const dotmap={yes:'<span class="dot d-yes"></span>',no:'<span class="dot d-no"></span>',part:'<span class="dot d-part"></span>'};
+      const visb=document.getElementById('visBody');
+      VIS.forEach(r=>visb.appendChild(el(`<tr><td><b>${r[0]}</b></td><td>${dotmap[r[1]]}</td><td>${dotmap[r[2]]}</td><td>${dotmap[r[3]]}</td><td>${dotmap[r[4]]}</td></tr>`)));
+
+      // Roadmap
+      const emoji={ok:'✅',soon:'🟡',plan:'⚪'};
+      const rtl=document.getElementById('roadmapTl');
+      ROADMAP.forEach(r=>rtl.appendChild(el(`<div class="tl-item"><b>${emoji[r[0]]} ${r[1]}</b><span>${r[2]} &nbsp;·&nbsp; <code style="font-family:var(--mono);font-size:12px;color:var(--gold)">${r[3]}</code></span></div>`)));
+
+      // Next
+      const ng=document.getElementById('nextGrid');
+      NEXT.forEach(n=>ng.appendChild(el(`<div class="card"><h3>${n[0]}</h3><p style="margin:6px 0 0;font-size:14px">${n[1]}</p></div>`)));
+
+      /* ---------------- INTERACTIONS ---------------- */
+      // Clickable map nodes
+      document.querySelectorAll('.node[data-target]').forEach(n=>{
+        n.addEventListener('click', ()=>{
+          const t=document.getElementById(n.dataset.target);
+          if(!t) return;
+          t.scrollIntoView({behavior:'smooth', block:'center'});
+          t.classList.remove('flash'); void t.offsetWidth; t.classList.add('flash');
+        });
+      });
+
+      // Reveal on scroll
+      const io=new IntersectionObserver((ents)=>{
+        ents.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target);}});
+      },{threshold:0.12});
+      document.querySelectorAll('.reveal').forEach(s=>io.observe(s));
+
+      // Active nav via sections
+      const links=[...document.querySelectorAll('.toc a')];
+      const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+      const spy=new IntersectionObserver((ents)=>{
+        ents.forEach(e=>{
+          if(e.isIntersecting){
+            links.forEach(a=>a.classList.remove('active'));
+            const a=map.get(e.target.id); if(a)a.classList.add('active');
+          }
+        });
+      },{rootMargin:'-45% 0px -50% 0px'});
+      document.querySelectorAll('main section').forEach(s=>spy.observe(s));
+
+      // Mobile menu
+      const sb=document.getElementById('sidebar'), scrim=document.getElementById('scrim');
+      const toggle=(o)=>{sb.classList.toggle('open',o);scrim.classList.toggle('on',o);};
+      document.getElementById('menuBtn').addEventListener('click',()=>toggle(!sb.classList.contains('open')));
+      scrim.addEventListener('click',()=>toggle(false));
+      document.querySelectorAll('.toc a').forEach(a=>a.addEventListener('click',()=>toggle(false)));
+    </script>
+  </body>
+</html>
