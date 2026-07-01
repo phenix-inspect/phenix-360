@@ -275,7 +275,7 @@ function Assistant({
       type: 'demande',
       visibility: 'client',
       state: 'ouverte',
-      content: { question: result.demande.question, destinataire: 'equipe' },
+      content: { question: result.demande.question, destinataire: 'phenix' },
     });
     setResult(null);
     setQuestion('');
@@ -318,7 +318,7 @@ function Assistant({
           <div className="space-y-2 rounded-lg border border-border bg-paper-50 p-3">
             <p className="text-sm text-muted-foreground">{result.message}</p>
             <Button size="sm" onClick={() => void transmettre()}>
-              Transmettre à l'équipe
+              Transmettre à PHÉNIX
             </Button>
           </div>
         )}

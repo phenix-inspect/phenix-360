@@ -39,7 +39,7 @@ export type AssistantResult =
       kind: 'demande_intent';
       assistant: 'PHÉNIX 360';
       message: string;
-      demande: { question: string; destinataire: 'equipe' };
+      demande: { question: string; destinataire: 'phenix' };
     };
 
 /** Synthèse à partir du contexte uniquement (LLM réel ou mock). */
@@ -176,7 +176,7 @@ function demandeIntent(question: string, message: string): AssistantResult {
     kind: 'demande_intent',
     assistant: 'PHÉNIX 360',
     message,
-    demande: { question, destinataire: 'equipe' },
+    demande: { question, destinataire: 'phenix' },
   };
 }
 

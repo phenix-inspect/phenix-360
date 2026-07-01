@@ -14,7 +14,7 @@ import {
   PROJECT_STEPS,
   PROJECT_STEP_LABEL,
   attachmentId,
-  teamQueue,
+  questionsEnAttente,
   type Event,
   type EventActor,
   type Project,
@@ -33,12 +33,12 @@ const TITLES: Record<ComposerKind, { title: string; description: string }> = {
   photo: { title: 'Ajouter des photos', description: 'Partagez l’avancement en images.' },
   document: { title: 'Ajouter un document', description: 'Devis, plan, facture…' },
   demande: {
-    title: 'Déclarer une demande',
-    description: 'Une décision à demander au client, ou un point pour l’équipe.',
+    title: 'Demander une décision au client',
+    description: 'Posez une question ou soumettez un choix à votre client.',
   },
   repondre: {
     title: 'Répondre au client',
-    description: 'Les demandes en attente de votre réponse.',
+    description: 'Les questions du client en attente de votre réponse.',
   },
 };
 
@@ -101,7 +101,6 @@ function CaptureForm({
   const [piece, setPiece] = useState('');
   const [libelle, setLibelle] = useState('');
   const [question, setQuestion] = useState('');
-  const [destinataire, setDestinataire] = useState<'client' | 'equipe'>('client');
   const [visibility, setVisibility] = useState<'client' | 'interne'>('client');
 
   const submit = async (publish: boolean) => {
@@ -141,7 +140,7 @@ function CaptureForm({
         visibility: 'client',
         type: 'demande',
         state: 'ouverte',
-        content: { question: question.trim(), destinataire },
+        content: { question: question.trim(), destinataire: 'client' },
       });
     }
     onDone();
@@ -208,25 +207,13 @@ function CaptureForm({
       )}
 
       {kind === 'demande' && (
-        <>
-          <Textarea
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ex. Quel carrelage pour la salle de bain ?"
-            rows={2}
-            autoFocus
-          />
-          <Field label="Destinataire">
-            <select
-              value={destinataire}
-              onChange={(e) => setDestinataire(e.target.value as 'client' | 'equipe')}
-              className={selectCls}
-            >
-              <option value="client">Client (décision attendue)</option>
-              <option value="equipe">Équipe PHÉNIX</option>
-            </select>
-          </Field>
-        </>
+        <Textarea
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="Ex. Quel carrelage pour la salle de bain ?"
+          rows={2}
+          autoFocus
+        />
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
@@ -267,7 +254,7 @@ function ReplyList({
   events: Event[];
   onDone: () => void;
 }): React.JSX.Element {
-  const queue = teamQueue(events).filter((e) => e.content.destinataire === 'equipe');
+  const queue = questionsEnAttente(events);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   if (queue.length === 0) {

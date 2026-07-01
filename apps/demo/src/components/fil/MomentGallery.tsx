@@ -5,7 +5,6 @@ import {
   Eye,
   EyeOff,
   Flag,
-  ListPlus,
   MessageCircle,
   PenLine,
   Send,
@@ -24,8 +23,7 @@ import { fmtDateTime } from '../../lib/format';
 import { FilImage } from './FilImage';
 import { PhotoAnnotator, type AnnotationInput } from './PhotoAnnotator';
 
-const ACTION_LABEL: Record<'demande' | 'decision' | 'reserve' | 'sav', string> = {
-  demande: 'Demande',
+const ACTION_LABEL: Record<'decision' | 'reserve' | 'sav', string> = {
   decision: 'Décision',
   reserve: 'Réserve',
   sav: 'SAV',
@@ -46,7 +44,6 @@ export function MomentGallery({
   initialPhotoId,
   onSendPhotoMessage,
   onAddAnnotation,
-  onCreateDemande,
   onCreateReserve,
   onClose,
 }: {
@@ -58,7 +55,6 @@ export function MomentGallery({
   initialPhotoId?: string;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
   onAddAnnotation: (input: AnnotationInput) => void;
-  onCreateDemande: (annotationId: string) => void;
   onCreateReserve: (
     annotationId: string,
     options: { responsable?: string; echeance?: string },
@@ -291,14 +287,6 @@ export function MomentGallery({
                       <span className="flex shrink-0 gap-1.5">
                         <button
                           type="button"
-                          onClick={() => onCreateDemande(a.id)}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
-                        >
-                          <ListPlus aria-hidden />
-                          Demande
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => {
                             setReserveFor(a.id);
                             setResp('');
@@ -307,7 +295,7 @@ export function MomentGallery({
                           className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
                         >
                           <Flag aria-hidden />
-                          Réserve
+                          Créer une réserve
                         </button>
                       </span>
                     )}

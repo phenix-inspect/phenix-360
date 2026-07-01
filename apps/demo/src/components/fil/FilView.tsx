@@ -169,9 +169,6 @@ export function FilView({
           onAddAnnotation={(input) =>
             demo.addAnnotation(project.id, { momentId: gallery.moment.id, actor, ...input })
           }
-          onCreateDemande={(annotationId) =>
-            void demo.createDemandeFromAnnotation(project.id, annotationId, actor)
-          }
           onCreateReserve={(annotationId, options) =>
             void demo.createReserveFromAnnotation(project.id, annotationId, actor, options)
           }

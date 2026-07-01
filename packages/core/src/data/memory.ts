@@ -20,17 +20,10 @@ import {
   type ProjectId,
   type UserId,
 } from '../ids.js';
-import type { DemandeContent, DemandeResolution, Event } from '../event.js';
+import type { DemandeResolution, Event } from '../event.js';
 import type { Project, ProjectMember } from '../project.js';
 import { currentStep } from '../views.js';
-import type {
-  Backend,
-  DemandePatch,
-  NewEvent,
-  NewMember,
-  NewProject,
-  ProjectPatch,
-} from './repository.js';
+import type { Backend, NewEvent, NewMember, NewProject, ProjectPatch } from './repository.js';
 
 export interface BackendState {
   projects: Project[];
@@ -174,24 +167,6 @@ export class InMemoryBackend implements Backend {
     if (event.type !== 'demande') throw new Error(`L'événement ${id} n'est pas une demande`);
     event.content = { ...event.content, resolution };
     event.state = 'traitee';
-    this.write(state);
-    return event;
-  }
-
-  async updateDemande(id: EventId, patch: DemandePatch): Promise<Event> {
-    const state = this.read();
-    const event = state.events.find((e) => e.id === id);
-    if (!event) throw new Error(`Événement introuvable : ${id}`);
-    if (event.type !== 'demande') throw new Error(`L'événement ${id} n'est pas une demande`);
-    const content = event.content as DemandeContent;
-    const next: DemandeContent = { ...content };
-    if (patch.responsable !== undefined) next.responsable = patch.responsable;
-    if (patch.priorite !== undefined) next.priorite = patch.priorite;
-    if (patch.resolution !== undefined) next.resolution = patch.resolution;
-    // Timeline append-only : on n'écrase jamais, on ajoute.
-    if (patch.activite) next.activites = [...(content.activites ?? []), patch.activite];
-    event.content = next;
-    if (patch.state !== undefined) event.state = patch.state;
     this.write(state);
     return event;
   }

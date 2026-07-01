@@ -17,7 +17,7 @@
  *    stockages séparés (voir views.ts).
  */
 import type { CaptureId, EventId, IsoDateTime, ProjectId, UserId } from './ids.js';
-import type { ActorRole, EventActor } from './actor.js';
+import type { EventActor } from './actor.js';
 import type { EventAttachment } from './attachment.js';
 import type { ProjectStep } from './project.js';
 
@@ -51,16 +51,9 @@ export type EventVisibility = (typeof EVENT_VISIBILITIES)[number];
 /**
  * Cycle de vie. Deux familles selon le type :
  *  • publication (compte_rendu / photo / document) : `brouillon → publie`
- *  • demande : `ouverte → en_cours → traitee (répondue) → close (fermée)`
+ *  • demande client : `ouverte → traitee (répondue) → close`
  */
-export const EVENT_STATES = [
-  'brouillon',
-  'publie',
-  'ouverte',
-  'en_cours',
-  'traitee',
-  'close',
-] as const;
+export const EVENT_STATES = ['brouillon', 'publie', 'ouverte', 'traitee', 'close'] as const;
 export type EventState = (typeof EVENT_STATES)[number];
 
 /* -------------------------------------------------------------------------- *
@@ -94,77 +87,19 @@ export interface DocumentContent {
   categorie?: DocumentCategory;
 }
 
-/** Qui doit agir sur une demande — pilote le bandeau décision client. */
-export type DemandeAudience = 'client' | 'equipe';
+/**
+ * Destinataire d'une demande — jamais un collaborateur interne (PHÉNIX n'est
+ * pas un logiciel d'équipe). Deux cas :
+ *  • `client` : PHÉNIX attend une décision / une action du CLIENT ;
+ *  • `phenix` : une question DU client à laquelle PHÉNIX (le conducteur) répond.
+ */
+export type DemandeAudience = 'client' | 'phenix';
 
 /** Réponse PORTÉE par la demande (pas un événement séparé, pas un fil). */
 export interface DemandeResolution {
   texte: string;
   resolvedBy: UserId;
   resolvedAt: IsoDateTime;
-}
-
-/** Priorité opérationnelle d'une demande (pilote tri & badges). */
-export const DEMANDE_PRIORITES = ['basse', 'normale', 'haute', 'urgente'] as const;
-export type DemandePriorite = (typeof DEMANDE_PRIORITES)[number];
-export const DEMANDE_PRIORITE_LABEL: Record<DemandePriorite, string> = {
-  basse: 'Basse',
-  normale: 'Normale',
-  haute: 'Haute',
-  urgente: 'Urgente',
-};
-/** Poids de tri (le plus urgent d'abord). */
-export const DEMANDE_PRIORITE_RANG: Record<DemandePriorite, number> = {
-  urgente: 0,
-  haute: 1,
-  normale: 2,
-  basse: 3,
-};
-
-/** Libellé du statut d'une demande (les states publication ne s'appliquent pas). */
-export function demandeStatutLabel(state: EventState): string {
-  switch (state) {
-    case 'ouverte':
-      return 'Ouverte';
-    case 'en_cours':
-      return 'En cours';
-    case 'traitee':
-      return 'Répondue';
-    case 'close':
-      return 'Fermée';
-    default:
-      return state;
-  }
-}
-
-/**
- * Une entrée de la TIMELINE d'une demande (append-only) : ouverture, prise en
- * charge / changement de statut, assignation, commentaire, réponse. Portée par
- * la demande elle-même (pas de duplication ; le journal reste la source unique).
- */
-export const DEMANDE_ACTIVITE_KINDS = [
-  'ouverture',
-  'statut',
-  'assignation',
-  'priorite',
-  'commentaire',
-  'reponse',
-] as const;
-export type DemandeActiviteKind = (typeof DEMANDE_ACTIVITE_KINDS)[number];
-
-export interface DemandeActivite {
-  kind: DemandeActiviteKind;
-  authorId: UserId;
-  authorRole: ActorRole;
-  at: IsoDateTime;
-  /** Texte libre (commentaire / réponse). */
-  texte?: string;
-  /** Changement de statut : avant → après. */
-  from?: EventState;
-  to?: EventState;
-  /** Nouveau responsable (assignation) / nouvelle priorité. */
-  responsable?: string;
-  priorite?: DemandePriorite;
 }
 
 /**
@@ -180,17 +115,11 @@ export interface FilSource {
 }
 
 export interface DemandeContent {
-  /** Besoin du client, formulé via l'assistant (ADR-001 §6). */
+  /** Besoin / question du client (ADR-001 §6). */
   question: string;
   /** Destinataire de l'action attendue (`client` ⇒ décision client). */
   destinataire: DemandeAudience;
   resolution?: DemandeResolution;
-  /** Responsable de la prise en charge (texte libre en V1 : « Conducteur »…). */
-  responsable?: string;
-  /** Priorité opérationnelle (défaut : normale). */
-  priorite?: DemandePriorite;
-  /** Timeline append-only de la demande (commentaires, statuts, réponse…). */
-  activites?: DemandeActivite[];
   /** Origine (le cas échéant) : photo annotée du Fil. */
   source?: FilSource;
 }
@@ -379,16 +308,11 @@ export function isVisibleToClient(e: Event): boolean {
     // Demande adressée au client : visible dès `ouverte` (il doit pouvoir agir),
     // puis une fois `traitee` / `close`.
     if (e.content.destinataire === 'client') {
-      return (
-        e.state === 'ouverte' ||
-        e.state === 'en_cours' ||
-        e.state === 'traitee' ||
-        e.state === 'close'
-      );
+      // Décision attendue du client : visible dès `ouverte`, puis résolue.
+      return e.state === 'ouverte' || e.state === 'traitee' || e.state === 'close';
     }
-    // Demande interne (vers l'équipe) : visible client seulement une fois résolue.
-    // Les états `ouverte` / `en_cours` restent internes (le travail en cours ne
-    // fuit jamais côté client).
+    // Question du client à PHÉNIX : visible côté client une fois la réponse
+    // apportée (le brouillon de réponse ne fuit pas).
     return e.state === 'traitee' || e.state === 'close';
   }
   // compte_rendu / photo / document : visibles une fois publiés.

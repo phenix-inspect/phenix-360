@@ -15,11 +15,10 @@ import {
 import {
   EVENT_TYPE_LABEL,
   buildChantierAttention,
-  nbDemandesActives,
+  questionsEnAttente,
   reserveStatut,
   reservesOuvertes,
   sortByDate,
-  teamQueue,
   userId,
   type Event,
   type EventActor,
@@ -46,7 +45,6 @@ import { AttentionPanel } from '../components/AttentionPanel';
 import { HistoriqueView } from '../components/HistoriqueView';
 import { FilView } from '../components/fil/FilView';
 import { ReservesView } from '../components/ReservesView';
-import { DemandesView } from '../components/DemandesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
 
@@ -76,13 +74,12 @@ export function CompagnonView({
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour.
-  const [tab, setTab] = useState<
-    'suivi' | 'preparation' | 'fil' | 'demandes' | 'reserves' | 'historique'
-  >(dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi');
+  const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique'>(
+    dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi',
+  );
 
   const attention = buildChantierAttention(dossier, events);
   const nbReservesOuvertes = reservesOuvertes(events).length;
-  const nbDemandes = nbDemandesActives(events);
 
   const askDocument = async (docId: string) => {
     if (!dossier) return;
@@ -144,19 +141,13 @@ export function CompagnonView({
       <Tabs
         value={tab}
         onValueChange={(v) =>
-          setTab(v as 'suivi' | 'preparation' | 'fil' | 'demandes' | 'reserves' | 'historique')
+          setTab(v as 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique')
         }
       >
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           {dossier && <TabsTrigger value="preparation">Préparation</TabsTrigger>}
           <TabsTrigger value="fil">Le Fil</TabsTrigger>
-          <TabsTrigger value="demandes">
-            <span className="flex items-center gap-1.5">
-              Demandes
-              {nbDemandes > 0 && <Badge variant="warning">{nbDemandes}</Badge>}
-            </span>
-          </TabsTrigger>
           <TabsTrigger value="reserves">
             <span className="flex items-center gap-1.5">
               Réserves
@@ -173,9 +164,6 @@ export function CompagnonView({
         )}
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />
-        </TabsContent>
-        <TabsContent value="demandes">
-          <DemandesView snap={snap} events={events} actor={actor} onOpenFilPhoto={openFilPhoto} />
         </TabsContent>
         <TabsContent value="reserves">
           <ReservesView
@@ -222,15 +210,13 @@ function SuiviTab({
   onLeverReserve: (reserve: ReserveEvent) => void;
 }): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
-  const pendingReplies = teamQueue(events).filter(
-    (e) => e.content.destinataire === 'equipe',
-  ).length;
+  const pendingReplies = questionsEnAttente(events).length;
 
   const actions: ActionDef[] = [
     { kind: 'compte_rendu', label: 'Nouveau compte rendu', icon: <NotebookPen aria-hidden /> },
     { kind: 'photo', label: 'Ajouter des photos', icon: <ImageIcon aria-hidden /> },
     { kind: 'document', label: 'Ajouter un document', icon: <FileText aria-hidden /> },
-    { kind: 'demande', label: 'Déclarer une demande', icon: <HelpCircle aria-hidden /> },
+    { kind: 'demande', label: 'Demander au client', icon: <HelpCircle aria-hidden /> },
     { kind: 'repondre', label: 'Répondre au client', icon: <Reply aria-hidden /> },
   ];
 
