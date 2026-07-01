@@ -120,7 +120,7 @@ export function PhenixWidget({
             <div ref={threadRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
               <PhenixBubble
                 text={
-                  'Bonjour 👋 Je suis PHÉNIX. Je connais votre chantier : posez-moi une question, ' +
+                  'Bonjour 👋 J’ai votre chantier sous les yeux. Posez-moi votre question, ' +
                   'je vous réponds simplement.'
                 }
               />
@@ -227,10 +227,7 @@ function MessageRow({
       )}
       {m.kind === 'escalade' &&
         (reponse ? (
-          <PhenixBubble
-            text={`J'ai une réponse concernant votre question : ${reponse}`}
-            highlight
-          />
+          <PhenixBubble text={reponse} highlight label="Réponse de l'équipe PHÉNIX" />
         ) : (
           <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-medium text-gold-700">
             En attente de l'équipe PHÉNIX
@@ -243,24 +240,31 @@ function MessageRow({
 function PhenixBubble({
   text,
   highlight,
+  label,
 }: {
   text: string;
   highlight?: boolean;
+  label?: string;
 }): React.JSX.Element {
   return (
     <div className="flex items-start gap-2.5">
       <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-ink-900 text-gold-300 [&_svg]:size-3.5">
         <Sparkles aria-hidden />
       </span>
-      <p
+      <div
         className={`max-w-[85%] rounded-2xl rounded-tl-md px-4 py-2.5 text-sm ${
           highlight
             ? 'border border-gold-300 bg-gold-50 text-foreground'
             : 'border border-border bg-surface text-foreground'
         }`}
       >
-        {text}
-      </p>
+        {label && (
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gold-700">
+            {label}
+          </p>
+        )}
+        <p>{text}</p>
+      </div>
     </div>
   );
 }
