@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import { isDemande, type EventActor, type Project } from '@phenix360/core';
-import { ArrowRight, Send, Sparkles, X } from 'lucide-react';
+import { ArrowRight, Send, X } from 'lucide-react';
 import { conversationOf, demo, type DemoSnapshot, type PhenixMessage } from '../store';
+import { LeonAvatar } from './LeonAvatar';
 
 const SUGGESTIONS = [
   'Est-ce que je dois faire quelque chose ?',
@@ -76,9 +77,7 @@ export function PhenixWidget({
           aria-label="Ouvrir PHÉNIX"
           className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2.5 rounded-full bg-ink-900 py-3 pl-3 pr-5 text-paper-0 shadow-lg transition-transform duration-base hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2"
         >
-          <span className="grid size-8 place-items-center rounded-full bg-gold-500/20 text-gold-300 [&_svg]:size-5">
-            <Sparkles aria-hidden />
-          </span>
+          <LeonAvatar className="size-9" />
           <span className="text-left leading-tight">
             <span className="block font-serif text-sm font-semibold">PHÉNIX</span>
             <span className="block text-[0.65rem] text-paper-0/70">Une question ?</span>
@@ -97,9 +96,7 @@ export function PhenixWidget({
           <aside className="relative flex h-full w-full max-w-md flex-col bg-background shadow-lg">
             {/* Header */}
             <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-              <span className="grid size-10 place-items-center rounded-xl bg-ink-900 text-gold-300 [&_svg]:size-5">
-                <Sparkles aria-hidden />
-              </span>
+              <LeonAvatar className="size-10" />
               <div className="flex-1">
                 <p className="font-serif text-lg font-semibold leading-tight text-foreground">
                   PHÉNIX
@@ -248,9 +245,7 @@ function PhenixBubble({
 }): React.JSX.Element {
   return (
     <div className="flex items-start gap-2.5">
-      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-ink-900 text-gold-300 [&_svg]:size-3.5">
-        <Sparkles aria-hidden />
-      </span>
+      <LeonAvatar className="mt-0.5 size-7" />
       <div
         className={`max-w-[85%] rounded-2xl rounded-tl-md px-4 py-2.5 text-sm ${
           highlight
