@@ -649,8 +649,10 @@ export const demo = {
 
     const events = snapshot.events.filter((e) => e.projectId === projectId);
     const dossier = snapshot.dossiers[projectId] ?? null;
+    const moments = snapshot.fil.moments[projectId] ?? [];
+    const zones = snapshot.fil.zones[projectId] ?? [];
     const history = list.map((m) => ({ role: m.role, texte: m.texte }));
-    const reply = corePhenix({ question: texte, events, dossier, history });
+    const reply = corePhenix({ question: texte, events, dossier, moments, zones, history });
 
     const phenixMsg: PhenixMessage = {
       id: crypto.randomUUID(),

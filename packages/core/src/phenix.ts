@@ -1,22 +1,26 @@
 /**
- * PHÉNIX — le cerveau (B1 : socle « concierge », ancré et déterministe)
+ * PHÉNIX — le cerveau (B2 : connaissance projet, ancrée & client-safe)
  * ===========================================================================
  * PHÉNIX n'est pas un chat : c'est un chef de projet numérique côté client.
  * Règle fondatrice — il ne répond QUE lorsqu'il dispose d'une information fiable
  * du dossier (aucune invention). Sinon, il transmet à l'équipe (escalade).
  *
- * B1 (ce fichier) : réponses par gabarits déterministes premium, ancrées sur les
- * vraies données (journal, comptes rendus, commandes, documents, réserves), avec
- * mention de source (« Réponse basée sur… »), mémoire simple (zone évoquée) et
- * règle « toujours faire avancer » (l'action réelle attendue du client).
- * Le RAG complet, les commandes exécutées et le push proactif viendront après
- * (B2+). La formulation restera remplaçable par un LLM sans toucher l'ancrage.
+ * B2 : PHÉNIX connaît tout le dossier — devis / avenants, planning / étapes,
+ * commandes / livraisons, documents, décisions, réserves (traduites), photos,
+ * pièces / matériaux / dates. Chaque réponse cite sa source (« Réponse basée
+ * sur… »). Règles non négociables :
+ *   • jamais de MONTANT ni de CALCUL (les questions de prix escaladent) ;
+ *   • jamais d'information interne (réserve n°, responsable, statut technique) ;
+ *   • au moindre doute → escalade.
+ * La formulation reste déterministe (remplaçable par un LLM sans toucher
+ * l'ancrage). Aucune logique dispersée : tout vit ici.
  */
 import type { Event } from './event.js';
 import { isDocument, isVisibleToClient } from './event.js';
 import { currentStep, leveeDeReserve, pendingClientDecisions, reserveEvents } from './views.js';
 import { PROJECT_STEP_LABEL } from './project.js';
-import type { Order, ProjectDossier } from './prepare.js';
+import type { ClientSelection, Order, ProjectDossier } from './prepare.js';
+import type { Moment, ProjectZone } from './fil.js';
 
 /** Ce sur quoi une réponse s'appuie (mention client, jamais technique). */
 export interface PhenixSource {
@@ -44,15 +48,100 @@ export interface PhenixInput {
   /** Journal du projet (PHÉNIX lit l'interne, mais ne parle QUE client-safe). */
   events: Event[];
   dossier?: ProjectDossier | null;
-  /** Historique de l'échange (mémoire simple : zone évoquée précédemment). */
+  /** Le Fil (pour répondre sur les photos par pièce). */
+  moments?: Moment[];
+  zones?: ProjectZone[];
+  /** Historique de l'échange (mémoire simple : intention + zone du tour précédent). */
   history?: { role: 'client' | 'phenix'; texte: string }[];
 }
 
+/* -------------------------------------------------------------------------- *
+ * Utilitaires de langue (déterministes, tolérants)
+ * -------------------------------------------------------------------------- */
 const strip = (s: string): string =>
   s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+
+const STOP = new Set([
+  'les',
+  'des',
+  'une',
+  'est',
+  'vous',
+  'avez',
+  'quel',
+  'quelle',
+  'quels',
+  'pour',
+  'dans',
+  'avec',
+  'sur',
+  'par',
+  'que',
+  'qui',
+  'votre',
+  'vos',
+  'nos',
+  'ses',
+  'mon',
+  'mes',
+  'est',
+  'ce',
+  'cette',
+  'mon',
+  'ma',
+  'ok',
+  'the',
+  'and',
+  'ou',
+  'est',
+  'elle',
+  'ils',
+  'sont',
+  'pas',
+  'plus',
+  'moi',
+  'nous',
+  'ete',
+  'etre',
+  'fait',
+  'faire',
+  'the',
+  'de',
+  'du',
+  'au',
+  'aux',
+  'le',
+  'la',
+  'un',
+  'en',
+  'a',
+  'il',
+  'je',
+  'tu',
+  'on',
+  'se',
+  'ne',
+  'y',
+  'deja',
+  'encore',
+  'bien',
+]);
+
+const tokenize = (s: string): string[] =>
+  strip(s)
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !STOP.has(w));
+
+function fmtDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+}
+
+/** Détection « question de prix » → jamais de montant/calcul (escalade). */
+const PRICE_RX =
+  /(combien|cout|coute|prix|montant|tarif|budget|euro|paiement|payer|acompte|reste a payer|facturation)/;
 
 const ZONES: { key: string; rx: RegExp }[] = [
   { key: 'la salle de bain', rx: /(salle de bain|sdb|douche|baignoire|lavabo)/ },
@@ -68,10 +157,6 @@ function zoneOf(text: string): string | null {
   return null;
 }
 
-function fmtDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-}
-
 /** Les actions réellement attendues du client (décisions en attente au journal). */
 export function clientTodos(events: Event[]): PhenixTodo[] {
   return pendingClientDecisions(events).map((d) => ({
@@ -83,18 +168,141 @@ export function clientTodos(events: Event[]): PhenixTodo[] {
   }));
 }
 
+/* -------------------------------------------------------------------------- *
+ * projectKnowledge — index client-safe de faits vérifiés du dossier
+ * -------------------------------------------------------------------------- */
+interface KnowledgeFact {
+  keys: string[];
+  answer: string;
+  clientLabel: string;
+}
+
+function commandeAnswer(o: Order): string {
+  const liv = o.dateLivraisonReelle ?? o.dateLivraisonEstimee;
+  if (o.statut === 'livree' || o.statut === 'posee' || o.statut === 'terminee')
+    return `Votre commande « ${o.label} » a bien été livrée${
+      o.dateLivraisonReelle ? ` le ${fmtDate(o.dateLivraisonReelle)}` : ''
+    }.`;
+  if (o.statut === 'commandee' || o.statut === 'en_preparation' || o.statut === 'expediee')
+    return `Votre commande « ${o.label} » est passée${
+      liv ? `, livraison prévue le ${fmtDate(liv)}` : ''
+    }.`;
+  return `La commande « ${o.label} » n'est pas encore passée ; votre conducteur la prépare.`;
+}
+
+function selectionAnswer(s: ClientSelection): string {
+  if (s.statut === 'valide')
+    return `Votre choix « ${s.categorie} » est validé${s.detail ? ` : ${s.detail}` : ''}.`;
+  return `Le choix « ${s.categorie} » est encore à valider de votre côté.`;
+}
+
+/** Assemble les faits vérifiés (client-safe). Aucun montant, aucune donnée interne. */
+function projectKnowledge(input: PhenixInput): KnowledgeFact[] {
+  const facts: KnowledgeFact[] = [];
+  const d = input.dossier;
+
+  // Documents (journal, visibles client)
+  for (const e of input.events.filter(isVisibleToClient).filter(isDocument)) {
+    facts.push({
+      keys: [...tokenize(e.content.libelle), 'document'],
+      answer: `J'ai retrouvé votre « ${e.content.libelle} ». Il est disponible dans votre espace.`,
+      clientLabel: 'vos documents',
+    });
+  }
+
+  if (d) {
+    // Commandes / livraisons
+    for (const o of d.orders) {
+      facts.push({
+        keys: [...tokenize(`${o.label} ${o.fournisseur ?? ''} ${o.reference ?? ''}`), 'commande'],
+        answer: commandeAnswer(o),
+        clientLabel: 'vos commandes',
+      });
+    }
+    // Choix client
+    for (const s of d.selections) {
+      facts.push({
+        keys: [...tokenize(`${s.categorie} ${s.label} ${s.detail ?? ''}`), 'choix'],
+        answer: selectionAnswer(s),
+        clientLabel: 'vos décisions',
+      });
+    }
+    // Planning / étapes (dates certaines)
+    for (const t of d.planning) {
+      facts.push({
+        keys: [...tokenize(t.label), 'etape', 'planning'],
+        answer: `L'étape « ${t.label} » est prévue autour du ${fmtDate(t.start)}.`,
+        clientLabel: 'votre planning',
+      });
+    }
+    // Devis / avenants (existence, jamais de montant)
+    if (d.devis) {
+      facts.push({
+        keys: ['devis', 'contrat'],
+        answer: "J'ai retrouvé votre devis signé. Je peux vous l'ouvrir.",
+        clientLabel: 'votre devis',
+      });
+    }
+    if (d.avenants && d.avenants.length > 0) {
+      facts.push({
+        keys: ['avenant', 'avenants', 'modification', 'modificatif'],
+        answer: "Un avenant a été ajouté à votre devis initial. Je peux vous l'ouvrir.",
+        clientLabel: 'votre devis',
+      });
+    }
+  }
+
+  // Photos par pièce (Le Fil)
+  if (input.moments && input.moments.length > 0) {
+    const zoneLabel = new Map((input.zones ?? []).map((z) => [z.id, z.label] as const));
+    const byZone = new Map<string, number>();
+    for (const m of input.moments) {
+      const label = m.zoneId ? zoneLabel.get(m.zoneId) : undefined;
+      if (label) byZone.set(label, (byZone.get(label) ?? 0) + m.photos.length);
+    }
+    for (const [label, count] of byZone) {
+      facts.push({
+        keys: [...tokenize(label), 'photo', 'photos'],
+        answer: `Vous avez ${count} photo${count > 1 ? 's' : ''} de « ${label} » dans votre récit.`,
+        clientLabel: 'vos photos',
+      });
+    }
+  }
+
+  return facts;
+}
+
+/** Recherche ancrée : le fait le mieux recouvert, sinon rien (→ escalade). */
+function searchKnowledge(q: string, facts: KnowledgeFact[]): KnowledgeFact | null {
+  const qTokens = new Set(tokenize(q));
+  let best: KnowledgeFact | null = null;
+  let bestScore = 0;
+  for (const f of facts) {
+    const score = f.keys.filter((k) => qTokens.has(k)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = f;
+    }
+  }
+  return bestScore >= 1 ? best : null;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Reconnaissance d'intention (déterministe, remplaçable par un LLM)
+ * -------------------------------------------------------------------------- */
 type PhenixIntent =
   | 'salutation'
   | 'todo'
+  | 'choix_valides'
   | 'avancement'
+  | 'planning'
   | 'reception'
-  | 'livraison'
+  | 'commande'
   | 'document'
   | 'reserve'
   | 'photo'
   | 'none';
 
-/** Reconnaissance d'intention tolérante (déterministe, remplaçable par un LLM). */
 function detectIntent(q: string): PhenixIntent {
   if (/^(bonjour|salut|hello|coucou|bonsoir|hey)\b/.test(q) && q.length < 24) return 'salutation';
   if (
@@ -103,35 +311,62 @@ function detectIntent(q: string): PhenixIntent {
     )
   )
     return 'todo';
-  if (/(reception|réception)/.test(q)) return 'reception';
-  if (/(livraison|livr|delai|arrive|meuble)/.test(q)) return 'livraison';
   if (
-    /(devis|facture|document|papier|contrat|attestation|plan|signer|signature|retrouve|ou est)/.test(
+    /(ai-je (deja )?(choisi|valide)|mes choix|que j'ai (choisi|valide)|choix.*valide|deja valide|deja choisi)/.test(
+      q,
+    )
+  )
+    return 'choix_valides';
+  if (/(reception|réception)/.test(q)) return 'reception';
+  if (
+    /(prochaine etape|prochaine phase|etape suivante|quand commence|quand debute|quand demarre|quand attaque)/.test(
+      q,
+    )
+  )
+    return 'planning';
+  if (/(command|livr|arrive|arrivee|expedi|colis|recu|fournisseur|delai)/.test(q))
+    return 'commande';
+  if (
+    /(devis|facture|document|papier|contrat|attestation|assurance|plan|signer|signature|retrouve|ou est|avenant)/.test(
       q,
     )
   )
     return 'document';
-  if (/(reserve|réserve|reprise|malfacon|defaut|corrige|peinture|finition)/.test(q))
-    return 'reserve';
+  if (/(reserve|réserve|reprise|malfacon|defaut|corrige|finition)/.test(q)) return 'reserve';
   if (/(photo|image|montre|voir la|voir les|revoir|regarder)/.test(q)) return 'photo';
   if (/(ou en est|avanc|etape|ca avance|bientot|termine avant|fini avant|c'est ou)/.test(q))
     return 'avancement';
-  if (/\bquand\b/.test(q)) return 'livraison';
+  if (/\bquand\b/.test(q)) return 'commande';
   return 'none';
 }
 
-/**
- * Le cœur de PHÉNIX (B1). Déterministe : chaque réponse est adossée à une donnée
- * du dossier et cite sa source. Sans donnée fiable → escalade (jamais d'invention).
- */
+/** Trouve la commande la plus proche des mots de la question. */
+function matchOrder(q: string, orders: Order[]): Order | undefined {
+  const qTokens = new Set(tokenize(q));
+  let best: Order | undefined;
+  let bestScore = 0;
+  for (const o of orders) {
+    const keys = tokenize(`${o.label} ${o.fournisseur ?? ''} ${o.reference ?? ''}`);
+    const score = keys.filter((k) => qTokens.has(k)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      best = o;
+    }
+  }
+  return bestScore >= 1 ? best : undefined;
+}
+
+/* -------------------------------------------------------------------------- *
+ * Le cœur de PHÉNIX
+ * -------------------------------------------------------------------------- */
 export function askPhenix(input: PhenixInput): PhenixReply {
   const q = strip(input.question);
   const events = input.events;
+  const dossier = input.dossier ?? null;
   const todos = clientTodos(events);
   const nextTodo = todos[0];
 
   // Mémoire simple : intention + zone reportées du tour précédent.
-  // Ex. « Où en est la cuisine ? » puis « Et la salle de bain ? ».
   let intent = detectIntent(q);
   let zone = zoneOf(input.question);
   if (input.history) {
@@ -163,6 +398,9 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     sources: [],
     escaladeQuestion: input.question.trim(),
   });
+
+  // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
+  if (PRICE_RX.test(q)) return escalate();
 
   switch (intent) {
     case 'salutation':
@@ -200,6 +438,21 @@ export function askPhenix(input: PhenixInput): PhenixReply {
         false,
       );
 
+    case 'choix_valides': {
+      const valides = (dossier?.selections ?? []).filter((s) => s.statut === 'valide');
+      // Question ciblée sur une catégorie précise ?
+      const ciblee = (dossier?.selections ?? []).find((s) =>
+        tokenize(`${s.categorie} ${s.label}`).some((k) => new Set(tokenize(q)).has(k)),
+      );
+      if (ciblee) return reply(selectionAnswer(ciblee), 'vos décisions');
+      if (valides.length === 0)
+        return reply("Vous n'avez pas encore validé de choix pour le moment.", 'vos décisions');
+      return reply(
+        `Vous avez validé : ${valides.map((s) => s.categorie).join(', ')}.`,
+        'vos décisions',
+      );
+    }
+
     case 'avancement': {
       const step = currentStep(events);
       if (!step) return escalate();
@@ -211,19 +464,52 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       );
     }
 
+    case 'planning': {
+      const tasks = dossier?.planning ?? [];
+      if (tasks.length === 0) return escalate();
+      const today = new Date().toISOString().slice(0, 10);
+      // « quand commence X » : tâche dont le libellé recoupe la question.
+      const qTokens = new Set(tokenize(q));
+      const ciblee = tasks.find((t) => tokenize(t.label).some((k) => qTokens.has(k)));
+      if (ciblee)
+        return reply(
+          `L'étape « ${ciblee.label} » est prévue autour du ${fmtDate(ciblee.start)}.`,
+          'votre planning',
+        );
+      // « prochaine étape » : première tâche qui démarre après aujourd'hui.
+      const next = [...tasks]
+        .sort((a, b) => a.start.localeCompare(b.start))
+        .find((t) => t.start > today);
+      if (next)
+        return reply(
+          `La prochaine étape est « ${next.label} », prévue autour du ${fmtDate(next.start)}.`,
+          'votre planning',
+        );
+      return escalate();
+    }
+
     case 'reception':
-      // La date de réception n'est pas figée en B1 → on transmet plutôt qu'inventer.
+      // La date de réception n'est pas figée de façon certaine → on transmet.
       return escalate();
 
-    case 'livraison': {
-      const orders: Order[] = input.dossier?.orders ?? [];
-      const ord = orders.find((o) => o.dateLivraisonReelle || o.dateLivraisonEstimee);
-      if (!ord) return escalate();
-      const d = ord.dateLivraisonReelle ?? ord.dateLivraisonEstimee!;
-      return reply(`La livraison « ${ord.label} » est prévue le ${fmtDate(d)}.`, 'vos commandes');
+    case 'commande': {
+      const orders = dossier?.orders ?? [];
+      if (orders.length === 0) return escalate();
+      const o = matchOrder(q, orders);
+      if (o) return reply(commandeAnswer(o), 'vos commandes');
+      // Générique (« quand la livraison ») : première commande datée.
+      const dated = orders.find((x) => x.dateLivraisonReelle || x.dateLivraisonEstimee);
+      if (dated) return reply(commandeAnswer(dated), 'vos commandes');
+      return escalate();
     }
 
     case 'document': {
+      // Avenant demandé explicitement
+      if (/avenant/.test(q) && dossier?.avenants && dossier.avenants.length > 0)
+        return reply(
+          "Un avenant a été ajouté à votre devis initial. Je peux vous l'ouvrir.",
+          'votre devis',
+        );
       const docs = events.filter(isVisibleToClient).filter(isDocument);
       const want = /devis/.test(q)
         ? 'devis'
@@ -234,13 +520,22 @@ export function askPhenix(input: PhenixInput): PhenixReply {
             : /attestation|assurance/.test(q)
               ? 'attestation'
               : null;
-      const doc =
-        (want ? docs.find((d) => strip(d.content.libelle).includes(want)) : undefined) ?? docs[0];
-      if (!doc) return escalate();
-      return reply(
-        `J'ai retrouvé votre « ${doc.content.libelle} ». Il est disponible dans votre espace.`,
-        'vos documents',
-      );
+      if (want) {
+        const doc = docs.find((d) => strip(d.content.libelle).includes(want));
+        if (doc)
+          return reply(
+            `J'ai retrouvé votre « ${doc.content.libelle} ». Il est disponible dans votre espace.`,
+            'vos documents',
+          );
+        return escalate(); // demandé un document précis introuvable → on ne devine pas.
+      }
+      const first = docs[0];
+      if (first)
+        return reply(
+          `J'ai retrouvé votre « ${first.content.libelle} ». Il est disponible dans votre espace.`,
+          'vos documents',
+        );
+      return escalate();
     }
 
     case 'reserve': {
@@ -259,15 +554,38 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     }
 
     case 'photo': {
-      const cible = zone ?? 'votre chantier';
+      // Ancré : si on connaît la pièce, on vérifie réellement les photos du Fil.
+      if (zone && input.moments) {
+        const zoneLabel = new Map((input.zones ?? []).map((z) => [z.id, z.label] as const));
+        const target = strip(zone).replace(/^(la|le|les|l') /, '');
+        const count = input.moments
+          .filter((m) => {
+            const label = m.zoneId ? zoneLabel.get(m.zoneId) : undefined;
+            return label ? strip(label).includes(target) || target.includes(strip(label)) : false;
+          })
+          .reduce((n, m) => n + m.photos.length, 0);
+        if (count > 0)
+          return reply(
+            `Vous avez ${count} photo${count > 1 ? 's' : ''} de ${zone} dans votre récit, un peu plus bas.`,
+            'vos photos',
+          );
+        return reply(
+          `Je n'ai pas encore de photo de ${zone} dans votre récit ; dès qu'il y en aura, elles y apparaîtront.`,
+          'vos photos',
+        );
+      }
       return reply(
-        `Les dernières photos de ${cible} sont dans votre récit, un peu plus bas.`,
-        'les photos de votre chantier',
+        'Les dernières photos de votre chantier sont dans votre récit, un peu plus bas.',
+        'vos photos',
       );
     }
 
-    default:
-      // Inquiétude sans intention précise → vérification honnête et rassurante.
+    default: {
+      // B2 : recherche ancrée dans la connaissance projet (matériaux, pièces,
+      // éléments précis…). Si rien de sûr → escalade (jamais d'approximation).
+      const fact = searchKnowledge(q, projectKnowledge(input));
+      if (fact) return reply(fact.answer, fact.clientLabel);
+
       if (worried) {
         const step = currentStep(events);
         const base = step
@@ -282,7 +600,7 @@ export function askPhenix(input: PhenixInput): PhenixReply {
           sources: [{ clientLabel: 'votre planning' }],
         };
       }
-      // Rien de fiable → escalade (jamais d'approximation).
       return escalate();
+    }
   }
 }
