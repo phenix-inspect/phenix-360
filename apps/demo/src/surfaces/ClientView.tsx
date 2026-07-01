@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Badge, Card, CardContent, EmptyState } from '@phenix360/ui';
 import { CalendarRange, Palette, Sparkles } from 'lucide-react';
 import {
@@ -126,17 +127,46 @@ export function ClientView({
   const latest = feed[0];
   const rest = feed.slice(1);
 
+  // Navigation PHÉNIX : on ouvre l'écran ciblé (défilement + repère visuel).
+  const clientTarget = snap.clientTarget;
+  useEffect(() => {
+    if (!clientTarget) return;
+    const id =
+      clientTarget.kind === 'document'
+        ? `ev-${clientTarget.ref}`
+        : clientTarget.kind === 'decision'
+          ? 'section-decision'
+          : clientTarget.kind === 'etapes'
+            ? 'section-etapes'
+            : 'section-fil';
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.animate?.(
+        [
+          { boxShadow: '0 0 0 0 rgba(169,128,58,0)' },
+          { boxShadow: '0 0 0 4px rgba(169,128,58,0.55)' },
+          { boxShadow: '0 0 0 0 rgba(169,128,58,0)' },
+        ],
+        { duration: 1600, easing: 'ease-out' },
+      );
+    }
+    demo.clearClientTarget();
+  }, [clientTarget]);
+
   return (
     <div className="space-y-6">
-      {clientDecision ? (
-        <ClientDecisionBanner
-          decision={clientDecision}
-          onValidate={(optionId) => validateDecision(clientDecision, optionId)}
-          onModify={(message) => requestModification(clientDecision, message)}
-        />
-      ) : (
-        <SmartBanner project={project} events={events} actor={actor} />
-      )}
+      <div id="section-decision" className="rounded-2xl">
+        {clientDecision ? (
+          <ClientDecisionBanner
+            decision={clientDecision}
+            onValidate={(optionId) => validateDecision(clientDecision, optionId)}
+            onModify={(message) => requestModification(clientDecision, message)}
+          />
+        ) : (
+          <SmartBanner project={project} events={events} actor={actor} />
+        )}
+      </div>
 
       <Card>
         <CardContent className="space-y-5 p-6">
@@ -145,10 +175,12 @@ export function ClientView({
         </CardContent>
       </Card>
 
-      <FilView snap={snap} project={project} actor={actor} canCompose={false} />
+      <div id="section-fil" className="rounded-2xl">
+        <FilView snap={snap} project={project} actor={actor} canCompose={false} />
+      </div>
 
       {dossier && dossierDated && (
-        <section className="space-y-3">
+        <section id="section-etapes" className="space-y-3 rounded-2xl">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <CalendarRange aria-hidden />
             <h2 className="font-serif text-lg font-semibold tracking-tight">
@@ -219,7 +251,9 @@ export function ClientView({
             <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
               Dernière activité
             </h2>
-            <MomentCard event={latest!} authorName={nameOf(snap, latest!.actor.userId)} />
+            <div id={`ev-${latest!.id}`} className="rounded-2xl">
+              <MomentCard event={latest!} authorName={nameOf(snap, latest!.actor.userId)} />
+            </div>
           </section>
 
           {rest.length > 0 && (
@@ -229,7 +263,9 @@ export function ClientView({
               </h2>
               <div className="space-y-5">
                 {rest.map((e) => (
-                  <MomentCard key={e.id} event={e} authorName={nameOf(snap, e.actor.userId)} />
+                  <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
+                    <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
+                  </div>
                 ))}
               </div>
             </section>

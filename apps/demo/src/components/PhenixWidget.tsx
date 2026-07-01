@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import { isDemande, type EventActor, type Project } from '@phenix360/core';
+import type { PhenixAction } from '@phenix360/core';
 import { ArrowRight, Send, X } from 'lucide-react';
 import { conversationOf, demo, type DemoSnapshot, type PhenixMessage } from '../store';
 import { LeonAvatar } from './LeonAvatar';
@@ -59,13 +60,26 @@ export function PhenixWidget({
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
+  // PHÉNIX = centre de navigation : il ouvre / filtre / affiche. Il n'ouvre que
+  // l'écran concerné pour une décision — il ne valide jamais à la place du client.
+  const navigate = (action: PhenixAction): void => {
+    if (action.kind === 'photo') {
+      if (action.ref) demo.openFilPhoto(action.ref);
+    } else {
+      demo.openClientTarget(action.kind, action.ref);
+    }
+    setOpen(false);
+  };
+
   const send = async (text: string): Promise<void> => {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
     setDraft('');
-    await demo.askPhenix(project.id, actor, t);
+    const msg = await demo.askPhenix(project.id, actor, t);
     setBusy(false);
+    // Commande explicite (« ouvre… ») → on exécute l'ouverture directement.
+    if (msg?.autoOpen && msg.action) navigate(msg.action);
   };
 
   return (
@@ -126,7 +140,7 @@ export function PhenixWidget({
                   key={m.id}
                   m={m}
                   reponse={reponseFor(m.demandeRef)}
-                  onClose={() => setOpen(false)}
+                  onNavigate={navigate}
                 />
               ))}
             </div>
@@ -181,11 +195,11 @@ export function PhenixWidget({
 function MessageRow({
   m,
   reponse,
-  onClose,
+  onNavigate,
 }: {
   m: PhenixMessage;
   reponse: string | null;
-  onClose: () => void;
+  onNavigate: (action: PhenixAction) => void;
 }): React.JSX.Element {
   if (m.role === 'client') {
     return (
@@ -204,6 +218,15 @@ function MessageRow({
           Réponse basée sur {m.sources.map((s) => s.clientLabel).join(', ')}.
         </p>
       )}
+      {m.action && (
+        <button
+          type="button"
+          onClick={() => onNavigate(m.action!)}
+          className="ml-1 inline-flex items-center gap-1.5 rounded-lg bg-ink-900 px-3 py-2 text-xs font-semibold text-paper-0 transition-transform hover:-translate-y-0.5 [&_svg]:size-3.5"
+        >
+          {m.action.label} <ArrowRight aria-hidden />
+        </button>
+      )}
       {m.avancer && (
         <div className="ml-1 rounded-xl border border-gold-200 bg-gold-50 p-3">
           <p className="text-xs font-medium uppercase tracking-wide text-gold-700">
@@ -214,7 +237,7 @@ function MessageRow({
             <span className="text-xs text-muted-foreground">{m.avancer.effort}</span>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => onNavigate({ kind: 'decision', label: 'Ouvrir ma décision' })}
               className="inline-flex items-center gap-1 text-xs font-semibold text-gold-700 hover:underline [&_svg]:size-3.5"
             >
               Le faire maintenant <ArrowRight aria-hidden />

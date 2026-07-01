@@ -33,12 +33,28 @@ export interface PhenixTodo {
   effort: string;
 }
 
+/**
+ * Une NAVIGATION que PHÉNIX propose ou exécute (B3). PHÉNIX ouvre / filtre /
+ * affiche — il ne valide JAMAIS une décision à la place du client (l'action
+ * `decision` ne fait qu'ouvrir l'écran concerné).
+ */
+export interface PhenixAction {
+  kind: 'document' | 'photo' | 'fil' | 'decision' | 'etapes';
+  /** Cible précise (id de document, id de moment…), selon le `kind`. */
+  ref?: string;
+  label: string;
+}
+
 export interface PhenixReply {
   kind: 'reponse' | 'escalade';
   message: string;
   sources: PhenixSource[];
   /** Prochaine action du client, proposée en fin de réponse (si elle existe). */
   avancer?: PhenixTodo;
+  /** Navigation associée (bouton), le cas échéant. */
+  action?: PhenixAction;
+  /** Commande explicite (« ouvre… ») → l'UI exécute l'ouverture directement. */
+  autoOpen?: boolean;
   /** Question à transmettre au conducteur (quand `kind === 'escalade'`). */
   escaladeQuestion?: string;
 }
@@ -327,14 +343,18 @@ function detectIntent(q: string): PhenixIntent {
   if (/(command|livr|arrive|arrivee|expedi|colis|recu|fournisseur|delai)/.test(q))
     return 'commande';
   if (
-    /(devis|facture|document|papier|contrat|attestation|assurance|plan|signer|signature|retrouve|ou est|avenant)/.test(
+    /(devis|facture|document|papier|contrat|attestation|assurance|\bplan\b|signer|signature|retrouve|ou est|avenant)/.test(
       q,
     )
   )
     return 'document';
   if (/(reserve|réserve|reprise|malfacon|defaut|corrige|finition)/.test(q)) return 'reserve';
   if (/(photo|image|montre|voir la|voir les|revoir|regarder)/.test(q)) return 'photo';
-  if (/(ou en est|avanc|etape|ca avance|bientot|termine avant|fini avant|c'est ou)/.test(q))
+  if (
+    /(ou en est|avanc|etape|planning|calendrier|frise|ca avance|bientot|termine avant|fini avant|c'est ou)/.test(
+      q,
+    )
+  )
     return 'avancement';
   if (/\bquand\b/.test(q)) return 'commande';
   return 'none';
@@ -384,12 +404,30 @@ export function askPhenix(input: PhenixInput): PhenixReply {
 
   const worried = /(inquiet|inquiete|peur|angoiss|stress|nerveu|panique|m'inquiet)/.test(q);
   const empathie = worried ? 'Je comprends votre inquiétude. ' : '';
+  // Commande explicite → PHÉNIX exécute l'ouverture (centre de navigation).
+  const isCommand =
+    /(ouvre|ouvrir|ouvrez|montre|montrer|montrez|affiche|affichez|emmene|emmène|va (sur|a|à)|conduis|fais voir|je veux voir|amene|amène)/.test(
+      q,
+    );
 
   const reply = (message: string, clientLabel?: string, withAvancer = true): PhenixReply => ({
     kind: 'reponse',
     message,
     sources: clientLabel ? [{ clientLabel }] : [],
     ...(withAvancer && nextTodo ? { avancer: nextTodo } : {}),
+  });
+  /** Réponse AVEC navigation (bouton ; exécutée d'emblée si commande). */
+  const nav = (
+    message: string,
+    clientLabel: string,
+    action: PhenixAction,
+    autoOpen: boolean,
+  ): PhenixReply => ({
+    kind: 'reponse',
+    message,
+    sources: [{ clientLabel }],
+    action,
+    ...(autoOpen ? { autoOpen: true } : {}),
   });
   const escalate = (): PhenixReply => ({
     kind: 'escalade',
@@ -401,6 +439,22 @@ export function askPhenix(input: PhenixInput): PhenixReply {
 
   // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
   if (PRICE_RX.test(q)) return escalate();
+
+  // Navigation « ouvre ma décision » : on OUVRE l'écran, on ne valide jamais.
+  if (isCommand && /(decision|choix|valider)/.test(q)) {
+    if (nextTodo)
+      return nav(
+        `Je vous ouvre votre prochaine décision : ${nextTodo.label}.`,
+        'vos décisions en attente',
+        { kind: 'decision', label: 'Ouvrir ma décision' },
+        true,
+      );
+    return reply(
+      "Vous n'avez aucune décision en attente aujourd'hui. Je veille sur votre chantier.",
+      'vos décisions en attente',
+      false,
+    );
+  }
 
   switch (intent) {
     case 'salutation':
@@ -425,17 +479,19 @@ export function askPhenix(input: PhenixInput): PhenixReply {
           false,
         );
       if (todos.length === 1)
-        return reply(
+        return nav(
           empathie +
             `Aujourd'hui, une seule action est attendue de votre part : ${todos[0]!.label} (${todos[0]!.effort}).`,
           'vos décisions en attente',
-          false,
+          { kind: 'decision', label: 'Ouvrir ma décision' },
+          isCommand,
         );
-      return reply(
+      return nav(
         empathie +
           `Aujourd'hui, ${todos.length} actions vous attendent. La plus importante : ${todos[0]!.label}.`,
         'vos décisions en attente',
-        false,
+        { kind: 'decision', label: 'Ouvrir ma décision' },
+        isCommand,
       );
 
     case 'choix_valides': {
@@ -457,10 +513,15 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const step = currentStep(events);
       if (!step) return escalate();
       const suffix = zone ? ` (${zone})` : '';
-      return reply(
-        empathie +
-          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement.`,
+      const message = isCommand
+        ? 'Je vous ouvre l’avancement de votre chantier.'
+        : empathie +
+          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement.`;
+      return nav(
+        message,
         'les derniers comptes rendus',
+        { kind: 'etapes', label: 'Voir les étapes' },
+        isCommand,
       );
     }
 
@@ -470,20 +531,25 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const today = new Date().toISOString().slice(0, 10);
       // « quand commence X » : tâche dont le libellé recoupe la question.
       const qTokens = new Set(tokenize(q));
+      const etapesAction: PhenixAction = { kind: 'etapes', label: 'Voir le planning' };
       const ciblee = tasks.find((t) => tokenize(t.label).some((k) => qTokens.has(k)));
       if (ciblee)
-        return reply(
+        return nav(
           `L'étape « ${ciblee.label} » est prévue autour du ${fmtDate(ciblee.start)}.`,
           'votre planning',
+          etapesAction,
+          isCommand,
         );
       // « prochaine étape » : première tâche qui démarre après aujourd'hui.
       const next = [...tasks]
         .sort((a, b) => a.start.localeCompare(b.start))
         .find((t) => t.start > today);
       if (next)
-        return reply(
+        return nav(
           `La prochaine étape est « ${next.label} », prévue autour du ${fmtDate(next.start)}.`,
           'votre planning',
+          etapesAction,
+          isCommand,
         );
       return escalate();
     }
@@ -504,37 +570,46 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     }
 
     case 'document': {
-      // Avenant demandé explicitement
-      if (/avenant/.test(q) && dossier?.avenants && dossier.avenants.length > 0)
-        return reply(
-          "Un avenant a été ajouté à votre devis initial. Je peux vous l'ouvrir.",
-          'votre devis',
-        );
       const docs = events.filter(isVisibleToClient).filter(isDocument);
+      const openDoc = (d: (typeof docs)[number]): PhenixReply =>
+        nav(
+          isCommand
+            ? `Je vous ouvre votre « ${d.content.libelle} ».`
+            : `J'ai retrouvé votre « ${d.content.libelle} ». Je peux vous l'ouvrir.`,
+          'vos documents',
+          { kind: 'document', ref: d.id, label: `Ouvrir « ${d.content.libelle} »` },
+          isCommand,
+        );
+      // Avenant : on ouvre le devis (le devis porte les avenants).
+      if (/avenant/.test(q) && dossier?.avenants && dossier.avenants.length > 0) {
+        const devisDoc = docs.find((d) => strip(d.content.libelle).includes('devis'));
+        return nav(
+          isCommand
+            ? 'Je vous ouvre votre devis (avenant inclus).'
+            : "Un avenant a été ajouté à votre devis initial. Je peux vous l'ouvrir.",
+          'votre devis',
+          devisDoc
+            ? { kind: 'document', ref: devisDoc.id, label: 'Ouvrir le devis' }
+            : { kind: 'fil', label: 'Voir mon espace' },
+          isCommand,
+        );
+      }
       const want = /devis/.test(q)
         ? 'devis'
         : /facture/.test(q)
           ? 'facture'
-          : /plan/.test(q)
+          : /\bplan\b/.test(q)
             ? 'plan'
             : /attestation|assurance/.test(q)
               ? 'attestation'
               : null;
       if (want) {
         const doc = docs.find((d) => strip(d.content.libelle).includes(want));
-        if (doc)
-          return reply(
-            `J'ai retrouvé votre « ${doc.content.libelle} ». Il est disponible dans votre espace.`,
-            'vos documents',
-          );
-        return escalate(); // demandé un document précis introuvable → on ne devine pas.
+        if (doc) return openDoc(doc);
+        return escalate(); // document précis introuvable → on ne devine pas.
       }
       const first = docs[0];
-      if (first)
-        return reply(
-          `J'ai retrouvé votre « ${first.content.libelle} ». Il est disponible dans votre espace.`,
-          'vos documents',
-        );
+      if (first) return openDoc(first);
       return escalate();
     }
 
@@ -558,25 +633,34 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       if (zone && input.moments) {
         const zoneLabel = new Map((input.zones ?? []).map((z) => [z.id, z.label] as const));
         const target = strip(zone).replace(/^(la|le|les|l') /, '');
-        const count = input.moments
-          .filter((m) => {
-            const label = m.zoneId ? zoneLabel.get(m.zoneId) : undefined;
-            return label ? strip(label).includes(target) || target.includes(strip(label)) : false;
-          })
-          .reduce((n, m) => n + m.photos.length, 0);
-        if (count > 0)
-          return reply(
-            `Vous avez ${count} photo${count > 1 ? 's' : ''} de ${zone} dans votre récit, un peu plus bas.`,
+        const inZone = input.moments.filter((m) => {
+          const label = m.zoneId ? zoneLabel.get(m.zoneId) : undefined;
+          return label ? strip(label).includes(target) || target.includes(strip(label)) : false;
+        });
+        const count = inZone.reduce((n, m) => n + m.photos.length, 0);
+        if (count > 0) {
+          const latest = [...inZone].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]!;
+          return nav(
+            isCommand
+              ? `Je vous ouvre les photos de ${zone}.`
+              : `Vous avez ${count} photo${count > 1 ? 's' : ''} de ${zone} dans votre récit.`,
             'vos photos',
+            { kind: 'photo', ref: latest.id, label: `Voir les photos de ${zone}` },
+            isCommand,
           );
+        }
         return reply(
           `Je n'ai pas encore de photo de ${zone} dans votre récit ; dès qu'il y en aura, elles y apparaîtront.`,
           'vos photos',
         );
       }
-      return reply(
-        'Les dernières photos de votre chantier sont dans votre récit, un peu plus bas.',
+      return nav(
+        isCommand
+          ? 'Je vous ouvre le récit en photos de votre chantier.'
+          : 'Les dernières photos de votre chantier sont dans votre récit.',
         'vos photos',
+        { kind: 'fil', label: 'Voir le récit' },
+        isCommand,
       );
     }
 

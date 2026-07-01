@@ -39,6 +39,7 @@ import {
   type NewEvent,
   type NewMember,
   type NewProject,
+  type PhenixAction,
   type PhenixSource,
   type PhenixTodo,
   type ProjectDossier,
@@ -76,8 +77,18 @@ export interface PhenixMessage {
   kind?: 'reponse' | 'escalade';
   sources?: PhenixSource[];
   avancer?: PhenixTodo;
+  /** Navigation associée (bouton dans le fil). */
+  action?: PhenixAction;
+  /** Commande explicite → l'UI ouvre d'emblée (TRANSITOIRE, jamais persisté). */
+  autoOpen?: boolean;
   /** Si escaladée : l'événement `demande` créé au Journal (pour la reprise). */
   demandeRef?: string;
+}
+
+/** Cible de navigation posée par PHÉNIX (consommée par l'Espace client). */
+export interface ClientTarget {
+  kind: 'document' | 'decision' | 'etapes' | 'fil';
+  ref?: string;
 }
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
@@ -118,6 +129,8 @@ export interface DemoSnapshot extends BackendState {
   phenix: Record<string, PhenixMessage[]>;
   /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
   filTarget: { momentId: string; photoId?: string } | null;
+  /** Cible transitoire : navigation PHÉNIX dans l'Espace client. */
+  clientTarget: ClientTarget | null;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -125,8 +138,10 @@ const backend = new InMemoryBackend(kv);
 const channel = new BroadcastChannel('phenix-demo');
 const listeners = new Set<() => void>();
 
-// Cible transitoire (en mémoire) pour le lien retour « Voir la photo ».
+// Cibles transitoires (en mémoire) : lien retour « Voir la photo » + navigation
+// PHÉNIX. Déclarées AVANT build() (elles y sont lues) pour éviter tout TDZ.
 let filTarget: { momentId: string; photoId?: string } | null = null;
+let clientTarget: ClientTarget | null = null;
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {
@@ -145,6 +160,7 @@ function build(): DemoSnapshot {
     },
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     filTarget,
+    clientTarget,
   };
 }
 
@@ -197,6 +213,17 @@ export const demo = {
   /** Cible consommée par la galerie. */
   clearFilTarget(): void {
     filTarget = null;
+    refresh();
+  },
+
+  /** PHÉNIX ouvre un écran de l'Espace client (navigation). */
+  openClientTarget(kind: ClientTarget['kind'], ref?: string): void {
+    clientTarget = { kind, ...(ref ? { ref } : {}) };
+    refresh();
+  },
+  /** Cible consommée par l'Espace client. */
+  clearClientTarget(): void {
+    clientTarget = null;
     refresh();
   },
 
@@ -633,9 +660,13 @@ export const demo = {
    * escalade en créant une demande (`destinataire: 'phenix'`) au Journal, qui
    * remonte côté conducteur (« Répondre au client » / le radar).
    */
-  async askPhenix(projectId: ProjectId, actor: EventActor, question: string): Promise<void> {
+  async askPhenix(
+    projectId: ProjectId,
+    actor: EventActor,
+    question: string,
+  ): Promise<PhenixMessage | null> {
     const texte = question.trim();
-    if (!texte) return;
+    if (!texte) return null;
     const now = new Date().toISOString();
     const conv = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
     const list = conv[projectId] ?? [];
@@ -662,6 +693,7 @@ export const demo = {
       kind: reply.kind,
       ...(reply.sources.length ? { sources: reply.sources } : {}),
       ...(reply.avancer ? { avancer: reply.avancer } : {}),
+      ...(reply.action ? { action: reply.action } : {}),
     };
 
     conv[projectId] = [...list, clientMsg, phenixMsg];
@@ -685,6 +717,9 @@ export const demo = {
     }
     refresh();
     broadcast();
+    // On renvoie le message (avec `autoOpen` TRANSITOIRE — jamais persisté) pour
+    // que l'UI exécute l'ouverture des commandes explicites.
+    return { ...phenixMsg, ...(reply.autoOpen ? { autoOpen: true } : {}) };
   },
 
   /** Charge le chantier de démonstration (jeu de données vivant). */
