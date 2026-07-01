@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
-import { CalendarRange, MessageCircle, Palette, Send, Sparkles } from 'lucide-react';
+import { Badge, Card, CardContent, EmptyState } from '@phenix360/ui';
+import { CalendarRange, Palette, Sparkles } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
@@ -10,9 +9,7 @@ import {
   isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
-  runAssistant,
   userId,
-  type AssistantResult,
   type ClientDecision,
   type EventActor,
   type Project,
@@ -26,6 +23,7 @@ import { GrandesEtapes } from '../components/GrandesEtapes';
 import { MomentCard } from '../components/MomentCard';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
+import { PhenixWidget } from '../components/PhenixWidget';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'client');
@@ -239,90 +237,7 @@ export function ClientView({
         </>
       )}
 
-      <Assistant snap={snap} project={project} actor={actor} />
+      <PhenixWidget snap={snap} project={project} actor={actor} />
     </div>
-  );
-}
-
-function Assistant({
-  snap,
-  project,
-  actor,
-}: {
-  snap: DemoSnapshot;
-  project: Project;
-  actor: EventActor;
-}): React.JSX.Element {
-  const [question, setQuestion] = useState('');
-  const [result, setResult] = useState<AssistantResult | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const ask = async () => {
-    if (!question.trim()) return;
-    setBusy(true);
-    const events = snap.events.filter((e) => e.projectId === project.id);
-    const orders = dossierOf(snap, project.id)?.orders ?? [];
-    const res = await runAssistant({ question: question.trim(), events, orders });
-    setResult(res);
-    setBusy(false);
-  };
-
-  const transmettre = async () => {
-    if (result?.kind !== 'demande_intent') return;
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'ouverte',
-      content: { question: result.demande.question, destinataire: 'phenix' },
-    });
-    setResult(null);
-    setQuestion('');
-  };
-
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-6">
-        <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-          <MessageCircle aria-hidden />
-          <h2 className="font-serif text-lg font-semibold tracking-tight">Demandez à PHÉNIX</h2>
-        </div>
-        <div className="flex gap-2">
-          <Input
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ex. Où en est la salle de bain ?"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void ask();
-            }}
-          />
-          <Button onClick={() => void ask()} disabled={busy}>
-            <Send aria-hidden />
-            Demander
-          </Button>
-        </div>
-
-        {result?.kind === 'answer' && (
-          <div className="space-y-2 rounded-lg border border-border bg-paper-50 p-3">
-            <p className="whitespace-pre-line text-sm text-foreground">{result.answer}</p>
-            {result.sources.length > 0 && (
-              <p className="text-xs text-muted-foreground">
-                Sources : {result.sources.map((s) => s.excerpt).join(' · ')}
-              </p>
-            )}
-          </div>
-        )}
-
-        {result?.kind === 'demande_intent' && (
-          <div className="space-y-2 rounded-lg border border-border bg-paper-50 p-3">
-            <p className="text-sm text-muted-foreground">{result.message}</p>
-            <Button size="sm" onClick={() => void transmettre()}>
-              Transmettre à PHÉNIX
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }

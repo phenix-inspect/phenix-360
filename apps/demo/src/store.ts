@@ -15,6 +15,7 @@ import {
   DEFAULT_AUDIENCE,
   InMemoryBackend,
   annotationId as toAnnotationId,
+  askPhenix as corePhenix,
   attachmentId as toAttachmentId,
   buildDecisionContent,
   coupDeCoeurId as toCoupId,
@@ -38,6 +39,8 @@ import {
   type NewEvent,
   type NewMember,
   type NewProject,
+  type PhenixSource,
+  type PhenixTodo,
   type ProjectDossier,
   type ProjectId,
   type ProjectPatch,
@@ -61,6 +64,21 @@ const FIL_COUPS_KEY = 'phenix-demo:fil-coups:v1';
 const FIL_MESSAGES_KEY = 'phenix-demo:fil-messages:v1';
 const FIL_ZONES_KEY = 'phenix-demo:fil-zones:v1';
 const FIL_ANNOTATIONS_KEY = 'phenix-demo:fil-annotations:v1';
+// PHÉNIX (conversation client) — agrégat léger, distinct du Journal.
+const PHENIX_CONV_KEY = 'phenix-demo:phenix-conv:v1';
+
+/** Un message du fil de conversation PHÉNIX (côté client). */
+export interface PhenixMessage {
+  id: string;
+  role: 'client' | 'phenix';
+  texte: string;
+  at: string;
+  kind?: 'reponse' | 'escalade';
+  sources?: PhenixSource[];
+  avancer?: PhenixTodo;
+  /** Si escaladée : l'événement `demande` créé au Journal (pour la reprise). */
+  demandeRef?: string;
+}
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
@@ -96,6 +114,8 @@ export interface DemoSnapshot extends BackendState {
     zones: Record<string, ProjectZone[]>;
     annotations: Record<string, Annotation[]>;
   };
+  /** Conversation PHÉNIX (par projet) — fil client, distinct du Journal. */
+  phenix: Record<string, PhenixMessage[]>;
   /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
   filTarget: { momentId: string; photoId?: string } | null;
 }
@@ -123,6 +143,7 @@ function build(): DemoSnapshot {
       zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
       annotations: readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {}),
     },
+    phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     filTarget,
   };
 }
@@ -606,6 +627,64 @@ export const demo = {
     broadcast();
   },
 
+  /**
+   * PHÉNIX répond au client (B1). Le fil de conversation est un agrégat léger
+   * (hors Journal). PHÉNIX ne répond QUE s'il a une donnée fiable ; sinon il
+   * escalade en créant une demande (`destinataire: 'phenix'`) au Journal, qui
+   * remonte côté conducteur (« Répondre au client » / le radar).
+   */
+  async askPhenix(projectId: ProjectId, actor: EventActor, question: string): Promise<void> {
+    const texte = question.trim();
+    if (!texte) return;
+    const now = new Date().toISOString();
+    const conv = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
+    const list = conv[projectId] ?? [];
+
+    const clientMsg: PhenixMessage = {
+      id: crypto.randomUUID(),
+      role: 'client',
+      texte,
+      at: now,
+    };
+
+    const events = snapshot.events.filter((e) => e.projectId === projectId);
+    const dossier = snapshot.dossiers[projectId] ?? null;
+    const history = list.map((m) => ({ role: m.role, texte: m.texte }));
+    const reply = corePhenix({ question: texte, events, dossier, history });
+
+    const phenixMsg: PhenixMessage = {
+      id: crypto.randomUUID(),
+      role: 'phenix',
+      texte: reply.message,
+      at: now,
+      kind: reply.kind,
+      ...(reply.sources.length ? { sources: reply.sources } : {}),
+      ...(reply.avancer ? { avancer: reply.avancer } : {}),
+    };
+
+    conv[projectId] = [...list, clientMsg, phenixMsg];
+    localStorage.setItem(PHENIX_CONV_KEY, JSON.stringify(conv));
+
+    // Escalade : on ouvre une demande au Journal et on la relie au message.
+    if (reply.kind === 'escalade' && reply.escaladeQuestion) {
+      const event = await backend.appendEvent({
+        projectId,
+        actor,
+        type: 'demande',
+        visibility: 'client',
+        state: 'ouverte',
+        content: { question: reply.escaladeQuestion, destinataire: 'phenix' },
+      });
+      const map = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
+      map[projectId] = (map[projectId] ?? []).map((m) =>
+        m.id === phenixMsg.id ? { ...m, demandeRef: event.id } : m,
+      );
+      localStorage.setItem(PHENIX_CONV_KEY, JSON.stringify(map));
+    }
+    refresh();
+    broadcast();
+  },
+
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
     const { state, people, activeProjectId, dossiers, fil } = buildDemoSeed();
@@ -619,6 +698,7 @@ export const demo = {
     localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
     localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(fil.annotations));
+    localStorage.removeItem(PHENIX_CONV_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -636,6 +716,7 @@ export const demo = {
     localStorage.removeItem(FIL_MESSAGES_KEY);
     localStorage.removeItem(FIL_ZONES_KEY);
     localStorage.removeItem(FIL_ANNOTATIONS_KEY);
+    localStorage.removeItem(PHENIX_CONV_KEY);
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -670,6 +751,15 @@ export function dossierOf(
 export function pinnedOf(snap: DemoSnapshot, projectId: string | null | undefined): Set<string> {
   if (!projectId) return new Set();
   return new Set(snap.pins[projectId] ?? []);
+}
+
+/** Le fil de conversation PHÉNIX d'un projet (côté client). */
+export function conversationOf(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): PhenixMessage[] {
+  if (!projectId) return [];
+  return snap.phenix[projectId] ?? [];
 }
 
 /** Le Fil d'un projet (moments + annotations + zones). */

@@ -17,6 +17,7 @@ export * from './decision.js';
 export * from './views.js';
 export * from './next-action.js';
 export * from './assistant.js';
+export * from './phenix.js';
 export * from './calendar.js';
 export * from './devis.js';
 export * from './prepare.js';
