@@ -386,14 +386,19 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   const todos = clientTodos(events);
   const nextTodo = todos[0];
 
-  // Mémoire simple : intention + zone reportées du tour précédent.
+  // Mémoire simple : intention + zone reportées du tour précédent. On ne
+  // reporte l'INTENTION que pour une vraie relance courte (« et la cuisine ? ») :
+  // une question longue porte son propre sujet — hériter d'une intention passée
+  // ferait répondre à côté (une réponse assurée hors-sujet = une invention). La
+  // zone, elle, se reporte toujours (elle ne fait que préciser une réponse).
   let intent = detectIntent(q);
   let zone = zoneOf(input.question);
+  const isFollowUp = tokenize(q).length <= 3;
   if (input.history) {
     for (let i = input.history.length - 1; i >= 0; i--) {
       const h = input.history[i];
       if (!h || h.role !== 'client') continue;
-      if (intent === 'none') {
+      if (intent === 'none' && isFollowUp) {
         const past = detectIntent(strip(h.texte));
         if (past !== 'none' && past !== 'salutation') intent = past;
       }
