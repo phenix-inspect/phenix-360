@@ -683,6 +683,64 @@ export const demo = {
     broadcast();
   },
 
+  /* --------------------------- Mode Artisan ------------------------------- */
+
+  /**
+   * L'artisan SIGNALE au conducteur une intervention terminée (« à valider »).
+   * Canal distinct des questions client (`destinataire: 'conducteur'`), toujours
+   * INTERNE : jamais exposé au client (VISION Art. 9). Le conducteur le voit dans
+   * son journal / le radar, puis valide (ex. lève la réserve).
+   */
+  async artisanSignal(projectId: ProjectId, actor: EventActor, libelle: string): Promise<void> {
+    const question = libelle.trim();
+    if (!question) return;
+    await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'demande',
+      visibility: 'interne',
+      state: 'ouverte',
+      content: { question, destinataire: 'conducteur' },
+    });
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * L'artisan PARTAGE une photo (et un mot en légende) de son avancement. Photo
+   * interne (visible de l'équipe, jamais du client tant qu'elle n'est pas
+   * repartagée). Réutilise le même modèle de pièce jointe que le reste du Fil.
+   */
+  async artisanPhoto(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: { legende?: string; piece?: string },
+  ): Promise<void> {
+    const legende = input.legende?.trim();
+    const piece = input.piece?.trim();
+    await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'photo',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        attachment: {
+          id: toAttachmentId(crypto.randomUUID()),
+          kind: 'photo',
+          bucket: 'demo',
+          storagePath: `${projectId}/${crypto.randomUUID()}.jpg`,
+          mimeType: 'image/jpeg',
+          createdAt: new Date().toISOString(),
+        },
+        ...(legende ? { legende } : {}),
+        ...(piece ? { piece } : {}),
+      },
+    });
+    refresh();
+    broadcast();
+  },
+
   /**
    * LEVÉE d'une réserve (append-only). On n'efface ni ne modifie jamais la
    * réserve : on AJOUTE au Journal un événement `levee` qui pointe vers elle,

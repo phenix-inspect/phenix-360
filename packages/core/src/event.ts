@@ -140,7 +140,7 @@ export interface DocumentContent {
  *  • `client` : PHÉNIX attend une décision / une action du CLIENT ;
  *  • `phenix` : une question DU client à laquelle PHÉNIX (le conducteur) répond.
  */
-export type DemandeAudience = 'client' | 'phenix';
+export type DemandeAudience = 'client' | 'phenix' | 'conducteur';
 
 /** Réponse PORTÉE par la demande (pas un événement séparé, pas un fil). */
 export interface DemandeResolution {

@@ -16,14 +16,16 @@ import { demo, useDemo } from './store';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { PointDuSoirView } from './surfaces/PointDuSoirView';
 import { CompagnonView } from './surfaces/CompagnonView';
+import { ArtisanView } from './surfaces/ArtisanView';
 import { ClientView } from './surfaces/ClientView';
 import { PhenixStart } from './start/PhenixStart';
 
-type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'client';
+type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'artisan' | 'client';
 
 const VIEW_OPTIONS = [
   { value: 'aujourdhui' as const, label: 'Aujourd’hui' },
   { value: 'compagnon' as const, label: 'Chantier' },
+  { value: 'artisan' as const, label: 'Artisan' },
   { value: 'client' as const, label: 'Espace client' },
 ];
 
@@ -89,6 +91,8 @@ export function App(): React.JSX.Element {
           <NoProject onNew={() => setCreating(true)} />
         ) : view === 'compagnon' ? (
           <CompagnonView snap={snap} project={activeProject} />
+        ) : view === 'artisan' ? (
+          <ArtisanView snap={snap} project={activeProject} />
         ) : (
           <ClientView snap={snap} project={activeProject} />
         )}

@@ -52,24 +52,32 @@ d'une réserve existante → futur sprint « Amendement de faits ». VISION Art.
 
 Base : `DossierPanel` très riche (note de lancement PHÉNIX, devis + avenants,
 feuille de route, planning en dates, commandes, propositions, documents,
-questions). **Manque** : parcours de dépôt guidé plus robuste, édition du dossier,
-états vides propres, cohérence des compteurs. VISION Art. 1, 7.
+questions). **Objectif PO** : un vrai **bureau de préparation** — un chantier entièrement
+préparable dans PHÉNIX avant de partir : devis, plans, photos, commandes,
+fournisseurs, planning, artisans, documents, décisions, **budget**, **check-list
+de lancement**. **Manque** : édition du dossier, budget consolidé, check-list de
+lancement, états vides propres. VISION Art. 1, 7.
 
 ### EPIC 6 — Planning intelligent · 🟡 À compléter
 
 Base : `buildPlanning`, `PlanningFrieze`, `GrandesEtapes`, `SmartPlanningView`.
-**Manque** : replanification (décalage d'étape ↦ propagation), impact des
-décisions/commandes en retard sur les dates, jalons. VISION Art. 3, 7.
+**Objectif PO** : un vrai planning, pas seulement des dates — vue intelligente :
+**interventions**, **dépendances**, **retards**, **conflits**, **alertes**.
+**Manque** : replanification (décalage ↦ propagation), dépendances entre étapes,
+détection de conflits, impact des décisions/commandes en retard. VISION Art. 3, 7.
 
 ### EPIC 7 — Bibliothèque · 🟡 À compléter
 
-Base : `BibliothequeView` (le Fil par pièce/album). **Manque** : recherche,
-filtres (pièce / type / partagé), sélection multiple, tri. VISION Art. 8, 9.
+**Objectif PO** : une vraie **GED** — classement automatique, recherche,
+**versionning**, assistance IA au rangement. Base : `BibliothequeView` (le Fil par
+pièce/album). **Manque** : recherche, filtres (pièce / type / partagé),
+versionning, classement automatique. VISION Art. 8, 9.
 
 ### EPIC 8 — Documents · 🔴 À développer
 
-Générer les **sorties** métier (compte rendu, PV de réception, liste de réserves)
-en document partageable/imprimable. Aujourd'hui : aperçu écran seulement. VISION Art. 8.
+**Objectif PO** : tous les documents réellement exploitables — **CR**, **PV**,
+**SAV**, documents chantier — générés en sortie partageable/imprimable. Aujourd'hui :
+aperçu écran seulement. VISION Art. 8.
 
 ### EPIC 9 — Notifications · 🔴 À développer
 
@@ -77,16 +85,25 @@ Un vrai centre de notifications (le « radar » : ce qui a bougé, ce qui attend
 Base partielle : `AttentionPanel`. **Manque** : file de notifications datée,
 lue/non-lue, actions rapides. VISION Art. 7, 10.
 
-### EPIC 10 — Assistant IA · 🟡 À compléter
+### EPIC 10 — Assistant IA · 🟡 À compléter — **reporté après les fondations métier**
 
 Base : concierge **Léon** côté client (réponses ancrées, escalade, reprise) +
-copilote `buildChantierAttention` côté conducteur. **Manque** : plus d'insights
-proactifs (silence client, intervention due, réserve → réception), mémoire. VISION Art. 7, 9.
+copilote `buildChantierAttention` côté conducteur. **Décision PO (02/07/2026)** :
+on n'investit pas massivement l'IA tant que le métier n'est pas complet — l'IA
+amplifie un logiciel déjà excellent, elle ne masque pas un manque. Reprise après
+les EPICs 11/5/6/19/8/7/9/Admin. VISION Art. 7, 9.
 
-### EPIC 11 — Mode Artisan · 🔴 À développer
+### EPIC 11 — Mode Artisan · ✅ Terminé (Sprint 2)
 
-Vue dédiée artisan : ses tâches, ses réserves à lever, ses livraisons — sans
-l'interne du conducteur ni le client. VISION Art. 9.
+L'espace du sous-traitant sur un chantier (`ArtisanView`, 4ᵉ onglet « Artisan ») :
+sélecteur d'identité (artisans du chantier), **mon planning** (où en est le
+chantier), **mes interventions** (réserves + actions qui me sont attribuées) avec
+**« Signaler terminé »** (signalement au conducteur, canal `destinataire:
+'conducteur'`, surfacé au journal), **partager une photo/mot** d'avancement, et
+**les infos partagées** du chantier. Nouveau rôle `sous_traitant`. Tout ce que
+l'artisan écrit est **interne → jamais côté client** (garanti par
+`isVisibleToClient`, testé). Playwright artisan 8/8, sans régression. VISION Art. 9
+(chacun ne voit que ce qui lui est destiné), Art. 2 (acteurs du chantier).
 
 ### EPIC 12 — Mode Client · 🟡 À compléter
 
@@ -120,8 +137,11 @@ Le planning **de tous les chantiers** d'un conducteur, sur une seule frise. VISI
 
 ### EPIC 19 — Commandes · 🟡 À compléter
 
-Base : commandes dans le dossier + alertes (`buildOrderAlerts`). **Manque** :
-cycle de vie éditable (à commander → commandée → livrée), lien avenant → commande. VISION Art. 7.
+**Objectif PO** : un vrai **module commandes** — suivi, **réception**,
+**manquants**, **retards**, **impact sur le planning**. Base : commandes du
+dossier + alertes (`buildOrderAlerts`). **Manque** : cycle de vie éditable
+(à commander → commandée → livrée), réception avec manquants, lien avenant →
+commande, impact planning. VISION Art. 7.
 
 ### EPIC 20 — Documents intelligents · 🔴 À développer
 
@@ -137,9 +157,25 @@ Aujourd'hui : dossier saisi/seedé. VISION Art. 7.
   EPIC 14/15/16. Décision d'architecture à tracer dans `DECISIONS.md` avant de coder.
 - **Tests** : suites Playwright par Epic (parcours réels), zéro erreur console.
 
-## Ordre de marche (proposé par le CTO)
+## Ordre de marche V1 — figé par le PO (02/07/2026)
 
-Finir les 🟡 les plus proches du métier et du quotidien du conducteur avant les
-🔴 d'infrastructure : **4 Réserves → 5 Préparation / 19 Commandes → 9 Notifications
-→ 6 Planning → 8 Documents**, puis la fondation bêta (**14 Auth → 15/16 → 13 Admin**).
-Cet ordre peut évoluer ; il est réévalué à chaque sprint.
+**Principe :** terminer le MÉTIER avant d'investir l'IA. « Une IA à 70 % dans une
+application à 100 % plutôt qu'une IA à 100 % dans une application à 70 %. » L'IA
+sera l'accélérateur, jamais la béquille — elle ne doit jamais masquer un manque
+fonctionnel.
+
+Priorités de construction, dans l'ordre :
+
+1. **EPIC 11 — Mode Artisan** _(Sprint 2, en cours)_
+2. **EPIC 5 — Préparation chantier** (vrai bureau de préparation)
+3. **EPIC 6 — Planning intelligent** (interventions, dépendances, retards, conflits)
+4. **EPIC 19 — Commandes** (vrai module : suivi, réception, manquants, retards)
+5. **EPIC 8 — Documents** (CR, PV, SAV, documents chantier exploitables)
+6. **EPIC 7 — Bibliothèque** (vraie GED : classement, recherche, versionning)
+7. **EPIC 9 — Notifications** (centre : priorités, lecture, historique)
+8. **EPIC 13/15/16/17 — Administration** (entreprises, utilisateurs, rôles, paramètres)
+   avec la fondation **EPIC 14 — Authentification**.
+
+**Puis seulement**, une fois ces briques terminées : **EPIC 10 — Assistant IA**
+(copilote), qui aura alors énormément de matière pour devenir réellement utile.
+`DECISIONS.md` : investissement IA reporté après les fondations métier (02/07/2026).

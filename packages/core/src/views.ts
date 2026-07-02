@@ -73,6 +73,20 @@ export function questionsEnAttente(events: Event[]): DemandeEvent[] {
   );
 }
 
+/**
+ * Signalements des ARTISANS en attente de validation du conducteur (« j'ai
+ * terminé, à valider »). Canal distinct des questions client — lecture filtrée
+ * du journal (Mode Artisan). Toujours interne : jamais exposé au client.
+ */
+export function signalementsArtisan(events: Event[]): DemandeEvent[] {
+  return sortByDate(
+    events
+      .filter(isDemande)
+      .filter((e) => e.content.destinataire === 'conducteur' && e.state === 'ouverte'),
+    'asc',
+  );
+}
+
 /** Le récit client : tout le journal visible au client, récent d'abord. */
 export function clientFeed(events: Event[]): Event[] {
   return sortByDate(forClient(events), 'desc');

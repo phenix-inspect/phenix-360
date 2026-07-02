@@ -12,7 +12,11 @@ export function eventTitle(e: Event): string {
     case 'document':
       return e.content.libelle;
     case 'demande':
-      return e.content.destinataire === 'client' ? 'Une décision vous attend' : 'Demande';
+      return e.content.destinataire === 'client'
+        ? 'Une décision vous attend'
+        : e.content.destinataire === 'conducteur'
+          ? 'Signalement artisan'
+          : 'Demande';
     case 'decision':
       return describeDecisionEvent(e.content).title;
     case 'reserve':

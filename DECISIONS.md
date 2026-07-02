@@ -76,3 +76,37 @@ donc l'absence d'édition ne bloque pas l'usage.
 un patch ad hoc réservé aux réserves.
 **Impact :** un futur sprint « Amendement de faits » ajoutera l'édition à réserves,
 actions, décisions et commandes d'un coup. Noté au backlog.
+
+## 02/07/2026 — Terminer le métier avant d'investir l'IA
+
+**Décision :** l'ordre de construction V1 privilégie les fondations MÉTIER
+(Artisan, Préparation, Planning, Commandes, Documents, Bibliothèque, Notifications,
+Administration) AVANT tout investissement massif dans le copilote IA (EPIC 10).
+**Pourquoi (PO) :** « une IA à 70 % dans une application à 100 % plutôt qu'une IA à
+100 % dans une application à 70 % ». L'IA est un accélérateur, pas une béquille :
+elle ne doit jamais masquer un manque fonctionnel, et elle aura bien plus de
+matière une fois le métier complet.
+**Alternatives rejetées :** enchaîner les sprints IA (copilote proactif) tout de suite.
+**Impact :** `BACKLOG.md` réordonné (Ordre de marche V1 figé). EPIC 11 Mode Artisan
+devient le Sprint 2. EPIC 10 repris après les fondations.
+
+## 02/07/2026 — Mode Artisan : rôle `sous_traitant`, identité par sélecteur, canal dédié
+
+**Décision :** (1) ajout du rôle d'acteur `sous_traitant` (l'artisan est un auteur
+d'événements de plein droit). (2) En l'absence d'authentification (EPIC 14),
+l'identité de l'artisan est choisie par un **sélecteur** (les artisans du
+chantier, dérivés des responsables de réserves/actions et des intervenants). (3)
+Le canal artisan → conducteur (« Signaler terminé / à valider ») est une `demande`
+avec `destinataire: 'conducteur'`, **toujours en visibilité interne** — donc
+jamais visible du client (`isVisibleToClient` retourne faux dès que `visibility
+!== 'client'`).
+**Pourquoi :** livrer un Mode Artisan complet et client-safe sans attendre l'auth ;
+modéliser proprement le rôle plutôt que de le simuler ; séparer le canal artisan
+du canal client (`destinataire: 'phenix'`) pour ne pas polluer « Répondre au
+client ».
+**Alternatives rejetées :** faire signer l'artisan comme `equipe` (moins juste) ;
+un flag ad hoc au lieu d'un vrai canal `demande`.
+**Impact / suites :** un **inbox conducteur dédié** aux signalements artisans
+(`signalementsArtisan`) et l'**authentification** (identités réelles) restent à
+faire (EPIC 9/14). La persistance du « signalé » entre sessions viendra avec la
+brique d'amendement de faits.
