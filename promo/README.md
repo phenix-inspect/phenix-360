@@ -2,10 +2,10 @@
 
 Deux films de présentation (style Apple / Linear), rendus et livrés :
 
-| Fichier | Durée | Sujet |
-|---|---|---|
-| `phenix-conducteur-demo.mp4` | ~2 min 41 | Le bureau mobile du conducteur |
-| `phenix-client-demo.mp4` | ~1 min 59 | L'espace client (sécurisé, concierge Léon) |
+| Fichier                      | Durée     | Sujet                                                                                            |
+| ---------------------------- | --------- | ------------------------------------------------------------------------------------------------ |
+| `phenix-conducteur-demo.mp4` | ~2 min 47 | Le bureau mobile du conducteur — matin, préparation, copilote, scène signature, fil vivant, soir |
+| `phenix-client-demo.mp4`     | ~1 min 50 | L'espace client — vraie conversation avec le concierge Léon                                      |
 
 Chaque film contient déjà : carte d'intro + carte d'outro titrées (fondus + léger
 zoom), **musique de fond douce**, **sous-titres cinétiques = la narration**,
@@ -37,6 +37,7 @@ python3 make_voice.py client     --engine edge --voice fr-FR-DeniseNeural   # ou
 ```
 
 ### Autres moteurs de voix
+
 ```bash
 export OPENAI_API_KEY=...    ; python3 make_voice.py conducteur --engine openai --voice onyx
 export ELEVENLABS_API_KEY=...; python3 make_voice.py conducteur --engine eleven --voice <voice_id>

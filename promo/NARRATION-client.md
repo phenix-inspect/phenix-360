@@ -1,23 +1,22 @@
-# Vidéo 2 — PHÉNIX côté client
+# Vidéo 2 — PHÉNIX côté client (le concierge)
 
 Narration (voix off), dans l'ordre du montage :
 
-- [7.2s] Le client ne voit jamais la complexité du chantier.
-- [12.2s] Il retrouve uniquement ce qui le concerne.
-- [18.0s] Les décisions.
-- [22.8s] Les photos.
-- [28.0s] L’histoire de son chantier, en images.
-- [33.8s] L’avancement.
-- [39.7s] Et PHÉNIX.
-- [43.5s] Il peut poser une question.
-- [50.1s] PHÉNIX répond à partir des informations réelles du projet.
-- [57.5s] Si une réponse n’est pas certaine…
-- [64.9s] PHÉNIX n’invente jamais.
-- [69.3s] L’équipe est sollicitée.
-- [77.8s] L’équipe répond. Le client est informé.
-- [86.3s] Jamais de réserve technique. Jamais de responsable.
-- [92.7s] Aucune action interne. Aucune complexité.
-- [98.8s] Chacun ne voit que ce qui lui est destiné.
-- [103.8s] Simple.
-- [106.8s] Rassurant.
-- [109.7s] Transparent.
+- [7.2s] Côté client, tout est simple.
+- [11.2s] Il ne voit que ce qui le concerne.
+- [16.8s] Et il peut parler à PHÉNIX. Une vraie conversation.
+- [23.4s] « Où en est la salle de bain ? »
+- [27.5s] PHÉNIX retrouve les vraies photos du chantier.
+- [33.8s] « Et le carrelage ? »
+- [37.5s] Une date précise, tirée du planning réel.
+- [44.0s] « Puis-je changer le meuble vasque ? »
+- [48.3s] Quand il ne sait pas, PHÉNIX n’invente jamais.
+- [53.1s] Il crée une demande auprès de l’équipe.
+- [62.3s] L’équipe répond. Le client est toujours informé.
+- [70.7s] Jamais de réserve. Jamais de responsable. Jamais l’interne.
+- [77.5s] Juste son chantier, raconté simplement.
+- [83.5s] De belles photos. Son avancement. Ses choix.
+- [90.1s] Chacun ne voit que ce qui lui est destiné.
+- [94.9s] Simple.
+- [97.8s] Rassurant.
+- [100.7s] Transparent.

@@ -20,7 +20,7 @@ import { Camera, Check, Loader2, Mic, Plus, Send, Sparkles, Trash2, X } from 'lu
 import { demo } from '../../store';
 import { mediaUploader } from '../../lib/media';
 
-type Step = 'capture' | 'comprend' | 'partager';
+type Step = 'capture' | 'travaille' | 'comprend' | 'partager';
 
 interface Pick {
   key: string;
@@ -96,8 +96,10 @@ export function MissionFlow({
 
   const runPhenix = (): void => {
     const recit = phrasesList.join('. ');
+    // Le conducteur range son téléphone. PHÉNIX, lui, se met au travail (Art. 5,
+    // 7) : il rédige, extrait, crée, met à jour — puis « C'est prêt ».
     setPrep(prepareMission({ kind, recit, presents: [], photoIds: [] }));
-    setStep('comprend');
+    setStep('travaille');
   };
 
   const validate = async (): Promise<void> => {
@@ -163,9 +165,11 @@ export function MissionFlow({
         <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
           {step === 'capture'
             ? 'En cours'
-            : step === 'comprend'
-              ? 'PHÉNIX a compris'
-              : 'Enregistré'}
+            : step === 'travaille'
+              ? 'PHÉNIX prépare…'
+              : step === 'comprend'
+                ? 'PHÉNIX a compris'
+                : 'Enregistré'}
         </span>
       </header>
 
@@ -184,6 +188,10 @@ export function MissionFlow({
           />
         )}
 
+        {step === 'travaille' && prep && (
+          <TravailleStep prep={prep} onDone={() => setStep('comprend')} />
+        )}
+
         {step === 'comprend' && prep && <ComprendStep prep={prep} onChange={setPrep} />}
 
         {step === 'partager' && prep && (
@@ -199,58 +207,150 @@ export function MissionFlow({
         )}
       </div>
 
-      {/* Pied : une seule action forte */}
-      <footer className="border-t border-border px-5 py-4">
-        <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
-          {step === 'capture' && (
-            <>
-              <span className="text-xs text-muted-foreground">
-                {picks.length > 0 || phrasesList.length > 0
-                  ? `${picks.length} photo${picks.length > 1 ? 's' : ''} · ${phrasesList.length} note${phrasesList.length > 1 ? 's' : ''}`
-                  : 'Photographiez et parlez'}
+      {/* Pied : une seule action forte (masqué pendant que PHÉNIX prépare) */}
+      {step !== 'travaille' && (
+        <footer className="border-t border-border px-5 py-4">
+          <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+            {step === 'capture' && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {picks.length > 0 || phrasesList.length > 0
+                    ? `${picks.length} photo${picks.length > 1 ? 's' : ''} · ${phrasesList.length} note${phrasesList.length > 1 ? 's' : ''}`
+                    : 'Photographiez et parlez'}
+                </span>
+                <Button size="lg" onClick={runPhenix} disabled={!canFinish}>
+                  <Sparkles aria-hidden /> J’ai terminé
+                </Button>
+              </>
+            )}
+            {step === 'comprend' && (
+              <>
+                <Button variant="ghost" onClick={() => setStep('capture')}>
+                  Reprendre
+                </Button>
+                <Button size="lg" onClick={() => void validate()} disabled={busy}>
+                  <Check aria-hidden /> Valider
+                </Button>
+              </>
+            )}
+            {step === 'partager' && (
+              <>
+                {!shared ? (
+                  <>
+                    <Button variant="ghost" onClick={onClose}>
+                      Terminer
+                    </Button>
+                    <Button
+                      size="lg"
+                      onClick={() => void share()}
+                      disabled={audiences.length === 0 || busy}
+                    >
+                      <Send aria-hidden /> Partager
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-xs text-muted-foreground">Partagé (aperçu).</span>
+                    <Button size="lg" onClick={onClose}>
+                      Terminer
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </footer>
+      )}
+    </div>
+  );
+}
+
+/* ------------------ Étape « PHÉNIX prépare » (scène signature) ------------- */
+
+/**
+ * Le geste iconique de PHÉNIX : le conducteur a rangé son téléphone ; PHÉNIX,
+ * lui, travaille en arrière-plan. On MONTRE ce travail — rédaction, extraction,
+ * création, mise à jour — puis « C'est prêt. » (VISION.md Art. 5, 7, 11).
+ */
+function TravailleStep({
+  prep,
+  onDone,
+}: {
+  prep: MissionPreparation;
+  onDone: () => void;
+}): React.JSX.Element {
+  const tasks = [
+    'Lecture de vos photos et de votre dictée',
+    'Rédaction du compte rendu',
+    prep.decisions.length
+      ? `Extraction de ${prep.decisions.length} décision${prep.decisions.length > 1 ? 's' : ''}`
+      : 'Extraction des décisions',
+    prep.reserves.length
+      ? `Création de ${prep.reserves.length} réserve${prep.reserves.length > 1 ? 's' : ''}`
+      : 'Création des réserves',
+    'Mise à jour du planning',
+    'Préparation des notifications client',
+  ];
+  // `done` = nombre de tâches terminées ; à la fin, on révèle « C'est prêt. »
+  const [done, setDone] = useState(0);
+  const ready = done >= tasks.length;
+
+  useEffect(() => {
+    if (ready) {
+      const t = setTimeout(onDone, 2600);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => setDone((d) => d + 1), done === 0 ? 550 : 700);
+    return () => clearTimeout(t);
+  }, [done, ready, onDone, tasks.length]);
+
+  return (
+    <div className="mx-auto flex min-h-full max-w-xl flex-col items-center justify-center px-5 py-12 text-center">
+      <div
+        className={`grid size-16 place-items-center rounded-full bg-gold-100 text-gold-700 transition-transform duration-500 [&_svg]:size-8 ${
+          ready ? 'scale-100' : 'scale-100'
+        }`}
+      >
+        {ready ? <Check aria-hidden /> : <Loader2 aria-hidden className="animate-spin" />}
+      </div>
+
+      <h2 className="mt-5 font-serif text-2xl font-semibold text-foreground">
+        {ready ? 'C’est prêt.' : 'PHÉNIX prépare votre compte rendu…'}
+      </h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {ready
+          ? 'Vous pouvez ranger votre téléphone.'
+          : 'Vous avez rangé votre téléphone. PHÉNIX, lui, se met au travail.'}
+      </p>
+
+      <ul className="mt-7 w-full max-w-sm space-y-2 text-left">
+        {tasks.map((label, i) => {
+          const state = i < done ? 'done' : i === done ? 'active' : 'todo';
+          return (
+            <li
+              key={label}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-2.5 text-sm transition-all duration-300 ${
+                state === 'done'
+                  ? 'border-gold-200 bg-gold-50 text-foreground'
+                  : state === 'active'
+                    ? 'border-gold-300 bg-surface text-foreground'
+                    : 'border-border bg-surface text-muted-foreground opacity-45'
+              }`}
+            >
+              <span className="grid size-6 shrink-0 place-items-center [&_svg]:size-4">
+                {state === 'done' ? (
+                  <Check aria-hidden className="text-gold-700" />
+                ) : state === 'active' ? (
+                  <Loader2 aria-hidden className="animate-spin text-gold-600" />
+                ) : (
+                  <span className="size-1.5 rounded-full bg-border" aria-hidden />
+                )}
               </span>
-              <Button size="lg" onClick={runPhenix} disabled={!canFinish}>
-                <Sparkles aria-hidden /> J’ai terminé
-              </Button>
-            </>
-          )}
-          {step === 'comprend' && (
-            <>
-              <Button variant="ghost" onClick={() => setStep('capture')}>
-                Reprendre
-              </Button>
-              <Button size="lg" onClick={() => void validate()} disabled={busy}>
-                <Check aria-hidden /> Valider
-              </Button>
-            </>
-          )}
-          {step === 'partager' && (
-            <>
-              {!shared ? (
-                <>
-                  <Button variant="ghost" onClick={onClose}>
-                    Terminer
-                  </Button>
-                  <Button
-                    size="lg"
-                    onClick={() => void share()}
-                    disabled={audiences.length === 0 || busy}
-                  >
-                    <Send aria-hidden /> Partager
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="text-xs text-muted-foreground">Partagé (aperçu).</span>
-                  <Button size="lg" onClick={onClose}>
-                    Terminer
-                  </Button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </footer>
+              {label}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

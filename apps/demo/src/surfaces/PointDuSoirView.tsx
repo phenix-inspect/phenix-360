@@ -114,8 +114,9 @@ export function PointDuSoirView({
       </Section>
 
       <div className="rounded-2xl border border-gold-200 bg-gold-50 p-4">
+        <p className="font-serif text-lg font-semibold text-foreground">Tout est tracé.</p>
         <p className="text-sm text-foreground">
-          Tout est tracé. <strong>PHÉNIX ne lâche rien</strong> — vous pouvez décrocher.
+          <strong>Demain est prêt.</strong> Vous pouvez rentrer chez vous.
         </p>
         <Button size="lg" className="mt-3" onClick={onPreparerDemain}>
           Préparer demain <ArrowRight aria-hidden />

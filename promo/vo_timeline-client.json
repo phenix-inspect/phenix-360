@@ -2,98 +2,93 @@
   "video": "phenix-client-demo.mp4",
   "lines": [
     {
-      "start": 7.191,
-      "end": 12.201,
-      "text": "Le client ne voit jamais la complexité du chantier."
+      "start": 7.222,
+      "end": 11.24,
+      "text": "Côté client, tout est simple."
     },
     {
-      "start": 12.201,
-      "end": 17.964,
-      "text": "Il retrouve uniquement ce qui le concerne."
+      "start": 11.24,
+      "end": 16.802,
+      "text": "Il ne voit que ce qui le concerne."
     },
     {
-      "start": 17.964,
-      "end": 22.843,
-      "text": "Les décisions."
+      "start": 16.802,
+      "end": 23.448,
+      "text": "Et il peut parler à PHÉNIX. Une vraie conversation."
     },
     {
-      "start": 22.843,
-      "end": 28.015,
-      "text": "Les photos."
+      "start": 23.448,
+      "end": 27.466,
+      "text": "« Où en est la salle de bain ? »"
     },
     {
-      "start": 28.015,
-      "end": 33.782,
-      "text": "L’histoire de son chantier, en images."
+      "start": 27.466,
+      "end": 33.792,
+      "text": "PHÉNIX retrouve les vraies photos du chantier."
     },
     {
-      "start": 33.782,
-      "end": 39.687,
-      "text": "L’avancement."
+      "start": 33.792,
+      "end": 37.523,
+      "text": "« Et le carrelage ? »"
     },
     {
-      "start": 39.687,
-      "end": 43.519,
-      "text": "Et PHÉNIX."
+      "start": 37.523,
+      "end": 43.954,
+      "text": "Une date précise, tirée du planning réel."
     },
     {
-      "start": 43.519,
-      "end": 50.14,
-      "text": "Il peut poser une question."
+      "start": 43.954,
+      "end": 48.259,
+      "text": "« Puis-je changer le meuble vasque ? »"
     },
     {
-      "start": 50.14,
-      "end": 57.487,
-      "text": "PHÉNIX répond à partir des informations réelles du projet."
+      "start": 48.259,
+      "end": 53.146,
+      "text": "Quand il ne sait pas, PHÉNIX n’invente jamais."
     },
     {
-      "start": 57.487,
-      "end": 64.889,
-      "text": "Si une réponse n’est pas certaine…"
+      "start": 53.146,
+      "end": 62.314,
+      "text": "Il crée une demande auprès de l’équipe."
     },
     {
-      "start": 64.889,
-      "end": 69.318,
-      "text": "PHÉNIX n’invente jamais."
+      "start": 62.314,
+      "end": 70.657,
+      "text": "L’équipe répond. Le client est toujours informé."
     },
     {
-      "start": 69.318,
-      "end": 77.778,
-      "text": "L’équipe est sollicitée."
+      "start": 70.657,
+      "end": 77.457,
+      "text": "Jamais de réserve. Jamais de responsable. Jamais l’interne."
     },
     {
-      "start": 77.778,
-      "end": 86.253,
-      "text": "L’équipe répond. Le client est informé."
+      "start": 77.457,
+      "end": 83.46,
+      "text": "Juste son chantier, raconté simplement."
     },
     {
-      "start": 86.253,
-      "end": 92.683,
-      "text": "Jamais de réserve technique. Jamais de responsable."
+      "start": 83.46,
+      "end": 90.055,
+      "text": "De belles photos. Son avancement. Ses choix."
     },
     {
-      "start": 92.683,
-      "end": 98.823,
-      "text": "Aucune action interne. Aucune complexité."
-    },
-    {
-      "start": 98.823,
-      "end": 103.833,
+      "start": 90.055,
+      "end": 94.933,
       "text": "Chacun ne voit que ce qui lui est destiné."
     },
     {
-      "start": 103.833,
-      "end": 106.781,
+      "start": 94.933,
+      "end": 97.803,
       "text": "Simple."
     },
     {
-      "start": 106.781,
-      "end": 109.728,
+      "start": 97.803,
+      "end": 100.674,
       "text": "Rassurant."
     },
     {
-      "start": 109.728,
-      "end": 114.567,
+      "start": 100.674,
+      "end": 105.4,
       "text": "Transparent."
     }
   ]
