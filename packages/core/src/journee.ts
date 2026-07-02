@@ -9,6 +9,7 @@
  */
 import type { Project, ProjectStep } from './project.js';
 import type { Event } from './event.js';
+import { isCompteRendu, isDemande, isDocument, isLevee, isReserve } from './event.js';
 import type { ProjectDossier } from './prepare.js';
 import {
   currentStep,
@@ -91,4 +92,96 @@ export function buildDayBriefing(input: {
   );
 
   return { chantiers, totals };
+}
+
+/* -------------------------------------------------------------------------- *
+ * Le point du soir — « Clôturer ma journée »
+ * -------------------------------------------------------------------------- *
+ * À 18 h, le conducteur doit pouvoir rentrer la tête vide (VISION.md Art. 10).
+ * PHÉNIX lui montre ce qu'il a fait aujourd'hui, ce qui reste ouvert, et ce
+ * qu'il faut surveiller demain. Rien d'inventé : uniquement les faits (Art. 7).
+ */
+export interface EveningReview {
+  /** Ce qui a été fait aujourd'hui (comptes rendus, réserves, réponses…). */
+  faits: { label: string; count: number }[];
+  totalFaits: number;
+  /** Ce qui reste ouvert (à travers tous les chantiers). */
+  reserves: number;
+  decisions: number;
+  questions: number;
+  livraisons: number;
+  /** À surveiller demain — quelques lignes actionnables. */
+  demain: string[];
+}
+
+function memeJour(iso: string, now: number): boolean {
+  const d = new Date(iso);
+  const n = new Date(now);
+  return (
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate()
+  );
+}
+
+const plur = (n: number, s: string): string => `${n} ${s}${n > 1 ? 's' : ''}`;
+
+export function buildEveningReview(input: {
+  projects: Project[];
+  eventsByProject: Record<string, Event[]>;
+  dossiersByProject: Record<string, ProjectDossier | undefined>;
+  now?: number;
+}): EveningReview {
+  const now = input.now ?? Date.now();
+  const all: Event[] = Object.values(input.eventsByProject).flat();
+
+  const creesAujourdhui = all.filter((e) => memeJour(e.createdAt, now));
+  const comptesRendus = creesAujourdhui.filter(isCompteRendu).length;
+  const reservesOuvertesJour = creesAujourdhui.filter(isReserve).length;
+  const levees = creesAujourdhui.filter(isLevee).length;
+  const documents = creesAujourdhui.filter(isDocument).length;
+  const reponses = all.filter(
+    (e) => isDemande(e) && e.content.resolution && memeJour(e.content.resolution.resolvedAt, now),
+  ).length;
+
+  const faits = [
+    { label: comptesRendus > 1 ? 'comptes rendus' : 'compte rendu', count: comptesRendus },
+    { label: reponses > 1 ? 'réponses clients' : 'réponse client', count: reponses },
+    { label: levees > 1 ? 'réserves levées' : 'réserve levée', count: levees },
+    {
+      label: reservesOuvertesJour > 1 ? 'réserves ouvertes' : 'réserve ouverte',
+      count: reservesOuvertesJour,
+    },
+    { label: documents > 1 ? 'documents' : 'document', count: documents },
+  ].filter((f) => f.count > 0);
+  const totalFaits = faits.reduce((s, f) => s + f.count, 0);
+
+  const briefing = buildDayBriefing(input);
+  const t = briefing.totals;
+
+  // Réserves dont l'échéance approche (≤ 3 jours), tous chantiers.
+  const bientot = now + 3 * 86_400_000;
+  const reservesUrgentes = all.filter(
+    (e) =>
+      isReserve(e) &&
+      e.content.echeance &&
+      new Date(`${e.content.echeance}T00:00:00`).getTime() <= bientot &&
+      !all.some((x) => isLevee(x) && x.content.reserveId === e.id),
+  ).length;
+
+  const demain: string[] = [];
+  if (t.livraisons > 0) demain.push(`${plur(t.livraisons, 'livraison')} à contrôler`);
+  if (t.decisions > 0) demain.push(`${plur(t.decisions, 'décision')} client à relancer`);
+  if (reservesUrgentes > 0)
+    demain.push(`${plur(reservesUrgentes, 'réserve')} à lever cette semaine`);
+
+  return {
+    faits,
+    totalFaits,
+    reserves: t.reserves,
+    decisions: t.decisions,
+    questions: t.questions,
+    livraisons: t.livraisons,
+    demain,
+  };
 }

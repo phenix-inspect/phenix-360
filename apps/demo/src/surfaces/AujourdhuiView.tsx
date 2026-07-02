@@ -1,10 +1,19 @@
+import { Button } from '@phenix360/ui';
 import {
   PROJECT_STEP_LABEL,
   buildDayBriefing,
   type Event,
   type ChantierResume,
 } from '@phenix360/core';
-import { ChevronRight, Flag, HelpCircle, MessageSquare, Sunrise, Truck } from 'lucide-react';
+import {
+  ChevronRight,
+  Flag,
+  HelpCircle,
+  MessageSquare,
+  MoonStar,
+  Sunrise,
+  Truck,
+} from 'lucide-react';
 import { nameOf, type DemoSnapshot } from '../store';
 
 /**
@@ -15,9 +24,11 @@ import { nameOf, type DemoSnapshot } from '../store';
 export function AujourdhuiView({
   snap,
   onOpenChantier,
+  onCloturer,
 }: {
   snap: DemoSnapshot;
   onOpenChantier: (projectId: string) => void;
+  onCloturer: () => void;
 }): React.JSX.Element {
   const compagnon = snap.members.find((m) => m.role === 'compagnon');
   const prenom = compagnon ? nameOf(snap, compagnon.userId) : 'Mickaël';
@@ -83,6 +94,12 @@ export function AujourdhuiView({
           ))}
         </div>
       </section>
+
+      <div className="flex justify-center pt-2">
+        <Button variant="outline" onClick={onCloturer}>
+          <MoonStar aria-hidden /> Clôturer ma journée
+        </Button>
+      </div>
     </div>
   );
 }

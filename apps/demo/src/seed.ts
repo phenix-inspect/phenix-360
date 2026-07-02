@@ -179,7 +179,7 @@ export function buildDemoSeed(): DemoSeed {
         resolution: {
           texte: 'Oui : livraison confirmée pour lundi, avant le démarrage des cloisons.',
           resolvedBy: compaId,
-          resolvedAt: daysAgo(6),
+          resolvedAt: new Date().toISOString(),
         },
       },
     },
@@ -766,6 +766,25 @@ export function buildDemoSeed(): DemoSeed {
         photoId: mDalle.photos[1]!.id,
         annotationId: annId,
       },
+    },
+  });
+
+  // Un fait du jour (interne) : la visite de contrôle de ce matin. Nourrit le
+  // point du soir (« ce que vous avez fait aujourd'hui ») sur une démo fraîche.
+  events.push({
+    id: eventId(uuid()),
+    projectId: pid,
+    type: 'compte_rendu',
+    actor: compagnon,
+    visibility: 'interne',
+    state: 'publie',
+    captureId: null,
+    createdAt: new Date().toISOString(),
+    publishedBy: compaId,
+    publishedAt: new Date().toISOString(),
+    content: {
+      texte: 'Visite de contrôle ce matin : le second œuvre peut démarrer.',
+      etapeConfirmee: 'gros_oeuvre',
     },
   });
 

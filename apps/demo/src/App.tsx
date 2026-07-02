@@ -14,11 +14,12 @@ import { PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
 import { projectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
+import { PointDuSoirView } from './surfaces/PointDuSoirView';
 import { CompagnonView } from './surfaces/CompagnonView';
 import { ClientView } from './surfaces/ClientView';
 import { PhenixStart } from './start/PhenixStart';
 
-type ViewMode = 'aujourdhui' | 'compagnon' | 'client';
+type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'client';
 
 const VIEW_OPTIONS = [
   { value: 'aujourdhui' as const, label: 'Aujourd’hui' },
@@ -42,7 +43,7 @@ export function App(): React.JSX.Element {
           <BrandLockup size="lg" subtitle className="mr-auto" />
           {!creating && (
             <SegmentedControl
-              value={view}
+              value={view === 'soir' ? 'aujourdhui' : view}
               onValueChange={setView}
               options={VIEW_OPTIONS}
               aria-label="Choisir la vue"
@@ -79,8 +80,11 @@ export function App(): React.JSX.Element {
                 demo.setActiveProject(projectId(id));
                 setView('compagnon');
               }}
+              onCloturer={() => setView('soir')}
             />
           )
+        ) : view === 'soir' ? (
+          <PointDuSoirView snap={snap} onPreparerDemain={() => setView('aujourdhui')} />
         ) : activeProject === null ? (
           <NoProject onNew={() => setCreating(true)} />
         ) : view === 'compagnon' ? (
