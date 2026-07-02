@@ -22,4 +22,5 @@ export * from './devis.js';
 export * from './prepare.js';
 export * from './fil.js';
 export * from './mission.js';
+export * from './journee.js';
 export * from './data/index.js';

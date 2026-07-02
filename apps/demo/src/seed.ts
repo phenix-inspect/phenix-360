@@ -33,6 +33,7 @@ import {
   type Moment,
   type MomentType,
   type Project,
+  type ProjectStep,
   type ProjectDossier,
   type ProjectMember,
   type ProjectZone,
@@ -768,9 +769,150 @@ export function buildDemoSeed(): DemoSeed {
     },
   });
 
+  // ----------------------- Les autres chantiers -----------------------------
+  // Un conducteur pilote plusieurs affaires : « Aujourd'hui » agrège tout
+  // (VISION.md Art. 3). Chantiers plus légers (faits seuls, sans dossier).
+  const extraPeople: Record<string, string> = {};
+  const extraProjects: Project[] = [];
+  const extraMembers: ProjectMember[] = [];
+  const extraEvents: Event[] = [];
+
+  const makeChantier = (opts: {
+    name: string;
+    clientName: string;
+    step: ProjectStep;
+    startedDaysAgo: number;
+    reserves: string[];
+    clientDecision?: string;
+    clientQuestion?: string;
+  }): void => {
+    const cid = projectId(uuid());
+    const clId = userId(uuid());
+    const compa: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
+    extraPeople[clId] = opts.clientName;
+    const evs: Event[] = [];
+
+    // Un compte rendu client (fixe l'étape + nourrit le fil client).
+    evs.push({
+      id: eventId(uuid()),
+      projectId: cid,
+      type: 'compte_rendu',
+      actor: compa,
+      visibility: 'client',
+      state: 'publie',
+      captureId: null,
+      createdAt: daysAgo(2),
+      publishedBy: compaId,
+      publishedAt: daysAgo(2),
+      content: { texte: 'Le chantier avance conformément au planning.', etapeConfirmee: opts.step },
+    });
+
+    opts.reserves.forEach((libelle, i) => {
+      evs.push({
+        id: eventId(uuid()),
+        projectId: cid,
+        type: 'reserve',
+        actor: compa,
+        visibility: 'interne',
+        state: 'ouverte',
+        captureId: null,
+        createdAt: daysAgo(3),
+        publishedBy: compaId,
+        publishedAt: daysAgo(3),
+        content: {
+          numero: i + 1,
+          libelle,
+          responsable: 'Artisan',
+          echeance: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10),
+        },
+      });
+    });
+
+    if (opts.clientDecision) {
+      evs.push({
+        id: eventId(uuid()),
+        projectId: cid,
+        type: 'demande',
+        actor: compa,
+        visibility: 'client',
+        state: 'ouverte',
+        captureId: null,
+        createdAt: daysAgo(2),
+        publishedBy: null,
+        publishedAt: null,
+        content: { question: opts.clientDecision, destinataire: 'client' },
+      });
+    }
+    if (opts.clientQuestion) {
+      evs.push({
+        id: eventId(uuid()),
+        projectId: cid,
+        type: 'demande',
+        actor: { userId: clId, role: 'client', displayName: opts.clientName },
+        visibility: 'client',
+        state: 'ouverte',
+        captureId: null,
+        createdAt: daysAgo(1),
+        publishedBy: null,
+        publishedAt: null,
+        content: { question: opts.clientQuestion, destinataire: 'phenix' },
+      });
+    }
+
+    extraProjects.push({
+      id: cid,
+      name: opts.name,
+      clientId: clId,
+      status: 'en_cours',
+      currentStep: opts.step,
+      createdAt: daysAgo(opts.startedDaysAgo),
+    });
+    extraMembers.push(
+      {
+        id: projectMemberId(uuid()),
+        projectId: cid,
+        userId: compaId,
+        role: 'compagnon',
+        createdAt: daysAgo(opts.startedDaysAgo),
+      },
+      {
+        id: projectMemberId(uuid()),
+        projectId: cid,
+        userId: clId,
+        role: 'client',
+        createdAt: daysAgo(opts.startedDaysAgo),
+      },
+    );
+    extraEvents.push(...evs);
+  };
+
+  makeChantier({
+    name: 'Maison Écully',
+    clientName: 'M. Dubois',
+    step: 'second_oeuvre',
+    startedDaysAgo: 30,
+    reserves: [
+      'Joint de carrelage à reprendre dans la salle de bain',
+      'Prise mal alignée en cuisine',
+    ],
+    clientDecision: 'Quelle finition souhaitez-vous pour la rampe d’escalier ?',
+  });
+  makeChantier({
+    name: 'Duplex Croix-Rousse',
+    clientName: 'Mme Bernard',
+    step: 'finitions',
+    startedDaysAgo: 55,
+    reserves: ['Retouche peinture dans la cage d’escalier'],
+    clientQuestion: 'Serait-il possible de décaler la réception d’une semaine ?',
+  });
+
   return {
-    state: { projects: [project], members, events },
-    people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin' },
+    state: {
+      projects: [project, ...extraProjects],
+      members: [...members, ...extraMembers],
+      events: [...events, ...extraEvents],
+    },
+    people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin', ...extraPeople },
     activeProjectId: pid,
     dossiers: { [pid]: dossier },
     fil: {

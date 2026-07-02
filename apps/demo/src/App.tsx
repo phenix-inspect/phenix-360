@@ -13,21 +13,22 @@ import {
 import { PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
 import { projectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
+import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { CompagnonView } from './surfaces/CompagnonView';
 import { ClientView } from './surfaces/ClientView';
 import { PhenixStart } from './start/PhenixStart';
 
-type ViewMode = 'compagnon' | 'client' | 'split';
+type ViewMode = 'aujourdhui' | 'compagnon' | 'client';
 
 const VIEW_OPTIONS = [
-  { value: 'compagnon' as const, label: 'Compagnon' },
+  { value: 'aujourdhui' as const, label: 'Aujourd’hui' },
+  { value: 'compagnon' as const, label: 'Chantier' },
   { value: 'client' as const, label: 'Espace client' },
-  { value: 'split' as const, label: 'Côte à côte' },
 ];
 
 export function App(): React.JSX.Element {
   const snap = useDemo();
-  const [view, setView] = useState<ViewMode>('client');
+  const [view, setView] = useState<ViewMode>('aujourdhui');
   const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState(false);
 
@@ -68,31 +69,20 @@ export function App(): React.JSX.Element {
             }}
             onCancel={() => setCreating(false)}
           />
-        ) : activeProject === null ? (
-          <div className="mx-auto max-w-xl py-10">
-            <EmptyState
-              icon={<Sparkles aria-hidden />}
-              title="Aucun projet pour l'instant"
-              description="Déposez un dossier et laissez PHÉNIX préparer le chantier, ou rechargez le projet de démonstration."
-              action={
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Button onClick={() => setCreating(true)}>Nouveau projet</Button>
-                  <Button variant="outline" onClick={() => demo.loadDemo()}>
-                    Charger la démonstration
-                  </Button>
-                </div>
-              }
+        ) : view === 'aujourdhui' ? (
+          snap.projects.length === 0 ? (
+            <NoProject onNew={() => setCreating(true)} />
+          ) : (
+            <AujourdhuiView
+              snap={snap}
+              onOpenChantier={(id) => {
+                demo.setActiveProject(projectId(id));
+                setView('compagnon');
+              }}
             />
-          </div>
-        ) : view === 'split' ? (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <FramedSurface label="Côté compagnon">
-              <CompagnonView snap={snap} project={activeProject} />
-            </FramedSurface>
-            <FramedSurface label="Côté client">
-              <ClientView snap={snap} project={activeProject} />
-            </FramedSurface>
-          </div>
+          )
+        ) : activeProject === null ? (
+          <NoProject onNew={() => setCreating(true)} />
         ) : view === 'compagnon' ? (
           <CompagnonView snap={snap} project={activeProject} />
         ) : (
@@ -112,17 +102,22 @@ export function App(): React.JSX.Element {
   );
 }
 
-function FramedSurface({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.JSX.Element {
+function NoProject({ onNew }: { onNew: () => void }): React.JSX.Element {
   return (
-    <div className="space-y-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      {children}
+    <div className="mx-auto max-w-xl py-10">
+      <EmptyState
+        icon={<Sparkles aria-hidden />}
+        title="Aucun projet pour l'instant"
+        description="Déposez un dossier et laissez PHÉNIX préparer le chantier, ou rechargez le projet de démonstration."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button onClick={onNew}>Nouveau projet</Button>
+            <Button variant="outline" onClick={() => demo.loadDemo()}>
+              Charger la démonstration
+            </Button>
+          </div>
+        }
+      />
     </div>
   );
 }
