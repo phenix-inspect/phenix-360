@@ -48,15 +48,19 @@ alimente Aujourd'hui/soir. Interne strict (jamais côté client). Testé (réser
 7/7, sans régression). Report tracé dans `DECISIONS.md` : édition/réattribution
 d'une réserve existante → futur sprint « Amendement de faits ». VISION Art. 7, 8, 9.
 
-### EPIC 5 — Préparation chantier · 🟡 À compléter
+### EPIC 5 — Préparation chantier · ✅ Terminé (Sprint 3)
 
-Base : `DossierPanel` très riche (note de lancement PHÉNIX, devis + avenants,
-feuille de route, planning en dates, commandes, propositions, documents,
-questions). **Objectif PO** : un vrai **bureau de préparation** — un chantier entièrement
-préparable dans PHÉNIX avant de partir : devis, plans, photos, commandes,
-fournisseurs, planning, artisans, documents, décisions, **budget**, **check-list
-de lancement**. **Manque** : édition du dossier, budget consolidé, check-list de
-lancement, états vides propres. VISION Art. 1, 7.
+Le **bureau de préparation** : cockpit `PreparationCockpit` en tête de l'onglet
+Préparation, alimenté par le sélecteur pur `buildPreparation` (déterministe,
+aucune IA). Répond en 30 s à « ce chantier peut-il démarrer ? ». Enchaînement :
+**verdict** (Prêt / Presque / Pas encore, avec score), **budget** (prévisionnel
+éditable, engagé = commandes passées, restant), **check-list de lancement** (vérifs
+automatiques dérivées et points manuels du conducteur), **points bloquants**,
+**intervenants** (sous-traitants retenus éditables et fournisseurs), **prochaines
+dates**. Le détail complet du dossier (devis, planning, commandes, documents,
+choix…) reste conservé dessous. Ajouts modèle : `sousTraitants`, `checklist`,
+`budgetPrevisionnel`. Client-safe. Playwright préparation 9/9, sans régression.
+VISION Art. 1, 3, 7, 11.
 
 ### EPIC 6 — Planning intelligent · 🟡 À compléter
 

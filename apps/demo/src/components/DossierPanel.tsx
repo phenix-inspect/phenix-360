@@ -52,6 +52,7 @@ import { RoadmapProgress } from './RoadmapProgress';
 import { DevisBreakdown } from './DevisBreakdown';
 import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
+import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 
@@ -262,6 +263,8 @@ export function DossierPanel({
 
   return (
     <div className="space-y-6">
+      <PreparationCockpit dossier={dossier} patch={patch} />
+
       <div id="note-lancement">
         <LaunchNotePanel
           note={note}

@@ -590,6 +590,11 @@ export function buildDemoSeed(): DemoSeed {
         ],
       },
     ],
+    sousTraitants: [
+      { id: 'st-plombier', nom: 'SARL Aqua', lot: 'Plomberie' },
+      { id: 'st-elec', nom: 'Élec Pro', lot: 'Électricité' },
+      { id: 'st-carreleur', nom: 'Carrelage Lyonnais', lot: 'Carrelage & faïence' },
+    ],
     sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
     createdAt: new Date().toISOString(),
   };

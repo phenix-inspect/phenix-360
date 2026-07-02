@@ -110,3 +110,24 @@ un flag ad hoc au lieu d'un vrai canal `demande`.
 (`signalementsArtisan`) et l'**authentification** (identités réelles) restent à
 faire (EPIC 9/14). La persistance du « signalé » entre sessions viendra avec la
 brique d'amendement de faits.
+
+## 02/07/2026 — Bureau de préparation : synthèse déterministe, budget simple
+
+**Décision :** l'EPIC 5 ajoute un cockpit de préparation alimenté par un sélecteur
+PUR `buildPreparation(dossier)` (aucune IA). Le **budget engagé = montant des
+commandes déjà passées** (`ORDER_PLACED`) ; le prévisionnel par défaut = total TTC
+du devis consolidé (devis + avenants), surchargeable par le conducteur ; restant =
+prévisionnel − engagé. La **check-list de lancement** mêle des vérifications
+AUTOMATIQUES (dérivées : devis, plans, assurance, budget, date, planning,
+décisions, commandes) et des points MANUELS du conducteur. Le verdict « Prêt /
+Presque / Pas encore » découle de la check-list (un bloquant ⇒ pas prêt).
+**Pourquoi (PO) :** rester simple et déterministe pour cette V1 — pas de
+comptabilité avancée, pas de factures, pas de marge chantier ; le cockpit doit
+être lisible en 30 secondes.
+**Alternatives rejetées :** budget « engagé » incluant main-d'œuvre / factures /
+marge (repoussé) ; réécrire l'onglet Préparation existant (on l'a conservé sous le
+cockpit — zéro régression).
+**Impact / suites :** le **cycle de vie éditable des commandes** (à commander →
+commandée → livrée, réception, manquants) reste l'EPIC 19 ; la préparation le LIT
+seulement. Nouveaux champs dossier `sousTraitants` / `checklist` /
+`budgetPrevisionnel`.

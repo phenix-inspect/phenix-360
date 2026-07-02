@@ -463,6 +463,21 @@ export interface ProjectMemory {
 /* -------------------------------------------------------------------------- *
  * Dossier préparé + proposition
  * -------------------------------------------------------------------------- */
+/** Un sous-traitant retenu pour le chantier (Bureau de préparation). */
+export interface SousTraitant {
+  id: string;
+  nom: string;
+  /** Corps d'état / lot (ex. « Plomberie »). */
+  lot?: string;
+}
+
+/** Un point de lancement MANUEL ajouté par le conducteur (check-list). */
+export interface ChecklistManuel {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
 export interface ProjectDossier {
   infos: ProjectInfos;
   roadmap: RoadmapStep[];
@@ -471,6 +486,12 @@ export interface ProjectDossier {
   selections: ClientSelection[];
   documents: ProjectDocument[];
   questions: PreparationQuestion[];
+  /** Sous-traitants retenus pour ce chantier. */
+  sousTraitants?: SousTraitant[];
+  /** Points de lancement manuels du conducteur (en plus des vérifs automatiques). */
+  checklist?: ChecklistManuel[];
+  /** Budget prévisionnel saisi (sinon dérivé du total TTC devis + avenants). */
+  budgetPrevisionnel?: number;
   /** Lecture structurée du devis signé (lots, postes, montants, TVA). */
   devis?: Devis;
   /**
@@ -1574,6 +1595,254 @@ export function buildChantierAttention(
   }
 
   return items.sort((a, b) => ATTENTION_RANK[a.severity] - ATTENTION_RANK[b.severity]);
+}
+
+/* -------------------------------------------------------------------------- *
+ * BUREAU DE PRÉPARATION — synthèse « Prêt à démarrer ? » (EPIC 5)
+ * -------------------------------------------------------------------------- *
+ * Sélecteur PUR, déterministe (aucune IA) : à partir du seul dossier, il répond
+ * en un coup d'œil à « ce chantier peut-il démarrer ? ». Budget, check-list de
+ * lancement, points bloquants, intervenants, dates. Chaque item est DÉRIVÉ des
+ * données du dossier — jamais inventé (VISION Art. 7).
+ */
+export type PrepVerdict = 'pret' | 'presque' | 'pas_pret';
+export type ChecklistTone = 'fait' | 'a_verifier' | 'bloquant';
+
+export interface PrepBudget {
+  previsionnel: number;
+  engage: number;
+  restant: number;
+  devisTTC: number;
+  /** Engagé au-dessus du prévisionnel. */
+  depasse: boolean;
+  source: 'saisi' | 'devis' | 'infos' | 'aucun';
+}
+
+export interface ChecklistItem {
+  id: string;
+  label: string;
+  tone: ChecklistTone;
+  detail?: string;
+  /** Vérification automatique (dérivée) vs point manuel du conducteur. */
+  auto: boolean;
+}
+
+export type BloquantKind = 'document' | 'decision' | 'budget' | 'devis';
+export interface PrepBloquant {
+  id: string;
+  kind: BloquantKind;
+  message: string;
+  docId?: string;
+}
+
+export interface PrepDate {
+  id: string;
+  label: string;
+  date: string;
+  kind: 'demarrage' | 'jalon' | 'livraison';
+}
+
+export interface PreparationSummary {
+  budget: PrepBudget;
+  checklist: ChecklistItem[];
+  readiness: { prets: number; total: number; verdict: PrepVerdict };
+  bloquants: PrepBloquant[];
+  sousTraitants: SousTraitant[];
+  fournisseurs: string[];
+  materielsACommander: Order[];
+  datesImportantes: PrepDate[];
+}
+
+const round2p = (n: number): number => Math.round(n * 100) / 100;
+
+export function buildPreparation(
+  dossier: ProjectDossier,
+  nowMs: number = Date.now(),
+): PreparationSummary {
+  const { orders, documents } = dossier;
+
+  // — Budget (déterministe, simple : engagé = commandes déjà passées) —
+  const devisTTC = buildDevisSummary(dossier.devis, dossier.avenants ?? []).totalTTC;
+  const source: PrepBudget['source'] =
+    dossier.budgetPrevisionnel != null
+      ? 'saisi'
+      : devisTTC > 0
+        ? 'devis'
+        : dossier.infos.budget != null
+          ? 'infos'
+          : 'aucun';
+  const previsionnel =
+    dossier.budgetPrevisionnel ?? (devisTTC > 0 ? devisTTC : (dossier.infos.budget ?? 0));
+  const engage = round2p(
+    orders.filter((o) => ORDER_PLACED.has(o.statut)).reduce((a, o) => a + (o.montant ?? 0), 0),
+  );
+  const depasse = previsionnel > 0 && engage > previsionnel;
+  const budget: PrepBudget = {
+    previsionnel: round2p(previsionnel),
+    engage,
+    restant: round2p(previsionnel - engage),
+    devisTTC,
+    depasse,
+    source,
+  };
+
+  // — Décisions client (bloquantes si en retard) —
+  const decisions = buildClientDecisions(dossier, nowMs);
+  const decisionsEnRetard = decisions.filter((d) => d.status === 'en_retard');
+  const decisionsProches = decisions.filter((d) => d.status === 'proche');
+
+  // — Documents clés —
+  const findDoc = (rx: RegExp): ProjectDocument | undefined =>
+    documents.find((d) => rx.test(d.label));
+  const plans = findDoc(/plan/i);
+  const assurance = findDoc(/assurance|attestation/i);
+  const docsRecommandesManquants = documents.filter((d) => d.recommande && d.status === 'manquant');
+  const docTone = (d?: ProjectDocument): ChecklistTone =>
+    d == null
+      ? 'a_verifier'
+      : d.status === 'fourni'
+        ? 'fait'
+        : d.recommande && d.status === 'manquant'
+          ? 'bloquant'
+          : 'a_verifier';
+  const nbACommander = orders.filter((o) => o.statut === 'a_commander').length;
+
+  // — Check-list de lancement (auto) —
+  const auto: ChecklistItem[] = [
+    {
+      id: 'devis',
+      label: 'Devis signé',
+      tone: dossier.devis ? 'fait' : 'bloquant',
+      detail: dossier.devis?.reference,
+      auto: true,
+    },
+    { id: 'plans', label: 'Plans', tone: docTone(plans), auto: true },
+    { id: 'assurance', label: "Attestation d'assurance", tone: docTone(assurance), auto: true },
+    {
+      id: 'budget',
+      label: 'Budget prévisionnel',
+      tone: previsionnel > 0 ? (depasse ? 'bloquant' : 'fait') : 'a_verifier',
+      detail: depasse ? 'Engagé au-dessus du prévisionnel' : undefined,
+      auto: true,
+    },
+    {
+      id: 'demarrage',
+      label: 'Date de démarrage fixée',
+      tone: dossier.infos.startDate ? 'fait' : 'a_verifier',
+      auto: true,
+    },
+    {
+      id: 'planning',
+      label: 'Planning défini',
+      tone: dossier.planning.length > 0 ? 'fait' : 'a_verifier',
+      auto: true,
+    },
+    {
+      id: 'decisions',
+      label: 'Décisions client bloquantes levées',
+      tone:
+        decisionsEnRetard.length > 0
+          ? 'bloquant'
+          : decisionsProches.length > 0
+            ? 'a_verifier'
+            : 'fait',
+      detail:
+        decisionsEnRetard.length > 0
+          ? `${decisionsEnRetard.length} en retard`
+          : decisionsProches.length > 0
+            ? `${decisionsProches.length} échéance(s) proche(s)`
+            : undefined,
+      auto: true,
+    },
+    {
+      id: 'commandes',
+      label: 'Matériels commandés',
+      tone: nbACommander > 0 ? 'a_verifier' : 'fait',
+      detail: nbACommander > 0 ? `${nbACommander} à commander` : undefined,
+      auto: true,
+    },
+  ];
+
+  // — Check-list manuelle (conducteur) —
+  const manuel: ChecklistItem[] = (dossier.checklist ?? []).map((c) => ({
+    id: `m-${c.id}`,
+    label: c.label,
+    tone: c.done ? 'fait' : ('a_verifier' as ChecklistTone),
+    auto: false,
+  }));
+
+  const checklist = [...auto, ...manuel];
+  const prets = checklist.filter((c) => c.tone === 'fait').length;
+  const verdict: PrepVerdict = checklist.some((c) => c.tone === 'bloquant')
+    ? 'pas_pret'
+    : checklist.some((c) => c.tone === 'a_verifier')
+      ? 'presque'
+      : 'pret';
+
+  // — Points bloquants (mêmes causes que la check-list, listés pour agir) —
+  const bloquants: PrepBloquant[] = [];
+  if (!dossier.devis)
+    bloquants.push({ id: 'b-devis', kind: 'devis', message: 'Aucun devis signé au dossier.' });
+  for (const d of docsRecommandesManquants)
+    bloquants.push({
+      id: `b-doc-${d.id}`,
+      kind: 'document',
+      message: `Document recommandé manquant : ${d.label}.`,
+      docId: d.id,
+    });
+  for (const dec of decisionsEnRetard)
+    bloquants.push({
+      id: `b-dec-${dec.id}`,
+      kind: 'decision',
+      message: `Décision client en retard : ${dec.categorie}.`,
+    });
+  if (depasse)
+    bloquants.push({
+      id: 'b-budget',
+      kind: 'budget',
+      message: `Budget dépassé : engagé ${Math.round(engage)} € au-dessus du prévisionnel ${Math.round(previsionnel)} €.`,
+    });
+
+  // — Intervenants —
+  const fournisseurs = [
+    ...new Set(orders.map((o) => o.fournisseur).filter((x): x is string => Boolean(x))),
+  ].sort();
+
+  // — Dates importantes à venir (démarrage / jalons / livraisons) —
+  const today = new Date(nowMs).toISOString().slice(0, 10);
+  const dates: PrepDate[] = [];
+  if (dossier.infos.startDate && dossier.infos.startDate >= today)
+    dates.push({
+      id: 'd-start',
+      label: 'Démarrage du chantier',
+      date: dossier.infos.startDate,
+      kind: 'demarrage',
+    });
+  for (const t of dossier.planning)
+    if (t.start >= today)
+      dates.push({ id: `d-jalon-${t.id}`, label: t.label, date: t.start, kind: 'jalon' });
+  for (const o of orders) {
+    const liv = o.dateLivraisonReelle ?? o.dateLivraisonEstimee;
+    if (liv && liv >= today && o.statut !== 'a_commander')
+      dates.push({
+        id: `d-liv-${o.id}`,
+        label: `Livraison : ${o.label}`,
+        date: liv,
+        kind: 'livraison',
+      });
+  }
+  const datesImportantes = dates.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
+
+  return {
+    budget,
+    checklist,
+    readiness: { prets, total: checklist.length, verdict },
+    bloquants,
+    sousTraitants: dossier.sousTraitants ?? [],
+    fournisseurs,
+    materielsACommander: orders.filter((o) => o.statut === 'a_commander'),
+    datesImportantes,
+  };
 }
 
 /* -------------------------------------------------------------------------- *
