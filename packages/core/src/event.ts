@@ -84,6 +84,8 @@ export interface CompteRenduContent {
   decisions?: string[];
   /** Actions à suivre. */
   actions?: { label: string; responsable?: string }[];
+  /** Questions posées par le client pendant la mission (à traiter). */
+  questionsClient?: string[];
   /** Manquants / dommages relevés (livraison). */
   manquants?: string[];
   /** Version cliente (voix client) — utilisée à la projection espace client. */

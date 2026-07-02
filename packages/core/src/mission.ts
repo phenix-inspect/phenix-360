@@ -79,6 +79,7 @@ export interface MissionPreparation {
   decisions: string[];
   actions: MissionActionDraft[];
   reserves: MissionReserveDraft[];
+  questionsClient: string[];
   manquants: string[];
   presents: string[];
   /** Corps du document interne (résumé lisible pour le Journal). */
@@ -95,6 +96,8 @@ const RX_RESERVE =
   /réserve|à reprendre|pas conforme|non conforme|défaut|fissure|malfaçon|abîmé|abime|cassé|casse|rayé|raye|fuite|mal fix|manque|manqu/i;
 const RX_MANQUANT =
   /manqu|absent|abîmé|abime|cassé|casse|endommag|rayé|raye|dommage|incomplet|manquant/i;
+const RX_QUESTION_CLIENT =
+  /le client (demande|souhaite|veut|aimerait|se demande|questionne|s'interroge)/i;
 
 /** Découpe un récit libre en phrases nettoyées. */
 export function phrases(recit: string): string[] {
@@ -132,6 +135,8 @@ export function prepareMission(input: {
   const actionsAll = ph.filter((p) => RX_ACTION.test(p)).map((label) => ({ label: cap(label) }));
   const reservesCue = ph.filter((p) => RX_RESERVE.test(p));
   const manquantsAll = ph.filter((p) => RX_MANQUANT.test(p)).map(cap);
+  // Questions posées par le client (tournure « le client demande / souhaite… »).
+  const questionsClient = ph.filter((p) => RX_QUESTION_CLIENT.test(p)).map(cap);
 
   let decisions: string[] = [];
   let actions: MissionActionDraft[] = [];
@@ -177,6 +182,7 @@ export function prepareMission(input: {
     decisions,
     actions,
     reserves,
+    questionsClient,
     manquants,
   });
   const texteClient = buildRecapClient(input.kind, ph);
@@ -188,6 +194,7 @@ export function prepareMission(input: {
     decisions,
     actions,
     reserves,
+    questionsClient,
     manquants,
     presents,
     corps,
@@ -208,6 +215,7 @@ export function buildCorps(p: {
   decisions: string[];
   actions: MissionActionDraft[];
   reserves: MissionReserveDraft[];
+  questionsClient?: string[];
   manquants: string[];
 }): string {
   const parts: string[] = [];
@@ -215,6 +223,7 @@ export function buildCorps(p: {
   if (p.observations.length) parts.push(p.observations.map((o) => `${o}.`).join(' '));
   if (p.decisions.length) parts.push(`Décisions :\n${bullets(p.decisions)}`);
   if (p.actions.length) parts.push(`Actions :\n${bullets(p.actions.map((a) => a.label))}`);
+  if (p.questionsClient?.length) parts.push(`Questions client :\n${bullets(p.questionsClient)}`);
   if (p.manquants.length) parts.push(`Manquants / dommages :\n${bullets(p.manquants)}`);
   if (p.reserves.length)
     parts.push(`Points à reprendre :\n${bullets(p.reserves.map((r) => r.libelle))}`);
@@ -237,7 +246,11 @@ export function buildRecapClient(kind: MissionKind, observations: string[]): str
   // action, une décision, une réserve ou un manquant — c'est de l'interne).
   const neutres = observations.filter(
     (o) =>
-      !RX_ACTION.test(o) && !RX_DECISION.test(o) && !RX_RESERVE.test(o) && !RX_MANQUANT.test(o),
+      !RX_ACTION.test(o) &&
+      !RX_DECISION.test(o) &&
+      !RX_RESERVE.test(o) &&
+      !RX_MANQUANT.test(o) &&
+      !RX_QUESTION_CLIENT.test(o),
   );
   if (neutres.length === 0) return intro;
   const corps = neutres.map((o) => `${o}.`).join(' ');

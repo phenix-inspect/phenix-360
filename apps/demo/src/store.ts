@@ -773,6 +773,9 @@ export const demo = {
         ...(presents.length ? { presents } : {}),
         ...(input.prepared.decisions.length ? { decisions: input.prepared.decisions } : {}),
         ...(input.prepared.actions.length ? { actions: input.prepared.actions } : {}),
+        ...(input.prepared.questionsClient.length
+          ? { questionsClient: input.prepared.questionsClient }
+          : {}),
         ...(input.prepared.manquants.length ? { manquants: input.prepared.manquants } : {}),
         texteClient: input.prepared.texteClient,
       },

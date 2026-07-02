@@ -36,7 +36,7 @@ import {
   Plus,
   Reply,
 } from 'lucide-react';
-import { demo, dossierOf, filOf, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDateTime } from '../lib/format';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
@@ -74,7 +74,6 @@ export function CompagnonView({
   const actor = compagnonActor(snap, project);
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
-  const zones = filOf(snap, project.id).zones;
   const [composer, setComposer] = useState<ComposerKind | null>(null);
   const [missionPicker, setMissionPicker] = useState(false);
   const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
@@ -216,7 +215,6 @@ export function CompagnonView({
           kind={missionKind}
           project={project}
           actor={actor}
-          zones={zones}
           onClose={() => setMissionKind(null)}
         />
       )}
