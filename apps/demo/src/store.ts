@@ -33,6 +33,7 @@ import {
   type BackendState,
   type CoupDeCoeur,
   type DemandeResolution,
+  type ActionPriorite,
   type EventActor,
   type EventId,
   type FilPhoto,
@@ -644,6 +645,40 @@ export const demo = {
       a.id === annotationId ? { ...a, action: { kind: 'reserve', ref: event.id } } : a,
     );
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Création MANUELLE d'une réserve par le conducteur (registre pilotable). Même
+   * objet que celles nées d'une photo annotée — interne, ouverte, numérotée par
+   * projet — mais sans source Fil. Append-only : elle rejoint le Journal, la
+   * lentille Réserves la lit, Aujourd'hui/soir la comptent (VISION Art. 7, 8, 9).
+   */
+  async createReserve(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: { libelle: string; responsable?: string; echeance?: string; priorite?: ActionPriorite },
+  ): Promise<void> {
+    const libelle = input.libelle.trim();
+    if (!libelle) return;
+    const projectEvents = snapshot.events.filter((e) => e.projectId === projectId);
+    const responsable = input.responsable?.trim();
+    const echeance = input.echeance?.trim();
+    await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'reserve',
+      visibility: 'interne',
+      state: 'ouverte',
+      content: {
+        numero: nextReserveNumero(projectEvents),
+        libelle,
+        ...(responsable ? { responsable } : {}),
+        ...(echeance ? { echeance } : {}),
+        ...(input.priorite ? { priorite: input.priorite } : {}),
+      },
+    });
     refresh();
     broadcast();
   },

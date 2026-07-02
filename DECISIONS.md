@@ -60,3 +60,19 @@ une référence unique pour toute décision.
 **Alternatives rejetées :** discipline informelle laissée au jugement de chacun.
 **Impact :** chaque PR devra référencer la constitution ; les écarts sont
 refusés (Art. de gouvernance de `VISION.md`).
+
+## 02/07/2026 — Réserves : édition/réattribution reportée (amendement append-only)
+
+**Décision :** en V1, une réserve se crée (manuellement ou depuis une photo) puis
+se lève. Réattribuer le responsable ou repousser l'échéance d'une réserve
+existante n'est PAS développé dans ce sprint.
+**Pourquoi :** le Journal est append-only (Art. 8) — « éditer » un fait suppose un
+mécanisme d'AMENDEMENT (un événement ajouté qui corrige, comme la levée pointe
+vers la réserve). C'est une brique transverse (elle servira aussi actions,
+décisions, commandes) : elle mérite d'être conçue proprement, pas bricolée pour
+les seules réserves. La création fixe déjà responsable + échéance + priorité,
+donc l'absence d'édition ne bloque pas l'usage.
+**Alternatives rejetées :** muter la réserve en place (violerait l'append-only) ;
+un patch ad hoc réservé aux réserves.
+**Impact :** un futur sprint « Amendement de faits » ajoutera l'édition à réserves,
+actions, décisions et commandes d'un coup. Noté au backlog.

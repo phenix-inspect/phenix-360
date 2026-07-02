@@ -223,6 +223,8 @@ export interface ReserveEventContent {
   responsable?: string;
   /** Échéance de levée (ISO YYYY-MM-DD). */
   echeance?: string;
+  /** Priorité de traitement (tri par urgence dans le registre). */
+  priorite?: ActionPriorite;
   /** Origine : photo annotée du Fil (lien retour). */
   source?: FilSource;
 }

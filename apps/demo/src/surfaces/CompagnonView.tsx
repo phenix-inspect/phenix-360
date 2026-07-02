@@ -180,6 +180,7 @@ export function CompagnonView({
           <ReservesView
             snap={snap}
             project={project}
+            actor={actor}
             events={events}
             onLeverReserve={setLever}
             onOpenFilPhoto={openFilPhoto}
