@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Flag,
   HelpCircle,
+  ListChecks,
   MessageSquare,
   MoonStar,
   Sunrise,
@@ -66,13 +67,14 @@ export function AujourdhuiView({
       </div>
 
       {/* Ce qui réclame votre attention */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat
           icon={<HelpCircle aria-hidden />}
           value={t.decisions}
           label="décisions clients"
           accent
         />
+        <Stat icon={<ListChecks aria-hidden />} value={t.actions} label="actions à suivre" accent />
         <Stat icon={<Flag aria-hidden />} value={t.reserves} label="réserves à lever" accent />
         <Stat icon={<MessageSquare aria-hidden />} value={t.questions} label="clients à répondre" />
         <Stat icon={<Truck aria-hidden />} value={t.livraisons} label="livraisons prévues" />
@@ -113,9 +115,11 @@ function buildPhrase(t: {
   reserves: number;
   decisions: number;
   questions: number;
+  actions: number;
 }): string {
   const bits: string[] = [];
   if (t.decisions > 0) bits.push(`${t.decisions} décision${t.decisions > 1 ? 's' : ''} client`);
+  if (t.actions > 0) bits.push(`${t.actions} action${t.actions > 1 ? 's' : ''} à suivre`);
   if (t.questions > 0) bits.push(`${t.questions} client${t.questions > 1 ? 's' : ''} à répondre`);
   if (t.reserves > 0) bits.push(`${t.reserves} réserve${t.reserves > 1 ? 's' : ''} à lever`);
   if (bits.length === 0) return 'Rien d’urgent aujourd’hui. Vos chantiers avancent sereinement.';
@@ -165,6 +169,8 @@ function ChantierCard({
   const c = chantier;
   const badges: { label: string; accent?: boolean }[] = [];
   if (c.decisions > 0) badges.push({ label: `${c.decisions} décision client`, accent: true });
+  if (c.actions > 0)
+    badges.push({ label: `${c.actions} action${c.actions > 1 ? 's' : ''}`, accent: true });
   if (c.questions > 0) badges.push({ label: `${c.questions} à répondre`, accent: true });
   if (c.reserves > 0) badges.push({ label: `${c.reserves} réserve${c.reserves > 1 ? 's' : ''}` });
   if (c.livraisons > 0)

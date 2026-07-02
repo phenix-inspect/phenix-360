@@ -32,6 +32,7 @@ export const EVENT_TYPES = [
   'decision',
   'reserve',
   'levee',
+  'action',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -43,6 +44,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   decision: 'Décision',
   reserve: 'Réserve',
   levee: 'Levée de réserve',
+  action: 'Action',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -65,6 +67,31 @@ export type PhotoCategory = string;
 export type DocumentCategory = string;
 export type Room = string;
 
+/* — Structures de PILOTAGE portées par le compte rendu (V1 « vrai CR ») — */
+export type ActionPriorite = 'basse' | 'normale' | 'haute';
+export type QuestionEtat = 'ouverte' | 'repondue' | 'reportee';
+
+/** Une action à suivre : qui, pour quand, priorité, commentaire. */
+export interface CrAction {
+  label: string;
+  responsable?: string;
+  echeance?: string;
+  priorite?: ActionPriorite;
+  commentaire?: string;
+}
+/** Une décision prise : qui décide, impact, bloque-t-elle le chantier ? */
+export interface CrDecision {
+  libelle: string;
+  quiDecide?: string;
+  impact?: string;
+  bloque?: boolean;
+}
+/** Une question du client : ouverte, répondue ou reportée. */
+export interface CrQuestion {
+  libelle: string;
+  etat: QuestionEtat;
+}
+
 export interface CompteRenduContent {
   /** Texte du compte rendu (rédigé par l'IA, validé par l'humain). */
   texte: string;
@@ -81,11 +108,11 @@ export interface CompteRenduContent {
   /** Intervenants présents (réunion / réception). */
   presents?: string[];
   /** Décisions prises, extraites par PHÉNIX et validées. */
-  decisions?: string[];
-  /** Actions à suivre. */
-  actions?: { label: string; responsable?: string }[];
+  decisions?: CrDecision[];
+  /** Actions à suivre (snapshot ; chaque action est aussi un fait `action`). */
+  actions?: CrAction[];
   /** Questions posées par le client pendant la mission (à traiter). */
-  questionsClient?: string[];
+  questionsClient?: CrQuestion[];
   /** Manquants / dommages relevés (livraison). */
   manquants?: string[];
   /** Version cliente (voix client) — utilisée à la projection espace client. */
@@ -232,6 +259,22 @@ export interface LeveeEventContent {
   preuve?: LeveePreuve;
 }
 
+/* -------------------------------------------------------------------------- *
+ * ACTION — un ENGAGEMENT né d'une mission (« PHÉNIX ne lâche rien »). Objet de
+ * pilotage : qui, pour quand, priorité. Interne. Statut porté par le contenu
+ * (append-only : la clôture viendra par un événement ajouté, plus tard).
+ * -------------------------------------------------------------------------- */
+export interface ActionEventContent {
+  libelle: string;
+  responsable?: string;
+  echeance?: string;
+  priorite?: ActionPriorite;
+  commentaire?: string;
+  statut: 'a_faire' | 'faite';
+  /** Origine : le compte rendu / la mission d'où l'action est née. */
+  source?: FilSource;
+}
+
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
 export interface EventContentByType {
   compte_rendu: CompteRenduContent;
@@ -241,6 +284,7 @@ export interface EventContentByType {
   decision: DecisionEventContent;
   reserve: ReserveEventContent;
   levee: LeveeEventContent;
+  action: ActionEventContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -290,6 +334,10 @@ export interface LeveeEvent extends EventEnvelope {
   type: 'levee';
   content: LeveeEventContent;
 }
+export interface ActionEvent extends EventEnvelope {
+  type: 'action';
+  content: ActionEventContent;
+}
 
 /** L'événement du journal — colonne vertébrale du produit. */
 export type Event =
@@ -299,7 +347,8 @@ export type Event =
   | DemandeEvent
   | DecisionEvent
   | ReserveEvent
-  | LeveeEvent;
+  | LeveeEvent
+  | ActionEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type
@@ -311,6 +360,7 @@ export const isDemande = (e: Event): e is DemandeEvent => e.type === 'demande';
 export const isDecision = (e: Event): e is DecisionEvent => e.type === 'decision';
 export const isReserve = (e: Event): e is ReserveEvent => e.type === 'reserve';
 export const isLevee = (e: Event): e is LeveeEvent => e.type === 'levee';
+export const isAction = (e: Event): e is ActionEvent => e.type === 'action';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';

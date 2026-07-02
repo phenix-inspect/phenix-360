@@ -781,7 +781,7 @@ export const demo = {
       },
     });
 
-    // 3) Les faits « réserve » (append-only, numérotés, liés à la photo source).
+    // 3) Les faits « réserve » (append-only, numérotés, avec responsable/échéance).
     let numero = nextReserveNumero(snapshot.events.filter((e) => e.projectId === projectId));
     for (const r of input.prepared.reserves) {
       await backend.appendEvent({
@@ -793,6 +793,8 @@ export const demo = {
         content: {
           numero,
           libelle: r.libelle,
+          ...(r.responsable ? { responsable: r.responsable } : {}),
+          ...(r.echeance ? { echeance: r.echeance } : {}),
           source: {
             kind: 'fil',
             momentId,
@@ -801,6 +803,27 @@ export const demo = {
         },
       });
       numero += 1;
+    }
+
+    // 4) Les faits « action » — les engagements nés de la mission (« PHÉNIX ne
+    //    lâche rien »). Interne, à faire, rattachés à la mission.
+    for (const a of input.prepared.actions) {
+      await backend.appendEvent({
+        projectId,
+        actor,
+        type: 'action',
+        visibility: 'interne',
+        state: 'publie',
+        content: {
+          libelle: a.label,
+          statut: 'a_faire',
+          ...(a.responsable ? { responsable: a.responsable } : {}),
+          ...(a.echeance ? { echeance: a.echeance } : {}),
+          ...(a.priorite ? { priorite: a.priorite } : {}),
+          ...(a.commentaire ? { commentaire: a.commentaire } : {}),
+          source: { kind: 'fil', momentId },
+        },
+      });
     }
 
     refresh();

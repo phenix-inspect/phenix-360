@@ -19,6 +19,8 @@ export function eventTitle(e: Event): string {
       return `Réserve n°${e.content.numero}`;
     case 'levee':
       return `Réserve n°${e.content.reserveNumero} levée`;
+    case 'action':
+      return e.content.libelle;
   }
 }
 
@@ -49,6 +51,15 @@ export function eventDescription(e: Event): string | undefined {
         Boolean,
       );
       return parts.length > 0 ? parts.join(' · ') : 'Réserve levée et tracée au journal.';
+    }
+    case 'action': {
+      const c = e.content;
+      const meta = [
+        c.responsable ? `Responsable : ${c.responsable}` : null,
+        c.echeance ? `échéance ${c.echeance}` : null,
+        c.priorite && c.priorite !== 'normale' ? `priorité ${c.priorite}` : null,
+      ].filter(Boolean);
+      return meta.length > 0 ? `${c.libelle} · ${meta.join(' · ')}` : c.libelle;
     }
     case 'photo':
       return undefined;

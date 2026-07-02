@@ -1,6 +1,14 @@
 import { Button } from '@phenix360/ui';
 import { buildEveningReview, type Event } from '@phenix360/core';
-import { ArrowRight, Check, Flag, HelpCircle, MessageSquare, MoonStar } from 'lucide-react';
+import {
+  ArrowRight,
+  Check,
+  Flag,
+  HelpCircle,
+  ListChecks,
+  MessageSquare,
+  MoonStar,
+} from 'lucide-react';
 import { nameOf, type DemoSnapshot } from '../store';
 
 /**
@@ -29,6 +37,7 @@ export function PointDuSoirView({
   });
 
   const ouvert = [
+    { icon: <ListChecks aria-hidden />, n: review.actions, label: 'actions à suivre' },
     { icon: <Flag aria-hidden />, n: review.reserves, label: 'réserves à lever' },
     { icon: <HelpCircle aria-hidden />, n: review.decisions, label: 'décisions client en attente' },
     { icon: <MessageSquare aria-hidden />, n: review.questions, label: 'clients à répondre' },

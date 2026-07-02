@@ -9,7 +9,7 @@
  */
 import type { Project, ProjectStep } from './project.js';
 import type { Event } from './event.js';
-import { isCompteRendu, isDemande, isDocument, isLevee, isReserve } from './event.js';
+import { isAction, isCompteRendu, isDemande, isDocument, isLevee, isReserve } from './event.js';
 import type { ProjectDossier } from './prepare.js';
 import {
   currentStep,
@@ -25,6 +25,7 @@ export interface ChantierResume {
   reserves: number;
   decisions: number;
   questions: number;
+  actions: number;
   livraisons: number;
   /** Ce chantier réclame une action aujourd'hui. */
   urgent: boolean;
@@ -37,8 +38,14 @@ export interface DayBriefing {
     reserves: number;
     decisions: number;
     questions: number;
+    actions: number;
     livraisons: number;
   };
+}
+
+/** Actions ouvertes (engagements « à faire ») d'un chantier. */
+export function actionsOuvertes(events: Event[]): Event[] {
+  return events.filter((e) => isAction(e) && e.content.statut === 'a_faire');
 }
 
 /** Livraisons attendues : commandes passées, pas encore reçues. */
@@ -62,6 +69,7 @@ export function buildDayBriefing(input: {
     const reserves = reservesOuvertes(events).length;
     const decisions = pendingClientDecisions(events).length;
     const questions = questionsEnAttente(events).length;
+    const actions = actionsOuvertes(events).length;
     const livraisons = livraisonsAVenir(dossier);
     return {
       projectId: p.id,
@@ -70,14 +78,15 @@ export function buildDayBriefing(input: {
       reserves,
       decisions,
       questions,
+      actions,
       livraisons,
-      urgent: decisions > 0 || questions > 0 || reserves > 0,
+      urgent: decisions > 0 || questions > 0 || reserves > 0 || actions > 0,
     };
   });
 
   // Les chantiers urgents d'abord, puis par volume d'attention décroissant.
   const weight = (c: ChantierResume): number =>
-    c.decisions * 100 + c.questions * 50 + c.reserves * 10 + c.livraisons;
+    c.decisions * 100 + c.questions * 50 + c.reserves * 10 + c.actions * 5 + c.livraisons;
   chantiers.sort((a, b) => weight(b) - weight(a));
 
   const totals = chantiers.reduce(
@@ -86,9 +95,10 @@ export function buildDayBriefing(input: {
       reserves: acc.reserves + c.reserves,
       decisions: acc.decisions + c.decisions,
       questions: acc.questions + c.questions,
+      actions: acc.actions + c.actions,
       livraisons: acc.livraisons + c.livraisons,
     }),
-    { chantiers: 0, reserves: 0, decisions: 0, questions: 0, livraisons: 0 },
+    { chantiers: 0, reserves: 0, decisions: 0, questions: 0, actions: 0, livraisons: 0 },
   );
 
   return { chantiers, totals };
@@ -109,6 +119,7 @@ export interface EveningReview {
   reserves: number;
   decisions: number;
   questions: number;
+  actions: number;
   livraisons: number;
   /** À surveiller demain — quelques lignes actionnables. */
   demain: string[];
@@ -138,6 +149,7 @@ export function buildEveningReview(input: {
   const creesAujourdhui = all.filter((e) => memeJour(e.createdAt, now));
   const comptesRendus = creesAujourdhui.filter(isCompteRendu).length;
   const reservesOuvertesJour = creesAujourdhui.filter(isReserve).length;
+  const actionsJour = creesAujourdhui.filter(isAction).length;
   const levees = creesAujourdhui.filter(isLevee).length;
   const documents = creesAujourdhui.filter(isDocument).length;
   const reponses = all.filter(
@@ -147,6 +159,7 @@ export function buildEveningReview(input: {
   const faits = [
     { label: comptesRendus > 1 ? 'comptes rendus' : 'compte rendu', count: comptesRendus },
     { label: reponses > 1 ? 'réponses clients' : 'réponse client', count: reponses },
+    { label: actionsJour > 1 ? 'actions créées' : 'action créée', count: actionsJour },
     { label: levees > 1 ? 'réserves levées' : 'réserve levée', count: levees },
     {
       label: reservesOuvertesJour > 1 ? 'réserves ouvertes' : 'réserve ouverte',
@@ -171,6 +184,7 @@ export function buildEveningReview(input: {
 
   const demain: string[] = [];
   if (t.livraisons > 0) demain.push(`${plur(t.livraisons, 'livraison')} à contrôler`);
+  if (t.actions > 0) demain.push(`${plur(t.actions, 'action')} à suivre`);
   if (t.decisions > 0) demain.push(`${plur(t.decisions, 'décision')} client à relancer`);
   if (reservesUrgentes > 0)
     demain.push(`${plur(reservesUrgentes, 'réserve')} à lever cette semaine`);
@@ -181,6 +195,7 @@ export function buildEveningReview(input: {
     reserves: t.reserves,
     decisions: t.decisions,
     questions: t.questions,
+    actions: t.actions,
     livraisons: t.livraisons,
     demain,
   };

@@ -6,6 +6,7 @@ import {
   Flag,
   HelpCircle,
   Image,
+  ListChecks,
   NotebookPen,
   Sparkles,
 } from 'lucide-react';
@@ -33,6 +34,7 @@ const TYPE_ICON: Record<EventType, React.ReactNode> = {
   decision: <Sparkles aria-hidden="true" />,
   reserve: <Flag aria-hidden="true" />,
   levee: <CircleCheck aria-hidden="true" />,
+  action: <ListChecks aria-hidden="true" />,
 };
 
 export const Timeline = React.forwardRef<HTMLOListElement, React.HTMLAttributes<HTMLOListElement>>(

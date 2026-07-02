@@ -4,10 +4,16 @@ import {
   MISSION_LABEL,
   buildCorps,
   prepareMission,
+  type ActionPriorite,
+  type CrAction,
+  type CrDecision,
+  type CrQuestion,
   type EventActor,
   type MissionKind,
   type MissionPreparation,
+  type MissionReserveDraft,
   type Project,
+  type QuestionEtat,
   type UploadedMedia,
 } from '@phenix360/core';
 import { Camera, Check, Loader2, Mic, Plus, Send, Sparkles, Trash2, X } from 'lucide-react';
@@ -452,34 +458,115 @@ function ComprendStep({
         items={prep.presents}
         onChange={(items) => onChange({ ...prep, presents: items })}
       />
-      <EditList
+
+      <CardSection<CrDecision>
         label="Décisions"
         items={prep.decisions}
-        onChange={(items) => onChange({ ...prep, decisions: items })}
+        blank={() => ({ libelle: '', bloque: false })}
+        onChange={(decisions) => onChange({ ...prep, decisions })}
+        render={(d, set) => (
+          <>
+            <LibelleInput
+              value={d.libelle}
+              placeholder="La décision prise…"
+              onChange={(libelle) => set({ ...d, libelle })}
+            />
+            <div className="flex flex-wrap gap-2">
+              <MetaInput
+                placeholder="Qui décide ?"
+                value={d.quiDecide}
+                onChange={(v) => set({ ...d, quiDecide: v })}
+              />
+              <MetaInput
+                placeholder="Impact"
+                value={d.impact}
+                onChange={(v) => set({ ...d, impact: v })}
+              />
+            </div>
+            <Toggle
+              label="Bloque le chantier"
+              checked={Boolean(d.bloque)}
+              onChange={(bloque) => set({ ...d, bloque })}
+            />
+          </>
+        )}
       />
-      <EditList
+
+      <CardSection<CrAction>
         label="Actions à suivre"
-        items={prep.actions.map((a) => a.label)}
-        onChange={(items) => onChange({ ...prep, actions: items.map((label) => ({ label })) })}
+        items={prep.actions}
+        blank={() => ({ label: '', priorite: 'normale' })}
+        onChange={(actions) => onChange({ ...prep, actions })}
+        render={(a, set) => (
+          <>
+            <LibelleInput
+              value={a.label}
+              placeholder="L'action à suivre…"
+              onChange={(label) => set({ ...a, label })}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <MetaInput
+                placeholder="Responsable"
+                value={a.responsable}
+                onChange={(v) => set({ ...a, responsable: v })}
+              />
+              <DateInput value={a.echeance} onChange={(v) => set({ ...a, echeance: v })} />
+              <PrioritePicker
+                value={a.priorite ?? 'normale'}
+                onChange={(p) => set({ ...a, priorite: p })}
+              />
+            </div>
+            <MetaInput
+              full
+              placeholder="Commentaire (optionnel)"
+              value={a.commentaire}
+              onChange={(v) => set({ ...a, commentaire: v })}
+            />
+          </>
+        )}
       />
-      <EditList
+
+      <CardSection<MissionReserveDraft>
         label="Réserves / points à reprendre"
-        items={prep.reserves.map((r) => r.libelle)}
-        onChange={(items) =>
-          onChange({
-            ...prep,
-            reserves: items.map((libelle, i) => ({
-              libelle,
-              ...(prep.reserves[i]?.photoId ? { photoId: prep.reserves[i]!.photoId } : {}),
-            })),
-          })
-        }
+        items={prep.reserves}
+        blank={() => ({ libelle: '' })}
+        onChange={(reserves) => onChange({ ...prep, reserves })}
+        render={(r, set) => (
+          <>
+            <LibelleInput
+              value={r.libelle}
+              placeholder="Le point à reprendre…"
+              onChange={(libelle) => set({ ...r, libelle })}
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <MetaInput
+                placeholder="Responsable"
+                value={r.responsable}
+                onChange={(v) => set({ ...r, responsable: v })}
+              />
+              <DateInput value={r.echeance} onChange={(v) => set({ ...r, echeance: v })} />
+            </div>
+          </>
+        )}
       />
-      <EditList
+
+      <CardSection<CrQuestion>
         label="Questions client"
         items={prep.questionsClient}
-        onChange={(items) => onChange({ ...prep, questionsClient: items })}
+        blank={() => ({ libelle: '', etat: 'ouverte' })}
+        onChange={(questionsClient) => onChange({ ...prep, questionsClient })}
+        render={(q, set) => (
+          <>
+            <LibelleInput
+              value={q.libelle}
+              placeholder="La question du client…"
+              onChange={(libelle) => set({ ...q, libelle })}
+            />
+            <EtatPicker value={q.etat} onChange={(etat) => set({ ...q, etat })} />
+          </>
+        )}
       />
+
       {prep.manquants.length > 0 && (
         <EditList
           label="Manquants / dommages"
@@ -549,6 +636,202 @@ function EditList({
         <Plus aria-hidden /> Ajouter
       </button>
     </div>
+  );
+}
+
+/* --------- Cartes de pilotage riches (éditables, sans popup) -------------- */
+
+function CardSection<T>({
+  label,
+  items,
+  blank,
+  onChange,
+  render,
+}: {
+  label: string;
+  items: T[];
+  blank: () => T;
+  onChange: (items: T[]) => void;
+  render: (item: T, set: (v: T) => void) => React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {label}
+        {items.length > 0 ? ` (${items.length})` : ''}
+      </p>
+      {items.map((it, i) => (
+        <div
+          key={i}
+          className="flex items-start gap-2 rounded-xl border border-border bg-surface p-3"
+        >
+          <div className="flex-1 space-y-2">
+            {render(it, (v) => onChange(items.map((x, j) => (j === i ? v : x))))}
+          </div>
+          <button
+            type="button"
+            onClick={() => onChange(items.filter((_, j) => j !== i))}
+            aria-label="Supprimer"
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-paper-50 hover:text-foreground [&_svg]:size-4"
+          >
+            <Trash2 aria-hidden />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...items, blank()])}
+        className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 hover:underline [&_svg]:size-3.5"
+      >
+        <Plus aria-hidden /> Ajouter
+      </button>
+    </div>
+  );
+}
+
+function LibelleInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+}): React.JSX.Element {
+  return (
+    <input
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full rounded-lg border border-transparent bg-transparent px-0 text-sm font-medium text-foreground focus:border-transparent focus:outline-none focus:ring-0"
+    />
+  );
+}
+
+function MetaInput({
+  value,
+  placeholder,
+  onChange,
+  full,
+}: {
+  value?: string;
+  placeholder: string;
+  onChange: (v: string | undefined) => void;
+  full?: boolean;
+}): React.JSX.Element {
+  return (
+    <input
+      value={value ?? ''}
+      placeholder={placeholder}
+      onChange={(e) => onChange(e.target.value || undefined)}
+      className={`h-8 rounded-lg border border-input bg-paper-50 px-2.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400 ${
+        full ? 'w-full' : 'w-36'
+      }`}
+    />
+  );
+}
+
+function DateInput({
+  value,
+  onChange,
+}: {
+  value?: string;
+  onChange: (v: string | undefined) => void;
+}): React.JSX.Element {
+  return (
+    <input
+      type="date"
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value || undefined)}
+      aria-label="Échéance"
+      className="h-8 rounded-lg border border-input bg-paper-50 px-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+    />
+  );
+}
+
+const PRIORITES: ActionPriorite[] = ['basse', 'normale', 'haute'];
+
+function PrioritePicker({
+  value,
+  onChange,
+}: {
+  value: ActionPriorite;
+  onChange: (p: ActionPriorite) => void;
+}): React.JSX.Element {
+  return (
+    <div className="inline-flex overflow-hidden rounded-lg border border-input">
+      {PRIORITES.map((p) => (
+        <button
+          key={p}
+          type="button"
+          aria-pressed={value === p}
+          onClick={() => onChange(p)}
+          className={`px-2.5 py-1 text-xs capitalize transition-colors ${
+            value === p
+              ? 'bg-gold-100 font-medium text-gold-800'
+              : 'bg-surface text-muted-foreground'
+          }`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const ETATS: { id: QuestionEtat; label: string }[] = [
+  { id: 'ouverte', label: 'Ouverte' },
+  { id: 'repondue', label: 'Répondue' },
+  { id: 'reportee', label: 'Reportée' },
+];
+
+function EtatPicker({
+  value,
+  onChange,
+}: {
+  value: QuestionEtat;
+  onChange: (e: QuestionEtat) => void;
+}): React.JSX.Element {
+  return (
+    <div className="inline-flex overflow-hidden rounded-lg border border-input">
+      {ETATS.map((e) => (
+        <button
+          key={e.id}
+          type="button"
+          aria-pressed={value === e.id}
+          onClick={() => onChange(e.id)}
+          className={`px-2.5 py-1 text-xs transition-colors ${
+            value === e.id
+              ? 'bg-gold-100 font-medium text-gold-800'
+              : 'bg-surface text-muted-foreground'
+          }`}
+        >
+          {e.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}): React.JSX.Element {
+  return (
+    <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-foreground">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="size-4 accent-gold-600"
+      />
+      {label}
+    </label>
   );
 }
 
@@ -655,17 +938,24 @@ function MissionDoc({
         )}
         {prep.decisions.length > 0 && (
           <DocSection title="Décisions">
-            <DocList items={prep.decisions} />
+            <DocList
+              items={prep.decisions.map(
+                (d) =>
+                  `${d.libelle}${docSuffix([d.quiDecide, d.bloque ? 'bloque le chantier' : undefined])}`,
+              )}
+            />
           </DocSection>
         )}
         {prep.actions.length > 0 && (
           <DocSection title="Actions à suivre">
-            <DocList items={prep.actions.map((a) => a.label)} />
+            <DocList
+              items={prep.actions.map((a) => `${a.label}${docSuffix([a.responsable, a.echeance])}`)}
+            />
           </DocSection>
         )}
         {prep.questionsClient.length > 0 && (
           <DocSection title="Questions client">
-            <DocList items={prep.questionsClient} />
+            <DocList items={prep.questionsClient.map((q) => `${q.libelle} (${q.etat})`)} />
           </DocSection>
         )}
         {prep.manquants.length > 0 && (
@@ -679,6 +969,7 @@ function MissionDoc({
               {prep.reserves.map((r, i) => (
                 <li key={i}>
                   {i + 1}. {r.libelle}
+                  {docSuffix([r.responsable, r.echeance])}
                 </li>
               ))}
             </ol>
@@ -687,6 +978,11 @@ function MissionDoc({
       </div>
     </article>
   );
+}
+
+function docSuffix(parts: (string | undefined)[]): string {
+  const s = parts.filter(Boolean).join(' · ');
+  return s ? ` — ${s}` : '';
 }
 
 function DocList({ items }: { items: string[] }): React.JSX.Element {

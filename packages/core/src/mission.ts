@@ -9,6 +9,7 @@
  * signature, sans toucher aux écrans.
  */
 import type { MomentType } from './fil.js';
+import type { CrAction, CrDecision, CrQuestion } from './event.js';
 
 /** Les 7 missions de la V1 « Gestion du chantier ». Toutes sont des MomentType. */
 export type MissionKind =
@@ -65,10 +66,8 @@ export const missionMomentType = (kind: MissionKind): MomentType => kind;
 export interface MissionReserveDraft {
   libelle: string;
   photoId?: string;
-}
-export interface MissionActionDraft {
-  label: string;
   responsable?: string;
+  echeance?: string;
 }
 
 export interface MissionPreparation {
@@ -76,10 +75,10 @@ export interface MissionPreparation {
   docTitre: string;
   /** Le récit, découpé en observations propres. */
   observations: string[];
-  decisions: string[];
-  actions: MissionActionDraft[];
+  decisions: CrDecision[];
+  actions: CrAction[];
   reserves: MissionReserveDraft[];
-  questionsClient: string[];
+  questionsClient: CrQuestion[];
   manquants: string[];
   presents: string[];
   /** Corps du document interne (résumé lisible pour le Journal). */
@@ -131,15 +130,21 @@ export function prepareMission(input: {
     ...(firstPhoto ? { photoId: firstPhoto } : {}),
   });
 
-  const decisionsAll = ph.filter((p) => RX_DECISION.test(p)).map(cap);
-  const actionsAll = ph.filter((p) => RX_ACTION.test(p)).map((label) => ({ label: cap(label) }));
+  const decisionsAll: CrDecision[] = ph
+    .filter((p) => RX_DECISION.test(p))
+    .map((p) => ({ libelle: cap(p), bloque: false }));
+  const actionsAll: CrAction[] = ph
+    .filter((p) => RX_ACTION.test(p))
+    .map((label) => ({ label: cap(label), priorite: 'normale' }));
   const reservesCue = ph.filter((p) => RX_RESERVE.test(p));
   const manquantsAll = ph.filter((p) => RX_MANQUANT.test(p)).map(cap);
   // Questions posées par le client (tournure « le client demande / souhaite… »).
-  const questionsClient = ph.filter((p) => RX_QUESTION_CLIENT.test(p)).map(cap);
+  const questionsClient: CrQuestion[] = ph
+    .filter((p) => RX_QUESTION_CLIENT.test(p))
+    .map((p) => ({ libelle: cap(p), etat: 'ouverte' }));
 
-  let decisions: string[] = [];
-  let actions: MissionActionDraft[] = [];
+  let decisions: CrDecision[] = [];
+  let actions: CrAction[] = [];
   let reserves: MissionReserveDraft[] = [];
   let manquants: string[] = [];
 
@@ -206,27 +211,52 @@ function bullets(items: string[]): string {
   return items.map((i) => `• ${i}`).join('\n');
 }
 
+const suffixe = (parts: (string | undefined)[]): string => {
+  const s = parts.filter(Boolean).join(' · ');
+  return s ? ` — ${s}` : '';
+};
+
 /** Corps du document interne (résumé lisible, alimente le Journal). */
 export function buildCorps(p: {
   kind: MissionKind;
   docTitre: string;
   observations: string[];
   presents: string[];
-  decisions: string[];
-  actions: MissionActionDraft[];
+  decisions: CrDecision[];
+  actions: CrAction[];
   reserves: MissionReserveDraft[];
-  questionsClient?: string[];
+  questionsClient?: CrQuestion[];
   manquants: string[];
 }): string {
   const parts: string[] = [];
   if (p.presents.length) parts.push(`Présents : ${p.presents.join(', ')}.`);
   if (p.observations.length) parts.push(p.observations.map((o) => `${o}.`).join(' '));
-  if (p.decisions.length) parts.push(`Décisions :\n${bullets(p.decisions)}`);
-  if (p.actions.length) parts.push(`Actions :\n${bullets(p.actions.map((a) => a.label))}`);
-  if (p.questionsClient?.length) parts.push(`Questions client :\n${bullets(p.questionsClient)}`);
+  if (p.decisions.length)
+    parts.push(
+      `Décisions :\n${bullets(
+        p.decisions.map(
+          (d) =>
+            `${d.libelle}${suffixe([d.quiDecide, d.bloque ? 'bloque le chantier' : undefined])}`,
+        ),
+      )}`,
+    );
+  if (p.actions.length)
+    parts.push(
+      `Actions :\n${bullets(
+        p.actions.map((a) => `${a.label}${suffixe([a.responsable, a.echeance])}`),
+      )}`,
+    );
+  if (p.questionsClient?.length)
+    parts.push(
+      `Questions client :\n${bullets(p.questionsClient.map((q) => `${q.libelle} (${q.etat})`))}`,
+    );
   if (p.manquants.length) parts.push(`Manquants / dommages :\n${bullets(p.manquants)}`);
   if (p.reserves.length)
-    parts.push(`Points à reprendre :\n${bullets(p.reserves.map((r) => r.libelle))}`);
+    parts.push(
+      `Points à reprendre :\n${bullets(
+        p.reserves.map((r) => `${r.libelle}${suffixe([r.responsable, r.echeance])}`),
+      )}`,
+    );
   if (parts.length === 0) parts.push('Rien à signaler.');
   return parts.join('\n\n');
 }
