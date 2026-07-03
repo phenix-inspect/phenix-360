@@ -131,3 +131,28 @@ cockpit — zéro régression).
 commandée → livrée, réception, manquants) reste l'EPIC 19 ; la préparation le LIT
 seulement. Nouveaux champs dossier `sousTraitants` / `checklist` /
 `budgetPrevisionnel`.
+
+## 03/07/2026 — Stabilisation : le Fil est le récit unique ; rubans de perspective
+
+**Décision :** sprint de stabilisation (aucune nouvelle brique). (1) **Dédoublonnage
+Espace client** — le **Fil** devient le récit visuel unique du chantier ; le bloc
+« Dernière activité » / « Le récit de votre chantier » (qui rejouait les mêmes
+photos que le Fil) est supprimé et remplacé par une section resserrée **« Comptes
+rendus & documents »** qui ne garde que les éléments utiles ET absents du Fil
+(comptes rendus partagés, documents publiés). Les décisions restent portées par le
+bandeau et « Vos choix ». (2) **Clarté des perspectives** — un **ruban « Aperçu »**
+en tête des vues Artisan et Espace client indique sans ambiguïté que le conducteur
+consulte ce que voit un autre acteur ; les vues « Aujourd'hui » / « Chantier »
+restent celles du conducteur (pas de ruban = on est chez soi).
+**Pourquoi :** rendre l'application plus propre, plus fluide, plus fiable —
+« Le Fil doit devenir le récit unique du chantier » ; l'utilisateur doit comprendre
+immédiatement de quel côté il se trouve (conducteur / artisan / client).
+**Alternatives rejetées :** supprimer entièrement le bloc d'événements (on perdait
+les comptes rendus et documents, absents du Fil) ; renommer les onglets du switcher
+(risque de churn et de régression pour un gain moindre que les rubans).
+**Impact :** nouveau composant de présentation `PerspectiveRibbon` (apps/demo).
+Nouvelle suite `stabilite.test.mjs` (16/16) : balayage multi-chantiers × tous
+onglets, client-safety exhaustive (zéro fuite inter-chantiers), rubans de
+perspective, parcours Fil (coup de cœur + petit mot), états vides, zéro erreur
+console. VISION Art. 8 (le fait, colonne vertébrale ; pas de duplication) et Art. 9
+(chacun ne voit que ce qui le concerne).

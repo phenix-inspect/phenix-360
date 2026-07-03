@@ -112,7 +112,12 @@ l'artisan écrit est **interne → jamais côté client** (garanti par
 ### EPIC 12 — Mode Client · 🟡 À compléter
 
 Base : `ClientView` riche (décision, Fil, concierge, client-safe strict).
-**Manque** : historique client propre, notifications client, préférences. VISION Art. 9.
+**Stabilisation (Sprint 4.1) :** le **Fil est désormais le récit visuel unique** ;
+le doublon photo (« Dernière activité » / « Le récit de votre chantier ») est
+remplacé par une section resserrée **« Comptes rendus & documents »** (éléments
+utiles absents du Fil). Ruban **« Aperçu »** (`PerspectiveRibbon`) en tête des vues
+Artisan et Espace client → on comprend immédiatement de quel côté on se trouve.
+**Manque** : historique client propre, notifications client, préférences. VISION Art. 8, 9.
 
 ### EPIC 13 — Administration · 🔴 À développer
 

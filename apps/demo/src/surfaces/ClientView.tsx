@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { Badge, Card, CardContent, EmptyState } from '@phenix360/ui';
-import { CalendarRange, Palette, Sparkles } from 'lucide-react';
+import { Badge, Card, CardContent } from '@phenix360/ui';
+import { CalendarRange, FileText, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
@@ -17,6 +17,7 @@ import {
 } from '@phenix360/core';
 import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
+import { PerspectiveRibbon } from '../components/PerspectiveRibbon';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
@@ -49,7 +50,12 @@ export function ClientView({
   const clientDecision = dossier
     ? (buildClientDecisions(dossier).find((d) => d.clientActionable) ?? null)
     : null;
-  const feed = clientFeed(events);
+  // Le Fil porte le récit visuel (photos, moments). Ici on ne conserve que les
+  // éléments de suivi utiles au client et absents du Fil : comptes rendus et
+  // documents publiés. Les décisions vivent dans le bandeau et « Vos choix ».
+  const updates = clientFeed(events).filter(
+    (e) => e.type === 'compte_rendu' || e.type === 'document',
+  );
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -124,9 +130,6 @@ export function ClientView({
       ? decisions.filter((d) => d.eventId !== action.decision.eventId)
       : decisions;
 
-  const latest = feed[0];
-  const rest = feed.slice(1);
-
   // Navigation PHÉNIX : on ouvre l'écran ciblé (défilement + repère visuel).
   const clientTarget = snap.clientTarget;
   useEffect(() => {
@@ -156,6 +159,8 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
+      <PerspectiveRibbon audience="client" subject={nameOf(snap, project.clientId)} />
+
       <div id="section-decision" className="rounded-2xl">
         {clientDecision ? (
           <ClientDecisionBanner
@@ -239,38 +244,22 @@ export function ClientView({
         </section>
       )}
 
-      {feed.length === 0 ? (
-        <EmptyState
-          icon={<Sparkles aria-hidden />}
-          title="Votre récit commence bientôt"
-          description="Votre premier compte rendu et vos premières photos apparaîtront ici. Votre équipe PHÉNIX prépare votre chantier."
-        />
-      ) : (
-        <>
-          <section className="space-y-3">
-            <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
-              Dernière activité
+      {updates.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+            <FileText aria-hidden />
+            <h2 className="font-serif text-lg font-semibold tracking-tight">
+              Comptes rendus & documents
             </h2>
-            <div id={`ev-${latest!.id}`} className="rounded-2xl">
-              <MomentCard event={latest!} authorName={nameOf(snap, latest!.actor.userId)} />
-            </div>
-          </section>
-
-          {rest.length > 0 && (
-            <section className="space-y-4">
-              <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
-                Le récit de votre chantier
-              </h2>
-              <div className="space-y-5">
-                {rest.map((e) => (
-                  <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
-                    <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
-                  </div>
-                ))}
+          </div>
+          <div className="space-y-4">
+            {updates.map((e) => (
+              <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
+                <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
               </div>
-            </section>
-          )}
-        </>
+            ))}
+          </div>
+        </section>
       )}
 
       <PhenixWidget snap={snap} project={project} actor={actor} />
