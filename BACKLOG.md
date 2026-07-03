@@ -62,7 +62,20 @@ alimente Aujourd'hui/soir. Interne strict (jamais côté client). Testé (réser
 7/7, sans régression). Report tracé dans `DECISIONS.md` : édition/réattribution
 d'une réserve existante → futur sprint « Amendement de faits ». VISION Art. 7, 8, 9.
 
-### EPIC 5 — Préparation chantier · ✅ Terminé (Sprint 3)
+### EPIC 5 — Préparation chantier · ✅ Terminé (Sprint 3 + EPIC 1 complète)
+
+**EPIC 1 (véritable espace Préparation)** : la Préparation est disponible sur
+**tout** chantier (blanc compris via `ensureDossier`), entièrement **éditable** —
+coordonnées & accès client, devis, budget, **intervenants** (artisans + fournisseurs
+avec contact), **documents catégorisés** (devis/plan/diagnostic/DPE/assurance/contrat)
+avec **vrais fichiers** (Lot 3) ouvrables et demande au client, **photos avant
+travaux**, **commandes** (ajout + fiche complète), **feuille de route & jalons**,
+planning prévisionnel, check-list de lancement, cockpit « prêt à démarrer ? ».
+Doublon intervenants du cockpit retiré (section dédiée unique). `prep.test.mjs`
+11/11, `preparation.test.mjs` 9/9, client-safe. Ajouts core `Project.address`,
+`ProjectDocument.categorie/attachment`, `Fournisseur`, `SousTraitant.contact`.
+
+_Détail Sprint 3 :_
 
 Le **bureau de préparation** : cockpit `PreparationCockpit` en tête de l'onglet
 Préparation, alimenté par le sélecteur pur `buildPreparation` (déterministe,

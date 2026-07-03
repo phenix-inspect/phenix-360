@@ -31,6 +31,7 @@ import {
   CalendarClock,
   CircleCheck,
   FileText,
+  HardHat,
   HelpCircle,
   Image as ImageIcon,
   NotebookPen,
@@ -159,7 +160,7 @@ export function CompagnonView({
       >
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
-          {dossier && <TabsTrigger value="preparation">Préparation</TabsTrigger>}
+          <TabsTrigger value="preparation">Préparation</TabsTrigger>
           <TabsTrigger value="fil">Le Fil</TabsTrigger>
           <TabsTrigger value="reserves">
             <span className="flex items-center gap-1.5">
@@ -170,11 +171,13 @@ export function CompagnonView({
           <TabsTrigger value="historique">Historique</TabsTrigger>
         </TabsList>
         <TabsContent value="suivi">{suivi}</TabsContent>
-        {dossier && (
-          <TabsContent value="preparation">
+        <TabsContent value="preparation">
+          {dossier ? (
             <DossierPanel project={project} dossier={dossier} actor={actor} events={events} />
-          </TabsContent>
-        )}
+          ) : (
+            <PrepEmpty project={project} />
+          )}
+        </TabsContent>
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />
         </TabsContent>
@@ -221,6 +224,23 @@ export function CompagnonView({
           onClose={() => setMissionKind(null)}
         />
       )}
+    </div>
+  );
+}
+
+function PrepEmpty({ project }: { project: Project }): React.JSX.Element {
+  return (
+    <div className="mx-auto max-w-xl py-8">
+      <EmptyState
+        icon={<HardHat aria-hidden />}
+        title="Préparez ce chantier"
+        description="Coordonnées client, devis, budget, intervenants, documents, plans, diagnostics, photos avant travaux, commandes, planning et check-list de lancement — tout ce qu'il faut pour démarrer sereinement."
+        action={
+          <Button onClick={() => demo.ensureDossier(project)}>
+            <HardHat aria-hidden /> Démarrer la préparation
+          </Button>
+        }
+      />
     </div>
   );
 }

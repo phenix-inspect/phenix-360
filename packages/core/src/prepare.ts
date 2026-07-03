@@ -16,6 +16,7 @@
  * propre feuille de route, construite à partir du devis.
  */
 import type { IsoDateTime } from './ids.js';
+import type { EventAttachment } from './attachment.js';
 import type {
   DecisionEventContent,
   DecisionEventKind,
@@ -409,12 +410,40 @@ export const DOCUMENT_STATUS_TONE: Record<
   manquant: 'danger',
 };
 
+/** Familles de documents d'un chantier (préparation). */
+export const PREP_DOC_CATEGORIES = [
+  'devis',
+  'plan',
+  'diagnostic',
+  'dpe',
+  'assurance',
+  'contrat',
+  'photo_avant',
+  'autre',
+] as const;
+export type PrepDocCategory = (typeof PREP_DOC_CATEGORIES)[number];
+
+export const PREP_DOC_CATEGORY_LABEL: Record<PrepDocCategory, string> = {
+  devis: 'Devis',
+  plan: 'Plan',
+  diagnostic: 'Diagnostic',
+  dpe: 'DPE',
+  assurance: 'Assurance',
+  contrat: 'Contrat',
+  photo_avant: 'Photo avant travaux',
+  autre: 'Autre',
+};
+
 export interface ProjectDocument {
   id: string;
   label: string;
   status: DocumentStatus;
   /** Indispensable au démarrage / à la sécurité ? (jamais bloquant sinon). */
   recommande?: boolean;
+  /** Famille de document (devis, plan, diagnostic, DPE, assurance…). */
+  categorie?: PrepDocCategory;
+  /** Vrai fichier déposé (Lot 3 : aperçu local base64). */
+  attachment?: EventAttachment;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -463,12 +492,23 @@ export interface ProjectMemory {
 /* -------------------------------------------------------------------------- *
  * Dossier préparé + proposition
  * -------------------------------------------------------------------------- */
-/** Un sous-traitant retenu pour le chantier (Bureau de préparation). */
+/** Un sous-traitant / artisan retenu pour le chantier (Bureau de préparation). */
 export interface SousTraitant {
   id: string;
   nom: string;
   /** Corps d'état / lot (ex. « Plomberie »). */
   lot?: string;
+  /** Contact (téléphone ou email, texte libre). */
+  contact?: string;
+}
+
+/** Un fournisseur retenu pour le chantier. */
+export interface Fournisseur {
+  id: string;
+  nom: string;
+  /** Ce qu'il fournit (ex. « Carrelage », « Cuisine »). */
+  lot?: string;
+  contact?: string;
 }
 
 /** Un point de lancement MANUEL ajouté par le conducteur (check-list). */
@@ -486,8 +526,10 @@ export interface ProjectDossier {
   selections: ClientSelection[];
   documents: ProjectDocument[];
   questions: PreparationQuestion[];
-  /** Sous-traitants retenus pour ce chantier. */
+  /** Sous-traitants / artisans retenus pour ce chantier. */
   sousTraitants?: SousTraitant[];
+  /** Fournisseurs retenus pour ce chantier. */
+  fournisseurs?: Fournisseur[];
   /** Points de lancement manuels du conducteur (en plus des vérifs automatiques). */
   checklist?: ChecklistManuel[];
   /** Budget prévisionnel saisi (sinon dérivé du total TTC devis + avenants). */

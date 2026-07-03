@@ -16,6 +16,8 @@ import {
   INTERNAL_AUDIENCE,
   SHARED_AUDIENCE,
   InMemoryBackend,
+  PROJECT_STEPS,
+  PROJECT_STEP_LABEL,
   annotationId as toAnnotationId,
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
@@ -49,6 +51,7 @@ import {
   type PhenixAction,
   type PhenixSource,
   type PhenixTodo,
+  type Project,
   type ProjectDossier,
   type ProjectId,
   type ProjectPatch,
@@ -452,6 +455,35 @@ export const demo = {
         localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
       }
     }
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Garantit qu'un chantier a un DOSSIER de préparation (EPIC 1). Un chantier
+   * créé à la main n'en a pas : on en crée un vide, amorcé depuis ses infos
+   * (client, adresse) et la feuille de route standard. Idempotent.
+   */
+  ensureDossier(project: Project): void {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    if (dossiers[project.id]) return;
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    const clientName = project.clientId ? (people[project.clientId] ?? '') : '';
+    dossiers[project.id] = {
+      infos: {
+        ...(clientName ? { clientName } : {}),
+        ...(project.address ? { address: project.address } : {}),
+      },
+      roadmap: PROJECT_STEPS.map((s) => ({ id: s, label: PROJECT_STEP_LABEL[s] })),
+      planning: [],
+      orders: [],
+      selections: [],
+      documents: [],
+      questions: [],
+      sources: [],
+      createdAt: new Date().toISOString(),
+    };
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },

@@ -49,7 +49,6 @@ export function PreparationCockpit({
         <LaunchChecklist prep={prep} dossier={dossier} patch={patch} />
         <div className="space-y-4">
           {prep.bloquants.length > 0 && <BlockersList prep={prep} />}
-          <TeamSuppliers prep={prep} dossier={dossier} patch={patch} />
           <KeyDates prep={prep} />
         </div>
       </div>
@@ -352,105 +351,6 @@ function BlockersList({ prep }: { prep: PreparationSummary }): React.JSX.Element
 }
 
 /* ---------------------------- Intervenants ------------------------------- */
-
-function TeamSuppliers({
-  prep,
-  dossier,
-  patch,
-}: {
-  prep: PreparationSummary;
-  dossier: ProjectDossier;
-  patch: (next: Partial<ProjectDossier>) => void;
-}): React.JSX.Element {
-  const [nom, setNom] = useState('');
-  const [lot, setLot] = useState('');
-  const list = dossier.sousTraitants ?? [];
-
-  const add = (): void => {
-    const n = nom.trim();
-    if (!n) return;
-    patch({
-      sousTraitants: [
-        ...list,
-        { id: crypto.randomUUID(), nom: n, ...(lot.trim() ? { lot: lot.trim() } : {}) },
-      ],
-    });
-    setNom('');
-    setLot('');
-  };
-  const remove = (id: string): void => patch({ sousTraitants: list.filter((s) => s.id !== id) });
-
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-4">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
-          <Users aria-hidden /> Intervenants
-        </h3>
-
-        <div className="space-y-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Sous-traitants retenus
-          </p>
-          {list.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Aucun sous-traitant retenu pour l’instant.
-            </p>
-          ) : (
-            <ul className="flex flex-wrap gap-1.5">
-              {list.map((s) => (
-                <li
-                  key={s.id}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-foreground"
-                >
-                  <span className="font-medium">{s.nom}</span>
-                  {s.lot && <span className="text-muted-foreground">· {s.lot}</span>}
-                  <button
-                    type="button"
-                    onClick={() => remove(s.id)}
-                    aria-label={`Retirer ${s.nom}`}
-                    className="text-muted-foreground hover:text-foreground [&_svg]:size-3"
-                  >
-                    <X aria-hidden />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            <Input
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && add()}
-              placeholder="Nom"
-              aria-label="Nom du sous-traitant"
-              className="h-8 w-32"
-            />
-            <Input
-              value={lot}
-              onChange={(e) => setLot(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && add()}
-              placeholder="Lot (optionnel)"
-              aria-label="Lot du sous-traitant"
-              className="h-8 w-32"
-            />
-            <Button size="sm" variant="outline" onClick={add} disabled={!nom.trim()}>
-              <Plus aria-hidden /> Ajouter
-            </Button>
-          </div>
-        </div>
-
-        {prep.fournisseurs.length > 0 && (
-          <div className="space-y-1.5 border-t border-border pt-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Fournisseurs
-            </p>
-            <p className="text-sm text-foreground">{prep.fournisseurs.join(' · ')}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 /* ------------------------------- Dates ----------------------------------- */
 

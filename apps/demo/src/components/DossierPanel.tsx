@@ -36,7 +36,7 @@ import {
 import {
   Banknote,
   CalendarDays,
-  FileText,
+  Contact,
   ListChecks,
   MessageSquareWarning,
   Palette,
@@ -50,11 +50,13 @@ import { demo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { RoadmapProgress } from './RoadmapProgress';
 import { DevisBreakdown } from './DevisBreakdown';
-import { DocumentStatusBadge } from './DocumentStatusBadge';
 import { LaunchNotePanel } from './LaunchNotePanel';
 import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
+import { CoordonneesCard } from './prep/CoordonneesCard';
+import { IntervenantsSection } from './prep/IntervenantsSection';
+import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -83,6 +85,18 @@ export function DossierPanel({
   const saveOrder = (updated: Order) => {
     patch({ orders: dossier.orders.map((o) => (o.id === updated.id ? updated : o)) });
     setEditing(null);
+  };
+
+  const addOrder = () => {
+    const o: Order = { id: crypto.randomUUID(), label: 'Nouvelle commande', statut: 'a_commander' };
+    patch({ orders: [...dossier.orders, o] });
+    setEditing(o);
+  };
+
+  const addRoadmapStep = (label: string) => {
+    const l = label.trim();
+    if (!l) return;
+    patch({ roadmap: [...dossier.roadmap, { id: crypto.randomUUID(), label: l }] });
   };
 
   // Le conducteur envoie (ou renvoie) les propositions au client.
@@ -275,7 +289,7 @@ export function DossierPanel({
         />
       </div>
 
-      <Info dossier={dossier} />
+      <CoordonneesCard project={project} dossier={dossier} patch={patch} />
 
       {dossier.devis && (
         <Section
@@ -309,34 +323,56 @@ export function DossierPanel({
 
       <Section
         icon={<ListChecks aria-hidden />}
-        title="Feuille de route"
+        title="Feuille de route & jalons"
         count={dossier.roadmap.length}
       >
-        <RoadmapProgress roadmap={dossier.roadmap} />
+        {dossier.roadmap.length > 0 && <RoadmapProgress roadmap={dossier.roadmap} />}
+        <RoadmapAdder onAdd={addRoadmapStep} />
       </Section>
 
-      <Section icon={<CalendarDays aria-hidden />} title="Planning" count={dossier.roadmap.length}>
-        <SmartPlanningView
-          dossier={dossier}
-          onSetStartDate={(date) =>
-            patch({ infos: { ...dossier.infos, startDate: date ?? undefined } })
-          }
-        />
+      {dossier.roadmap.length > 0 && (
+        <Section icon={<CalendarDays aria-hidden />} title="Planning prévisionnel">
+          <SmartPlanningView
+            dossier={dossier}
+            onSetStartDate={(date) =>
+              patch({ infos: { ...dossier.infos, startDate: date ?? undefined } })
+            }
+          />
+        </Section>
+      )}
+
+      <Section icon={<Contact aria-hidden />} title="Intervenants">
+        <IntervenantsSection dossier={dossier} patch={patch} />
       </Section>
 
-      <Section icon={<Banknote aria-hidden />} title="Commandes" count={dossier.orders.length}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dossier.orders.map((o) => (
-            <div key={o.id} id={`order-${o.id}`} className="rounded-xl">
-              <OrderCard
-                order={o}
-                steps={stepLabels(o.stepIds)}
-                onStatus={(s) => setOrderStatus(o.id, s)}
-                onEdit={() => setEditing(o)}
-              />
-            </div>
-          ))}
-        </div>
+      <Section
+        icon={<Banknote aria-hidden />}
+        title="Commandes"
+        count={dossier.orders.length}
+        action={
+          <Button size="sm" variant="outline" onClick={addOrder}>
+            <Plus aria-hidden /> Ajouter une commande
+          </Button>
+        }
+      >
+        {dossier.orders.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border bg-surface p-3 text-sm text-muted-foreground">
+            Aucune commande. Ajoutez les achats à anticiper (cuisine, carrelage, menuiseries…).
+          </p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {dossier.orders.map((o) => (
+              <div key={o.id} id={`order-${o.id}`} className="rounded-xl">
+                <OrderCard
+                  order={o}
+                  steps={stepLabels(o.stepIds)}
+                  onStatus={(s) => setOrderStatus(o.id, s)}
+                  onEdit={() => setEditing(o)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </Section>
 
       <DecisionsSection dossier={dossier} />
@@ -383,31 +419,14 @@ export function DossierPanel({
         </div>
       </Section>
 
-      <Section icon={<FileText aria-hidden />} title="Documents" count={dossier.documents.length}>
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-          {dossier.documents.map((d) => (
-            <li
-              key={d.id}
-              id={`document-${d.id}`}
-              className="flex flex-wrap items-center justify-between gap-2 bg-surface px-3 py-2"
-            >
-              <span className="text-sm text-foreground">{d.label}</span>
-              <div className="flex items-center gap-2">
-                <DocumentStatusBadge status={d.status} />
-                {(d.status === 'manquant' || d.status === 'a_fournir') && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => void askDocument(d.id, d.label)}
-                  >
-                    Demander au client
-                  </Button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Section>
+      <PrepDocumentsSection
+        project={project}
+        dossier={dossier}
+        patch={patch}
+        onAskDocument={(docId, label) => void askDocument(docId, label)}
+      />
+
+      <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
 
       {dossier.questions.length > 0 && (
         <Section
@@ -440,30 +459,28 @@ export function DossierPanel({
   );
 }
 
-function Info({ dossier }: { dossier: ProjectDossier }): React.JSX.Element {
-  const i = dossier.infos;
-  const rows: [string, string | undefined][] = [
-    ['Client', i.clientName],
-    ['Téléphone', i.phone],
-    ['Email', i.email],
-    ['Adresse', i.address],
-    ['Type de bien', i.propertyType],
-    ['Surface', i.surface ? `${i.surface} m²` : undefined],
-    ['Budget', i.budget ? fmtMoney(i.budget) : undefined],
-    ['Durée', i.duration],
-    ['Début', i.startDate ? fmtDateShort(i.startDate) : undefined],
-  ];
+function RoadmapAdder({ onAdd }: { onAdd: (label: string) => void }): React.JSX.Element {
+  const [label, setLabel] = useState('');
   return (
-    <Card>
-      <CardContent className="grid gap-x-6 gap-y-3 p-5 sm:grid-cols-2 lg:grid-cols-3">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-            <p className="text-sm text-foreground">{value ?? '—'}</p>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <Input
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="Ajouter un jalon (ex. Réception, Livraison cuisine)"
+        aria-label="Nouveau jalon"
+        className="min-w-48 flex-1"
+      />
+      <Button
+        size="sm"
+        onClick={() => {
+          onAdd(label);
+          setLabel('');
+        }}
+        disabled={!label.trim()}
+      >
+        <Plus aria-hidden /> Ajouter un jalon
+      </Button>
+    </div>
   );
 }
 

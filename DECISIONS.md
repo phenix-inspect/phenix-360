@@ -16,6 +16,38 @@ Impact : …
 
 ---
 
+## 03/07/2026 — EPIC 1 : un véritable espace « Préparation », éditable, sur tout chantier
+
+**Décision :** la Préparation devient un vrai bureau de préparation, disponible sur
+**chaque** chantier (y compris créé à la main : `demo.ensureDossier` crée un dossier
+vide amorcé depuis les infos + la feuille de route standard) et **entièrement
+éditable**. Le **dossier** est l'agrégat de préparation, distinct du Journal
+append-only : c'est un document de travail qu'on édite directement (`saveDossier`) ;
+les actions vers le client (demande de document, envoi de décision) passent, elles,
+par le Journal. Sections : cockpit « prêt à démarrer ? », note de lancement,
+**coordonnées & accès client** (éditable, synchronise nom client + adresse du
+chantier), devis + avenants, **feuille de route & jalons** (ajout), planning
+prévisionnel, **intervenants** (artisans + fournisseurs, contact, CRUD),
+**commandes** (ajout + fiche complète), décisions client, propositions, choix,
+**documents catégorisés** (devis/plan/diagnostic/DPE/assurance/contrat) avec **vrais
+fichiers** (Lot 3) et demande au client, **photos avant travaux**, check-list.
+**Ajouts core :** `Project.address` (déjà), `ProjectDocument.categorie` +
+`attachment`, `PrepDocCategory`, `Fournisseur`, `SousTraitant.contact`,
+`ProjectDossier.fournisseurs`.
+**Pourquoi :** « avant le premier coup de marteau, préparer entièrement le
+chantier » — un espace, pas un formulaire, où le conducteur sent que PHÉNIX
+travaille avec lui. VISION Art. 1, 3, 7, 11.
+**Alternatives rejetées :** garder la Préparation réservée aux chantiers issus du
+parcours guidé (démo) ; laisser les documents sans fichier ; dupliquer les
+intervenants (le cockpit en avait un bloc — **retiré** au profit de la section
+dédiée unique, pour éviter le doublon).
+**Impact :** `ensureDossier`, `CoordonneesCard`, `IntervenantsSection`,
+`PrepDocuments` (+ photos avant), `DossierPanel` augmenté, Préparation ouverte sur
+tout chantier (`CompagnonView`). `prep.test.mjs` 11/11 (préparer, coordonnées,
+intervenants, documents avec fichier, demande client, photos avant, jalons,
+commandes, persistance, client-safe). Non-régression : preparation 9/9 + 12 autres
+suites (141 assertions), zéro erreur console.
+
 ## 02/07/2026 — Les missions sont conservées
 
 **Décision :** on garde le choix d'une mission (un tap) comme entrée principale.
