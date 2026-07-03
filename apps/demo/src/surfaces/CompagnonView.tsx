@@ -13,6 +13,7 @@ import {
   Timeline,
 } from '@phenix360/ui';
 import {
+  EVENT_STATE_LABEL,
   EVENT_TYPE_LABEL,
   buildChantierAttention,
   questionsEnAttente,
@@ -286,7 +287,7 @@ function SuiviTab({
                 <div className="min-w-0">
                   <p className="truncate text-sm text-foreground">{eventTitle(e)}</p>
                   <p className="text-xs text-muted-foreground">
-                    {EVENT_TYPE_LABEL[e.type]} · brouillon
+                    {EVENT_TYPE_LABEL[e.type]} · {EVENT_STATE_LABEL[e.state].toLowerCase()}
                   </p>
                 </div>
                 <Button size="sm" onClick={() => void demo.publishEvent(e.id, actor.userId)}>
@@ -353,7 +354,7 @@ function SuiviTab({
                                 : 'neutral'
                           }
                         >
-                          {e.state}
+                          {EVENT_STATE_LABEL[e.state]}
                         </Badge>
                       )}
                       {(() => {

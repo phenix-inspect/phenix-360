@@ -76,7 +76,7 @@ export function AujourdhuiView({
         />
         <Stat icon={<ListChecks aria-hidden />} value={t.actions} label="actions à suivre" accent />
         <Stat icon={<Flag aria-hidden />} value={t.reserves} label="réserves à lever" accent />
-        <Stat icon={<MessageSquare aria-hidden />} value={t.questions} label="clients à répondre" />
+        <Stat icon={<MessageSquare aria-hidden />} value={t.questions} label="réponses à donner" />
         <Stat icon={<Truck aria-hidden />} value={t.livraisons} label="livraisons prévues" />
       </div>
 
@@ -120,7 +120,7 @@ function buildPhrase(t: {
   const bits: string[] = [];
   if (t.decisions > 0) bits.push(`${t.decisions} décision${t.decisions > 1 ? 's' : ''} client`);
   if (t.actions > 0) bits.push(`${t.actions} action${t.actions > 1 ? 's' : ''} à suivre`);
-  if (t.questions > 0) bits.push(`${t.questions} client${t.questions > 1 ? 's' : ''} à répondre`);
+  if (t.questions > 0) bits.push(`${t.questions} réponse${t.questions > 1 ? 's' : ''} à donner`);
   if (t.reserves > 0) bits.push(`${t.reserves} réserve${t.reserves > 1 ? 's' : ''} à lever`);
   if (bits.length === 0) return 'Rien d’urgent aujourd’hui. Vos chantiers avancent sereinement.';
   return `Aujourd’hui, ${bits.join(', ')} réclament votre attention.`;

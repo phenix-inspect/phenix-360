@@ -58,6 +58,19 @@ export type EventVisibility = (typeof EVENT_VISIBILITIES)[number];
 export const EVENT_STATES = ['brouillon', 'publie', 'ouverte', 'traitee', 'close'] as const;
 export type EventState = (typeof EVENT_STATES)[number];
 
+/**
+ * Libellés d'état lisibles (jamais l'énum brut à l'écran) : un produit premium
+ * en français affiche « Publié », pas « publie ». Source unique pour toutes les
+ * surfaces.
+ */
+export const EVENT_STATE_LABEL: Record<EventState, string> = {
+  brouillon: 'Brouillon',
+  publie: 'Publié',
+  ouverte: 'Ouverte',
+  traitee: 'Traitée',
+  close: 'Clôturée',
+};
+
 /* -------------------------------------------------------------------------- *
  * Contenus typés (la part spécifique à chaque type — ADR-002 §3)
  * -------------------------------------------------------------------------- */
