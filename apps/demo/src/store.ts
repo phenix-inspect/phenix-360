@@ -192,24 +192,34 @@ function build(): DemoSnapshot {
   };
 }
 
+/**
+ * Toutes les clés qui composent l'espace de travail local (hors marqueur
+ * d'initialisation `SEEDED_KEY`). Source unique pour vider, exporter et
+ * restaurer : chantiers/journal (`STATE_KEY`), noms, projet actif, dossiers,
+ * épingles, tout le Fil, la conversation PHÉNIX et le journal des partages.
+ */
+const WORKSPACE_KEYS = [
+  STATE_KEY,
+  PEOPLE_KEY,
+  ACTIVE_KEY,
+  DOSSIERS_KEY,
+  PINS_KEY,
+  FIL_MOMENTS_KEY,
+  FIL_COUPS_KEY,
+  FIL_MESSAGES_KEY,
+  FIL_ZONES_KEY,
+  FIL_ANNOTATIONS_KEY,
+  PHENIX_CONV_KEY,
+  SHARES_KEY,
+] as const;
+
+/** Marqueur du format de sauvegarde (pour reconnaître un fichier valide). */
+const BACKUP_APP = 'phenix-360';
+const BACKUP_VERSION = 1;
+
 /** Vide TOUT l'espace de travail (toutes les clés) et le marque initialisé. */
 function clearWorkspace(): void {
-  for (const key of [
-    STATE_KEY,
-    PEOPLE_KEY,
-    ACTIVE_KEY,
-    DOSSIERS_KEY,
-    PINS_KEY,
-    FIL_MOMENTS_KEY,
-    FIL_COUPS_KEY,
-    FIL_MESSAGES_KEY,
-    FIL_ZONES_KEY,
-    FIL_ANNOTATIONS_KEY,
-    PHENIX_CONV_KEY,
-    SHARES_KEY,
-  ]) {
-    localStorage.removeItem(key);
-  }
+  for (const key of WORKSPACE_KEYS) localStorage.removeItem(key);
   localStorage.setItem(SEEDED_KEY, '1');
 }
 
@@ -1169,6 +1179,69 @@ export const demo = {
     clearWorkspace();
     refresh();
     broadcast();
+  },
+
+  /**
+   * SAUVEGARDE (Lot 4) : sérialise tout l'espace de travail local en une chaîne
+   * JSON lisible. Le fichier contient chantiers/journal, missions, réserves,
+   * actions, tout le Fil (photos localStorage comprises), les dossiers, les
+   * paramètres (noms, projet actif) et les conversations PHÉNIX.
+   */
+  exportWorkspace(): string {
+    const data: Record<string, unknown> = {};
+    for (const key of WORKSPACE_KEYS) {
+      const raw = localStorage.getItem(key);
+      if (raw === null) continue;
+      try {
+        data[key] = JSON.parse(raw);
+      } catch {
+        data[key] = raw;
+      }
+    }
+    return JSON.stringify(
+      { app: BACKUP_APP, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), data },
+      null,
+      2,
+    );
+  },
+
+  /**
+   * RESTAURATION (Lot 4) : remplace INTÉGRALEMENT l'espace de travail par une
+   * sauvegarde. Validation stricte AVANT toute écriture — en cas de fichier
+   * invalide, rien n'est modifié (aucune perte silencieuse). Sur succès, l'état
+   * courant est entièrement remplacé (les clés absentes de la sauvegarde sont
+   * retirées) : ce qui est restauré est exactement le contenu du fichier.
+   */
+  importWorkspace(json: string): { ok: true } | { ok: false; error: string } {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(json);
+    } catch {
+      return { ok: false, error: 'Fichier illisible : ce n’est pas un JSON valide.' };
+    }
+    if (typeof parsed !== 'object' || parsed === null) {
+      return { ok: false, error: 'Fichier invalide : structure inattendue.' };
+    }
+    const obj = parsed as Record<string, unknown>;
+    if (obj.app !== BACKUP_APP) {
+      return { ok: false, error: 'Ce fichier n’est pas une sauvegarde PHÉNIX 360.' };
+    }
+    if (typeof obj.data !== 'object' || obj.data === null) {
+      return { ok: false, error: 'Sauvegarde invalide : données manquantes.' };
+    }
+    const data = obj.data as Record<string, unknown>;
+    // Restauration COMPLÈTE : on remplace l'espace par la sauvegarde.
+    for (const key of WORKSPACE_KEYS) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        localStorage.setItem(key, JSON.stringify(data[key]));
+      } else {
+        localStorage.removeItem(key);
+      }
+    }
+    localStorage.setItem(SEEDED_KEY, '1');
+    refresh();
+    broadcast();
+    return { ok: true };
   },
 };
 

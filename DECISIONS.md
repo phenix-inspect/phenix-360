@@ -317,3 +317,29 @@ préparation inutile pour un chantier vide).
 `ProjectHero` affiche l'adresse. Persistance localStorage inchangée, reset OK,
 **aucune régression démo**. `chantier.test.mjs` 10/10 (créer, atterrir, éditer,
 persistance, reset, démo intacte, multi-vues). VISION Art. 2, 11.
+
+## 03/07/2026 — App réelle locale · Lot 4 : sauvegarde / restauration locale
+
+**Décision :** on peut **exporter** tout l'espace de travail en un fichier `.json`
+et **importer** une sauvegarde pour restaurer l'état complet. Deux boutons dans
+« Gérer » (section « Sauvegarde locale ») : _Exporter mes données_ (télécharge
+`phenix-360-sauvegarde-AAAA-MM-JJ.json`) et _Importer une sauvegarde_. Une **source
+unique** `WORKSPACE_KEYS` couvre toutes les clés (chantiers/journal, noms, projet
+actif, dossiers, épingles, **tout le Fil** photos localStorage comprises,
+conversations PHÉNIX, partages) — export, import et « vider » partagent la même
+liste, donc rien n'est oublié.
+**Sécurité :** import = **restauration complète** (remplace l'état, retire les clés
+absentes de la sauvegarde) ; **validation stricte AVANT toute écriture** (marqueur
+`app: 'phenix-360'` + objet `data`) → un fichier invalide affiche un message clair
+et **ne modifie rien** (aucune perte silencieuse) ; **confirmation obligatoire**
+avant de remplacer les données (« Remplacer mes données », action irréversible).
+**Pourquoi :** pouvoir tester PHÉNIX avec de vrais chantiers sans peur de perdre ses
+données — le filet de sécurité AVANT d'ajouter de vrais fichiers (Lot 3).
+**Alternatives rejetées :** import fusionnel (ambigu, risque d'état incohérent) ;
+import direct sans confirmation (perte accidentelle) ; cloud / compte (hors cadre —
+100 % local).
+**Impact :** `store.exportWorkspace`/`importWorkspace` + `WORKSPACE_KEYS` ;
+`ManageDialog` (téléchargement Blob, `<input type=file>` caché, étape de
+confirmation avec message d'erreur). `backup.test.mjs` 8/8 (créer, exporter,
+fichier invalide sans perte, reset, confirmation, restauration complète, démo
+intacte). VISION Art. 8 (le journal, source unique — ici sérialisée), Art. 11.

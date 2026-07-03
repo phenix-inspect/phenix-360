@@ -190,8 +190,11 @@ Aujourd'hui : dossier saisi/seedé. VISION Art. 7.
   et édition d'un chantier réel** à la main (`ChantierForm` : nom, client, adresse,
   étape de départ), sans dossier de démo, atterrissage direct dans le chantier ;
   ajouts core `Project.address` + étape de départ (`chantier.test.mjs` 10/10).
-  **Suite** : export/import local (`.json`), vrais fichiers (photos/PDF en base64
-  local). Pas de mise en ligne, pas d'auth, pas de Supabase.
+  **Lot 4 livré** : **sauvegarde / restauration locale** — exporter tout l'espace en
+  `.json`, importer une sauvegarde (restauration complète), avec confirmation,
+  message clair si fichier invalide et zéro perte silencieuse (`backup.test.mjs`
+  8/8). **Suite** : vrais fichiers (photos/PDF en base64 local). Pas de mise en
+  ligne, pas d'auth, pas de Supabase.
 - **Persistance & backend réel** : aujourd'hui `localStorage` + backend en mémoire
   (mono-poste, mono-conducteur). Pré-requis d'une bêta multi-utilisateur → lié à
   EPIC 14/15/16. Décision d'architecture à tracer dans `DECISIONS.md` avant de coder.

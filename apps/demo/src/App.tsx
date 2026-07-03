@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   BrandLockup,
   Button,
@@ -11,7 +11,9 @@ import {
   SegmentedControl,
 } from '@phenix360/ui';
 import {
+  AlertTriangle,
   Building2,
+  Download,
   Eye,
   HardHat,
   Pencil,
@@ -19,6 +21,7 @@ import {
   RotateCcw,
   Settings2,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 import { projectId, type ProjectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
@@ -237,73 +240,179 @@ function ManageDialog({
   onGuided: () => void;
 }): React.JSX.Element {
   const snap = useDemo();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [pendingImport, setPendingImport] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const resetImport = (): void => {
+    setPendingImport(null);
+    setImportError(null);
+  };
+  const close = (): void => {
+    resetImport();
+    onClose();
+  };
+
+  const handleExport = (): void => {
+    const json = demo.exportWorkspace();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `phenix-360-sauvegarde-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  const onFilePicked = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    const text = await file.text();
+    setImportError(null);
+    setPendingImport(text); // ouvre l'étape de confirmation (jamais d'import direct)
+  };
+
+  const confirmImport = (): void => {
+    if (pendingImport === null) return;
+    const res = demo.importWorkspace(pendingImport);
+    if (!res.ok) {
+      setImportError(res.error); // message clair, rien n'a été modifié
+      return;
+    }
+    resetImport();
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Gérer</DialogTitle>
-          <DialogDescription>Vos chantiers et les données de démonstration.</DialogDescription>
+          <DialogDescription>Vos chantiers, vos sauvegardes et la démonstration.</DialogDescription>
         </DialogHeader>
 
-        {snap.projects.length > 1 && (
-          <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-muted-foreground">Chantier actif</span>
-            <select
-              value={snap.activeProjectId ?? ''}
-              onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
-              className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
-            >
-              {snap.projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
+        {pendingImport !== null ? (
+          <div className="space-y-3">
+            <div className="flex items-start gap-2 rounded-lg border border-gold-200 bg-gold-50 p-3 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-700">
+              <AlertTriangle aria-hidden />
+              <p>
+                Importer cette sauvegarde <strong>remplacera</strong> vos données actuelles. Cette
+                action est irréversible.
+              </p>
+            </div>
+            {importError && (
+              <p
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-destructive bg-surface p-3 text-sm text-destructive [&_svg]:size-4 [&_svg]:shrink-0"
+              >
+                <AlertTriangle aria-hidden />
+                {importError}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={resetImport}>
+                Annuler
+              </Button>
+              <Button onClick={confirmImport}>Remplacer mes données</Button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {snap.projects.length > 1 && (
+              <label className="flex flex-col gap-1.5 text-sm">
+                <span className="text-muted-foreground">Chantier actif</span>
+                <select
+                  value={snap.activeProjectId ?? ''}
+                  onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
+                  className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
+                >
+                  {snap.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            <div className="grid gap-2">
+              <Button variant="outline" className="justify-start" onClick={onNewChantier}>
+                <HardHat aria-hidden />
+                Nouveau chantier
+              </Button>
+              {canEdit && (
+                <Button variant="outline" className="justify-start" onClick={onEditChantier}>
+                  <Pencil aria-hidden />
+                  Modifier le chantier actif
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                className="justify-start text-muted-foreground"
+                onClick={onGuided}
+              >
+                <PlusCircle aria-hidden />
+                Parcours guidé (déposer un dossier)
+              </Button>
+            </div>
+
+            <div className="grid gap-2 border-t border-border pt-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Sauvegarde locale
+              </p>
+              <Button variant="outline" className="justify-start" onClick={handleExport}>
+                <Download aria-hidden />
+                Exporter mes données
+              </Button>
+              <Button
+                variant="outline"
+                className="justify-start"
+                onClick={() => fileInput.current?.click()}
+              >
+                <Upload aria-hidden />
+                Importer une sauvegarde
+              </Button>
+            </div>
+
+            <div className="grid gap-2 border-t border-border pt-3">
+              <Button
+                variant="ghost"
+                className="justify-start text-muted-foreground"
+                onClick={() => {
+                  demo.loadDemo();
+                  onClose();
+                }}
+              >
+                <Sparkles aria-hidden />
+                Recharger la démonstration
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start text-muted-foreground"
+                onClick={() => {
+                  demo.reset();
+                  onClose();
+                }}
+              >
+                <RotateCcw aria-hidden />
+                Repartir de zéro
+              </Button>
+            </div>
+          </>
         )}
 
-        <div className="grid gap-2">
-          <Button variant="outline" className="justify-start" onClick={onNewChantier}>
-            <HardHat aria-hidden />
-            Nouveau chantier
-          </Button>
-          {canEdit && (
-            <Button variant="outline" className="justify-start" onClick={onEditChantier}>
-              <Pencil aria-hidden />
-              Modifier le chantier actif
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            className="justify-start text-muted-foreground"
-            onClick={onGuided}
-          >
-            <PlusCircle aria-hidden />
-            Parcours guidé (déposer un dossier)
-          </Button>
-          <Button
-            variant="ghost"
-            className="justify-start text-muted-foreground"
-            onClick={() => {
-              demo.loadDemo();
-              onClose();
-            }}
-          >
-            <Sparkles aria-hidden />
-            Recharger la démonstration
-          </Button>
-          <Button
-            variant="ghost"
-            className="justify-start text-muted-foreground"
-            onClick={() => {
-              demo.reset();
-              onClose();
-            }}
-          >
-            <RotateCcw aria-hidden />
-            Repartir de zéro
-          </Button>
-        </div>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          className="hidden"
+          aria-hidden
+          onChange={(e) => {
+            void onFilePicked(e.target.files?.[0]);
+            e.target.value = '';
+          }}
+        />
       </DialogContent>
     </Dialog>
   );
