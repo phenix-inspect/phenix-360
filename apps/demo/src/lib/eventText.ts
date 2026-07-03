@@ -1,4 +1,9 @@
-import { PROJECT_STEP_LABEL, describeDecisionEvent, type Event } from '@phenix360/core';
+import {
+  PROJECT_STEP_LABEL,
+  describeDecisionEvent,
+  reserveStatut,
+  type Event,
+} from '@phenix360/core';
 
 /** Première lettre en capitale (le contexte métier saisi peut être en minuscule). */
 const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -21,10 +26,10 @@ export function eventTitle(e: Event): string {
       return e.content.libelle;
     case 'demande':
       return e.content.destinataire === 'client'
-        ? 'Une décision vous attend'
+        ? 'Décision attendue du client'
         : e.content.destinataire === 'conducteur'
           ? 'Signalement artisan'
-          : 'Demande';
+          : 'Question du client';
     case 'decision':
       return `Décision client · ${cap(e.content.categorie)}`;
     case 'reserve':
@@ -79,5 +84,36 @@ export function eventDescription(e: Event): string | undefined {
       return e.content.legende;
     case 'document':
       return undefined;
+  }
+}
+
+export interface JournalStatut {
+  label: string;
+  variant: 'warning' | 'success';
+}
+
+/**
+ * Badge d'état d'une ligne de journal — un seul par ligne, et seulement s'il
+ * PORTE une information. « Publié » n'est jamais affiché : tout est publié par
+ * défaut, le badge serait du bruit et écraserait les états qui comptent. Casse et
+ * sémantique unifiées entre tous les types : à traiter = ambre (`warning`), fait
+ * = vert (`success`). VISION Art. 11 (simplicité).
+ */
+export function journalStatut(e: Event, events: Event[]): JournalStatut | null {
+  if (e.state === 'brouillon') return { label: 'Brouillon', variant: 'warning' };
+  switch (e.type) {
+    case 'reserve':
+      return reserveStatut(e, events) === 'levee'
+        ? { label: 'Levée', variant: 'success' }
+        : { label: 'Ouverte', variant: 'warning' };
+    case 'levee':
+      return { label: 'Levée', variant: 'success' };
+    case 'demande':
+      if (e.state === 'ouverte') return { label: 'En attente', variant: 'warning' };
+      if (e.state === 'traitee') return { label: 'Traitée', variant: 'success' };
+      return null;
+    default:
+      // compte_rendu / photo / document / decision publiés : aucun badge.
+      return null;
   }
 }

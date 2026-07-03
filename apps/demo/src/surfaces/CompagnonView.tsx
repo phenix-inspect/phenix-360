@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDate } from '../lib/format';
-import { eventDescription, eventTitle } from '../lib/eventText';
+import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { RoadmapProgress } from '../components/RoadmapProgress';
@@ -315,6 +315,11 @@ function SuiviTab({
             <Timeline>
               {events.map((e) => {
                 const statut = e.type === 'reserve' ? reserveStatut(e, events) : null;
+                const badge = journalStatut(e, events);
+                const filSrc =
+                  e.type === 'demande' || e.type === 'reserve' ? e.content.source : undefined;
+                const canLever = e.type === 'reserve' && statut === 'ouverte';
+                const hasRow = badge != null || filSrc?.kind === 'fil' || canLever;
                 return (
                   <ActivityItem
                     key={e.id}
@@ -337,51 +342,29 @@ function SuiviTab({
                       ) : undefined
                     }
                   >
-                    <span className="mt-1 flex flex-wrap items-center gap-2">
-                      {e.type === 'reserve' ? (
-                        <Badge variant={statut === 'levee' ? 'success' : 'warning'}>
-                          {statut === 'levee' ? 'levée' : 'ouverte'}
-                        </Badge>
-                      ) : e.type === 'levee' ? (
-                        <Badge variant="success">levée</Badge>
-                      ) : (
-                        <Badge
-                          variant={
-                            e.state === 'publie'
-                              ? 'success'
-                              : e.state === 'brouillon'
-                                ? 'warning'
-                                : 'neutral'
-                          }
-                        >
-                          {EVENT_STATE_LABEL[e.state]}
-                        </Badge>
-                      )}
-                      {(() => {
-                        const src =
-                          e.type === 'demande' || e.type === 'reserve'
-                            ? e.content.source
-                            : undefined;
-                        return src?.kind === 'fil' ? (
+                    {hasRow && (
+                      <span className="mt-2 flex flex-wrap items-center gap-2">
+                        {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
+                        {filSrc?.kind === 'fil' && (
                           <button
                             type="button"
-                            onClick={() => onOpenFilPhoto(src.momentId, src.photoId)}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
+                            onClick={() => onOpenFilPhoto(filSrc.momentId, filSrc.photoId)}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-3.5"
                           >
                             <ImageIcon aria-hidden /> Voir la photo
                           </button>
-                        ) : null;
-                      })()}
-                      {e.type === 'reserve' && statut === 'ouverte' && (
-                        <button
-                          type="button"
-                          onClick={() => onLeverReserve(e)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-gold-700 underline-offset-4 hover:underline [&_svg]:size-3.5"
-                        >
-                          <CircleCheck aria-hidden /> Lever la réserve
-                        </button>
-                      )}
-                    </span>
+                        )}
+                        {canLever && (
+                          <button
+                            type="button"
+                            onClick={() => onLeverReserve(e)}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-gold-600 px-2.5 py-1 text-xs font-semibold text-paper-0 transition-colors duration-base hover:bg-gold-700 [&_svg]:size-3.5"
+                          >
+                            <CircleCheck aria-hidden /> Lever la réserve
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </ActivityItem>
                 );
               })}

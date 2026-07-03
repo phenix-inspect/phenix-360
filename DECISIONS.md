@@ -222,3 +222,29 @@ filtre » = usine à gaz).
 `stabilite.test.mjs` 21/21 : compteur > 0 = raccourci en page (reste sur
 Aujourd'hui, « Mes chantiers » à l'écran) ; compteur à 0 non cliquable. VISION
 Art. 3 (piloter sa journée), Art. 7/8 (tout dérive des faits, rien d'inventé).
+
+## 03/07/2026 — Cohérence du Journal du chantier (lisibilité)
+
+**Décision :** stabilisation du Journal / Historique (aucun nouveau module, aucune
+refonte, append-only intact). (1) **Libellés voix conducteur** : « Une décision
+vous attend » → « Décision attendue du client » (le « vous » parlait au client) ;
+« Demande » → « Question du client ». (2) **Badges harmonisés** via un helper de
+présentation unique `journalStatut` : un seul badge par ligne, casse et sémantique
+unifiées (à traiter = ambre, fait = vert) — Brouillon, En attente, Traitée,
+Ouverte, Levée. Le badge **« Publié » est masqué** (tout est publié par défaut : il
+n'informait pas et écrasait les états utiles). Le badge « Interne » (visibilité)
+reste, distinct. (3) **Actions plus visibles avec hiérarchie** : « Lever la
+réserve » devient un bouton plein or (action posée par le conducteur), « Voir la
+photo » un bouton contour (navigation) — fini les liens soulignés discrets.
+**Pourquoi :** rendre le Journal exploitable au quotidien — chaque type se comprend
+en moins de 10 s, sans doublon visuel. Le Journal est une **mémoire de chantier**,
+pas une pile d'événements.
+**Alternatives rejetées :** garder « Publié » (bruit, validé par le PO pour
+suppression) ; router les actions ailleurs (elles vivent au bon endroit, dans la
+ligne).
+**Impact :** `eventText.ts` (libellés + `journalStatut`), `CompagnonView`
+(SuiviTab) et `HistoriqueView` partagent le même langage visuel. Présentation
+seule : `isVisibleToClient` inchangé, **client-safe** vérifié (les libellés de
+demande ne remontent jamais côté client). Nouveau `journal.test.mjs` 9/9 (titres,
+badges, actions, dialogue de levée, historique, client-safe). VISION Art. 8 (les
+vues sont des projections du Journal), Art. 10 (rien ne tombe), Art. 11 (simplicité).

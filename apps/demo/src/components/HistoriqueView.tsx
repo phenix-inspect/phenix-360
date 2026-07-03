@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { ActivityItem, EmptyState, SegmentedControl, Timeline } from '@phenix360/ui';
+import { ActivityItem, Badge, EmptyState, SegmentedControl, Timeline } from '@phenix360/ui';
 import { projectHistory, sortByDate, type Event, type Project } from '@phenix360/core';
 import { History, Star } from 'lucide-react';
 import { demo, nameOf, pinnedOf, type DemoSnapshot } from '../store';
 import { fmtDate } from '../lib/format';
-import { eventDescription, eventTitle } from '../lib/eventText';
+import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { PhotoTile } from './PhotoTile';
 
 /**
@@ -66,6 +66,7 @@ export function HistoriqueView({
         <Timeline>
           {items.map((e) => {
             const isPinned = pinned.has(e.id);
+            const badge = journalStatut(e, events);
             return (
               <ActivityItem
                 key={e.id}
@@ -82,16 +83,19 @@ export function HistoriqueView({
                   ) : undefined
                 }
               >
-                <button
-                  type="button"
-                  onClick={() => demo.togglePin(project.id, e.id)}
-                  className={`mt-1 inline-flex items-center gap-1.5 text-xs font-medium [&_svg]:size-3.5 ${
-                    isPinned ? 'text-gold-700' : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  <Star aria-hidden className={isPinned ? 'fill-current' : ''} />
-                  {isPinned ? 'Épinglé' : 'Épingler'}
-                </button>
+                <span className="mt-2 flex flex-wrap items-center gap-2">
+                  {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
+                  <button
+                    type="button"
+                    onClick={() => demo.togglePin(project.id, e.id)}
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium [&_svg]:size-3.5 ${
+                      isPinned ? 'text-gold-700' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    <Star aria-hidden className={isPinned ? 'fill-current' : ''} />
+                    {isPinned ? 'Épinglé' : 'Épingler'}
+                  </button>
+                </span>
               </ActivityItem>
             );
           })}

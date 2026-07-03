@@ -45,6 +45,14 @@ prépare → C'est prêt »** → compréhension → validation → partage. VIS
 `prepareMission` (déterministe, jamais d'invention) : décisions / actions /
 réserves / questions client enrichies, éditables, projetées au Journal. VISION Art. 6, 7, 8.
 
+**Cohérence du Journal (Sprint 4.5)** : le Journal / Historique est une vraie
+mémoire de chantier — libellés voix conducteur (« Décision attendue du client »,
+« Question du client »), badges harmonisés via `journalStatut` (un seul par ligne,
+casse + sémantique unifiées ; « Publié » masqué car tout est publié par défaut ;
+« Interne » conservé), actions plus visibles (« Lever la réserve » plein or,
+« Voir la photo » contour). Présentation seule, append-only et client-safe intacts.
+`journal.test.mjs` 9/9.
+
 ### EPIC 4 — Réserves · ✅ Terminé (Sprint 1)
 
 Le registre pilotable : création manuelle (libellé, responsable, échéance,
