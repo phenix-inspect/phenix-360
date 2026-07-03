@@ -12,6 +12,7 @@ export * from './ids.js';
 export * from './actor.js';
 export * from './project.js';
 export * from './attachment.js';
+export * from './contact.js';
 export * from './event.js';
 export * from './decision.js';
 export * from './views.js';

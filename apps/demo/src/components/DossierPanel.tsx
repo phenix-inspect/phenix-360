@@ -35,6 +35,7 @@ import {
 } from '@phenix360/core';
 import {
   Banknote,
+  BookUser,
   CalendarDays,
   Contact,
   ListChecks,
@@ -55,6 +56,7 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
+import { CarnetChantier } from './contacts/CarnetChantier';
 import { IntervenantsSection } from './prep/IntervenantsSection';
 import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
 
@@ -343,6 +345,10 @@ export function DossierPanel({
 
       <Section icon={<Contact aria-hidden />} title="Intervenants">
         <IntervenantsSection dossier={dossier} patch={patch} />
+      </Section>
+
+      <Section icon={<BookUser aria-hidden />} title="Carnet du chantier">
+        <CarnetChantier project={project} />
       </Section>
 
       <Section

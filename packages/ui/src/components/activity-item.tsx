@@ -8,6 +8,7 @@ import {
   Image,
   ListChecks,
   NotebookPen,
+  Phone,
   Sparkles,
 } from 'lucide-react';
 import type { ActorRole, EventType, EventVisibility } from '@phenix360/core';
@@ -35,6 +36,7 @@ const TYPE_ICON: Record<EventType, React.ReactNode> = {
   reserve: <Flag aria-hidden="true" />,
   levee: <CircleCheck aria-hidden="true" />,
   action: <ListChecks aria-hidden="true" />,
+  communication: <Phone aria-hidden="true" />,
 };
 
 export const Timeline = React.forwardRef<HTMLOListElement, React.HTMLAttributes<HTMLOListElement>>(

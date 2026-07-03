@@ -26,6 +26,7 @@ import {
   zoneId,
   type Annotation,
   type BackendState,
+  type Contact,
   type CoupDeCoeur,
   type Event,
   type EventActor,
@@ -45,6 +46,8 @@ export interface DemoSeed {
   people: Record<string, string>;
   activeProjectId: string;
   dossiers: Record<string, ProjectDossier>;
+  /** Annuaire du conducteur — contacts globaux, réutilisables entre chantiers. */
+  contacts: Contact[];
   /** Le Fil — agrégat distinct du Journal (par projet). */
   fil: {
     moments: Record<string, Moment[]>;
@@ -930,6 +933,58 @@ export function buildDemoSeed(): DemoSeed {
     clientQuestion: 'Serait-il possible de décaler la réception d’une semaine ?',
   });
 
+  // ----------------------------- L'annuaire ---------------------------------
+  // Le carnet d'adresses du conducteur : quelques contacts déjà liés au chantier
+  // Lyon 6e (client, artisan, fournisseur) + un contact transverse non lié.
+  const contacts: Contact[] = [
+    {
+      id: uuid(),
+      nom: 'Mme Martin',
+      role: 'client',
+      phone: '06 22 14 88 03',
+      email: 'm.martin@email.fr',
+      whatsapp: '06 22 14 88 03',
+      address: '8 rue Vauban, 69006 Lyon',
+      notes: 'Cliente du chantier Lyon 6e. Disponible en fin de journée.',
+      projectIds: [pid],
+      createdAt: daysAgo(20),
+    },
+    {
+      id: uuid(),
+      nom: 'Karim Bouaziz',
+      societe: 'SARL Aqua',
+      role: 'artisan',
+      phone: '06 45 12 78 90',
+      email: 'contact@sarl-aqua.fr',
+      notes: 'Plomberie — lot sanitaire. Réactif par WhatsApp.',
+      projectIds: [pid],
+      createdAt: daysAgo(18),
+    },
+    {
+      id: uuid(),
+      nom: 'Showroom Mobalpa Lyon',
+      societe: 'Mobalpa',
+      role: 'fournisseur',
+      phone: '04 72 00 11 22',
+      email: 'lyon@mobalpa.fr',
+      address: '15 cours Lafayette, 69003 Lyon',
+      notes: 'Cuisine équipée — réf. MOB-CHENE-CLAIR.',
+      projectIds: [pid],
+      createdAt: daysAgo(12),
+    },
+    {
+      id: uuid(),
+      nom: 'Cabinet Vitruve',
+      societe: 'Vitruve Architecture',
+      role: 'architecte',
+      phone: '04 78 55 33 21',
+      email: 'atelier@vitruve-archi.fr',
+      notes: 'Architecte partenaire, plusieurs affaires.',
+      projectIds: [],
+      createdAt: daysAgo(30),
+    },
+  ];
+
   return {
     state: {
       projects: [project, ...extraProjects],
@@ -939,6 +994,7 @@ export function buildDemoSeed(): DemoSeed {
     people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin', ...extraPeople },
     activeProjectId: pid,
     dossiers: { [pid]: dossier },
+    contacts,
     fil: {
       moments: { [pid]: moments },
       coups: { [pid]: coups },

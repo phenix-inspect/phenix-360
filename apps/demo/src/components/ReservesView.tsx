@@ -5,14 +5,17 @@ import {
   reserveEvents,
   reserveStatut,
   type ActionPriorite,
+  type Contact,
   type Event,
   type EventActor,
   type Project,
+  type ProjectId,
   type ReserveEvent,
 } from '@phenix360/core';
 import { AlertTriangle, CircleCheck, Flag, Image as ImageIcon, Plus, X } from 'lucide-react';
-import { demo, nameOf, type DemoSnapshot } from '../store';
+import { demo, nameOf, useDemo, type DemoSnapshot } from '../store';
 import { fmtDate, fmtDateShort } from '../lib/format';
+import { ContactActions } from './contacts/ContactActions';
 
 /**
  * Vue RÉSERVES — le REGISTRE pilotable du conducteur. Lecture des événements du
@@ -334,6 +337,10 @@ function OpenReserve({
             overdue={overdue}
           />
 
+          {r.content.responsable && (
+            <ResponsableActions projectId={r.projectId} responsable={r.content.responsable} />
+          )}
+
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <Button size="sm" onClick={() => onLever(r)}>
               <CircleCheck aria-hidden /> Lever la réserve
@@ -470,6 +477,50 @@ function MetaLine({
           {overdue ? ' · en retard' : ''}
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * Pont réserve → annuaire : si le responsable saisi (texte libre) correspond à
+ * un contact de l'annuaire, PHÉNIX propose de le joindre en un geste — appeler,
+ * relancer par SMS/WhatsApp — sans quitter la réserve (VISION Art. 6, 7). Toute
+ * action lancée d'ici est tracée au Journal du chantier.
+ */
+function matchContact(contacts: Contact[], responsable: string): Contact | undefined {
+  const needle = responsable.trim().toLowerCase();
+  if (needle.length < 3) return undefined;
+  return contacts.find((c) =>
+    [c.nom, c.societe]
+      .filter((s): s is string => Boolean(s && s.length >= 3))
+      .map((s) => s.toLowerCase())
+      .some((h) => h.includes(needle) || needle.includes(h)),
+  );
+}
+
+function ResponsableActions({
+  projectId,
+  responsable,
+}: {
+  projectId: ProjectId;
+  responsable: string;
+}): React.JSX.Element | null {
+  const snap = useDemo();
+  const contact = matchContact(snap.contacts, responsable);
+  if (!contact) return null;
+  const project = snap.projects.find((p) => p.id === projectId);
+  return (
+    <div className="rounded-lg border border-dashed border-border bg-surface/60 p-2.5">
+      <p className="mb-1.5 text-xs text-muted-foreground">
+        Joindre <span className="font-medium text-foreground">{contact.nom}</span>
+        {contact.societe ? ` · ${contact.societe}` : ''}
+      </p>
+      <ContactActions
+        contact={contact}
+        projectId={projectId}
+        {...(project ? { chantierName: project.name } : {})}
+        compact
+      />
     </div>
   );
 }

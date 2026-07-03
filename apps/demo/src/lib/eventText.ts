@@ -2,11 +2,20 @@ import {
   PROJECT_STEP_LABEL,
   describeDecisionEvent,
   reserveStatut,
+  type CommCanal,
   type Event,
 } from '@phenix360/core';
 
 /** Première lettre en capitale (le contexte métier saisi peut être en minuscule). */
 const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+const COMM_CANAL_LABEL: Record<CommCanal, string> = {
+  appel: 'Appel',
+  sms: 'SMS',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+  itineraire: 'Itinéraire',
+};
 
 /**
  * Titre lisible d'un événement (présentation — dérivé du contenu typé). Forme
@@ -38,6 +47,8 @@ export function eventTitle(e: Event): string {
       return `Réserve n°${e.content.reserveNumero} levée`;
     case 'action':
       return e.content.libelle;
+    case 'communication':
+      return `${COMM_CANAL_LABEL[e.content.canal]} · ${e.content.contactNom}`;
   }
 }
 
@@ -84,6 +95,10 @@ export function eventDescription(e: Event): string | undefined {
       return e.content.legende;
     case 'document':
       return undefined;
+    case 'communication': {
+      const parts = [e.content.role, e.content.sujet].filter(Boolean);
+      return parts.length > 0 ? parts.join(' · ') : undefined;
+    }
   }
 }
 

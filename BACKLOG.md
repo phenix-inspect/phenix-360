@@ -192,6 +192,28 @@ commande, impact planning. VISION Art. 7.
 Lecture d'un devis/plan déposé → extraction structurée (lots, postes, montants).
 Aujourd'hui : dossier saisi/seedé. VISION Art. 7.
 
+### EPIC 21 — Communication & Contacts · ✅ Terminé (Sprint « Bureau mobile » 1)
+
+Le **bureau mobile** du conducteur : joindre qui il faut, quand il faut, sans
+quitter PHÉNIX. **Modèle `Contact`** réutilisable (core : `contact.ts` — rôles
+client / artisan / fournisseur / architecte / bureau de contrôle / assureur /
+investisseur / autre ; société, tél, email, WhatsApp, adresse, notes, chantiers
+liés). **Annuaire global** (`surfaces/Annuaire.tsx`, bouton d'en-tête) : recherche,
+filtre par rôle, création / édition / suppression. **Carnet du chantier** intégré à
+la Préparation (`CarnetChantier`) : contacts liés au chantier, lier un contact
+existant en un geste. **Actions de communication** en **deep-links natifs** (V1
+100 % locale, sans backend, sans envoi réel) : `tel:` / `sms:` / `wa.me` / `mailto:`
+/ Google Maps (`lib/contactActions.ts`). **Messages pré-remplis** par PHÉNIX selon
+le contexte (`lib/commTemplates.ts` : relance artisan, envoi CR, demande de document,
+confirmation de livraison, rappel d'intervention, demande de disponibilité, message
+client rassurant) — le conducteur ajuste, puis l'app native s'ouvre. **Journalisation
+append-only** : chaque action ouverte depuis un chantier est tracée au Journal
+(événement `communication`, **toujours interne**, jamais côté client — Art. 9),
+consultable dans l'historique de chaque contact. **Pont réserve → annuaire** : quand
+le responsable d'une réserve correspond à un contact, PHÉNIX propose de le joindre.
+Contacts seedés (client, artisan, fournisseur, architecte). `contacts.test.mjs` 10/10,
+non-régression complète (14 suites), zéro erreur console. VISION Art. 1, 2, 6, 7, 9, 11.
+
 ---
 
 ## Fondations techniques (transverses, pré-requis bêta)
@@ -238,3 +260,20 @@ Priorités de construction, dans l'ordre :
 **Puis seulement**, une fois ces briques terminées : **EPIC 10 — Assistant IA**
 (copilote), qui aura alors énormément de matière pour devenir réellement utile.
 `DECISIONS.md` : investissement IA reporté après les fondations métier (02/07/2026).
+
+## Réordonnancement « Bureau mobile » — validé par le PO (03/07/2026)
+
+**Principe :** penser _bureau mobile du conducteur_. À 7 h, il doit pouvoir faire
+**95 % de sa journée dans PHÉNIX** sans en sortir. Trou produit majeur identifié :
+il quittait l'app pour **communiquer** (appeler, relancer, envoyer un CR). Nouvel
+ordre validé, orienté journée réelle du conducteur :
+
+1. **Communication & Contacts** (EPIC 21) — ✅ _fait_
+2. **Agenda & journée du conducteur** — la timeline du jour, actionnable
+3. **Coordination des artisans** — qui vient, quand, relances, confirmations
+4. **Planning intelligent** (EPIC 6)
+5. **Commandes** (EPIC 19)
+6. **Documents & Signatures** (EPIC 8)
+7. **Assistant PHÉNIX renforcé** (EPIC 10)
+
+`DECISIONS.md` : arbitrage tracé (03/07/2026).

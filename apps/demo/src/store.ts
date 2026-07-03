@@ -33,9 +33,12 @@ import {
   type Annotation,
   type AnnotationType,
   type BackendState,
+  type CommCanal,
+  type Contact,
   type CoupDeCoeur,
   type DemandeResolution,
   type ActionPriorite,
+  type Event,
   type EventActor,
   type EventId,
   type FilPhoto,
@@ -80,6 +83,8 @@ const FIL_ANNOTATIONS_KEY = 'phenix-demo:fil-annotations:v1';
 const PHENIX_CONV_KEY = 'phenix-demo:phenix-conv:v1';
 // Gestion du chantier — journal des partages (simulation / aperçu, hors Journal).
 const SHARES_KEY = 'phenix-demo:shares:v1';
+// Annuaire du conducteur (contacts) — global, réutilisable entre chantiers.
+const CONTACTS_KEY = 'phenix-demo:contacts:v1';
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -150,6 +155,8 @@ export interface DemoSnapshot extends BackendState {
   phenix: Record<string, PhenixMessage[]>;
   /** Journal des partages (par projet) — aperçu / simulation, hors Journal. */
   shares: Record<string, ShareLog[]>;
+  /** Annuaire du conducteur — contacts globaux, réutilisables entre chantiers. */
+  contacts: Contact[];
   /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
   filTarget: { momentId: string; photoId?: string } | null;
   /** Cible transitoire : navigation PHÉNIX dans l'Espace client. */
@@ -189,6 +196,7 @@ function build(): DemoSnapshot {
     },
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
+    contacts: readJson<Contact[]>(CONTACTS_KEY, []),
     filTarget,
     clientTarget,
     seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
@@ -214,6 +222,7 @@ const WORKSPACE_KEYS = [
   FIL_ANNOTATIONS_KEY,
   PHENIX_CONV_KEY,
   SHARES_KEY,
+  CONTACTS_KEY,
 ] as const;
 
 /** Marqueur du format de sauvegarde (pour reconnaître un fichier valide). */
@@ -484,6 +493,89 @@ export const demo = {
       createdAt: new Date().toISOString(),
     };
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /* ------------------------- Annuaire & communication -------------------- */
+
+  /** Ajoute ou met à jour un contact de l'annuaire (upsert par id). */
+  saveContact(contact: Contact): void {
+    const list = readJson<Contact[]>(CONTACTS_KEY, []);
+    const idx = list.findIndex((c) => c.id === contact.id);
+    if (idx >= 0) list[idx] = contact;
+    else list.push(contact);
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    refresh();
+    broadcast();
+  },
+
+  /** Supprime un contact de l'annuaire. */
+  deleteContact(id: string): void {
+    const list = readJson<Contact[]>(CONTACTS_KEY, []).filter((c) => c.id !== id);
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    refresh();
+    broadcast();
+  },
+
+  /** Lie / délie un contact à un chantier (toggle). */
+  toggleContactProject(id: string, projectId: string): void {
+    const list = readJson<Contact[]>(CONTACTS_KEY, []).map((c) => {
+      if (c.id !== id) return c;
+      const has = c.projectIds.includes(projectId);
+      return {
+        ...c,
+        projectIds: has
+          ? c.projectIds.filter((p) => p !== projectId)
+          : [...c.projectIds, projectId],
+      };
+    });
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Trace une COMMUNICATION lancée depuis PHÉNIX (l'app native s'ouvre à côté).
+   * Append-only au Journal du chantier, TOUJOURS interne (jamais côté client,
+   * VISION Art. 9). Sans chantier (annuaire global d'un contact non lié), on
+   * n'écrit pas au Journal — l'app native s'ouvre quand même.
+   */
+  async logCommunication(
+    projectId: ProjectId | null,
+    input: {
+      canal: CommCanal;
+      contactNom: string;
+      contactId?: string;
+      role?: string;
+      sujet?: string;
+    },
+  ): Promise<void> {
+    if (!projectId) return;
+    const member = snapshot.members.find(
+      (m) => m.projectId === projectId && m.role === 'compagnon',
+    );
+    const uid = member?.userId ?? toUserId('compagnon-demo');
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    const actor: EventActor = {
+      userId: uid,
+      role: 'compagnon',
+      displayName: people[uid] ?? 'Mickaël',
+    };
+    await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'communication',
+      visibility: 'interne',
+      state: 'publie',
+      content: {
+        canal: input.canal,
+        contactNom: input.contactNom,
+        ...(input.contactId ? { contactId: input.contactId } : {}),
+        ...(input.role ? { role: input.role } : {}),
+        ...(input.sujet ? { sujet: input.sujet } : {}),
+      },
+    });
     refresh();
     broadcast();
   },
@@ -1178,11 +1270,12 @@ export const demo = {
 
   /** Charge le chantier de démonstration (jeu de données vivant). */
   loadDemo(): void {
-    const { state, people, activeProjectId, dossiers, fil } = buildDemoSeed();
+    const { state, people, activeProjectId, dossiers, contacts, fil } = buildDemoSeed();
     kv.save(state);
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
     localStorage.removeItem(PINS_KEY);
     localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(fil.moments));
     localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
@@ -1313,6 +1406,19 @@ export function conversationOf(
 ): PhenixMessage[] {
   if (!projectId) return [];
   return snap.phenix[projectId] ?? [];
+}
+
+/** Contacts de l'annuaire liés à un chantier. */
+export function contactsOf(snap: DemoSnapshot, projectId: string | null | undefined): Contact[] {
+  if (!projectId) return [];
+  return snap.contacts.filter((c) => c.projectIds.includes(projectId));
+}
+
+/** Historique des communications tracées vers un contact (tous chantiers, récentes d'abord). */
+export function communicationsOf(snap: DemoSnapshot, contactId: string): Event[] {
+  return snap.events
+    .filter((e) => e.type === 'communication' && e.content.contactId === contactId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 /** Le Fil d'un projet (moments + annotations + zones). */

@@ -33,8 +33,13 @@ export const EVENT_TYPES = [
   'reserve',
   'levee',
   'action',
+  'communication',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+/** Canaux d'une communication lancée depuis PHÉNIX (app native ouverte). */
+export const COMM_CANALS = ['appel', 'sms', 'whatsapp', 'email', 'itineraire'] as const;
+export type CommCanal = (typeof COMM_CANALS)[number];
 
 export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   compte_rendu: 'Compte rendu',
@@ -45,6 +50,7 @@ export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   reserve: 'Réserve',
   levee: 'Levée de réserve',
   action: 'Action',
+  communication: 'Communication',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -290,6 +296,23 @@ export interface ActionEventContent {
   source?: FilSource;
 }
 
+/* -------------------------------------------------------------------------- *
+ * COMMUNICATION — trace d'un contact lancé depuis PHÉNIX (appel, SMS, WhatsApp,
+ * email, itinéraire). Le message part dans l'app native ; PHÉNIX en garde la
+ * TRACE (append-only). Toujours INTERNE — jamais côté client (VISION Art. 9).
+ * -------------------------------------------------------------------------- */
+export interface CommunicationContent {
+  canal: CommCanal;
+  /** Nom du destinataire au moment de l'action (snapshot append-only). */
+  contactNom: string;
+  /** Contact de l'annuaire concerné (le cas échéant). */
+  contactId?: string;
+  /** Rôle du contact (lecture). */
+  role?: string;
+  /** Motif / sujet (ex. « relance intervention »). */
+  sujet?: string;
+}
+
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
 export interface EventContentByType {
   compte_rendu: CompteRenduContent;
@@ -300,6 +323,7 @@ export interface EventContentByType {
   reserve: ReserveEventContent;
   levee: LeveeEventContent;
   action: ActionEventContent;
+  communication: CommunicationContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -354,6 +378,11 @@ export interface ActionEvent extends EventEnvelope {
   content: ActionEventContent;
 }
 
+export interface CommunicationEvent extends EventEnvelope {
+  type: 'communication';
+  content: CommunicationContent;
+}
+
 /** L'événement du journal — colonne vertébrale du produit. */
 export type Event =
   | CompteRenduEvent
@@ -363,7 +392,8 @@ export type Event =
   | DecisionEvent
   | ReserveEvent
   | LeveeEvent
-  | ActionEvent;
+  | ActionEvent
+  | CommunicationEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type

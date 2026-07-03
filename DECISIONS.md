@@ -403,3 +403,43 @@ laisser les documents sans fichier réel (aperçu impossible).
 journal). `files.test.mjs` 7/7 (photo réelle affichée, document + lien, document
 côté client, fichier trop lourd bloqué, interne non fuité, fichiers dans l'export).
 VISION Art. 4/5 (capture), Art. 8, Art. 9, Art. 11.
+
+## 03/07/2026 — Bureau mobile · EPIC Communication & Contacts (V1 deep-links)
+
+**Décision :** faire de PHÉNIX le point de départ des communications du
+conducteur, sans jamais devenir une messagerie. Un **annuaire** réutilisable
+(modèle `Contact` dans core, hors Journal — c'est un carnet, pas un fait de
+chantier), un **carnet par chantier**, et des **actions en deep-links natifs**
+(`tel:` / `sms:` / `https://wa.me/` / `mailto:` / Google Maps). L'app native
+s'ouvre ; PHÉNIX ne l'intègre pas. **100 % local, aucun backend, aucun envoi
+réel.** Messages **pré-remplis déterministes** (aucune IA) : PHÉNIX propose, le
+conducteur ajuste et envoie (Art. 7).
+**Traçabilité :** toute action lancée depuis un chantier est journalisée
+(`appendEvent` type `communication`), **append-only** et **toujours `interne`** :
+`isVisibleToClient` la rejette par construction (première garde `visibility !==
+'client'`), donc **jamais de fuite côté client** (Art. 9). L'historique des
+échanges se lit par contact (`communicationsOf`), pas dans la timeline des jalons.
+**Choix d'affichage :** `communication` n'est **pas** un `isMilestone` — la
+communication est une trace utile, surfacée dans la fiche contact, sans encombrer
+l'Historique du chantier. Sans chantier (annuaire global d'un contact non lié),
+on n'écrit rien au Journal : l'app native s'ouvre quand même.
+**Contacts vs `intervenants` (EPIC 5) :** l'annuaire (`Contact`, réutilisable,
+avec actions et historique) **coexiste** avec les intervenants texte du dossier
+(sous-traitants / fournisseurs de la Préparation, déjà stabilisés à 141
+assertions). On n'a **pas** fusionné pour ne pas déstabiliser EPIC 5 ; une
+consolidation « intervenant = référence à un contact » est notée pour plus tard.
+**Pont réserve → annuaire :** quand le `responsable` (texte libre) d'une réserve
+correspond à un contact (nom / société), PHÉNIX propose de le joindre — sans
+ressaisie (Art. 6).
+**Alternatives rejetées :** messagerie intégrée / envoi serveur (hors cadre V1,
+imposerait un backend) ; API WhatsApp Business (compte, coût, hors local) ;
+journaliser les communications comme jalons visibles (bruit dans l'Historique) ;
+exposer l'annuaire au client (Art. 9).
+**Impact :** core `contact.ts` (+ `Event` type `communication`, mappers) ;
+`lib/contactActions.ts`, `lib/commTemplates.ts` ; `components/contacts/*`
+(`ContactActions`, `ContactCard`, `ContactEditor`, `CarnetChantier`) ;
+`surfaces/Annuaire.tsx` (bouton d'en-tête) ; `store` (`saveContact`,
+`deleteContact`, `toggleContactProject`, `logCommunication`, sélecteurs
+`contactsOf` / `communicationsOf`) ; intégration `DossierPanel` + `ReservesView` ;
+contacts seedés. `contacts.test.mjs` 10/10, 14 suites de non-régression au vert,
+zéro erreur console. VISION Art. 1, 2, 6, 7, 9, 11.
