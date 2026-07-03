@@ -27,7 +27,10 @@ régression → poussée sur la PR. Gate obligatoire à chaque sprint : `typeche
 
 Le point du matin (`AujourdhuiView`) : salutation, journée agrégée multi-chantiers,
 compteurs (décisions/actions/réserves/clients/livraisons), cartes chantier, entrée
-dans un chantier, clôture. VISION Art. 3, 10.
+dans un chantier, clôture. **Repère « Chantier actif »** (Sprint 4.3) sur la carte
+que les onglets Chantier / Artisan / Espace client ouvriront : depuis Aujourd'hui,
+on sait quel chantier ces vues visent (présentation seule, aucun onglet désactivé).
+VISION Art. 3, 10.
 
 ### EPIC 2 — Mission · ✅ Terminé
 

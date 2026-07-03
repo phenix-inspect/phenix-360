@@ -52,6 +52,12 @@ export function AujourdhuiView({
 
   const phrase = buildPhrase(t);
 
+  // Chantier « actif » = celui que les onglets Chantier / Artisan / Espace client
+  // ouvriront (même règle que App.tsx : sélection courante, sinon le premier). On
+  // le marque pour qu'on sache depuis Aujourd'hui quel chantier ces vues visent.
+  const activeId =
+    snap.projects.find((p) => p.id === snap.activeProjectId)?.id ?? snap.projects[0]?.id;
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* En-tête du matin */}
@@ -91,6 +97,7 @@ export function AujourdhuiView({
               key={c.projectId}
               chantier={c}
               clientName={nameOf(snap, projectClientId(snap, c.projectId))}
+              active={c.projectId === activeId}
               onOpen={() => onOpenChantier(c.projectId)}
             />
           ))}
@@ -160,10 +167,12 @@ function Stat({
 function ChantierCard({
   chantier,
   clientName,
+  active,
   onOpen,
 }: {
   chantier: ChantierResume;
   clientName: string;
+  active?: boolean;
   onOpen: () => void;
 }): React.JSX.Element {
   const c = chantier;
@@ -180,8 +189,13 @@ function ChantierCard({
     <button
       type="button"
       onClick={onOpen}
+      aria-current={active ? 'true' : undefined}
       className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left shadow-sm transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-        c.urgent ? 'border-gold-200 bg-surface' : 'border-border bg-surface'
+        active
+          ? 'border-gold-400 bg-surface'
+          : c.urgent
+            ? 'border-gold-200 bg-surface'
+            : 'border-border bg-surface'
       }`}
     >
       <span
@@ -189,9 +203,15 @@ function ChantierCard({
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="flex flex-wrap items-baseline gap-x-2">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-serif text-lg font-semibold text-foreground">{c.name}</span>
           <span className="text-xs text-muted-foreground">{clientName}</span>
+          {active && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-medium text-gold-800">
+              <span className="size-1.5 rounded-full bg-gold-500" aria-hidden />
+              Chantier actif
+            </span>
+          )}
         </span>
         <span className="text-xs text-muted-foreground">
           {c.step ? PROJECT_STEP_LABEL[c.step] : 'En préparation'}

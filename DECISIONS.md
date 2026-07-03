@@ -184,3 +184,20 @@ dans l'en-tête (sticky) : `Chantier · {nom}` côté conducteur, `Aperçu artis
 chantier on travaille ou quel espace on prévisualise. Cet ancrage rend le ruban
 `PerspectiveRibbon` redondant : il est **retiré** (simplification nette). Suite
 `stabilite.test.mjs` portée à 17/17. VISION Art. 3, 9, 11.
+
+## 03/07/2026 — Repère « Chantier actif » sur la vue Aujourd'hui
+
+**Décision :** sur « Aujourd'hui » (vue multi-chantiers), la carte du chantier que
+les onglets Chantier / Artisan / Espace client ouvriront porte un repère discret
+(bordure or + pastille « Chantier actif », même règle de cible que `App.tsx` :
+sélection courante, sinon le premier chantier). Présentation seule.
+**Pourquoi :** c'était le seul angle mort restant — depuis Aujourd'hui, les onglets
+agissaient sur un chantier actif invisible. Le repère (avant le clic) et l'ancrage
+sticky (après le clic) se renforcent : on ne se demande jamais « quel chantier ? ».
+**Alternatives rejetées :** désactiver les onglets tant qu'aucun chantier n'est
+choisi (retire un raccourci, change le comportement, plus risqué) — écarté au
+profit d'une amélioration purement visuelle, sans nouvelle logique métier.
+**Impact :** `AujourdhuiView`/`ChantierCard` (prop `active`, `aria-current`).
+`stabilite.test.mjs` 19/19 : la pastille marque le bon chantier, l'Espace client
+ouvert depuis Aujourd'hui correspond au chantier actif, et le repère suit la
+sélection (non-régression multi-chantiers). VISION Art. 3, 9.
