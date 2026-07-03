@@ -58,6 +58,29 @@ export function AujourdhuiView({
   const activeId =
     snap.projects.find((p) => p.id === snap.activeProjectId)?.id ?? snap.projects[0]?.id;
 
+  // Un compteur du matin répond à « où dois-je regarder ? ». Comme il agrège
+  // plusieurs chantiers, le clic ne route pas : il défile vers « Mes chantiers »
+  // et met en évidence, le temps d'une pulsation, les cartes concernées. Aucune
+  // logique métier, aucun état — on révèle ce que les cartes affichent déjà.
+  const focusCounter = (has: (c: ChantierResume) => boolean): void => {
+    document
+      .getElementById('mes-chantiers')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    for (const c of briefing.chantiers) {
+      if (!has(c)) continue;
+      document
+        .getElementById(`chantier-${c.projectId}`)
+        ?.animate?.(
+          [
+            { boxShadow: '0 0 0 0 rgba(169, 128, 58, 0)' },
+            { boxShadow: '0 0 0 4px rgba(169, 128, 58, 0.55)' },
+            { boxShadow: '0 0 0 0 rgba(169, 128, 58, 0)' },
+          ],
+          { duration: 1600, easing: 'ease-out' },
+        );
+    }
+  };
+
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       {/* En-tête du matin */}
@@ -79,15 +102,38 @@ export function AujourdhuiView({
           value={t.decisions}
           label="décisions clients"
           accent
+          onActivate={() => focusCounter((c) => c.decisions > 0)}
         />
-        <Stat icon={<ListChecks aria-hidden />} value={t.actions} label="actions à suivre" accent />
-        <Stat icon={<Flag aria-hidden />} value={t.reserves} label="réserves à lever" accent />
-        <Stat icon={<MessageSquare aria-hidden />} value={t.questions} label="réponses à donner" />
-        <Stat icon={<Truck aria-hidden />} value={t.livraisons} label="livraisons prévues" />
+        <Stat
+          icon={<ListChecks aria-hidden />}
+          value={t.actions}
+          label="actions à suivre"
+          accent
+          onActivate={() => focusCounter((c) => c.actions > 0)}
+        />
+        <Stat
+          icon={<Flag aria-hidden />}
+          value={t.reserves}
+          label="réserves à lever"
+          accent
+          onActivate={() => focusCounter((c) => c.reserves > 0)}
+        />
+        <Stat
+          icon={<MessageSquare aria-hidden />}
+          value={t.questions}
+          label="réponses à donner"
+          onActivate={() => focusCounter((c) => c.questions > 0)}
+        />
+        <Stat
+          icon={<Truck aria-hidden />}
+          value={t.livraisons}
+          label="livraisons prévues"
+          onActivate={() => focusCounter((c) => c.livraisons > 0)}
+        />
       </div>
 
       {/* Mes chantiers */}
-      <section className="space-y-3">
+      <section id="mes-chantiers" className="scroll-mt-24 space-y-3">
         <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
           Mes chantiers ({t.chantiers})
         </h2>
@@ -95,6 +141,7 @@ export function AujourdhuiView({
           {briefing.chantiers.map((c) => (
             <ChantierCard
               key={c.projectId}
+              domId={`chantier-${c.projectId}`}
               chantier={c}
               clientName={nameOf(snap, projectClientId(snap, c.projectId))}
               active={c.projectId === activeId}
@@ -138,19 +185,22 @@ function Stat({
   value,
   label,
   accent,
+  onActivate,
 }: {
   icon: React.ReactNode;
   value: number;
   label: string;
   accent?: boolean;
+  onActivate?: () => void;
 }): React.JSX.Element {
   const highlight = accent && value > 0;
-  return (
-    <div
-      className={`rounded-xl border p-3 ${
-        highlight ? 'border-gold-300 bg-gold-50' : 'border-border bg-surface'
-      }`}
-    >
+  // Un compteur n'est un raccourci que s'il a quelque chose à montrer (> 0).
+  const clickable = value > 0 && Boolean(onActivate);
+  const base = `w-full rounded-xl border p-3 text-left ${
+    highlight ? 'border-gold-300 bg-gold-50' : 'border-border bg-surface'
+  }`;
+  const inner = (
+    <>
       <div
         className={`flex items-center gap-1.5 text-xs ${
           highlight ? 'text-gold-700' : 'text-muted-foreground'
@@ -160,16 +210,30 @@ function Stat({
         <span>{label}</span>
       </div>
       <p className="mt-1 font-serif text-2xl font-semibold text-foreground">{value}</p>
-    </div>
+    </>
+  );
+
+  if (!clickable) return <div className={base}>{inner}</div>;
+  return (
+    <button
+      type="button"
+      onClick={onActivate}
+      aria-label={`Voir où : ${value} ${label}`}
+      className={`${base} cursor-pointer transition-colors duration-base hover:border-gold-400 hover:bg-gold-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
+    >
+      {inner}
+    </button>
   );
 }
 
 function ChantierCard({
+  domId,
   chantier,
   clientName,
   active,
   onOpen,
 }: {
+  domId: string;
   chantier: ChantierResume;
   clientName: string;
   active?: boolean;
@@ -188,6 +252,7 @@ function ChantierCard({
   return (
     <button
       type="button"
+      id={domId}
       onClick={onOpen}
       aria-current={active ? 'true' : undefined}
       className={`flex w-full items-center gap-4 rounded-xl border p-4 text-left shadow-sm transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${

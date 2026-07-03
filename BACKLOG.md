@@ -30,7 +30,10 @@ compteurs (décisions/actions/réserves/clients/livraisons), cartes chantier, en
 dans un chantier, clôture. **Repère « Chantier actif »** (Sprint 4.3) sur la carte
 que les onglets Chantier / Artisan / Espace client ouvriront : depuis Aujourd'hui,
 on sait quel chantier ces vues visent (présentation seule, aucun onglet désactivé).
-VISION Art. 3, 10.
+**Compteurs actionnables** (Sprint 4.4) : un compteur du matin (> 0) est un raccourci
+« où dois-je regarder ? » → défilement vers « Mes chantiers » + pulsation des cartes
+concernées (les compteurs à 0 restent en affichage simple). Aucun filtre, aucun
+routage, aucun état. VISION Art. 3, 10.
 
 ### EPIC 2 — Mission · ✅ Terminé
 

@@ -201,3 +201,24 @@ profit d'une amélioration purement visuelle, sans nouvelle logique métier.
 `stabilite.test.mjs` 19/19 : la pastille marque le bon chantier, l'Espace client
 ouvert depuis Aujourd'hui correspond au chantier actif, et le repère suit la
 sélection (non-régression multi-chantiers). VISION Art. 3, 9.
+
+## 03/07/2026 — Compteurs du matin actionnables (raccourci, pas routage)
+
+**Décision :** chaque compteur du matin (« réserves à lever », « réponses à
+donner »…) devient, quand il est > 0, un **raccourci** répondant à « où dois-je
+regarder ? » : clic → défilement vers « Mes chantiers » + **pulsation** temporaire
+des cartes qui alimentent ce compteur. Les compteurs à 0 ne sont pas cliquables
+(aspect inchangé).
+**Pourquoi :** les compteurs sont des **agrégats multi-chantiers** — ils n'ont pas
+de destination unique. Router vers un onglet serait faux (le travail est réparti)
+et incohérent (seules les réserves ont un onglet dédié). On relie l'agrégat (« le
+quoi ») au détail déjà affiché par les cartes (« le où »), sans rien inventer.
+**Alternatives rejetées :** router vers un onglet (ne généralise pas, parfois
+faux) ; filtrer la liste (masque des chantiers, exige un état + un « retirer le
+filtre » = usine à gaz).
+**Impact :** présentation seule dans `AujourdhuiView` (helper `focusCounter` +
+`scrollIntoView` + `animate`, motif déjà utilisé côté client ; ids `mes-chantiers`
+/ `chantier-{id}`). Aucune logique métier, aucun état persistant.
+`stabilite.test.mjs` 21/21 : compteur > 0 = raccourci en page (reste sur
+Aujourd'hui, « Mes chantiers » à l'écran) ; compteur à 0 non cliquable. VISION
+Art. 3 (piloter sa journée), Art. 7/8 (tout dérive des faits, rien d'inventé).
