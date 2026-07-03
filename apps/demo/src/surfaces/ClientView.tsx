@@ -17,7 +17,6 @@ import {
 } from '@phenix360/core';
 import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
-import { PerspectiveRibbon } from '../components/PerspectiveRibbon';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
@@ -159,8 +158,6 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
-      <PerspectiveRibbon audience="client" subject={nameOf(snap, project.clientId)} />
-
       <div id="section-decision" className="rounded-2xl">
         {clientDecision ? (
           <ClientDecisionBanner

@@ -10,7 +10,7 @@ import {
   EmptyState,
   SegmentedControl,
 } from '@phenix360/ui';
-import { PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
+import { Building2, Eye, PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
 import { projectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
@@ -38,6 +38,19 @@ export function App(): React.JSX.Element {
   const activeProject =
     snap.projects.find((p) => p.id === snap.activeProjectId) ?? snap.projects[0] ?? null;
 
+  // Ancrage de contexte : on sait TOUJOURS sur quel chantier on travaille et
+  // quel espace on prévisualise. Rien sur « Aujourd'hui » (vue multi-chantiers).
+  const anchor =
+    creating || activeProject === null
+      ? null
+      : view === 'compagnon'
+        ? { label: 'Chantier', name: activeProject.name, preview: false }
+        : view === 'artisan'
+          ? { label: 'Aperçu artisan', name: activeProject.name, preview: true }
+          : view === 'client'
+            ? { label: 'Aperçu client', name: activeProject.name, preview: true }
+            : null;
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-sticky border-b border-border bg-background/90 backdrop-blur">
@@ -61,6 +74,19 @@ export function App(): React.JSX.Element {
             <Settings2 aria-hidden />
           </Button>
         </div>
+
+        {anchor && (
+          <div className="border-t border-border/60 bg-surface/40">
+            <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-2 text-sm sm:px-6 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+              {anchor.preview ? <Eye aria-hidden /> : <Building2 aria-hidden />}
+              <span className="text-muted-foreground">{anchor.label}</span>
+              <span aria-hidden className="text-border">
+                ·
+              </span>
+              <span className="truncate font-medium text-foreground">{anchor.name}</span>
+            </div>
+          </div>
+        )}
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

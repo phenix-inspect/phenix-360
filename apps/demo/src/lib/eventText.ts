@@ -1,14 +1,22 @@
 import { PROJECT_STEP_LABEL, describeDecisionEvent, type Event } from '@phenix360/core';
 
-/** Titre lisible d'un événement (présentation — dérivé du contenu typé). */
+/** Première lettre en capitale (le contexte métier saisi peut être en minuscule). */
+const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
+/**
+ * Titre lisible d'un événement (présentation — dérivé du contenu typé). Forme
+ * « Type · contexte métier » : l'œil identifie d'abord la NATURE de l'entrée,
+ * puis son ancrage chantier (étape, pièce, choix). Le détail vit dans la
+ * description, jamais dans le titre.
+ */
 export function eventTitle(e: Event): string {
   switch (e.type) {
     case 'compte_rendu':
       return e.content.etapeConfirmee
-        ? PROJECT_STEP_LABEL[e.content.etapeConfirmee]
+        ? `Compte rendu · ${PROJECT_STEP_LABEL[e.content.etapeConfirmee]}`
         : 'Compte rendu';
     case 'photo':
-      return e.content.legende ?? 'Photo du chantier';
+      return e.content.piece ? `Photo · ${e.content.piece}` : 'Photo';
     case 'document':
       return e.content.libelle;
     case 'demande':
@@ -18,7 +26,7 @@ export function eventTitle(e: Event): string {
           ? 'Signalement artisan'
           : 'Demande';
     case 'decision':
-      return describeDecisionEvent(e.content).title;
+      return `Décision client · ${cap(e.content.categorie)}`;
     case 'reserve':
       return `Réserve n°${e.content.numero}`;
     case 'levee':
@@ -66,7 +74,9 @@ export function eventDescription(e: Event): string | undefined {
       return meta.length > 0 ? `${c.libelle} · ${meta.join(' · ')}` : c.libelle;
     }
     case 'photo':
-      return undefined;
+      // La légende porte le détail : elle passe du titre à la description, pour
+      // que le titre reste « Photo · Pièce » (lecture immédiate) sans rien perdre.
+      return e.content.legende;
     case 'document':
       return undefined;
   }

@@ -3,7 +3,7 @@ import { ActivityItem, EmptyState, SegmentedControl, Timeline } from '@phenix360
 import { projectHistory, sortByDate, type Event, type Project } from '@phenix360/core';
 import { History, Star } from 'lucide-react';
 import { demo, nameOf, pinnedOf, type DemoSnapshot } from '../store';
-import { fmtDateTime } from '../lib/format';
+import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { PhotoTile } from './PhotoTile';
 
@@ -72,7 +72,7 @@ export function HistoriqueView({
                 type={e.type}
                 title={eventTitle(e)}
                 description={eventDescription(e)}
-                date={fmtDateTime(e.createdAt)}
+                date={fmtDate(e.createdAt)}
                 author={nameOf(snap, e.actor.userId)}
                 authorRole={e.actor.role}
                 visibility={e.visibility}

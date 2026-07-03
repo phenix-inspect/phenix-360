@@ -15,7 +15,6 @@ import { CalendarClock, Camera, CheckCircle2, Flag, HardHat, ListChecks, Send } 
 import { demo, nameOf, type DemoSnapshot } from '../store';
 import { fmtDateShort } from '../lib/format';
 import { StepProgress } from '../components/StepProgress';
-import { PerspectiveRibbon } from '../components/PerspectiveRibbon';
 
 /**
  * MODE ARTISAN (EPIC 11) — l'espace du sous-traitant sur un chantier. Il reçoit
@@ -93,8 +92,7 @@ export function ArtisanView({
 
   if (artisans.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl space-y-6 py-10">
-        <PerspectiveRibbon audience="artisan" />
+      <div className="mx-auto max-w-2xl py-10">
         <EmptyState
           icon={<HardHat aria-hidden />}
           title="Aucun artisan sur ce chantier"
@@ -151,8 +149,6 @@ export function ArtisanView({
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <PerspectiveRibbon audience="artisan" />
-
       {/* En-tête + identité */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">

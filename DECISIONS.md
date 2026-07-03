@@ -156,3 +156,31 @@ onglets, client-safety exhaustive (zéro fuite inter-chantiers), rubans de
 perspective, parcours Fil (coup de cœur + petit mot), états vides, zéro erreur
 console. VISION Art. 8 (le fait, colonne vertébrale ; pas de duplication) et Art. 9
 (chacun ne voit que ce qui le concerne).
+
+## 03/07/2026 — Posture CTO/Qualité : dix améliorations discrètes plutôt qu'une brique
+
+**Décision :** nouvelle posture validée par le PO — je challenge chaque écran
+avant livraison (utilité, simplification, friction, évidence pour conducteur /
+artisan / client, risque de bug/régression/fuite, fidélité à la VISION). On
+privilégie de petites améliorations à fort impact ; chaque sprint doit laisser
+l'application meilleure, même sans nouvelle fonctionnalité. Je contredis avec des
+arguments métier quand une idée est inutile ou trop complexe.
+**Pourquoi :** l'objectif n'est pas de vider le backlog vite, mais de construire
+le meilleur logiciel de rénovation intérieure — irréprochable.
+**Alternatives rejetées :** empiler des fonctionnalités ; exécuter mécaniquement
+sans challenge.
+**Impact — premières passes livrées sous cette posture :**
+(1) Libellés d'état lisibles au journal (`EVENT_STATE_LABEL` : « Publié » au lieu
+de l'énum brut « publie »). (2) Compteur du matin « réponses à donner » (au lieu
+de « clients à répondre », bancal). (3) Titres de journal « Type · contexte
+métier » (`Compte rendu · Gros œuvre`, `Photo · Cuisine`, `Décision client ·
+Mobilier`) — la légende photo passe en description, rien n'est perdu ; les
+réserves n'ont pas de pièce au modèle, on garde `Réserve n°N` (pas de champ
+inventé). (4) Suppression de l'heure inutile au journal, à l'historique et aux
+cartes client (date longue « 3 juillet 2026 » ; l'heure reste sur les
+conversations du Fil, où elle a du sens). (5) **Ancrage de contexte** persistant
+dans l'en-tête (sticky) : `Chantier · {nom}` côté conducteur, `Aperçu artisan ·
+{nom}` / `Aperçu client · {nom}` en prévisualisation — on sait toujours sur quel
+chantier on travaille ou quel espace on prévisualise. Cet ancrage rend le ruban
+`PerspectiveRibbon` redondant : il est **retiré** (simplification nette). Suite
+`stabilite.test.mjs` portée à 17/17. VISION Art. 3, 9, 11.

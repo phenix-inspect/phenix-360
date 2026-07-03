@@ -115,8 +115,12 @@ Base : `ClientView` riche (décision, Fil, concierge, client-safe strict).
 **Stabilisation (Sprint 4.1) :** le **Fil est désormais le récit visuel unique** ;
 le doublon photo (« Dernière activité » / « Le récit de votre chantier ») est
 remplacé par une section resserrée **« Comptes rendus & documents »** (éléments
-utiles absents du Fil). Ruban **« Aperçu »** (`PerspectiveRibbon`) en tête des vues
-Artisan et Espace client → on comprend immédiatement de quel côté on se trouve.
+utiles absents du Fil).
+**Qualité (Sprint 4.2) :** **ancrage de contexte** persistant dans l'en-tête
+(`Chantier · {nom}` / `Aperçu client · {nom}` / `Aperçu artisan · {nom}`) → on sait
+toujours sur quel chantier on travaille ou quel espace on prévisualise (remplace et
+simplifie le ruban de perspective). Titres de journal « Type · contexte métier »,
+libellés d'état lisibles, dates épurées.
 **Manque** : historique client propre, notifications client, préférences. VISION Art. 8, 9.
 
 ### EPIC 13 — Administration · 🔴 À développer

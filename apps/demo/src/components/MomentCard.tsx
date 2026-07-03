@@ -3,7 +3,7 @@ import { ROLE_LABEL, type Event } from '@phenix360/core';
 import { Avatar } from './Avatar';
 import { PhotoTile } from './PhotoTile';
 import { eventDescription, eventTitle } from '../lib/eventText';
-import { fmtDateTime } from '../lib/format';
+import { fmtDate } from '../lib/format';
 
 /**
  * Une carte du RÉCIT client : un instant du chantier. La photo est l'élément
@@ -30,7 +30,7 @@ export function MomentCard({
           <div className="min-w-0 leading-tight">
             <p className="truncate text-sm font-medium text-foreground">{authorName}</p>
             <p className="text-xs text-muted-foreground">
-              {ROLE_LABEL[event.actor.role]} · {fmtDateTime(event.createdAt)}
+              {ROLE_LABEL[event.actor.role]} · {fmtDate(event.createdAt)}
             </p>
           </div>
         </div>
