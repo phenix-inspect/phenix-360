@@ -17,7 +17,9 @@ export function PhotoTile({
   size?: 'hero' | 'thumb';
   className?: string;
 }): React.JSX.Element {
-  const seed = photo.content.attachment.id;
+  const attachment = photo.content.attachment;
+  const seed = attachment.id;
+  const dataUrl = attachment.dataUrl;
   const legende = photo.content.legende;
   const piece = photo.content.piece;
   const hero = size === 'hero';
@@ -29,20 +31,29 @@ export function PhotoTile({
         hero ? 'aspect-[4/3] rounded-xl' : 'aspect-square rounded-lg',
         className,
       )}
-      style={warmGradient(seed)}
+      style={dataUrl ? undefined : warmGradient(seed)}
       role="img"
       aria-label={legende ?? 'Photo du chantier'}
     >
-      <span
-        aria-hidden
-        className={cn(
-          'absolute inset-0 flex items-center justify-center text-paper-0',
-          hero ? '[&_svg]:size-14' : '[&_svg]:size-7',
-        )}
-        style={{ opacity: 0.18 }}
-      >
-        <ImageIcon />
-      </span>
+      {dataUrl ? (
+        <img
+          src={dataUrl}
+          alt={legende ?? 'Photo du chantier'}
+          className="absolute inset-0 size-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            'absolute inset-0 flex items-center justify-center text-paper-0',
+            hero ? '[&_svg]:size-14' : '[&_svg]:size-7',
+          )}
+          style={{ opacity: 0.18 }}
+        >
+          <ImageIcon />
+        </span>
+      )}
 
       {hero && (piece != null || legende != null) && (
         <div

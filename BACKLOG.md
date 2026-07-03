@@ -193,7 +193,10 @@ Aujourd'hui : dossier saisi/seedé. VISION Art. 7.
   **Lot 4 livré** : **sauvegarde / restauration locale** — exporter tout l'espace en
   `.json`, importer une sauvegarde (restauration complète), avec confirmation,
   message clair si fichier invalide et zéro perte silencieuse (`backup.test.mjs`
-  8/8). **Suite** : vrais fichiers (photos/PDF en base64 local). Pas de mise en
+  8/8). **Lot 3 livré** : **vrais fichiers** — photos (Fil/mission/journal) et
+  documents (PDF/image) chargés et stockés en base64 local, aperçu, limites de
+  taille + message d'erreur clair, client-safe et export/import compatibles
+  (`files.test.mjs` 7/7). **Sprint « App réelle locale » complet.** Pas de mise en
   ligne, pas d'auth, pas de Supabase.
 - **Persistance & backend réel** : aujourd'hui `localStorage` + backend en mémoire
   (mono-poste, mono-conducteur). Pré-requis d'une bêta multi-utilisateur → lié à

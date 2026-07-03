@@ -2,6 +2,7 @@ import { FileText, Heart, MessageCircle, NotebookPen, Sparkles } from 'lucide-re
 import { ROLE_LABEL, type Event } from '@phenix360/core';
 import { Avatar } from './Avatar';
 import { PhotoTile } from './PhotoTile';
+import { DocumentLink } from './DocumentLink';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { fmtDate } from '../lib/format';
 
@@ -60,12 +61,17 @@ export function MomentCard({
           {description != null && (
             <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
           )}
-          {event.type === 'document' && (
-            <span className="mt-1 inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-muted-foreground">
-              <FileText aria-hidden />
-              {event.content.attachment.fileName ?? `${event.content.libelle}.pdf`}
-            </span>
-          )}
+          {event.type === 'document' &&
+            (event.content.attachment.dataUrl ? (
+              <span className="mt-1 inline-flex">
+                <DocumentLink attachment={event.content.attachment} />
+              </span>
+            ) : (
+              <span className="mt-1 inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-muted-foreground">
+                <FileText aria-hidden />
+                {event.content.attachment.fileName ?? `${event.content.libelle}.pdf`}
+              </span>
+            ))}
         </div>
 
         <div className="flex items-center gap-5 border-t border-border pt-3 text-muted-foreground">

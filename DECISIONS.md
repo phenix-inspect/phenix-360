@@ -343,3 +343,31 @@ import direct sans confirmation (perte accidentelle) ; cloud / compte (hors cadr
 confirmation avec message d'erreur). `backup.test.mjs` 8/8 (créer, exporter,
 fichier invalide sans perte, reset, confirmation, restauration complète, démo
 intacte). VISION Art. 8 (le journal, source unique — ici sérialisée), Art. 11.
+
+## 03/07/2026 — App réelle locale · Lot 3 : vrais fichiers (photos / documents)
+
+**Décision :** on peut charger de VRAIS fichiers, stockés 100 % en local. Les
+photos du Fil et des missions étaient déjà réelles (`mediaUploader` : compression
+canvas → data URL base64) ; on complète : (1) `EventAttachment.dataUrl?` (aperçu
+local, parallèle à `FilPhoto.imageUrl`) ; (2) `PhotoTile` affiche la vraie image
+quand elle existe (sinon dégradé) ; (3) le Composer « Ajouter des photos » /
+« Ajouter un document » upload de vrais fichiers (aperçu miniature / nom de
+fichier) au lieu de pièces jointes synthétiques ; (4) `DocumentLink` ouvre le
+document local (journal + Espace client). Nouveau `lib/upload.ts` :
+`readPhotoAttachment` (images compressées) / `readDocumentAttachment` (PDF ou
+image).
+**Sécurité / limites :** images compressées (≤ 1600 px) donc légères ; limite
+d'entrée image **15 Mo**, document **2 Mo** (localStorage ~5 Mo) ; **message clair
+si trop lourd, rien n'est publié** (aucune perte silencieuse). Le `visibility`
+(client/interne) gate l'événement entier via `isVisibleToClient` : la `dataUrl`
+d'une pièce interne n'atteint jamais le client (**client-safe inchangé**). Les
+fichiers (base64) vivent dans les mêmes clés localStorage → **compatibles
+export/import du Lot 4**.
+**Pourquoi :** utiliser PHÉNIX avec ses vraies photos et documents, en local.
+**Alternatives rejetées :** cloud / Supabase / stockage externe (hors cadre) ;
+laisser les documents sans fichier réel (aperçu impossible).
+**Impact :** `attachment.ts` (core, `dataUrl`), `lib/upload.ts`, `PhotoTile`,
+`Composer`, `DocumentLink`, `MomentCard`, `CompagnonView` (lien document au
+journal). `files.test.mjs` 7/7 (photo réelle affichée, document + lien, document
+côté client, fichier trop lourd bloqué, interne non fuité, fichiers dans l'export).
+VISION Art. 4/5 (capture), Art. 8, Art. 9, Art. 11.

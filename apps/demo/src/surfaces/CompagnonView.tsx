@@ -42,6 +42,7 @@ import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
+import { DocumentLink } from '../components/DocumentLink';
 import { RoadmapProgress } from '../components/RoadmapProgress';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
@@ -319,7 +320,12 @@ function SuiviTab({
                 const filSrc =
                   e.type === 'demande' || e.type === 'reserve' ? e.content.source : undefined;
                 const canLever = e.type === 'reserve' && statut === 'ouverte';
-                const hasRow = badge != null || filSrc?.kind === 'fil' || canLever;
+                const docAttachment =
+                  e.type === 'document' && e.content.attachment.dataUrl
+                    ? e.content.attachment
+                    : undefined;
+                const hasRow =
+                  badge != null || filSrc?.kind === 'fil' || canLever || docAttachment != null;
                 return (
                   <ActivityItem
                     key={e.id}
@@ -363,6 +369,7 @@ function SuiviTab({
                             <CircleCheck aria-hidden /> Lever la réserve
                           </button>
                         )}
+                        {docAttachment && <DocumentLink attachment={docAttachment} />}
                       </span>
                     )}
                   </ActivityItem>

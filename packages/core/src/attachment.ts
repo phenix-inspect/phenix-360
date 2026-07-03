@@ -23,6 +23,11 @@ export interface EventAttachment {
   mimeType: string;
   fileName?: string;
   sizeBytes?: number;
+  /**
+   * Aperçu affichable — data URL (base64) en V1 100 % locale ; en production,
+   * dérivé de `bucket`/`storagePath` (URL signée). Photos comme documents.
+   */
+  dataUrl?: string;
   /** Dimensions image (photos) — vignettes sans téléchargement. */
   width?: number;
   height?: number;
