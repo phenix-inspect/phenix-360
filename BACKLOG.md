@@ -100,8 +100,12 @@ aperçu écran seulement. VISION Art. 8.
 ### EPIC 9 — Notifications · 🔴 À développer
 
 Un vrai centre de notifications (le « radar » : ce qui a bougé, ce qui attend).
-Base partielle : `AttentionPanel`. **Manque** : file de notifications datée,
-lue/non-lue, actions rapides. VISION Art. 7, 10.
+Base partielle : `AttentionPanel` — **stabilisé (Sprint 4.6) en vrai radar de
+blocages** : uniquement les items bloquants (`warning`), 3 maximum, triés par
+priorité ; les infos non bloquantes sortent du radar (pointeur « + N → Préparation »
+si dépassement) ; message d'avenant court ; bouton « Ouvrir » contour lisible.
+`attention.test.mjs` 8/8. **Manque** : file de notifications datée, lue/non-lue,
+actions rapides. VISION Art. 7, 10.
 
 ### EPIC 10 — Assistant IA · 🟡 À compléter — **reporté après les fondations métier**
 

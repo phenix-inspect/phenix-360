@@ -286,16 +286,19 @@ export function avenantImpact(
  */
 export function describeAvenantImpact(impact: AvenantImpact): string {
   if (impact.note && impact.note.trim()) return impact.note.trim();
-  const ajoute = `${impact.postesAjoutes} prestation${impact.postesAjoutes > 1 ? 's' : ''}`;
+  // Court et orienté action : le détail chiffré (+ajoutées / ~modifiées) est déjà
+  // porté par le badge du radar — on ne le répète pas dans le message.
   const scope =
     impact.impactPlanning && impact.commandesAMettreAJour > 0
-      ? ' Pensez à vérifier son impact sur le planning et les commandes.'
+      ? 'le planning et les commandes'
       : impact.impactPlanning
-        ? ' Pensez à vérifier son impact sur le planning.'
+        ? 'le planning'
         : impact.commandesAMettreAJour > 0
-          ? ' Pensez à vérifier son impact sur les commandes.'
-          : '';
-  return `L'avenant n°${impact.numero} ajoute ${ajoute} et en remplace ${impact.postesRemplaces}.${scope}`;
+          ? 'les commandes'
+          : null;
+  return scope
+    ? `Avenant n°${impact.numero} — à répercuter sur ${scope}.`
+    : `Avenant n°${impact.numero} intégré.`;
 }
 
 /* ------------------------------- sélecteurs -------------------------------- */

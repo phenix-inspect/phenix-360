@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button, Card, CardContent } from '@phenix360/ui';
 import {
   Banknote,
@@ -31,7 +30,7 @@ const KIND_LABEL: Record<AttentionKind, string> = {
 };
 
 /**
- * Priorité : décision client urgente, puis impact avenant, puis commande
+ * Priorité entre blocages : décision client, puis impact avenant, puis commande
  * critique, puis document bloquant.
  */
 const KIND_RANK: Record<AttentionKind, number> = {
@@ -42,17 +41,19 @@ const KIND_RANK: Record<AttentionKind, number> = {
   question: 4,
   echeance: 5,
 };
-const SEVERITY_RANK = { warning: 0, info: 1, success: 2 } as const;
 
 const dot = (s: AttentionItem['severity']): string =>
   s === 'warning' ? 'bg-gold-500' : s === 'success' ? 'bg-success' : 'bg-info';
 
-const DEFAULT_VISIBLE = 3;
+/** Un radar, pas une liste : 3 blocages maximum. Le reste est dans la Préparation. */
+const MAX_VISIBLE = 3;
 
 /**
- * « PHÉNIX surveille votre chantier » — briefing de chef de chantier : en 5
- * secondes, les 3 priorités du jour. Les risques bloquants remontent ; les
- * éléments rassurants sont condensés en une ligne. « Voir tout » déplie le reste.
+ * « PHÉNIX surveille votre chantier » — le RADAR du conducteur : en 10 secondes,
+ * « qu'est-ce qui bloque réellement mon chantier maintenant ? ». On ne montre que
+ * les blocages (`warning`), 3 au maximum, triés par priorité. Le contexte non
+ * bloquant (phases à venir, questions) vit dans la Préparation. Les éléments
+ * rassurants sont condensés en une ligne (VISION Art. 3, 7, 10, 11).
  */
 export function AttentionPanel({
   items,
@@ -63,22 +64,18 @@ export function AttentionPanel({
   onAskDocument: (docId: string) => void;
   onOpenPreparation: () => void;
 }): React.JSX.Element {
-  const [expanded, setExpanded] = useState(false);
-
-  const actionable = items
-    .filter((i) => i.severity !== 'success')
-    .sort(
-      (a, b) =>
-        SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] ||
-        KIND_RANK[a.kind] - KIND_RANK[b.kind],
-    );
+  // Radar = uniquement ce qui bloque réellement le chantier.
+  const blockers = items
+    .filter((i) => i.severity === 'warning')
+    .sort((a, b) => KIND_RANK[a.kind] - KIND_RANK[b.kind]);
   const securedCount = items.filter((i) => i.severity === 'success').length;
 
-  const visible = expanded ? actionable : actionable.slice(0, DEFAULT_VISIBLE);
-  const hidden = actionable.length - visible.length;
+  const visible = blockers.slice(0, MAX_VISIBLE);
+  const overflow = blockers.length - visible.length;
+  const actionable = blockers;
 
   return (
-    <Card className="border-gold-200 bg-gold-50 shadow-gold">
+    <Card data-testid="attention-panel" className="border-gold-200 bg-gold-50 shadow-gold">
       <CardContent className="space-y-4 p-6">
         <div className="flex items-start gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground [&_svg]:size-5">
@@ -139,20 +136,16 @@ export function AttentionPanel({
                   >
                     Demander
                   </Button>
-                ) : item.kind === 'commande' ||
-                  item.kind === 'question' ||
-                  item.kind === 'decision' ||
-                  item.kind === 'echeance' ||
-                  item.kind === 'avenant' ? (
+                ) : (
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="shrink-0 text-muted-foreground"
+                    variant="outline"
+                    className="shrink-0"
                     onClick={onOpenPreparation}
                   >
                     Ouvrir
                   </Button>
-                ) : null}
+                )}
               </li>
             ))}
           </ul>
@@ -166,13 +159,14 @@ export function AttentionPanel({
           </p>
         )}
 
-        {(hidden > 0 || (expanded && actionable.length > DEFAULT_VISIBLE)) && (
+        {overflow > 0 && (
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={onOpenPreparation}
             className="text-sm font-medium text-gold-700 underline-offset-4 hover:underline"
           >
-            {expanded ? 'Réduire' : `Voir tout (${actionable.length})`}
+            + {overflow} autre{overflow > 1 ? 's' : ''} point{overflow > 1 ? 's' : ''} à traiter →
+            Préparation
           </button>
         )}
       </CardContent>

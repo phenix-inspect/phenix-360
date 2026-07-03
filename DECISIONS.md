@@ -248,3 +248,27 @@ seule : `isVisibleToClient` inchangé, **client-safe** vérifié (les libellés 
 demande ne remontent jamais côté client). Nouveau `journal.test.mjs` 9/9 (titres,
 badges, actions, dialogue de levée, historique, client-safe). VISION Art. 8 (les
 vues sont des projections du Journal), Art. 10 (rien ne tombe), Art. 11 (simplicité).
+
+## 03/07/2026 — AttentionPanel : un radar de blocages, pas une liste
+
+**Décision :** « PHÉNIX surveille votre chantier » répond à une seule question —
+« qu'est-ce qui bloque réellement mon chantier maintenant ? ». (1) Le radar
+n'affiche que les items **`warning`** (blocages réels), **3 au maximum**, triés par
+priorité (décision, avenant, commande, document). Les items `info` (phases à venir,
+questions PHÉNIX, docs « à fournir plus tard ») **sortent du radar** — ils vivent
+dans la Préparation / le planning. Suppression du « Voir tout (N) » ; s'il reste des
+blocages au-delà de 3, un simple pointeur « + N à traiter → Préparation » (Art. 10 :
+rien ne tombe). (2) Message d'avenant **raccourci** et orienté action (« Avenant n°1
+— à répercuter sur le planning et les commandes. ») : les chiffres sont déjà dans le
+badge +ajoutées/~modifiées (fin du doublon). (3) Bouton d'action « Ouvrir » passé de
+ghost gris à **contour** lisible.
+**Pourquoi :** un radar montre ce qui mérite l'attention _maintenant_, pas « toutes
+les choses possibles ». Lisible en < 10 s.
+**Alternatives rejetées :** garder les items `info` repliés derrière « Voir tout »
+(validé par le PO pour suppression) ; retirer la décision du Journal pour éviter le
+doublon (le radar est une LOUPE de triage, le Journal le registre — le recoupement
+est voulu, on ne touche pas au Journal).
+**Impact :** `AttentionPanel` (présentation + tri), `describeAvenantImpact` (core,
+message court — ne sert que le radar). Sélecteur déterministe inchangé, **rien
+d'inventé**, **client-safe** vérifié (le radar est interne, jamais côté client).
+Nouveau `attention.test.mjs` 8/8. VISION Art. 3, 7, 10, 11.
