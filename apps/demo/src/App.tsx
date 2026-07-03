@@ -10,8 +10,17 @@ import {
   EmptyState,
   SegmentedControl,
 } from '@phenix360/ui';
-import { Building2, Eye, PlusCircle, RotateCcw, Settings2, Sparkles } from 'lucide-react';
-import { projectId } from '@phenix360/core';
+import {
+  Building2,
+  Eye,
+  HardHat,
+  Pencil,
+  PlusCircle,
+  RotateCcw,
+  Settings2,
+  Sparkles,
+} from 'lucide-react';
+import { projectId, type ProjectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { PointDuSoirView } from './surfaces/PointDuSoirView';
@@ -20,6 +29,9 @@ import { ArtisanView } from './surfaces/ArtisanView';
 import { ClientView } from './surfaces/ClientView';
 import { PhenixStart } from './start/PhenixStart';
 import { Welcome } from './start/Welcome';
+import { ChantierForm, type ChantierValues } from './start/ChantierForm';
+
+type ChantierFormState = { mode: 'create' } | { mode: 'edit'; projectId: ProjectId } | null;
 
 type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'artisan' | 'client';
 
@@ -35,6 +47,7 @@ export function App(): React.JSX.Element {
   const [view, setView] = useState<ViewMode>('aujourdhui');
   const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState(false);
+  const [chantierForm, setChantierForm] = useState<ChantierFormState>(null);
 
   // Tout premier lancement : on propose un choix (démo / à vide) au lieu de
   // forcer la démo. Rien d'autre ne s'affiche tant que le choix n'est pas fait.
@@ -57,6 +70,30 @@ export function App(): React.JSX.Element {
           : view === 'client'
             ? { label: 'Aperçu client', name: activeProject.name, preview: true }
             : null;
+
+  const editProject =
+    chantierForm?.mode === 'edit'
+      ? (snap.projects.find((p) => p.id === chantierForm.projectId) ?? null)
+      : null;
+  const editInitial: Partial<ChantierValues> | undefined = editProject
+    ? {
+        name: editProject.name,
+        clientName: editProject.clientId ? (snap.people[editProject.clientId] ?? '') : '',
+        address: editProject.address ?? '',
+        startStep: editProject.currentStep ?? 'gros_oeuvre',
+      }
+    : undefined;
+
+  const submitChantier = async (values: ChantierValues): Promise<void> => {
+    if (!chantierForm) return;
+    if (chantierForm.mode === 'create') {
+      await demo.createChantier(values);
+      setView('compagnon');
+    } else {
+      await demo.updateChantier(chantierForm.projectId, values);
+    }
+    setChantierForm(null);
+  };
 
   return (
     <div className="min-h-screen">
@@ -107,7 +144,7 @@ export function App(): React.JSX.Element {
           />
         ) : view === 'aujourdhui' ? (
           snap.projects.length === 0 ? (
-            <NoProject onNew={() => setCreating(true)} />
+            <NoProject onNew={() => setChantierForm({ mode: 'create' })} />
           ) : (
             <AujourdhuiView
               snap={snap}
@@ -133,12 +170,31 @@ export function App(): React.JSX.Element {
 
       <ManageDialog
         open={managing}
+        canEdit={activeProject !== null}
         onClose={() => setManaging(false)}
-        onNewProject={() => {
+        onNewChantier={() => {
+          setManaging(false);
+          setChantierForm({ mode: 'create' });
+        }}
+        onEditChantier={() => {
+          if (!activeProject) return;
+          setManaging(false);
+          setChantierForm({ mode: 'edit', projectId: activeProject.id });
+        }}
+        onGuided={() => {
           setManaging(false);
           setCreating(true);
         }}
       />
+
+      {chantierForm && (
+        <ChantierForm
+          mode={chantierForm.mode}
+          initial={editInitial}
+          onSubmit={submitChantier}
+          onClose={() => setChantierForm(null)}
+        />
+      )}
     </div>
   );
 }
@@ -147,12 +203,14 @@ function NoProject({ onNew }: { onNew: () => void }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-xl py-10">
       <EmptyState
-        icon={<Sparkles aria-hidden />}
-        title="Aucun projet pour l'instant"
-        description="Déposez un dossier et laissez PHÉNIX préparer le chantier, ou rechargez le projet de démonstration."
+        icon={<HardHat aria-hidden />}
+        title="Aucun chantier pour l'instant"
+        description="Créez votre premier chantier — nom, client, adresse — et commencez à le suivre. Ou rechargez le chantier de démonstration pour explorer."
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={onNew}>Nouveau projet</Button>
+            <Button onClick={onNew}>
+              <HardHat aria-hidden /> Créer un chantier
+            </Button>
             <Button variant="outline" onClick={() => demo.loadDemo()}>
               Charger la démonstration
             </Button>
@@ -165,12 +223,18 @@ function NoProject({ onNew }: { onNew: () => void }): React.JSX.Element {
 
 function ManageDialog({
   open,
+  canEdit,
   onClose,
-  onNewProject,
+  onNewChantier,
+  onEditChantier,
+  onGuided,
 }: {
   open: boolean;
+  canEdit: boolean;
   onClose: () => void;
-  onNewProject: () => void;
+  onNewChantier: () => void;
+  onEditChantier: () => void;
+  onGuided: () => void;
 }): React.JSX.Element {
   const snap = useDemo();
   return (
@@ -178,12 +242,12 @@ function ManageDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Gérer</DialogTitle>
-          <DialogDescription>Projets et données de démonstration.</DialogDescription>
+          <DialogDescription>Vos chantiers et les données de démonstration.</DialogDescription>
         </DialogHeader>
 
         {snap.projects.length > 1 && (
           <label className="flex flex-col gap-1.5 text-sm">
-            <span className="text-muted-foreground">Projet actif</span>
+            <span className="text-muted-foreground">Chantier actif</span>
             <select
               value={snap.activeProjectId ?? ''}
               onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
@@ -199,13 +263,27 @@ function ManageDialog({
         )}
 
         <div className="grid gap-2">
-          <Button variant="outline" className="justify-start" onClick={onNewProject}>
+          <Button variant="outline" className="justify-start" onClick={onNewChantier}>
+            <HardHat aria-hidden />
+            Nouveau chantier
+          </Button>
+          {canEdit && (
+            <Button variant="outline" className="justify-start" onClick={onEditChantier}>
+              <Pencil aria-hidden />
+              Modifier le chantier actif
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            className="justify-start text-muted-foreground"
+            onClick={onGuided}
+          >
             <PlusCircle aria-hidden />
-            Nouveau projet
+            Parcours guidé (déposer un dossier)
           </Button>
           <Button
-            variant="outline"
-            className="justify-start"
+            variant="ghost"
+            className="justify-start text-muted-foreground"
             onClick={() => {
               demo.loadDemo();
               onClose();

@@ -1,5 +1,6 @@
 import { PROJECT_STATUS_LABEL, PROJECT_STEP_LABEL, type Project } from '@phenix360/core';
 import { Badge, cn } from '@phenix360/ui';
+import { MapPin } from 'lucide-react';
 
 /**
  * Le projet est le HÉROS de l'écran : grand titre éditorial, client, et l'état
@@ -28,6 +29,12 @@ export function ProjectHero({
           {project.name}
         </h1>
         <p className="text-sm text-muted-foreground">{clientName}</p>
+        {project.address && (
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+            <MapPin aria-hidden />
+            {project.address}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Badge variant="neutral">{PROJECT_STATUS_LABEL[project.status]}</Badge>

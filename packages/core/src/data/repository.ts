@@ -15,7 +15,7 @@ import type {
   EventType,
   EventVisibility,
 } from '../event.js';
-import type { Project, ProjectMember, ProjectStatus } from '../project.js';
+import type { Project, ProjectMember, ProjectStatus, ProjectStep } from '../project.js';
 
 /* -------------------------------------------------------------------------- *
  * Projets & membres
@@ -24,11 +24,17 @@ export interface NewProject {
   name: string;
   clientId?: UserId | null;
   status?: ProjectStatus;
+  /** Adresse du chantier (saisie à la création d'un chantier réel). */
+  address?: string;
+  /** Étape de départ (sinon dérivée des comptes rendus, `null` au début). */
+  currentStep?: ProjectStep | null;
 }
 
 export interface ProjectPatch {
   name?: string;
   status?: ProjectStatus;
+  address?: string;
+  currentStep?: ProjectStep | null;
 }
 
 export interface NewMember {

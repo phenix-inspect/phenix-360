@@ -52,6 +52,7 @@ import {
   type ProjectDossier,
   type ProjectId,
   type ProjectPatch,
+  type ProjectStep,
   type ProjectProposal,
   type ProjectZone,
   type UploadedMedia,
@@ -384,6 +385,65 @@ export const demo = {
     refresh();
     broadcast();
     return project.id;
+  },
+
+  /**
+   * Crée un CHANTIER RÉEL à la main (Lot 2 — App réelle locale) : nom, client,
+   * adresse, étape de départ. Pas de dossier de démo, pas de tunnel — un vrai
+   * chantier vide, prêt à recevoir comptes rendus / photos / réserves. On atterrit
+   * directement dedans (projet actif). VISION Art. 2.
+   */
+  async createChantier(input: {
+    name: string;
+    clientName?: string;
+    address?: string;
+    startStep?: ProjectStep;
+  }): Promise<ProjectId> {
+    const name = input.name.trim();
+    const clientId = toUserId(crypto.randomUUID());
+    const compaId = toUserId(crypto.randomUUID());
+    const address = input.address?.trim();
+    const project = await backend.createProject({
+      name,
+      status: 'en_cours',
+      clientId,
+      ...(address ? { address } : {}),
+      ...(input.startStep ? { currentStep: input.startStep } : {}),
+    });
+    await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
+    await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
+
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    people[compaId] = 'Mickaël';
+    people[clientId] = input.clientName?.trim() || 'Client';
+    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
+    refresh();
+    broadcast();
+    return project.id;
+  },
+
+  /** Modifie les infos d'un chantier réel (nom, client, adresse, étape). */
+  async updateChantier(
+    projectId: ProjectId,
+    input: { name?: string; clientName?: string; address?: string; startStep?: ProjectStep },
+  ): Promise<void> {
+    const patch: ProjectPatch = {};
+    if (input.name !== undefined) patch.name = input.name.trim();
+    if (input.address !== undefined) patch.address = input.address.trim();
+    if (input.startStep !== undefined) patch.currentStep = input.startStep;
+    if (Object.keys(patch).length > 0) await backend.updateProject(projectId, patch);
+
+    if (input.clientName !== undefined) {
+      const clientId = snapshot.projects.find((p) => p.id === projectId)?.clientId;
+      if (clientId) {
+        const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+        people[clientId] = input.clientName.trim() || 'Client';
+        localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+      }
+    }
+    refresh();
+    broadcast();
   },
 
   /** Met à jour le dossier préparé d'un projet (éditions ultérieures). */

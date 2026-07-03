@@ -76,8 +76,9 @@ export class InMemoryBackend implements Backend {
       id: toProjectId(uuid()),
       name: input.name,
       clientId: input.clientId ?? null,
+      ...(input.address !== undefined ? { address: input.address } : {}),
       status: input.status ?? 'en_preparation',
-      currentStep: null,
+      currentStep: input.currentStep ?? null,
       createdAt: now(),
     };
     state.projects.push(project);
@@ -99,6 +100,8 @@ export class InMemoryBackend implements Backend {
     if (!project) throw new Error(`Projet introuvable : ${id}`);
     if (patch.name !== undefined) project.name = patch.name;
     if (patch.status !== undefined) project.status = patch.status;
+    if (patch.address !== undefined) project.address = patch.address;
+    if (patch.currentStep !== undefined) project.currentStep = patch.currentStep;
     this.write(state);
     return project;
   }
@@ -176,6 +179,8 @@ export class InMemoryBackend implements Backend {
     const project = state.projects.find((p) => p.id === projectId);
     if (!project) return;
     const events = state.events.filter((e) => e.projectId === projectId);
-    project.currentStep = currentStep(events);
+    // Un chantier ne « recule » jamais : si aucun compte rendu ne fixe encore
+    // l'étape, on conserve l'étape de départ saisie à la création.
+    project.currentStep = currentStep(events) ?? project.currentStep;
   }
 }

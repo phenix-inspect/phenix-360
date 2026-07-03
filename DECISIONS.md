@@ -293,3 +293,27 @@ inchangée. `reel.test.mjs` 7/7 (bienvenue, à vide, persistance, démo via CTA 
 bienvenue, repartir de zéro). Premier lot du sprint « App réelle locale » (suite :
 création/édition de chantier réel, export/import local, vrais fichiers). VISION
 Art. 2, 11.
+
+## 03/07/2026 — App réelle locale · Lot 2 : création/édition d'un chantier réel
+
+**Décision :** on peut créer son propre chantier **à la main**, sans démo et sans
+tunnel : un petit formulaire premium (`ChantierForm`, Dialog) — **nom, client,
+adresse, étape de départ** — crée un vrai chantier vide via les ports
+`createProject`/`addMember` et on **atterrit directement dedans**. Les infos sont
+**modifiables** ensuite (même formulaire pré-rempli, « Modifier le chantier actif »
+dans Gérer). Compatible Aujourd'hui / Chantier / Espace client sans dossier de prep.
+**Ajouts modèle (core, minimes) :** `Project.address?`, `NewProject`/`ProjectPatch`
+acceptent `address` et `currentStep` (étape de départ). Le cache d'avancement ne
+« recule » plus : `refreshCurrentStep` conserve l'étape saisie tant qu'aucun compte
+rendu ne la fixe (`currentStep(events) ?? project.currentStep`).
+**Pourquoi :** rendre PHÉNIX utilisable pour de vrai — « je veux créer mes chantiers,
+pas regarder une démo ». Simple et rapide, pas d'onboarding.
+**Alternatives rejetées :** détourner `PhenixStart` (le flux guidé « dépose un
+dossier ») pour la création simple (trop lourd — il reste dispo en « Parcours
+guidé ») ; stocker l'adresse dans un dossier minimal (déclencherait un cockpit de
+préparation inutile pour un chantier vide).
+**Impact :** `store.createChantier`/`updateChantier` ; `ChantierForm` ; `App`
+(entrées « Créer un chantier » / « Modifier », `NoProject` recadré chantier) ;
+`ProjectHero` affiche l'adresse. Persistance localStorage inchangée, reset OK,
+**aucune régression démo**. `chantier.test.mjs` 10/10 (créer, atterrir, éditer,
+persistance, reset, démo intacte, multi-vues). VISION Art. 2, 11.

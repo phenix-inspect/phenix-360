@@ -48,6 +48,8 @@ export interface Project {
   name: string;
   /** Client propriétaire — V1 : un client = un chantier. */
   clientId: UserId | null;
+  /** Adresse du chantier (facultative, saisie à la création). */
+  address?: string;
   /** Statut de vie du projet (saisi). */
   status: ProjectStatus;
   /** Cache dérivé du dernier compte_rendu publié (jamais saisi à la main). */
