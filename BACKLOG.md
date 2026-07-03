@@ -183,6 +183,12 @@ Aujourd'hui : dossier saisi/seedé. VISION Art. 7.
 
 ## Fondations techniques (transverses, pré-requis bêta)
 
+- **App réelle locale** _(sprint en cours)_ : rendre PHÉNIX réellement utilisable en
+  local, pas seulement en démo. **Lot 1 livré** : la démo devient un **choix** au
+  premier lancement (écran `Welcome` : « Découvrir la démo » / « Démarrer à vide »),
+  plus d'auto-chargement imposé (`reel.test.mjs` 7/7). **Suite** : création/édition
+  de chantier réel, export/import local (`.json`), vrais fichiers (photos/PDF en
+  base64 local). Pas de mise en ligne, pas d'auth, pas de Supabase.
 - **Persistance & backend réel** : aujourd'hui `localStorage` + backend en mémoire
   (mono-poste, mono-conducteur). Pré-requis d'une bêta multi-utilisateur → lié à
   EPIC 14/15/16. Décision d'architecture à tracer dans `DECISIONS.md` avant de coder.

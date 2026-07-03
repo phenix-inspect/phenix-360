@@ -272,3 +272,24 @@ est voulu, on ne touche pas au Journal).
 message court — ne sert que le radar). Sélecteur déterministe inchangé, **rien
 d'inventé**, **client-safe** vérifié (le radar est interne, jamais côté client).
 Nouveau `attention.test.mjs` 8/8. VISION Art. 3, 7, 10, 11.
+
+## 03/07/2026 — App réelle locale · Lot 1 : la démo devient un choix
+
+**Décision :** au tout premier lancement, PHÉNIX n'impose plus le chantier de
+démonstration. Un **écran de bienvenue** propose deux voies : **« Découvrir la
+démonstration »** (charge un chantier complet) ou **« Démarrer à vide »** (espace
+de travail propre, prêt pour de vrais chantiers). Le choix se fait une fois
+(marqueur `SEEDED_KEY`) ; « Recharger la démo » et « Repartir de zéro » restent
+disponibles à tout moment.
+**Pourquoi :** l'objectif passe de « regarder une démo » à « utiliser PHÉNIX pour
+de vrai ». La 1ʳᵉ étape est de pouvoir démarrer sur un espace vierge, sans données
+de démo à effacer.
+**Alternatives rejetées :** garder l'auto-chargement de la démo (impose la démo) ;
+un simple bouton « vider » sans écran de choix (moins clair au premier contact).
+**Impact :** `store.ts` — `snapshot.seeded`, `startBlank()`, `clearWorkspace()`
+factorisé ; suppression de l'auto-seed. `App.tsx` rend `Welcome` tant que
+`!seeded`. Présentation seule, aucune logique métier, persistance localStorage
+inchangée. `reel.test.mjs` 7/7 (bienvenue, à vide, persistance, démo via CTA et via
+bienvenue, repartir de zéro). Premier lot du sprint « App réelle locale » (suite :
+création/édition de chantier réel, export/import local, vrais fichiers). VISION
+Art. 2, 11.

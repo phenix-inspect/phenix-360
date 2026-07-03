@@ -150,6 +150,12 @@ export interface DemoSnapshot extends BackendState {
   filTarget: { momentId: string; photoId?: string } | null;
   /** Cible transitoire : navigation PHÉNIX dans l'Espace client. */
   clientTarget: ClientTarget | null;
+  /**
+   * L'espace de travail est-il initialisé ? `false` au tout premier lancement :
+   * on propose alors un CHOIX (découvrir la démo / démarrer à vide) plutôt que
+   * d'imposer la démo. Passe à `true` dès qu'un choix est fait.
+   */
+  seeded: boolean;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -181,7 +187,29 @@ function build(): DemoSnapshot {
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
     filTarget,
     clientTarget,
+    seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
   };
+}
+
+/** Vide TOUT l'espace de travail (toutes les clés) et le marque initialisé. */
+function clearWorkspace(): void {
+  for (const key of [
+    STATE_KEY,
+    PEOPLE_KEY,
+    ACTIVE_KEY,
+    DOSSIERS_KEY,
+    PINS_KEY,
+    FIL_MOMENTS_KEY,
+    FIL_COUPS_KEY,
+    FIL_MESSAGES_KEY,
+    FIL_ZONES_KEY,
+    FIL_ANNOTATIONS_KEY,
+    PHENIX_CONV_KEY,
+    SHARES_KEY,
+  ]) {
+    localStorage.removeItem(key);
+  }
+  localStorage.setItem(SEEDED_KEY, '1');
 }
 
 function refresh(): void {
@@ -1068,28 +1096,25 @@ export const demo = {
 
   /** Repart de zéro (états vides élégants) — sans réamorcer la démo. */
   reset(): void {
-    localStorage.removeItem(STATE_KEY);
-    localStorage.removeItem(PEOPLE_KEY);
-    localStorage.removeItem(ACTIVE_KEY);
-    localStorage.removeItem(DOSSIERS_KEY);
-    localStorage.removeItem(PINS_KEY);
-    localStorage.removeItem(FIL_MOMENTS_KEY);
-    localStorage.removeItem(FIL_COUPS_KEY);
-    localStorage.removeItem(FIL_MESSAGES_KEY);
-    localStorage.removeItem(FIL_ZONES_KEY);
-    localStorage.removeItem(FIL_ANNOTATIONS_KEY);
-    localStorage.removeItem(PHENIX_CONV_KEY);
-    localStorage.removeItem(SHARES_KEY);
-    localStorage.setItem(SEEDED_KEY, '1');
+    clearWorkspace();
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Démarrer à vide au premier lancement : un espace de travail propre, prêt
+   * pour de VRAIS chantiers (pas la démo). Marque l'espace initialisé.
+   */
+  startBlank(): void {
+    clearWorkspace();
     refresh();
     broadcast();
   },
 };
 
-// Premier chargement : on amorce le chantier de démonstration une seule fois.
-if (typeof localStorage !== 'undefined' && localStorage.getItem(SEEDED_KEY) === null) {
-  demo.loadDemo();
-}
+// Au tout premier lancement, on N'IMPOSE PAS la démo : l'application propose un
+// choix (découvrir la démo / démarrer à vide). Le marqueur `SEEDED_KEY` reste
+// donc absent tant qu'aucun choix n'a été fait (cf. `snapshot.seeded`).
 
 export function useDemo(): DemoSnapshot {
   return useSyncExternalStore(demo.subscribe, demo.getSnapshot, demo.getSnapshot);

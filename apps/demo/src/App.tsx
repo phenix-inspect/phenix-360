@@ -19,6 +19,7 @@ import { CompagnonView } from './surfaces/CompagnonView';
 import { ArtisanView } from './surfaces/ArtisanView';
 import { ClientView } from './surfaces/ClientView';
 import { PhenixStart } from './start/PhenixStart';
+import { Welcome } from './start/Welcome';
 
 type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'artisan' | 'client';
 
@@ -34,6 +35,12 @@ export function App(): React.JSX.Element {
   const [view, setView] = useState<ViewMode>('aujourdhui');
   const [creating, setCreating] = useState(false);
   const [managing, setManaging] = useState(false);
+
+  // Tout premier lancement : on propose un choix (démo / à vide) au lieu de
+  // forcer la démo. Rien d'autre ne s'affiche tant que le choix n'est pas fait.
+  if (!snap.seeded) {
+    return <Welcome onDemo={() => demo.loadDemo()} onBlank={() => demo.startBlank()} />;
+  }
 
   const activeProject =
     snap.projects.find((p) => p.id === snap.activeProjectId) ?? snap.projects[0] ?? null;
