@@ -25,7 +25,7 @@ import {
   choixClientValides,
   coupDeCoeurId as toCoupId,
   decisionVisibility,
-  mockAnalyzeDossier,
+  realAnalyzeDossier,
   type AnalyzeInput,
   type DossierAnalyzer,
   filPhotoId as toFilPhotoId,
@@ -259,10 +259,10 @@ const listeners = new Set<() => void>();
 let filTarget: { momentId: string; photoId?: string } | null = null;
 let momentFocus: MomentFocus | null = null;
 let clientTarget: ClientTarget | null = null;
-// PORT D'ANALYSE (unique) — la simulation déterministe `mockAnalyzeDossier`
-// aujourd'hui, un vrai LLM demain via `setDossierAnalyzer`, SANS toucher aux
-// écrans : toute l'app passe par `demo.analyzeDossier`.
-let dossierAnalyzer: DossierAnalyzer = mockAnalyzeDossier;
+// PORT D'ANALYSE (unique) — LECTURE RÉELLE du devis (`realAnalyzeDossier`) :
+// PHÉNIX lit le texte réellement extrait des PDF, sans rien inventer. Un vrai
+// LLM/OCR pourra le remplacer via `setDossierAnalyzer`, SANS toucher aux écrans.
+let dossierAnalyzer: DossierAnalyzer = realAnalyzeDossier;
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {

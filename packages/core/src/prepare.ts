@@ -34,6 +34,12 @@ import {
   type Devis,
 } from './devis.js';
 import {
+  MIN_READABLE_CHARS,
+  buildDevisExtraction,
+  extractDevisFields,
+  type DevisExtraction,
+} from './devis-extract.js';
+import {
   DEFAULT_CALENDAR,
   addCalendarDays,
   businessToCalendarDays,
@@ -556,6 +562,12 @@ export interface ProjectDossier {
 export interface ProjectProposal {
   projectName: string;
   dossier: ProjectDossier;
+  /**
+   * Compte rendu de la LECTURE RÉELLE du devis (ce qui a été extrait, ce qui
+   * manque, confiance). Présent dès qu'un document a été analysé ; absent en
+   * création rapide. Transitoire (affiché à la préparation), non persisté.
+   */
+  extraction?: DevisExtraction;
 }
 
 /** Étapes scénarisées de l'écran d'analyse (présentation). */
@@ -1890,17 +1902,124 @@ export function buildPreparation(
 }
 
 /* -------------------------------------------------------------------------- *
- * Port d'analyse + implémentation MOCK (scénarisée)
+ * Port d'analyse : lecture RÉELLE (défaut) + MOCK scénarisé (référence)
  * -------------------------------------------------------------------------- */
+/** Un fichier déposé, avec le texte réellement extrait quand c'est un PDF lisible. */
+export interface AnalyzeFile {
+  name: string;
+  /** Texte extrait du document (PDF lisible). Absent si non extractible. */
+  text?: string;
+  /** PDF déposé dont AUCUN texte n'a pu être extrait (probable scan/image). */
+  imagePdf?: boolean;
+}
+
 export interface AnalyzeInput {
-  /** Fichiers déposés (on n'utilise que le nom dans la démo). */
-  files: { name: string }[];
+  files: AnalyzeFile[];
 }
 
 export type DossierAnalyzer = (input: AnalyzeInput) => ProjectProposal | Promise<ProjectProposal>;
 
 const has = (files: { name: string }[], needle: string): boolean =>
   files.some((f) => f.name.toLowerCase().includes(needle));
+
+const isPdfName = (name: string): boolean => /\.pdf$/i.test(name);
+
+/** Un document du dossier, dérivé d'un fichier réellement déposé (jamais inventé). */
+function documentFromFile(name: string, i: number): ProjectDocument {
+  const n = name.toLowerCase();
+  const map: { re: RegExp; label: string; categorie: PrepDocCategory }[] = [
+    { re: /devis/, label: 'Devis signé', categorie: 'devis' },
+    { re: /acompte/, label: 'Acompte versé', categorie: 'autre' },
+    { re: /plan/, label: 'Plans', categorie: 'plan' },
+    { re: /dpe/, label: 'DPE', categorie: 'dpe' },
+    { re: /diag|amiante|plomb/, label: 'Diagnostics', categorie: 'diagnostic' },
+    { re: /assurance/, label: "Attestation d'assurance", categorie: 'assurance' },
+    { re: /contrat/, label: 'Contrat', categorie: 'contrat' },
+  ];
+  const hit = map.find((m) => m.re.test(n));
+  return {
+    id: `doc-file-${i}`,
+    label: hit?.label ?? name,
+    status: 'fourni',
+    categorie: hit?.categorie ?? 'autre',
+    recommande: hit?.categorie === 'devis',
+  };
+}
+
+/**
+ * LECTURE RÉELLE du devis (analyseur par défaut). PHÉNIX lit le TEXTE réellement
+ * extrait des documents (l'extraction binaire PDF→texte se fait côté app) et en
+ * tire les informations exploitables — sans jamais inventer. Deux issues :
+ *  • aucun texte exploitable alors que des PDF ont été déposés → devis probablement
+ *    scanné/image : on le DIT (extraction.imageOnly), rien n'est fabriqué ;
+ *  • du texte lisible → on extrait client, adresse, montant, date, prestations,
+ *    pièces, matériaux, délais, paiement, émetteur, et on bâtit un dossier à
+ *    partir du RÉEL (feuille de route dérivée des lots réellement détectés).
+ * Un LLM/OCR pourra remplacer l'extraction derrière la même signature.
+ */
+export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
+  const documents = files.map((f, i) => documentFromFile(f.name, i));
+  const sources = files.map((f) => f.name);
+  const fullText = files
+    .map((f) => f.text ?? '')
+    .join('\n')
+    .trim();
+  const chars = fullText.replace(/\s+/g, ' ').trim().length;
+  const hasPdf = files.some((f) => isPdfName(f.name) || f.imagePdf);
+  const readable = chars >= MIN_READABLE_CHARS;
+
+  const baseDossier = (extra: Partial<ProjectDossier>): ProjectDossier => ({
+    infos: {},
+    roadmap: [],
+    planning: [],
+    orders: [],
+    selections: [],
+    documents,
+    questions: [],
+    sources,
+    createdAt: new Date().toISOString(),
+    ...extra,
+  });
+
+  // Aucun texte exploitable mais des PDF déposés → probable scan/image.
+  if (!readable && hasPdf) {
+    return {
+      projectName: 'Nouveau chantier',
+      dossier: baseDossier({}),
+      extraction: buildDevisExtraction({ prestations: [], pieces: [], materiaux: [] }, chars, true),
+    };
+  }
+
+  const fields = extractDevisFields(fullText);
+  const infos: ProjectInfos = {};
+  if (fields.clientName) infos.clientName = fields.clientName;
+  if (fields.address) infos.address = fields.address;
+  if (fields.phone) infos.phone = fields.phone;
+  if (fields.email) infos.email = fields.email;
+  const montant = fields.montantTTC ?? fields.montantHT;
+  if (montant != null) infos.budget = montant;
+  const duree = fields.delais?.match(/(\d+\s*(?:semaines?|mois|jours?|ans?))/i);
+  if (duree) infos.duration = duree[1];
+
+  // Feuille de route DÉRIVÉE des lots réellement détectés (jamais inventée).
+  const roadmap: RoadmapStep[] = fields.prestations.map((label, i) => ({
+    id: `step-${i + 1}`,
+    label,
+  }));
+
+  const city = fields.address?.match(/\d{5}\s+([A-Za-zÀ-ÿ'’ \-]{2,30})/)?.[1]?.trim();
+  const projectName = fields.clientName
+    ? `Chantier ${fields.clientName}`
+    : city
+      ? `Chantier ${city}`
+      : 'Nouveau chantier';
+
+  return {
+    projectName,
+    dossier: baseDossier({ infos, roadmap }),
+    extraction: buildDevisExtraction(fields, chars, false),
+  };
+};
 
 /**
  * Analyse SCÉNARISÉE : renvoie un dossier riche et crédible. L'état de certains

@@ -230,6 +230,28 @@ Rien d'inventé : la ville est DÉRIVÉE de l'adresse (jamais de valeur creuse s
 l'adresse manque), le client vient du carnet, l'urgence relit les mêmes compteurs
 que le matin. Dette réglée au passage : l'adresse du chantier principal ne vivait
 que dans le dossier — on la porte aussi sur le projet pour que la ville se dérive.
+
+04/07 — bloquant · « PHÉNIX ne lit pas vraiment mon devis »
+Fait : en déposant un vrai devis, le conducteur voit un dossier riche… mais
+FABRIQUÉ (Maison Dubois), sans rapport avec son PDF. L'analyse ne lisait que le
+NOM du fichier et rejouait un scénario. Rupture de confiance : « si ça invente
+ici, où d'autre ça invente ? »
+Lecture produit : on remplace la SIMULATION par une LECTURE RÉELLE, dans le port
+d'analyse existant (pas de nouvel écran, pas de nouveau concept). L'extraction
+texte du PDF est 100 % locale (aucun réseau, aucune dépendance : flux de contenu
++ décompression FlateDecode via l'API navigateur `DecompressionStream`) ; un
+module pur `extractDevisFields` en tire, par motifs déterministes, le client,
+l'adresse, le montant (HT/TTC), la date, les prestations/lots, les pièces, les
+matériaux, les délais, l'acompte et l'entreprise émettrice. RÈGLE D'OR : ne jamais
+inventer — un champ non trouvé reste « non détecté », et un PDF scanné (sans
+couche texte) est annoncé clairement (« Ce devis semble être une image. Je ne peux
+pas encore le lire automatiquement. »). L'écran « PHÉNIX prépare » gagne une carte
+« Lecture réelle du devis » (détecté / non détecté / indice de confiance). La
+feuille de route est DÉRIVÉE des lots réellement lus ; commandes et choix restent
+vides tant qu'on ne peut pas les extraire honnêtement (ce sera le rôle du LLM, à
+brancher derrière le même port `setDossierAnalyzer`, sans toucher aux écrans). On
+échange donc une démo « riche mais fausse » contre une lecture « juste, parfois
+partielle » — la confiance prime.
 ```
 
 ---

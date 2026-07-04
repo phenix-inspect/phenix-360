@@ -3,6 +3,7 @@ import { BrandLockup, Button, Input } from '@phenix360/ui';
 import {
   PREPARATION_STAGES,
   buildDossierSummary,
+  type DevisExtraction,
   type ProjectProposal,
   type UploadedMedia,
 } from '@phenix360/core';
@@ -10,12 +11,14 @@ import {
   ArrowRight,
   CalendarRange,
   CheckCircle2,
+  FileSearch,
   FileText,
   Image as ImageIcon,
   Loader2,
   MapPin,
   Package,
   Palette,
+  ScanLine,
   Sparkles,
   TriangleAlert,
   UploadCloud,
@@ -24,6 +27,7 @@ import {
 } from 'lucide-react';
 import { demo } from '../store';
 import { mediaUploader } from '../lib/media';
+import { extractPdfText } from '../lib/pdf';
 import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
 
@@ -31,6 +35,8 @@ type Phase = 'drop' | 'analysis' | 'synthesis' | 'review';
 interface Dropped {
   id: string;
   name: string;
+  /** Fichier brut conservé (pour lire réellement le texte des PDF). */
+  file?: File;
   /** Média prêt (photo) — matérialisé en « Avant travaux » à la création. */
   media?: UploadedMedia;
 }
@@ -60,7 +66,17 @@ export function PhenixStart({
     files.map((f) => f.media).filter((m): m is UploadedMedia => m != null);
 
   const prepare = async (): Promise<void> => {
-    const result = await demo.analyzeDossier({ files: files.map((f) => ({ name: f.name })) });
+    // Lecture RÉELLE : on extrait le texte des PDF déposés (local, sans réseau).
+    // Un PDF sans texte exploitable est signalé comme image (imagePdf).
+    const analyzed = await Promise.all(
+      files.map(async (f) => {
+        const isPdf = /\.pdf$/i.test(f.name);
+        if (!isPdf || !f.file) return { name: f.name };
+        const { text, readable } = await extractPdfText(f.file);
+        return readable ? { name: f.name, text } : { name: f.name, imagePdf: true };
+      }),
+    );
+    const result = await demo.analyzeDossier({ files: analyzed });
     setProposal(name.trim() ? { ...result, projectName: name.trim() } : result);
     setPhase('analysis');
   };
@@ -152,7 +168,7 @@ function NewChantierScreen({
     if (!list) return;
     for (const file of Array.from(list)) {
       const id = crypto.randomUUID();
-      setFiles((prev) => [...prev, { id, name: file.name }]);
+      setFiles((prev) => [...prev, { id, name: file.name, file }]);
       if (file.type.startsWith('image/')) {
         void mediaUploader(file).then((media) =>
           setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, media } : f))),
@@ -440,6 +456,8 @@ function SynthesisScreen({
         </p>
       </header>
 
+      {proposal.extraction && <DevisReadingCard extraction={proposal.extraction} />}
+
       <div className="grid gap-3 sm:grid-cols-2">
         <SynthCard icon={<User aria-hidden />} title="Le client">
           <SynthLine strong={infos.clientName ?? 'À préciser'} />
@@ -454,23 +472,32 @@ function SynthesisScreen({
           )}
         </SynthCard>
 
-        <SynthCard icon={<CalendarRange aria-hidden />} title="Le planning">
-          <SynthLine strong={`${s.steps} étapes`} />
-          <SynthLine
-            muted={`Annoncée ${s.announcedLabel ?? 'à préciser'} · estimée ${fmtDuree(s.estimatedDays)}`}
-            warn={s.durationRisk}
-          />
-        </SynthCard>
+        {s.steps > 0 && (
+          <SynthCard icon={<CalendarRange aria-hidden />} title="Le planning">
+            <SynthLine strong={`${s.steps} étapes`} />
+            <SynthLine
+              muted={`Annoncée ${s.announcedLabel ?? 'à préciser'} · estimée ${fmtDuree(s.estimatedDays)}`}
+              warn={s.durationRisk}
+            />
+          </SynthCard>
+        )}
 
-        <SynthCard icon={<Package aria-hidden />} title="Les commandes">
-          <SynthLine strong={`${d.orders.length} commandes`} />
-          <SynthLine muted={`${s.criticalOrders} au délai critique`} warn={s.criticalOrders > 0} />
-          {fournisseurs.length > 0 && <SynthLine muted={fournisseurs.slice(0, 3).join(', ')} />}
-        </SynthCard>
+        {d.orders.length > 0 && (
+          <SynthCard icon={<Package aria-hidden />} title="Les commandes">
+            <SynthLine strong={`${d.orders.length} commandes`} />
+            <SynthLine
+              muted={`${s.criticalOrders} au délai critique`}
+              warn={s.criticalOrders > 0}
+            />
+            {fournisseurs.length > 0 && <SynthLine muted={fournisseurs.slice(0, 3).join(', ')} />}
+          </SynthCard>
+        )}
 
-        <SynthCard icon={<Palette aria-hidden />} title="Les décisions client">
-          <SynthLine strong={`${s.clientDecisions} à obtenir`} />
-        </SynthCard>
+        {s.clientDecisions > 0 && (
+          <SynthCard icon={<Palette aria-hidden />} title="Les décisions client">
+            <SynthLine strong={`${s.clientDecisions} à obtenir`} />
+          </SynthCard>
+        )}
 
         <SynthCard icon={<FileText aria-hidden />} title="Les documents">
           <SynthLine strong={`${docsClasses} classés`} />
@@ -498,6 +525,65 @@ function SynthesisScreen({
           Ajuster le dossier
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Le compte rendu de LECTURE RÉELLE du devis : ce que PHÉNIX a lu, ce qu'il n'a
+ * pas trouvé, sa confiance. Jamais inventé. Si le PDF est une image, il le dit.
+ */
+function DevisReadingCard({ extraction }: { extraction: DevisExtraction }): React.JSX.Element {
+  if (extraction.imageOnly)
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-gold-300 bg-gold-50 p-4">
+        <span className="mt-0.5 text-gold-700 [&_svg]:size-5">
+          <ScanLine aria-hidden />
+        </span>
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">
+            Ce devis semble être une image. Je ne peux pas encore le lire automatiquement.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Aucun texte exploitable n'a été détecté (document scanné). La lecture par OCR arrivera —
+            en attendant, vous pouvez renseigner les informations à la main.
+          </p>
+        </div>
+      </div>
+    );
+
+  return (
+    <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+          <FileSearch aria-hidden />
+          Lecture réelle du devis
+        </span>
+        <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-0.5 text-xs font-medium text-gold-800">
+          Confiance {extraction.confidence}%
+        </span>
+      </div>
+
+      {extraction.detected.length > 0 && (
+        <dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+          {extraction.detected.map((f) => (
+            <div key={f.key} className="flex flex-col">
+              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{f.label}</dt>
+              <dd className="flex items-start gap-1.5 text-sm text-foreground [&_svg]:mt-0.5 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-success">
+                <CheckCircle2 aria-hidden />
+                <span>{f.value}</span>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {extraction.missing.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          <span className="font-medium">Non détecté :</span> {extraction.missing.join(' · ')}.
+          Complétez à la main si besoin — je n'invente rien.
+        </p>
+      )}
     </div>
   );
 }
