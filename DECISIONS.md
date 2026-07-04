@@ -508,3 +508,40 @@ des Contacts (aujourd'hui : noms de responsables + intervenants).
 aujourd'hui 9/9, attention 8/8, mission 14/14, journal 9/9, artisan 8/8, moment
 13/13, stabilité 21/21. Gate (typecheck/lint/prettier/build) vert. VISION Art. 2,
 6, 7, 9, 11.
+
+## 04/07/2026 — Consolidation 2 · Documents = une bibliothèque, trois vues
+
+**Audit :** Journal et Client étaient **déjà** une seule base (événement `document`
+
+- `visibility` = la vue ; sélecteur `vault`). Le vrai doublon : la **préparation**
+  stockait ses fichiers sur `ProjectDocument.attachment` (base64) **sans créer
+  d'événement** → un document préparé restait siloté (invisible au Journal et au
+  client), et le même fichier pouvait exister en double.
+
+**Décision (choix PO « suivi d'obtention pointant vers la bibliothèque ») :** le
+`document` event du Journal (`vault`) est la **base UNIQUE des fichiers**. Déposer
+un document en préparation crée désormais un événement `document` (INTERNE par
+défaut, client-safe) ; la **checklist** du dossier ne stocke plus le fichier : elle
+suit l'obtention et **pointe** vers l'événement (`ProjectDocument.eventId`).
+Préparation / Journal / Client ne sont que des **vues** de cette base.
+
+**Effet concret :** un document préparé **remonte au Journal** (fini le silo) ;
+un fichier n'existe qu'une fois. Le verdict « prêt à démarrer » est préservé (la
+checklist garde ses statuts attendu / demandé / fourni). `ProjectDocument.attachment`
+devient **déprécié** — encore utilisé par la catégorie `photo_avant` en attendant
+la **Consolidation 3 (Photos)**, où les photos avant travaux rejoindront la base
+photo unique.
+
+**Dénormalisation assumée :** la checklist garde `label`/`categorie`/`status` à
+côté de l'`eventId` (métadonnées d'obtention) ; le fichier, lui, est unique.
+
+**Alternatives rejetées :** tout collapser dans la bibliothèque (perdrait le suivi
+des documents attendus DPE/assurance — régression de préparation) ; garder les
+fichiers sur le dossier et projeter le Journal depuis lui (viole Art. 8, journal
+source de vérité).
+
+**Impact :** core `ProjectDocument` (+`eventId`, `attachment` déprécié) ; store
+`addPrepDocument` (crée l'événement + lie la checklist) ; `PrepDocumentsSection`
+(dépôt → bibliothèque, résolution du fichier via l'événement). Gate vert
+(typecheck/lint/prettier/build). `documents.test` 5/5 (dépôt → fourni + fichier
+ouvrable, remontée au Journal, client-safe), preparation 9/9. VISION Art. 7, 8, 9.

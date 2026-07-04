@@ -449,7 +449,17 @@ export interface ProjectDocument {
   recommande?: boolean;
   /** Famille de document (devis, plan, diagnostic, DPE, assurance…). */
   categorie?: PrepDocCategory;
-  /** Vrai fichier déposé (Lot 3 : aperçu local base64). */
+  /**
+   * Fichier fourni → référence l'événement `document` du Journal (base UNIQUE des
+   * fichiers, `vault`). La checklist ne stocke plus le fichier : elle suit
+   * l'obtention et pointe vers la bibliothèque. Consolidation Documents (04/07) —
+   * le fichier remonte ainsi au Journal et (si partagé) au client.
+   */
+  eventId?: string;
+  /**
+   * DÉPRÉCIÉ pour les documents (remplacé par `eventId`). Encore utilisé par la
+   * catégorie `photo_avant`, en attendant la consolidation Photos (#3).
+   */
   attachment?: EventAttachment;
 }
 

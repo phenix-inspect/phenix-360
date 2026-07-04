@@ -12,6 +12,7 @@ import {
 import { Camera, FileText, ImagePlus, Paperclip, Plus, X } from 'lucide-react';
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
 import { DocumentLink } from '../DocumentLink';
+import { demo, useDemo } from '../../store';
 import { readDocumentAttachment, readPhotoAttachment, MAX_DOC_MB } from '../../lib/upload';
 
 const FILE_CATEGORIES = PREP_DOC_CATEGORIES.filter((c) => c !== 'photo_avant');
@@ -33,12 +34,23 @@ export function PrepDocumentsSection({
   patch: (next: Partial<ProjectDossier>) => void;
   onAskDocument: (docId: string, label: string) => void;
 }): React.JSX.Element {
+  const snap = useDemo();
   const docs = dossier.documents.filter((d) => d.categorie !== 'photo_avant');
   const [label, setLabel] = useState('');
   const [categorie, setCategorie] = useState<PrepDocCategory>('devis');
   const [pending, setPending] = useState<EventAttachment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Le fichier vit dans la BIBLIOTHÈQUE (événement `document` du Journal) : on le
+  // résout via `eventId`. Repli sur `attachment` pour d'anciennes données.
+  const fileOf = (d: ProjectDocument): EventAttachment | undefined => {
+    if (d.eventId) {
+      const ev = snap.events.find((e) => e.id === d.eventId && e.type === 'document');
+      return ev?.type === 'document' ? ev.content.attachment : undefined;
+    }
+    return d.attachment;
+  };
 
   const onPick = async (file: File | undefined): Promise<void> => {
     if (!file) return;
@@ -54,14 +66,13 @@ export function PrepDocumentsSection({
 
   const add = (): void => {
     const l = label.trim() || pending?.fileName || PREP_DOC_CATEGORY_LABEL[categorie];
-    const doc: ProjectDocument = {
-      id: crypto.randomUUID(),
+    // Le fichier rejoint la bibliothèque unique (événement Journal) ; la checklist
+    // ne fait que pointer vers lui (source unique — Consolidation Documents).
+    void demo.addPrepDocument(project.id, {
       label: l,
       categorie,
-      status: pending ? 'fourni' : 'a_fournir',
       ...(pending ? { attachment: pending } : {}),
-    };
-    patch({ documents: [...dossier.documents, doc] });
+    });
     setLabel('');
     setPending(null);
     setError(null);
@@ -93,8 +104,11 @@ export function PrepDocumentsSection({
                   </p>
                 </div>
                 <DocumentStatusBadge status={d.status} />
-                {d.attachment && <DocumentLink attachment={d.attachment} />}
-                {(d.status === 'manquant' || d.status === 'a_fournir') && !d.attachment && (
+                {(() => {
+                  const att = fileOf(d);
+                  return att ? <DocumentLink attachment={att} /> : null;
+                })()}
+                {(d.status === 'manquant' || d.status === 'a_fournir') && !fileOf(d) && (
                   <Button size="sm" variant="outline" onClick={() => onAskDocument(d.id, d.label)}>
                     Demander au client
                   </Button>

@@ -40,6 +40,7 @@ import {
   type ActionPriorite,
   type Event,
   type EventActor,
+  type EventAttachment,
   type EventId,
   type FilPhoto,
   type KeyValueStore,
@@ -54,7 +55,9 @@ import {
   type PhenixAction,
   type PhenixSource,
   type PhenixTodo,
+  type PrepDocCategory,
   type Project,
+  type ProjectDocument,
   type ProjectDossier,
   type ProjectId,
   type ProjectPatch,
@@ -689,6 +692,60 @@ export const demo = {
         ...(input.sujet ? { sujet: input.sujet } : {}),
       },
     });
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Dépose un DOCUMENT de préparation. Le FICHIER rejoint la base UNIQUE (un
+   * événement `document` du Journal = la bibliothèque `vault`), INTERNE par
+   * défaut (client-safe) ; la checklist du dossier ne fait que POINTER vers lui
+   * (`eventId`). Sans fichier, on ajoute une simple entrée « à fournir » (suivi
+   * d'obtention). Fini le silo : un document préparé remonte au Journal.
+   */
+  async addPrepDocument(
+    projectId: ProjectId,
+    input: { label: string; categorie?: PrepDocCategory; attachment?: EventAttachment },
+  ): Promise<void> {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[projectId];
+    if (!dossier) return;
+    let eventId: string | undefined;
+    if (input.attachment) {
+      const member = snapshot.members.find(
+        (m) => m.projectId === projectId && m.role === 'compagnon',
+      );
+      const uid = member?.userId ?? toUserId('compagnon-demo');
+      const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+      const actor: EventActor = {
+        userId: uid,
+        role: 'compagnon',
+        displayName: people[uid] ?? 'Mickaël',
+      };
+      const ev = await backend.appendEvent({
+        projectId,
+        actor,
+        type: 'document',
+        visibility: 'interne',
+        state: 'publie',
+        content: {
+          attachment: input.attachment,
+          libelle: input.label,
+          ...(input.categorie ? { categorie: input.categorie } : {}),
+        },
+      });
+      eventId = ev.id;
+    }
+    const doc: ProjectDocument = {
+      id: crypto.randomUUID(),
+      label: input.label,
+      ...(input.categorie ? { categorie: input.categorie } : {}),
+      status: input.attachment ? 'fourni' : 'a_fournir',
+      ...(eventId ? { eventId } : {}),
+    };
+    dossier.documents = [...dossier.documents, doc];
+    dossiers[projectId] = dossier;
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
