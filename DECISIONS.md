@@ -16,6 +16,30 @@ Impact : …
 
 ---
 
+## 🧭 Journal de terrain — RC1 (observations produit · éphémère)
+
+> **Mode RC1, hors modèle produit.** Ce journal recueille les **enseignements**
+> du terrain — ce que le conducteur fait _vraiment_ sur un vrai chantier —, pas
+> les bugs ni les décisions techniques. Il est **éphémère** : relu à la fin de
+> RC1 pour orienter les prochaines Epics, puis retiré. La référence produit reste
+> **VISION.md**.
+>
+> Grille d'observation (un fait observé, jamais une solution — la solution se
+> décide après RC1) : _le conducteur est sorti de PHÉNIX pour… · a cherché… · n'a
+> jamais utilisé… · a hésité devant…_
+>
+> Format d'une entrée :
+>
+> ```
+> JJ/MM — [sorti / cherché / jamais utilisé / hésité] · écran ou geste concerné
+> Fait : ce qui s'est passé sur le chantier.
+> Lecture produit : ce que ça suggère (sans trancher la solution).
+> ```
+
+_En attente des premières journées de chantier._
+
+---
+
 ## 03/07/2026 — EPIC 1 : un véritable espace « Préparation », éditable, sur tout chantier
 
 **Décision :** la Préparation devient un vrai bureau de préparation, disponible sur
