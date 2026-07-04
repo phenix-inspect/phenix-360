@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { Button, Card, CardContent, Input } from '@phenix360/ui';
 import type { Project, ProjectDossier, ProjectInfos } from '@phenix360/core';
-import { Contact, Pencil } from 'lucide-react';
-import { demo } from '../../store';
+import { Contact as ContactIcon, Pencil } from 'lucide-react';
+import { clientContactOf, demo, useDemo } from '../../store';
 import { fmtDateShort, fmtMoney } from '../../lib/format';
+import { ContactEditor } from '../contacts/ContactEditor';
 
 /**
- * Coordonnées & accès client (EPIC 1 — Préparation). Éditable : le conducteur
- * saisit tout ce qu'il faut pour joindre le client et situer le chantier. La
- * mise à jour synchronise le dossier ET le chantier (nom client, adresse) pour
- * que l'ensemble de l'app reste cohérent. VISION Art. 2, 11.
+ * Coordonnées & accès client (Préparation). L'identité du client (nom, tél,
+ * email, adresse) est éditée **une seule fois**, sur son CONTACT (source unique —
+ * VISION Art. 6) ; les infos du bien (type, surface, budget, durée, début) vivent
+ * sur le dossier. Plus de ressaisie, plus de doublon.
  */
 export function CoordonneesCard({
   project,
@@ -20,32 +21,38 @@ export function CoordonneesCard({
   dossier: ProjectDossier;
   patch: (next: Partial<ProjectDossier>) => void;
 }): React.JSX.Element {
-  const [editing, setEditing] = useState(false);
+  const snap = useDemo();
+  const [editingInfos, setEditingInfos] = useState(false);
+  const [editingClientId, setEditingClientId] = useState<string | null>(null);
   const i = dossier.infos;
+  const client = clientContactOf(snap, project.clientId);
 
-  if (editing) {
+  const openClient = (): void => {
+    setEditingClientId(client?.id ?? demo.ensureClientContact(project));
+  };
+
+  if (editingInfos) {
     return (
       <Editor
         infos={i}
-        onCancel={() => setEditing(false)}
+        onCancel={() => setEditingInfos(false)}
         onSave={(next) => {
           patch({ infos: { ...i, ...next } });
-          // Synchronise le chantier (nom client + adresse) avec le dossier.
-          void demo.updateChantier(project.id, {
-            ...(next.clientName !== undefined ? { clientName: next.clientName } : {}),
-            ...(next.address !== undefined ? { address: next.address } : {}),
-          });
-          setEditing(false);
+          setEditingInfos(false);
         }}
       />
     );
   }
 
+  const editingContact = editingClientId
+    ? snap.contacts.find((c) => c.id === editingClientId)
+    : undefined;
+
   const rows: [string, string | undefined][] = [
-    ['Client', i.clientName],
-    ['Téléphone', i.phone],
-    ['Email', i.email],
-    ['Adresse', i.address],
+    ['Client', client?.nom ?? i.clientName],
+    ['Téléphone', client?.phone ?? i.phone],
+    ['Email', client?.email ?? i.email],
+    ['Adresse', client?.address ?? project.address ?? i.address],
     ['Type de bien', i.propertyType],
     ['Surface', i.surface ? `${i.surface} m²` : undefined],
     ['Budget', i.budget ? fmtMoney(i.budget) : undefined],
@@ -56,17 +63,27 @@ export function CoordonneesCard({
   return (
     <Card>
       <CardContent className="space-y-4 p-5">
-        <div className="flex items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
-          <Contact aria-hidden />
+        <div className="flex flex-wrap items-center gap-2 text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+          <ContactIcon aria-hidden />
           <h3 className="text-sm font-medium">Coordonnées & accès client</h3>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="ml-auto text-muted-foreground"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil aria-hidden /> Modifier les coordonnées
-          </Button>
+          <div className="ml-auto flex gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={openClient}
+            >
+              <Pencil aria-hidden /> Modifier le client
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={() => setEditingInfos(true)}
+            >
+              <Pencil aria-hidden /> Modifier les infos
+            </Button>
+          </div>
         </div>
         <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map(([label, value]) => (
@@ -78,9 +95,17 @@ export function CoordonneesCard({
         </div>
         <p className="text-xs text-muted-foreground">
           Le client accède à son Espace client (récit, décisions, documents partagés) dès qu'un
-          chantier est créé pour lui.
+          chantier est créé pour lui. Ses coordonnées se modifient sur sa fiche contact.
         </p>
       </CardContent>
+
+      {editingContact && (
+        <ContactEditor
+          contact={editingContact}
+          projects={snap.projects}
+          onClose={() => setEditingClientId(null)}
+        />
+      )}
     </Card>
   );
 }
@@ -103,21 +128,9 @@ function Editor({
     <Card>
       <CardContent className="space-y-4 p-5">
         <h3 className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
-          <Contact aria-hidden /> Coordonnées & accès client
+          <ContactIcon aria-hidden /> Informations du bien
         </h3>
         <div className="grid gap-3 sm:grid-cols-2">
-          <F label="Nom du client">
-            <Input value={v.clientName ?? ''} onChange={(e) => set('clientName', e.target.value)} />
-          </F>
-          <F label="Téléphone">
-            <Input value={v.phone ?? ''} onChange={(e) => set('phone', e.target.value)} />
-          </F>
-          <F label="Email">
-            <Input value={v.email ?? ''} onChange={(e) => set('email', e.target.value)} />
-          </F>
-          <F label="Adresse">
-            <Input value={v.address ?? ''} onChange={(e) => set('address', e.target.value)} />
-          </F>
           <F label="Type de bien">
             <Input
               value={v.propertyType ?? ''}

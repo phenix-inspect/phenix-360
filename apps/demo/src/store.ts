@@ -134,6 +134,45 @@ function readJson<T>(key: string, fallback: T): T {
   return raw ? (JSON.parse(raw) as T) : fallback;
 }
 
+/**
+ * Crée ou met à jour le CONTACT qui incarne le client d'un chantier (source
+ * unique de ses coordonnées, VISION Art. 6). L'identité qui pilote le client-safe
+ * reste `Project.clientId` ; ce contact la rend éditable en un seul endroit et
+ * joignable depuis le Carnet. Persiste dans CONTACTS_KEY (pas de refresh ici :
+ * l'appelant rafraîchit).
+ */
+function upsertClientContact(input: {
+  projectId: string;
+  clientId: UserId;
+  nom: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+}): void {
+  const list = readJson<Contact[]>(CONTACTS_KEY, []);
+  const existing = list.find((c) => c.userId === input.clientId);
+  if (existing) {
+    existing.nom = input.nom;
+    if (input.phone) existing.phone = input.phone;
+    if (input.email) existing.email = input.email;
+    if (input.address) existing.address = input.address;
+    if (!existing.projectIds.includes(input.projectId)) existing.projectIds.push(input.projectId);
+  } else {
+    list.push({
+      id: crypto.randomUUID(),
+      nom: input.nom,
+      role: 'client',
+      userId: input.clientId,
+      ...(input.phone ? { phone: input.phone } : {}),
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.address ? { address: input.address } : {}),
+      projectIds: [input.projectId],
+      createdAt: new Date().toISOString(),
+    });
+  }
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+}
+
 /** Snapshot exposé à React (immuable entre deux changements). */
 export interface DemoSnapshot extends BackendState {
   /** userId → nom affichable (détail de démo, hors core). */
@@ -328,6 +367,15 @@ export const demo = {
     people[compaId] = 'Mickaël';
     people[clientId] = proposal.dossier.infos.clientName ?? 'Client';
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    // Le client devient un CONTACT (source unique de ses coordonnées).
+    upsertClientContact({
+      projectId: project.id,
+      clientId,
+      nom: proposal.dossier.infos.clientName ?? 'Client',
+      ...(proposal.dossier.infos.phone ? { phone: proposal.dossier.infos.phone } : {}),
+      ...(proposal.dossier.infos.email ? { email: proposal.dossier.infos.email } : {}),
+      ...(proposal.dossier.infos.address ? { address: proposal.dossier.infos.address } : {}),
+    });
 
     const compaActor: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
 
@@ -439,6 +487,13 @@ export const demo = {
     people[compaId] = 'Mickaël';
     people[clientId] = input.clientName?.trim() || 'Client';
     localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    // Le client devient un CONTACT (source unique de ses coordonnées).
+    upsertClientContact({
+      projectId: project.id,
+      clientId,
+      nom: input.clientName?.trim() || 'Client',
+      ...(address ? { address } : {}),
+    });
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
     refresh();
     broadcast();
@@ -462,6 +517,13 @@ export const demo = {
         const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
         people[clientId] = input.clientName.trim() || 'Client';
         localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+        // Source unique : on synchronise le contact « client ».
+        upsertClientContact({
+          projectId,
+          clientId,
+          nom: input.clientName.trim() || 'Client',
+          ...(input.address !== undefined ? { address: input.address.trim() } : {}),
+        });
       }
     }
     refresh();
@@ -499,6 +561,33 @@ export const demo = {
 
   /* ------------------------- Annuaire & communication -------------------- */
 
+  /**
+   * Garantit qu'un chantier a un CONTACT « client » (source unique de ses
+   * coordonnées). Idempotent — pour les chantiers importés/anciens sans contact
+   * client. Renvoie l'id du contact.
+   */
+  ensureClientContact(project: Project): string {
+    const clientId = project.clientId;
+    if (!clientId) return '';
+    const existing = readJson<Contact[]>(CONTACTS_KEY, []).find((c) => c.userId === clientId);
+    if (existing) return existing.id;
+    const infos = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {})[project.id]?.infos;
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    upsertClientContact({
+      projectId: project.id,
+      clientId,
+      nom: people[clientId] || infos?.clientName || 'Client',
+      ...(infos?.phone ? { phone: infos.phone } : {}),
+      ...(infos?.email ? { email: infos.email } : {}),
+      ...((infos?.address ?? project.address)
+        ? { address: infos?.address ?? project.address }
+        : {}),
+    });
+    refresh();
+    broadcast();
+    return readJson<Contact[]>(CONTACTS_KEY, []).find((c) => c.userId === clientId)!.id;
+  },
+
   /** Ajoute ou met à jour un contact de l'annuaire (upsert par id). */
   saveContact(contact: Contact): void {
     const list = readJson<Contact[]>(CONTACTS_KEY, []);
@@ -506,6 +595,30 @@ export const demo = {
     if (idx >= 0) list[idx] = contact;
     else list.push(contact);
     localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    // Le contact est la SOURCE UNIQUE : on rafraîchit les instantanés dénormalisés
+    // qui le référencent (nom de fournisseur mis en cache sur les commandes du
+    // dossier — mutable). Les événements (réserves) sont append-only : leur nom
+    // figé reste, mais l'affichage résout toujours le nom vivant via l'id.
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    let touched = false;
+    for (const d of Object.values(dossiers)) {
+      for (const o of d.orders) {
+        if (o.fournisseurContactId === contact.id && o.fournisseur !== contact.nom) {
+          o.fournisseur = contact.nom;
+          touched = true;
+        }
+      }
+    }
+    if (touched) localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    // Si ce contact incarne le client d'un chantier, on tient à jour son nom
+    // affichable (people) — un seul endroit d'édition (VISION Art. 6).
+    if (contact.userId) {
+      const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+      if (people[contact.userId] !== contact.nom) {
+        people[contact.userId] = contact.nom;
+        localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+      }
+    }
     refresh();
     broadcast();
   },
@@ -880,12 +993,21 @@ export const demo = {
   async createReserve(
     projectId: ProjectId,
     actor: EventActor,
-    input: { libelle: string; responsable?: string; echeance?: string; priorite?: ActionPriorite },
+    input: {
+      libelle: string;
+      responsableContactId?: string;
+      echeance?: string;
+      priorite?: ActionPriorite;
+    },
   ): Promise<void> {
     const libelle = input.libelle.trim();
     if (!libelle) return;
     const projectEvents = snapshot.events.filter((e) => e.projectId === projectId);
-    const responsable = input.responsable?.trim();
+    // Le responsable est un CONTACT (source unique) ; on fige son nom au moment
+    // de la création (instantané append-only, jamais ressaisi).
+    const contact = input.responsableContactId
+      ? snapshot.contacts.find((c) => c.id === input.responsableContactId)
+      : undefined;
     const echeance = input.echeance?.trim();
     await backend.appendEvent({
       projectId,
@@ -896,7 +1018,7 @@ export const demo = {
       content: {
         numero: nextReserveNumero(projectEvents),
         libelle,
-        ...(responsable ? { responsable } : {}),
+        ...(contact ? { responsableContactId: contact.id, responsable: contact.nom } : {}),
         ...(echeance ? { echeance } : {}),
         ...(input.priorite ? { priorite: input.priorite } : {}),
       },
@@ -1412,6 +1534,15 @@ export function conversationOf(
 export function contactsOf(snap: DemoSnapshot, projectId: string | null | undefined): Contact[] {
   if (!projectId) return [];
   return snap.contacts.filter((c) => c.projectIds.includes(projectId));
+}
+
+/** Le CONTACT qui incarne le client d'un chantier (source unique de ses coordonnées). */
+export function clientContactOf(
+  snap: DemoSnapshot,
+  clientId: string | null | undefined,
+): Contact | undefined {
+  if (!clientId) return undefined;
+  return snap.contacts.find((c) => c.userId === clientId);
 }
 
 /** Historique des communications tracées vers un contact (tous chantiers, récentes d'abord). */

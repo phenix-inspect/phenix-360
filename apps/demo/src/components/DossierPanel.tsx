@@ -32,6 +32,7 @@ import {
   type OrderStatus,
   type Project,
   type ProjectDossier,
+  type ProjectId,
 } from '@phenix360/core';
 import {
   Banknote,
@@ -46,8 +47,9 @@ import {
   Sparkles,
   X,
 } from 'lucide-react';
-import { demo } from '../store';
+import { demo, useDemo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
+import { ContactPicker } from './contacts/ContactPicker';
 import { RoadmapProgress } from './RoadmapProgress';
 import { DevisBreakdown } from './DevisBreakdown';
 import { LaunchNotePanel } from './LaunchNotePanel';
@@ -450,6 +452,7 @@ export function DossierPanel({
       {editing && (
         <OrderEditor
           order={editing}
+          projectId={project.id}
           roadmap={dossier.roadmap}
           onSave={saveOrder}
           onClose={() => setEditing(null)}
@@ -552,15 +555,18 @@ function OrderCard({
 
 function OrderEditor({
   order,
+  projectId,
   roadmap,
   onSave,
   onClose,
 }: {
   order: Order;
+  projectId: ProjectId;
   roadmap: ProjectDossier['roadmap'];
   onSave: (order: Order) => void;
   onClose: () => void;
 }): React.JSX.Element {
+  const snap = useDemo();
   const [o, setO] = useState<Order>(order);
   const set = <K extends keyof Order>(key: K, value: Order[K]) =>
     setO((p) => ({ ...p, [key]: value }));
@@ -588,9 +594,20 @@ function OrderEditor({
             <Input value={o.label} onChange={(e) => set('label', e.target.value)} />
           </F>
           <F label="Fournisseur">
-            <Input
-              value={o.fournisseur ?? ''}
-              onChange={(e) => set('fournisseur', e.target.value)}
+            <ContactPicker
+              projectId={projectId}
+              role="fournisseur"
+              value={o.fournisseurContactId}
+              onChange={(id) => {
+                const c = id ? snap.contacts.find((x) => x.id === id) : undefined;
+                setO((p) => ({
+                  ...p,
+                  fournisseurContactId: id,
+                  ...(c ? { fournisseur: c.nom } : {}),
+                }));
+              }}
+              label="Fournisseur"
+              placeholder="Fournisseur (un contact)…"
             />
           </F>
           <F label="Référence">

@@ -277,3 +277,28 @@ ordre validé, orienté journée réelle du conducteur :
 7. **Assistant PHÉNIX renforcé** (EPIC 10)
 
 `DECISIONS.md` : arbitrage tracé (03/07/2026).
+
+## Phase de consolidation produit — ouverte par le PO (04/07/2026)
+
+**Objectif :** plus aucune duplication. Deux écrans qui font la même chose → on
+fusionne ; deux modèles pour la même information → une seule source de vérité.
+« Je préfère supprimer 500 lignes qu'en ajouter 5 000. » Priorité **avant** Agenda
+/ Planning / IA (qui réutiliseront les mêmes données).
+
+Audit des 5 bases visées :
+
+1. **Contacts** — ✅ _fait_ (04/07). Base unique : artisans, fournisseurs,
+   responsables de réserve, fournisseurs de commande et **client** sont des
+   `Contact` référencés par id. Fin du texte libre sur les objets durables ;
+   suppression de `SousTraitant`/`Fournisseur`/`IntervenantsSection` et du
+   matching flou réserve→contact. Capture de mission laissée en langage naturel
+   (frontière produit). Cf. `DECISIONS.md` 04/07.
+2. **Documents** — 🔴 à faire. Journal + Client sont **déjà** une base (événement
+   `document` + `visibility`). Reste à réconcilier la **checklist de préparation**
+   (`ProjectDocument`) avec les fichiers réels → une bibliothèque, 3 vues.
+3. **Photos** — 🔴 à faire. Deux formes : `FilPhoto` (Moments) et `EventAttachment`
+   (journal / photos avant). → forme canonique + tags, la vue diffère.
+4. **Interventions** — ✅ _déjà unique_ : `Moment.type` (réunion/visite/réception/
+   SAV…). Rien à faire (nettoyage mineur des libellés possible).
+5. **Communication** — ✅ _déjà unique_ : événement `communication` + `Contact`,
+   historique unique. Rien à faire.

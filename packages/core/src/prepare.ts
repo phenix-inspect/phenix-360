@@ -110,6 +110,13 @@ export const ORDER_RECEIVED: ReadonlySet<OrderStatus> = new Set<OrderStatus>([
 export interface Order {
   id: string;
   label: string;
+  /** Fournisseur — un CONTACT de l'annuaire (source unique). */
+  fournisseurContactId?: string;
+  /**
+   * Nom du fournisseur (instantané d'affichage / recherche). Le lien vivant est
+   * `fournisseurContactId` ; ce libellé est maintenu depuis le contact, jamais
+   * ressaisi une fois le contact choisi.
+   */
   fournisseur?: string;
   reference?: string;
   quantite?: number;

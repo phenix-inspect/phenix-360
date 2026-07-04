@@ -27,17 +27,23 @@ export function ContactEditor({
   contact,
   projects,
   initialProjectId,
+  initialRole,
   onClose,
+  onCreated,
 }: {
   contact?: Contact;
   projects: Project[];
   /** Chantier à pré-lier pour un NOUVEAU contact (créé depuis un Carnet). */
   initialProjectId?: string;
+  /** Rôle par défaut d'un NOUVEAU contact (créé depuis un sélecteur ciblé). */
+  initialRole?: ContactRole;
   onClose: () => void;
+  /** Appelé avec l'id du contact enregistré (pour le sélectionner en amont). */
+  onCreated?: (id: string) => void;
 }): React.JSX.Element {
   const [nom, setNom] = useState(contact?.nom ?? '');
   const [societe, setSociete] = useState(contact?.societe ?? '');
-  const [role, setRole] = useState<ContactRole>(contact?.role ?? 'artisan');
+  const [role, setRole] = useState<ContactRole>(contact?.role ?? initialRole ?? 'artisan');
   const [trade, setTrade] = useState(contact?.trade ?? '');
   const [phone, setPhone] = useState(contact?.phone ?? '');
   const [email, setEmail] = useState(contact?.email ?? '');
@@ -55,8 +61,9 @@ export function ContactEditor({
     const n = nom.trim();
     if (!n) return;
     const trimmed = (s: string): string | undefined => (s.trim() ? s.trim() : undefined);
+    const id = contact?.id ?? crypto.randomUUID();
     demo.saveContact({
-      id: contact?.id ?? crypto.randomUUID(),
+      id,
       nom: n,
       role,
       projectIds,
@@ -71,6 +78,7 @@ export function ContactEditor({
       ...(trimmed(address) ? { address: trimmed(address) } : {}),
       ...(trimmed(notes) ? { notes: trimmed(notes) } : {}),
     });
+    onCreated?.(id);
     onClose();
   };
 

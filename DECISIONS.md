@@ -443,3 +443,68 @@ exposer l'annuaire au client (Art. 9).
 `contactsOf` / `communicationsOf`) ; intégration `DossierPanel` + `ReservesView` ;
 contacts seedés. `contacts.test.mjs` 10/10, 14 suites de non-régression au vert,
 zéro erreur console. VISION Art. 1, 2, 6, 7, 9, 11.
+
+## 04/07/2026 — Phase de consolidation · Contacts = base unique (fin du texte libre)
+
+**Contexte :** le PO ouvre une **phase de consolidation** (« plus jamais de
+duplication ; je préfère supprimer 500 lignes qu'en ajouter 5 000 »). Audit des 5
+bases visées : **Interventions** (réunion/visite/réception/SAV) sont **déjà** un
+seul `Moment.type` (union fermée ; `MissionKind` sous-ensemble vérifié à la
+compilation) et **Communication** est **déjà** une base unique (événement
+`communication` + `Contact`). → 2 des 5 « doublons » n'existaient pas ; on ne
+facture pas de travail fictif. Restait 3 vraies consolidations : **Contacts** (ce
+lot), Documents, Photos.
+
+**Décision (Contacts) :** l'annuaire (`Contact`) devient la **source unique** des
+personnes. Fin du texte libre pour les objets **durables de pilotage** :
+
+- **Intervenants du chantier** : suppression des modèles `SousTraitant` /
+  `Fournisseur` et de `dossier.sousTraitants/fournisseurs` + du composant
+  `IntervenantsSection`. Le **Carnet du chantier** (Contacts liés au projet) est
+  la liste unique. `Contact` gagne `trade` (corps d'état / fourniture).
+- **Réserve** : `responsable` (texte) → `responsableContactId` (sélecteur
+  `ContactPicker`). Suppression du **matching flou** `matchContact` : le pont
+  réserve→contact est désormais un **lien réel**.
+- **Commande** : `fournisseur` (texte) → `fournisseurContactId` (sélecteur).
+- **Client** : `Contact.userId` incarne le membre client. L'identité qui pilote
+  le client-safe reste `Project.clientId` (choix PO « annuaire opérationnel,
+  client référencé ») ; ses coordonnées s'éditent **une seule fois** sur son
+  contact (`CoordonneesCard` → `ContactEditor`). `dossier.infos` ne porte plus que
+  les infos du **bien** (type, surface, budget, durée, début).
+
+**Frontière produit tenue (validée PO) :** la **capture de mission** reste en
+**langage naturel** — le conducteur raconte, PHÉNIX structure (VISION Art. 4/5/11).
+Imposer un sélecteur de contact dans le récit réintroduirait un formulaire et un
+matching flou. Le pont se fait **en aval** : la réserve née d'une mission s'assigne
+à un contact au registre.
+
+**Dénormalisation assumée (read-model) :** un nom lisible reste mis en cache à côté
+de l'id (`Order.fournisseur`, `Reserve.responsable`) pour la recherche/mémoire de
+l'assistant et les instantanés append-only. **La source éditable unique est le
+Contact** ; l'UI résout le nom vivant via l'id ; `saveContact` rafraîchit les
+caches des commandes (dossier mutable) et le nom affichable du client (`people`).
+Les événements (réserves) sont append-only : leur nom figé reste, l'affichage
+résout toujours le nom vivant par l'id.
+
+**Alternatives rejetées :** déplacer `Contact` dans l'état core maintenant
+(migration lourde d'une base tout juste introduite, risque de déstabilisation) ;
+fusion totale de l'identité client dans l'annuaire (exposerait le pilotage du
+client-safe à un carnet éditable) ; forcer les présents de mission en contacts
+(casse la capture signature).
+
+**Suite (à faire) :** Consolidation 2 — **Documents** (une bibliothèque ;
+Préparation/Journal/Client = vues ; la checklist `ProjectDocument` vs les fichiers
+`document`). Consolidation 3 — **Photos** (`FilPhoto` vs `EventAttachment` →
+forme canonique + tags). Mode Artisan pourra ensuite dériver sa liste d'artisans
+des Contacts (aujourd'hui : noms de responsables + intervenants).
+
+**Impact :** core `contact.ts` (+trade +userId), `prepare.ts` (−SousTraitant,
+−Fournisseur, −champs summary, Order.fournisseurContactId), `event.ts`
+(reserve/action.responsableContactId) ; demo `ContactPicker` (nouveau),
+`ContactEditor` (+trade, +initialRole, +onCreated, préserve userId),
+`CoordonneesCard` (édite le contact client), `DossierPanel`/`ReservesView`
+(sélecteurs), `store` (upsertClientContact, ensureClientContact, caches),
+`seed`. Suites au vert : preparation 9/9, reserves 7/7, **consolidation 7/7**,
+aujourd'hui 9/9, attention 8/8, mission 14/14, journal 9/9, artisan 8/8, moment
+13/13, stabilité 21/21. Gate (typecheck/lint/prettier/build) vert. VISION Art. 2,
+6, 7, 9, 11.

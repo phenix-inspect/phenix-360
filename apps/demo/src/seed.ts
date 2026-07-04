@@ -65,6 +65,8 @@ export function buildDemoSeed(): DemoSeed {
   const pid = projectId(uuid());
   const compaId = userId(uuid());
   const clientId = userId(uuid());
+  // Id de contact partagé : la réserve seedée référence ce contact (responsable).
+  const elecProContactId = uuid();
   const compagnon: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
   const cliente: EventActor = { userId: clientId, role: 'client', displayName: 'Mme Martin' };
 
@@ -761,7 +763,8 @@ export function buildDemoSeed(): DemoSeed {
     content: {
       numero: 1,
       libelle: 'Cette prise peut-elle être déplacée ?',
-      responsable: 'Électricien',
+      responsableContactId: elecProContactId,
+      responsable: 'Élec Pro',
       echeance: echeanceLevee,
       source: {
         kind: 'fil',
@@ -960,7 +963,7 @@ export function buildDemoSeed(): DemoSeed {
       createdAt: daysAgo(18),
     },
     {
-      id: uuid(),
+      id: elecProContactId,
       nom: 'Élec Pro',
       societe: 'Élec Pro',
       role: 'artisan',

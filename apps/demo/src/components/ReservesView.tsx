@@ -5,7 +5,6 @@ import {
   reserveEvents,
   reserveStatut,
   type ActionPriorite,
-  type Contact,
   type Event,
   type EventActor,
   type Project,
@@ -16,6 +15,7 @@ import { AlertTriangle, CircleCheck, Flag, Image as ImageIcon, Plus, X } from 'l
 import { demo, nameOf, useDemo, type DemoSnapshot } from '../store';
 import { fmtDate, fmtDateShort } from '../lib/format';
 import { ContactActions } from './contacts/ContactActions';
+import { ContactPicker } from './contacts/ContactPicker';
 
 /**
  * Vue RÉSERVES — le REGISTRE pilotable du conducteur. Lecture des événements du
@@ -177,13 +177,13 @@ function NewReserve({
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [libelle, setLibelle] = useState('');
-  const [responsable, setResponsable] = useState('');
+  const [responsableContactId, setResponsableContactId] = useState<string | undefined>(undefined);
   const [echeance, setEcheance] = useState('');
   const [priorite, setPriorite] = useState<ActionPriorite>('normale');
 
   const reset = (): void => {
     setLibelle('');
-    setResponsable('');
+    setResponsableContactId(undefined);
     setEcheance('');
     setPriorite('normale');
     setOpen(false);
@@ -193,7 +193,7 @@ function NewReserve({
     if (!libelle.trim()) return;
     await demo.createReserve(project.id, actor, {
       libelle,
-      responsable: responsable || undefined,
+      ...(responsableContactId ? { responsableContactId } : {}),
       echeance: echeance || undefined,
       priorite,
     });
@@ -234,22 +234,24 @@ function NewReserve({
           autoFocus
         />
 
-        <div className="flex flex-wrap gap-2">
-          <Input
-            value={responsable}
-            onChange={(e) => setResponsable(e.target.value)}
-            placeholder="Responsable"
-            aria-label="Responsable"
-            className="h-9 flex-1"
-          />
-          <input
-            type="date"
-            value={echeance}
-            onChange={(e) => setEcheance(e.target.value)}
-            aria-label="Échéance"
-            className="h-9 rounded-lg border border-input bg-surface px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+        <div className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Responsable</span>
+          <ContactPicker
+            projectId={project.id}
+            value={responsableContactId}
+            onChange={setResponsableContactId}
+            label="Responsable"
+            placeholder="Responsable (un contact)…"
           />
         </div>
+
+        <input
+          type="date"
+          value={echeance}
+          onChange={(e) => setEcheance(e.target.value)}
+          aria-label="Échéance"
+          className="h-9 w-full rounded-lg border border-input bg-surface px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+        />
 
         <div className="flex items-center justify-between">
           <PrioritePicker value={priorite} onChange={setPriorite} />
@@ -312,6 +314,13 @@ function OpenReserve({
   onLever: (reserve: ReserveEvent) => void;
   onOpenFilPhoto: (momentId: string, photoId?: string) => void;
 }): React.JSX.Element {
+  const snap = useDemo();
+  // Le responsable est un CONTACT : on affiche son nom VIVANT (source unique) ;
+  // repli sur l'instantané `responsable` pour les données historiques sans lien.
+  const cid = r.content.responsableContactId;
+  const responsableName = cid
+    ? (snap.contacts.find((c) => c.id === cid)?.nom ?? r.content.responsable)
+    : r.content.responsable;
   return (
     <li>
       <Card className={overdue ? 'border-destructive/40' : undefined}>
@@ -331,15 +340,9 @@ function OpenReserve({
 
           <p className="text-sm text-foreground">{r.content.libelle}</p>
 
-          <MetaLine
-            responsable={r.content.responsable}
-            echeance={r.content.echeance}
-            overdue={overdue}
-          />
+          <MetaLine responsable={responsableName} echeance={r.content.echeance} overdue={overdue} />
 
-          {r.content.responsable && (
-            <ResponsableActions projectId={r.projectId} responsable={r.content.responsable} />
-          )}
+          {cid && <ResponsableActions projectId={r.projectId} contactId={cid} />}
 
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <Button size="sm" onClick={() => onLever(r)}>
@@ -482,31 +485,20 @@ function MetaLine({
 }
 
 /**
- * Pont réserve → annuaire : si le responsable saisi (texte libre) correspond à
- * un contact de l'annuaire, PHÉNIX propose de le joindre en un geste — appeler,
- * relancer par SMS/WhatsApp — sans quitter la réserve (VISION Art. 6, 7). Toute
- * action lancée d'ici est tracée au Journal du chantier.
+ * Pont réserve → annuaire : le responsable EST un contact (lien direct, source
+ * unique). PHÉNIX propose de le joindre en un geste — appeler, relancer par
+ * SMS/WhatsApp — sans quitter la réserve (VISION Art. 6, 7). Toute action lancée
+ * d'ici est tracée au Journal du chantier.
  */
-function matchContact(contacts: Contact[], responsable: string): Contact | undefined {
-  const needle = responsable.trim().toLowerCase();
-  if (needle.length < 3) return undefined;
-  return contacts.find((c) =>
-    [c.nom, c.societe]
-      .filter((s): s is string => Boolean(s && s.length >= 3))
-      .map((s) => s.toLowerCase())
-      .some((h) => h.includes(needle) || needle.includes(h)),
-  );
-}
-
 function ResponsableActions({
   projectId,
-  responsable,
+  contactId,
 }: {
   projectId: ProjectId;
-  responsable: string;
+  contactId: string;
 }): React.JSX.Element | null {
   const snap = useDemo();
-  const contact = matchContact(snap.contacts, responsable);
+  const contact = snap.contacts.find((c) => c.id === contactId);
   if (!contact) return null;
   const project = snap.projects.find((p) => p.id === projectId);
   return (

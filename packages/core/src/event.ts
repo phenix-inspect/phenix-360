@@ -238,7 +238,13 @@ export interface ReserveEventContent {
   numero: number;
   /** Description de la réserve (« À reprendre avant réception »). */
   libelle: string;
-  /** Responsable de la levée (texte libre en V1 : « Peintre »…). */
+  /** Responsable de la levée — un CONTACT de l'annuaire (source unique). */
+  responsableContactId?: string;
+  /**
+   * Nom du responsable AU MOMENT de la création (instantané d'affichage /
+   * recherche / historique). Le lien vivant est `responsableContactId` ; ce
+   * libellé n'est jamais ressaisi à la main.
+   */
   responsable?: string;
   /** Échéance de levée (ISO YYYY-MM-DD). */
   echeance?: string;
@@ -287,6 +293,9 @@ export interface LeveeEventContent {
  * -------------------------------------------------------------------------- */
 export interface ActionEventContent {
   libelle: string;
+  /** Responsable — un CONTACT de l'annuaire (source unique). */
+  responsableContactId?: string;
+  /** Nom du responsable au moment de la création (instantané ; jamais ressaisi). */
   responsable?: string;
   echeance?: string;
   priorite?: ActionPriorite;
