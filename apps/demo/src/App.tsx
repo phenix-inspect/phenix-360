@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BrandLockup,
   Button,
@@ -62,7 +62,15 @@ export function App(): React.JSX.Element {
   const [managing, setManaging] = useState(false);
   // Onglet d'ouverture imposé au chantier (ex. « Récit » depuis un commentaire client).
   const [compaTab, setCompaTab] = useState<'fil' | undefined>(undefined);
+  // Aperçu client : PRÉVISUALISATION temporaire. On garde un chantier prévisualisé
+  // LOCAL, qui ne touche JAMAIS au chantier actif du conducteur. En quittant
+  // l'aperçu, on réinitialise → on revient exactement où l'on était.
+  const [clientPreviewId, setClientPreviewId] = useState<ProjectId | null>(null);
   const [chantierForm, setChantierForm] = useState<ChantierFormState>(null);
+
+  useEffect(() => {
+    if (view !== 'client') setClientPreviewId(null);
+  }, [view]);
 
   // Tout premier lancement : on propose un choix (démo / à vide) au lieu de
   // forcer la démo. Rien d'autre ne s'affiche tant que le choix n'est pas fait.
@@ -72,6 +80,9 @@ export function App(): React.JSX.Element {
 
   const activeProject =
     snap.projects.find((p) => p.id === snap.activeProjectId) ?? snap.projects[0] ?? null;
+  // Le chantier réellement affiché dans l'aperçu client (défaut : le chantier
+  // actif). Piloté localement, sans jamais modifier `activeProjectId`.
+  const previewProject = snap.projects.find((p) => p.id === clientPreviewId) ?? activeProject;
 
   // Ancrage de contexte : on sait TOUJOURS sur quel chantier on travaille et
   // quel espace on prévisualise. Rien sur « Aujourd'hui » (vue multi-chantiers).
@@ -83,7 +94,11 @@ export function App(): React.JSX.Element {
         : view === 'artisan'
           ? { label: 'Aperçu artisan', name: activeProject.name, preview: true }
           : view === 'client'
-            ? { label: 'Aperçu client', name: activeProject.name, preview: true }
+            ? {
+                label: 'Aperçu client',
+                name: (previewProject ?? activeProject).name,
+                preview: true,
+              }
             : null;
 
   const editProject =
@@ -156,11 +171,11 @@ export function App(): React.JSX.Element {
                 ·
               </span>
               {view === 'client' && snap.projects.length > 1 ? (
-                // Aperçu client : le conducteur choisit LE chantier à prévisualiser
-                // (pilote le chantier actif, une seule vérité partagée entre vues).
+                // Aperçu client TEMPORAIRE : on choisit le chantier à prévisualiser
+                // sans jamais toucher au chantier actif du conducteur (état local).
                 <select
-                  value={activeProject?.id ?? ''}
-                  onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
+                  value={(previewProject ?? activeProject)?.id ?? ''}
+                  onChange={(e) => setClientPreviewId(projectId(e.target.value))}
                   aria-label="Choisir le chantier à prévisualiser"
                   className="max-w-[60vw] truncate rounded-md border border-border bg-surface px-2 py-0.5 text-sm font-medium text-foreground"
                 >
@@ -212,7 +227,7 @@ export function App(): React.JSX.Element {
         ) : view === 'artisan' ? (
           <ArtisanView snap={snap} project={activeProject} />
         ) : (
-          <ClientView snap={snap} project={activeProject} />
+          <ClientView snap={snap} project={previewProject ?? activeProject} />
         )}
       </main>
 

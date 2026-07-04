@@ -62,21 +62,32 @@ try {
     },
   );
 
-  await assert('Aperçu client par chantier : le sélecteur change de chantier', async () => {
-    const sel = page.getByLabel('Choisir le chantier à prévisualiser');
-    await sel.waitFor({ state: 'visible', timeout: 5000 });
-    await sel.selectOption({ label: 'Maison Écully' });
-    await page
-      .getByRole('heading', { name: 'Maison Écully' })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-    // Retour sur Lyon 6e pour la suite.
-    await sel.selectOption({ label: 'Appartement Lyon 6e' });
-    await page
-      .getByRole('heading', { name: 'Appartement Lyon 6e' })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-  });
+  await assert(
+    'Aperçu client TEMPORAIRE : prévisualise sans toucher au chantier actif',
+    async () => {
+      const sel = page.getByLabel('Choisir le chantier à prévisualiser');
+      await sel.waitFor({ state: 'visible', timeout: 5000 });
+      await sel.selectOption({ label: 'Maison Écully' });
+      await page
+        .getByRole('heading', { name: 'Maison Écully' })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon 6e.
+      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+      await page
+        .getByText('Appartement Lyon 6e')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      // En rouvrant l'aperçu, il s'est réinitialisé sur le chantier actif (temporaire).
+      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      await page
+        .getByRole('heading', { name: 'Appartement Lyon 6e' })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      if ((await page.getByRole('heading', { name: 'Maison Écully' }).count()) > 0)
+        throw new Error('l’aperçu n’a pas été réinitialisé en quittant');
+    },
+  );
 
   await assert('Client-safe : rien d’interne ne fuit dans l’espace client', async () => {
     await page.waitForTimeout(400);
