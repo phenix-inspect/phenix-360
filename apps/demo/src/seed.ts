@@ -34,6 +34,7 @@ import {
   type Moment,
   type MomentType,
   type Project,
+  type ProjectStatus,
   type ProjectStep,
   type ProjectDossier,
   type ProjectMember,
@@ -860,6 +861,7 @@ export function buildDemoSeed(): DemoSeed {
     name: string;
     clientName: string;
     step: ProjectStep;
+    status?: ProjectStatus;
     startedDaysAgo: number;
     reserves: string[];
     clientDecision?: string;
@@ -942,7 +944,7 @@ export function buildDemoSeed(): DemoSeed {
       id: cid,
       name: opts.name,
       clientId: clId,
-      status: 'en_cours',
+      status: opts.status ?? 'en_cours',
       currentStep: opts.step,
       createdAt: daysAgo(opts.startedDaysAgo),
     });
@@ -969,6 +971,7 @@ export function buildDemoSeed(): DemoSeed {
     name: 'Maison Écully',
     clientName: 'M. Dubois',
     step: 'second_oeuvre',
+    status: 'pre_reception',
     startedDaysAgo: 30,
     reserves: [
       'Joint de carrelage à reprendre dans la salle de bain',
@@ -980,6 +983,7 @@ export function buildDemoSeed(): DemoSeed {
     name: 'Duplex Croix-Rousse',
     clientName: 'Mme Bernard',
     step: 'finitions',
+    status: 'levee_reserves',
     startedDaysAgo: 55,
     reserves: ['Retouche peinture dans la cage d’escalier'],
     clientQuestion: 'Serait-il possible de décaler la réception d’une semaine ?',

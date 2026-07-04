@@ -15,6 +15,8 @@ import {
 import {
   EVENT_STATE_LABEL,
   EVENT_TYPE_LABEL,
+  PROJECT_STATUSES,
+  PROJECT_STATUS_LABEL,
   buildChantierAttention,
   questionsEnAttente,
   reserveStatut,
@@ -25,6 +27,7 @@ import {
   type EventActor,
   type MissionKind,
   type Project,
+  type ProjectStatus,
   type ReserveEvent,
 } from '@phenix360/core';
 import {
@@ -91,7 +94,7 @@ export function CompagnonView({
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour — sauf onglet imposé.
   const [tab, setTab] = useState<CompagnonTab>(
-    initialTab ?? (dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi'),
+    initialTab ?? (dossier && project.status === 'pas_commence' ? 'preparation' : 'suivi'),
   );
 
   // Changement de chantier depuis la barre : on CONSERVE l'onglet courant (le
@@ -164,6 +167,24 @@ export function CompagnonView({
             <Plus aria-hidden /> Nouvelle mission
           </Button>
         </div>
+        {/* Statut métier — modifiable à la main (transitions manuelles, RC1). */}
+        <label className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="font-medium text-muted-foreground">Statut du chantier</span>
+          <select
+            value={project.status}
+            onChange={(e) =>
+              void demo.updateProject(project.id, { status: e.target.value as ProjectStatus })
+            }
+            aria-label="Statut du chantier"
+            className="rounded-lg border border-input bg-surface px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+          >
+            {PROJECT_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {PROJECT_STATUS_LABEL[s]}
+              </option>
+            ))}
+          </select>
+        </label>
         {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
       </div>
 

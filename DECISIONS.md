@@ -196,6 +196,23 @@ Et « C'est prêt » devient un écran de SYNTHÈSE (client, bien, planning, com
 + fournisseurs, décisions, documents, photos avant travaux, alertes) avant
 d'entrer — « Ajuster le dossier » reste dispo pour le détail. Moins de choix en
 amont, plus de preuve de travail.
+
+04/07 — cherché · Où en est CE chantier ? (statut métier)
+Fait : le conducteur savait ce qu'un chantier avait à traiter (compteurs), mais
+pas d'un coup d'œil OÙ il en est dans son cycle de vie (pas commencé → clôturé) ;
+et il ne pouvait pas isoler « mes chantiers en cours » des autres.
+Lecture produit : rien de neuf à inventer — `Project.status` existait déjà comme
+propriété MÉTIER saisie à la main (distincte de l'avancement dérivé). On l'a juste
+recalé sur les 5 statuts réels du terrain (Pas commencé / En cours / Pré-réception
+/ Levée des réserves / Clôturé) et rendu VISIBLE et pilotable, sans écran ni
+concept en plus : badge coloré au coup d'œil sur chaque carte et dans le héros du
+chantier (donc aussi côté aperçu client), barre de filtres au-dessus de « Mes
+chantiers » qui filtre la liste à l'instant (chips avec compteurs, seuls les
+statuts présents), et un simple dropdown sur l'écran chantier pour la transition
+— MANUELLE (le conducteur décide ; l'IA proposera plus tard). Source de vérité
+unique : le même `status` alimente Aujourd'hui, le chantier, l'aperçu client et
+l'export/import. Rejeté (challenge) : un écran « Liste des chantiers » — Aujourd'hui
+reste le seul point d'entrée, on l'enrichit, on n'ajoute pas de page.
 ```
 
 ---

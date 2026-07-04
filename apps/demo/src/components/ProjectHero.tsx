@@ -1,6 +1,7 @@
 import { PROJECT_STATUS_LABEL, PROJECT_STEP_LABEL, type Project } from '@phenix360/core';
 import { Badge, cn } from '@phenix360/ui';
 import { MapPin } from 'lucide-react';
+import { PROJECT_STATUS_BADGE } from '../lib/status';
 
 /**
  * Le projet est le HÉROS de l'écran : grand titre éditorial, client, et l'état
@@ -37,7 +38,9 @@ export function ProjectHero({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Badge variant="neutral">{PROJECT_STATUS_LABEL[project.status]}</Badge>
+        <Badge variant={PROJECT_STATUS_BADGE[project.status]}>
+          {PROJECT_STATUS_LABEL[project.status]}
+        </Badge>
         <Badge variant="gold">
           {project.currentStep ? PROJECT_STEP_LABEL[project.currentStep] : 'Étape à venir'}
         </Badge>

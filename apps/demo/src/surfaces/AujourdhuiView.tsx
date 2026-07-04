@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Button } from '@phenix360/ui';
+import { Badge, Button } from '@phenix360/ui';
 import {
+  PROJECT_STATUS_LABEL,
+  PROJECT_STATUSES,
   PROJECT_STEP_LABEL,
   actionsOuvertes,
   buildDayBriefing,
@@ -10,6 +12,7 @@ import {
   type Event,
   type ChantierResume,
   type DecisionEvent,
+  type ProjectStatus,
 } from '@phenix360/core';
 import {
   Check,
@@ -32,6 +35,7 @@ import {
   pendingClientCommentCount,
   type DemoSnapshot,
 } from '../store';
+import { PROJECT_STATUS_BADGE, PROJECT_STATUS_SHORT } from '../lib/status';
 import type { CompagnonTab } from './CompagnonView';
 
 /**
@@ -70,6 +74,8 @@ export function AujourdhuiView({
   const compagnon = snap.members.find((m) => m.role === 'compagnon');
   const prenom = compagnon ? nameOf(snap, compagnon.userId) : 'Mickaël';
   const [filter, setFilter] = useState<FilterKind | null>(null);
+  // Filtre par STATUT métier (barre au-dessus de « Mes chantiers »). 'all' = tous.
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
 
   const eventsByProject: Record<string, Event[]> = {};
   for (const e of snap.events) (eventsByProject[e.projectId] ??= []).push(e);
@@ -161,6 +167,15 @@ export function AujourdhuiView({
   const shown = filter
     ? briefing.chantiers.filter((c) => countFor(filter, c) > 0)
     : briefing.chantiers;
+
+  // Répartition par STATUT métier (source de vérité : project.status, porté par
+  // ChantierResume). Sert la barre de filtres et le filtrage instantané.
+  const statusCount = (s: ProjectStatus): number =>
+    briefing.chantiers.filter((c) => c.status === s).length;
+  const chantiersByStatus =
+    statusFilter === 'all'
+      ? briefing.chantiers
+      : briefing.chantiers.filter((c) => c.status === statusFilter);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -268,8 +283,27 @@ export function AujourdhuiView({
             <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
               Mes chantiers ({t.chantiers})
             </h2>
+            {/* Barre de filtres par STATUT — un clic filtre la liste, sans recharger
+                ni ouvrir d'écran. « Tous » d'abord, puis chaque statut présent. */}
+            <div className="flex flex-wrap gap-2">
+              <StatusChip
+                label="Tous"
+                count={t.chantiers}
+                active={statusFilter === 'all'}
+                onClick={() => setStatusFilter('all')}
+              />
+              {PROJECT_STATUSES.filter((s) => statusCount(s) > 0).map((s) => (
+                <StatusChip
+                  key={s}
+                  label={PROJECT_STATUS_SHORT[s]}
+                  count={statusCount(s)}
+                  active={statusFilter === s}
+                  onClick={() => setStatusFilter(s)}
+                />
+              ))}
+            </div>
             <div className="space-y-2">
-              {briefing.chantiers.map((c) => {
+              {chantiersByStatus.map((c) => {
                 const comments = pendingClientCommentCount(snap, c.projectId);
                 return (
                   <ChantierCard
@@ -374,6 +408,35 @@ function Stat({
       className={`${base} cursor-pointer transition-colors duration-base hover:border-gold-400 hover:bg-gold-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
     >
       {inner}
+    </button>
+  );
+}
+
+/** Une puce de la barre de filtres par statut : libellé + compteur, active ou non. */
+function StatusChip({
+  label,
+  count,
+  active,
+  onClick,
+}: {
+  label: string;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors duration-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+        active
+          ? 'border-gold-500 bg-gold-100 text-gold-800'
+          : 'border-border bg-surface text-muted-foreground hover:border-gold-300 hover:bg-gold-50'
+      }`}
+    >
+      {label}
+      <span className={active ? 'text-gold-700' : 'text-foreground'}>({count})</span>
     </button>
   );
 }
@@ -494,6 +557,7 @@ function ChantierCard({
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="font-serif text-lg font-semibold text-foreground">{c.name}</span>
+          <Badge variant={PROJECT_STATUS_BADGE[c.status]}>{PROJECT_STATUS_LABEL[c.status]}</Badge>
           <span className="text-xs text-muted-foreground">{clientName}</span>
           {active && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-medium text-gold-800">

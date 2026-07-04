@@ -33,13 +33,26 @@ export const PROJECT_STEP_ORDER: Record<ProjectStep, number> = {
  * Statut de vie du projet (distinct de l'étape de chantier) : pilote l'objet
  * central côté équipe. Saisi/ajusté à la main (≠ avancement, qui est dérivé).
  */
-export const PROJECT_STATUSES = ['en_preparation', 'en_cours', 'receptionne'] as const;
+/**
+ * Statut MÉTIER du chantier — une propriété unique, saisie/ajustée À LA MAIN par
+ * le conducteur (RC1 : transitions manuelles, jamais automatiques). Distinct de
+ * l'avancement (`currentStep`, dérivé des comptes rendus). Source de vérité unique.
+ */
+export const PROJECT_STATUSES = [
+  'pas_commence',
+  'en_cours',
+  'pre_reception',
+  'levee_reserves',
+  'cloture',
+] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
-  en_preparation: 'En préparation',
+  pas_commence: 'Pas commencé',
   en_cours: 'En cours',
-  receptionne: 'Réceptionné',
+  pre_reception: 'Pré-réception',
+  levee_reserves: 'Levée des réserves',
+  cloture: 'Clôturé',
 };
 
 export interface Project {

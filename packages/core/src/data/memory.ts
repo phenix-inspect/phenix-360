@@ -77,7 +77,7 @@ export class InMemoryBackend implements Backend {
       name: input.name,
       clientId: input.clientId ?? null,
       ...(input.address !== undefined ? { address: input.address } : {}),
-      status: input.status ?? 'en_preparation',
+      status: input.status ?? 'pas_commence',
       currentStep: input.currentStep ?? null,
       createdAt: now(),
     };

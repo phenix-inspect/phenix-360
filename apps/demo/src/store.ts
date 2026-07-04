@@ -461,7 +461,7 @@ export const demo = {
     const compaId = toUserId(crypto.randomUUID());
     const project = await backend.createProject({
       name: proposal.projectName,
-      status: 'en_preparation',
+      status: 'pas_commence',
       clientId,
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
@@ -592,7 +592,7 @@ export const demo = {
     const address = input.address?.trim();
     const project = await backend.createProject({
       name,
-      status: 'en_cours',
+      status: 'pas_commence',
       clientId,
       ...(address ? { address } : {}),
       ...(input.startStep ? { currentStep: input.startStep } : {}),

@@ -7,7 +7,7 @@
  * clients sans réponse, livraisons à venir. Aucune donnée inventée — tout est
  * lu des faits (le Journal) et du dossier (VISION.md Art. 7 & 8).
  */
-import type { Project, ProjectStep } from './project.js';
+import type { Project, ProjectStatus, ProjectStep } from './project.js';
 import type { Event } from './event.js';
 import { isAction, isCompteRendu, isDemande, isDocument, isLevee, isReserve } from './event.js';
 import type { ProjectDossier } from './prepare.js';
@@ -21,6 +21,8 @@ import {
 export interface ChantierResume {
   projectId: string;
   name: string;
+  /** Statut métier (saisi) — propriété unique, source de vérité. */
+  status: ProjectStatus;
   step: ProjectStep | null;
   reserves: number;
   decisions: number;
@@ -74,6 +76,7 @@ export function buildDayBriefing(input: {
     return {
       projectId: p.id,
       name: p.name,
+      status: p.status,
       step: currentStep(events) ?? p.currentStep ?? null,
       reserves,
       decisions,
