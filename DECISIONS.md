@@ -121,6 +121,17 @@ proposée (déjà rendue par « Une décision vous attend » + galerie de propos
 avec la délégation PHÉNIX intégrée), validée en un événement décision, suivie par
 le radar « choix validés ». Le neuf se limite à un formulaire de saisie et à deux
 champs (contexte, photos de la décision).
+
+04/07 — bug de feedback · Coup de cœur
+Fait : cliquer « Coup de cœur » ne changeait RIEN à l'écran — le conducteur (et le
+client) ne savait pas si le clic était pris en compte.
+Lecture produit : l'état « aimé » était bien enregistré (et persistait), mais les
+classes de couleur (`text-red-500`, `fill-red-500`) n'existent pas — la palette
+de marque REMPLACE les couleurs Tailwind par défaut : ces classes ne produisaient
+aucun style. La couleur d'émotion (#e11d48) n'est pas un rôle de marque ; on la
+pose en style inline dans l'app (hors garde-fou tokens, comme les dégradés). Le
+« pop » se joue en Web Animations API (pas de keyframe globale). Rappel : le coup
+de cœur reste SANS compteur (émotion, pas métrique) — décision produit conservée.
 ```
 
 ---
