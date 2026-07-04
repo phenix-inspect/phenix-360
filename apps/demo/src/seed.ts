@@ -593,11 +593,6 @@ export function buildDemoSeed(): DemoSeed {
         ],
       },
     ],
-    sousTraitants: [
-      { id: 'st-plombier', nom: 'SARL Aqua', lot: 'Plomberie' },
-      { id: 'st-elec', nom: 'Élec Pro', lot: 'Électricité' },
-      { id: 'st-carreleur', nom: 'Carrelage Lyonnais', lot: 'Carrelage & faïence' },
-    ],
     sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
     createdAt: new Date().toISOString(),
   };
@@ -938,9 +933,12 @@ export function buildDemoSeed(): DemoSeed {
   // Lyon 6e (client, artisan, fournisseur) + un contact transverse non lié.
   const contacts: Contact[] = [
     {
+      // Le contact « client » INCARNE le membre client (userId) : source unique
+      // de ses coordonnées, édité une seule fois (VISION Art. 6).
       id: uuid(),
       nom: 'Mme Martin',
       role: 'client',
+      userId: clientId,
       phone: '06 22 14 88 03',
       email: 'm.martin@email.fr',
       whatsapp: '06 22 14 88 03',
@@ -954,6 +952,7 @@ export function buildDemoSeed(): DemoSeed {
       nom: 'Karim Bouaziz',
       societe: 'SARL Aqua',
       role: 'artisan',
+      trade: 'Plomberie',
       phone: '06 45 12 78 90',
       email: 'contact@sarl-aqua.fr',
       notes: 'Plomberie — lot sanitaire. Réactif par WhatsApp.',
@@ -962,9 +961,32 @@ export function buildDemoSeed(): DemoSeed {
     },
     {
       id: uuid(),
+      nom: 'Élec Pro',
+      societe: 'Élec Pro',
+      role: 'artisan',
+      trade: 'Électricité',
+      phone: '06 33 21 54 76',
+      email: 'contact@elecpro.fr',
+      projectIds: [pid],
+      createdAt: daysAgo(18),
+    },
+    {
+      id: uuid(),
+      nom: 'Carrelage Lyonnais',
+      societe: 'Carrelage Lyonnais',
+      role: 'artisan',
+      trade: 'Carrelage & faïence',
+      phone: '04 78 42 19 03',
+      email: 'contact@carrelage-lyonnais.fr',
+      projectIds: [pid],
+      createdAt: daysAgo(16),
+    },
+    {
+      id: uuid(),
       nom: 'Showroom Mobalpa Lyon',
       societe: 'Mobalpa',
       role: 'fournisseur',
+      trade: 'Cuisine équipée',
       phone: '04 72 00 11 22',
       email: 'lyon@mobalpa.fr',
       address: '15 cours Lafayette, 69003 Lyon',

@@ -492,24 +492,12 @@ export interface ProjectMemory {
 /* -------------------------------------------------------------------------- *
  * Dossier préparé + proposition
  * -------------------------------------------------------------------------- */
-/** Un sous-traitant / artisan retenu pour le chantier (Bureau de préparation). */
-export interface SousTraitant {
-  id: string;
-  nom: string;
-  /** Corps d'état / lot (ex. « Plomberie »). */
-  lot?: string;
-  /** Contact (téléphone ou email, texte libre). */
-  contact?: string;
-}
-
-/** Un fournisseur retenu pour le chantier. */
-export interface Fournisseur {
-  id: string;
-  nom: string;
-  /** Ce qu'il fournit (ex. « Carrelage », « Cuisine »). */
-  lot?: string;
-  contact?: string;
-}
+/**
+ * Intervenants du chantier (artisans, fournisseurs, architecte…) : ce ne sont
+ * plus des entrées texte du dossier mais des **Contacts** de l'annuaire, liés au
+ * chantier (source unique — cf. `Contact`, `contactsOf`). Le Carnet du chantier
+ * les présente et les rend joignables. Plus de `SousTraitant` / `Fournisseur`.
+ */
 
 /** Un point de lancement MANUEL ajouté par le conducteur (check-list). */
 export interface ChecklistManuel {
@@ -526,10 +514,6 @@ export interface ProjectDossier {
   selections: ClientSelection[];
   documents: ProjectDocument[];
   questions: PreparationQuestion[];
-  /** Sous-traitants / artisans retenus pour ce chantier. */
-  sousTraitants?: SousTraitant[];
-  /** Fournisseurs retenus pour ce chantier. */
-  fournisseurs?: Fournisseur[];
   /** Points de lancement manuels du conducteur (en plus des vérifs automatiques). */
   checklist?: ChecklistManuel[];
   /** Budget prévisionnel saisi (sinon dérivé du total TTC devis + avenants). */
@@ -1689,8 +1673,6 @@ export interface PreparationSummary {
   checklist: ChecklistItem[];
   readiness: { prets: number; total: number; verdict: PrepVerdict };
   bloquants: PrepBloquant[];
-  sousTraitants: SousTraitant[];
-  fournisseurs: string[];
   materielsACommander: Order[];
   datesImportantes: PrepDate[];
 }
@@ -1845,11 +1827,6 @@ export function buildPreparation(
       message: `Budget dépassé : engagé ${Math.round(engage)} € au-dessus du prévisionnel ${Math.round(previsionnel)} €.`,
     });
 
-  // — Intervenants —
-  const fournisseurs = [
-    ...new Set(orders.map((o) => o.fournisseur).filter((x): x is string => Boolean(x))),
-  ].sort();
-
   // — Dates importantes à venir (démarrage / jalons / livraisons) —
   const today = new Date(nowMs).toISOString().slice(0, 10);
   const dates: PrepDate[] = [];
@@ -1880,8 +1857,6 @@ export function buildPreparation(
     checklist,
     readiness: { prets, total: checklist.length, verdict },
     bloquants,
-    sousTraitants: dossier.sousTraitants ?? [],
-    fournisseurs,
     materielsACommander: orders.filter((o) => o.statut === 'a_commander'),
     datesImportantes,
   };

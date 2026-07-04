@@ -60,7 +60,11 @@ export function ContactCard({
             <p className="font-medium text-foreground">{contact.nom}</p>
             <Badge variant={ROLE_VARIANT[contact.role]}>{CONTACT_ROLE_LABEL[contact.role]}</Badge>
           </div>
-          {contact.societe && <p className="text-sm text-muted-foreground">{contact.societe}</p>}
+          {(contact.societe || contact.trade) && (
+            <p className="text-sm text-muted-foreground">
+              {[contact.societe, contact.trade].filter(Boolean).join(' · ')}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 gap-1">
           {onEdit && (

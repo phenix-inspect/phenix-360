@@ -38,6 +38,7 @@ export function ContactEditor({
   const [nom, setNom] = useState(contact?.nom ?? '');
   const [societe, setSociete] = useState(contact?.societe ?? '');
   const [role, setRole] = useState<ContactRole>(contact?.role ?? 'artisan');
+  const [trade, setTrade] = useState(contact?.trade ?? '');
   const [phone, setPhone] = useState(contact?.phone ?? '');
   const [email, setEmail] = useState(contact?.email ?? '');
   const [whatsapp, setWhatsapp] = useState(contact?.whatsapp ?? '');
@@ -60,6 +61,9 @@ export function ContactEditor({
       role,
       projectIds,
       createdAt: contact?.createdAt ?? new Date().toISOString(),
+      // On préserve le lien membre (client) — jamais éditable depuis le carnet.
+      ...(contact?.userId ? { userId: contact.userId } : {}),
+      ...(trimmed(trade) ? { trade: trimmed(trade) } : {}),
       ...(trimmed(societe) ? { societe: trimmed(societe) } : {}),
       ...(trimmed(phone) ? { phone: trimmed(phone) } : {}),
       ...(trimmed(email) ? { email: trimmed(email) } : {}),
@@ -104,6 +108,15 @@ export function ContactEditor({
               ))}
             </select>
           </F>
+          {(role === 'artisan' || role === 'fournisseur') && (
+            <F label={role === 'artisan' ? 'Corps d’état / lot' : 'Fourniture'}>
+              <Input
+                value={trade}
+                onChange={(e) => setTrade(e.target.value)}
+                placeholder={role === 'artisan' ? 'Ex. Plomberie' : 'Ex. Carrelage'}
+              />
+            </F>
+          )}
           <F label="Téléphone">
             <Input
               value={phone}
