@@ -170,13 +170,27 @@ export function App(): React.JSX.Element {
               <span aria-hidden className="text-border">
                 ·
               </span>
-              {view === 'client' && snap.projects.length > 1 ? (
-                // Aperçu client TEMPORAIRE : on choisit le chantier à prévisualiser
-                // sans jamais toucher au chantier actif du conducteur (état local).
+              {snap.projects.length > 1 && (view === 'client' || view === 'compagnon') ? (
+                // Le chantier ancré devient un SÉLECTEUR :
+                //  • en Chantier → change le chantier ACTIF (on reste en suivi,
+                //    l'onglet courant est conservé par CompagnonView) ;
+                //  • en Aperçu client → change le chantier PRÉVISUALISÉ (état
+                //    local temporaire, sans toucher au chantier actif).
                 <select
-                  value={(previewProject ?? activeProject)?.id ?? ''}
-                  onChange={(e) => setClientPreviewId(projectId(e.target.value))}
-                  aria-label="Choisir le chantier à prévisualiser"
+                  value={
+                    (view === 'client' ? (previewProject ?? activeProject) : activeProject)?.id ??
+                    ''
+                  }
+                  onChange={(e) =>
+                    view === 'client'
+                      ? setClientPreviewId(projectId(e.target.value))
+                      : demo.setActiveProject(projectId(e.target.value))
+                  }
+                  aria-label={
+                    view === 'client'
+                      ? 'Choisir le chantier à prévisualiser'
+                      : 'Changer de chantier'
+                  }
                   className="max-w-[60vw] truncate rounded-md border border-border bg-surface px-2 py-0.5 text-sm font-medium text-foreground"
                 >
                   {snap.projects.map((p) => (

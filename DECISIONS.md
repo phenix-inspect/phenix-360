@@ -101,6 +101,16 @@ section, suffit — pas d'onglets, pas d'écran. Une puce ne s'affiche que si sa
 section existe (jamais d'entrée creuse). Récit et Bibliothèque étant deux vues
 d'une même section, leur puce défile ET bascule la vue (sinon la puce est vide
 de sens).
+
+04/07 — cherché · Passer d'un chantier à l'autre en plein suivi
+Fait : dans la vue Chantier, le nom du chantier ancré n'était qu'une étiquette ;
+pour changer de chantier, le conducteur devait repasser par Aujourd'hui.
+Lecture produit : le chantier ancré doit être un vrai SÉLECTEUR — on change de
+chantier sans quitter la vue, en gardant l'onglet courant (Suivi/Récit/Réserves…).
+Seule exception : la Préparation sans dossier n'a pas de contenu → retour sur
+Suivi. À noter (dette de test) : rendre le nom sélectionnable ajoute ses options
+au DOM ; un test visait « le nom » par son texte et attrapait désormais l'option
+cachée du menu → on cible le TITRE (heading), pas un texte ambigu.
 ```
 
 ---

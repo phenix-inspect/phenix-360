@@ -72,10 +72,11 @@ try {
         .getByRole('heading', { name: 'Maison Écully' })
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
-      // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon 6e.
+      // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon
+      // 6e. On vise le TITRE (le sélecteur de chantier liste aussi les noms).
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
       await page
-        .getByText('Appartement Lyon 6e')
+        .getByRole('heading', { name: 'Appartement Lyon 6e' })
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
       // En rouvrant l'aperçu, il s'est réinitialisé sur le chantier actif (temporaire).

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityItem,
   Badge,
@@ -91,6 +91,17 @@ export function CompagnonView({
   const [tab, setTab] = useState<CompagnonTab>(
     initialTab ?? (dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi'),
   );
+
+  // Changement de chantier depuis la barre : on CONSERVE l'onglet courant (le
+  // composant n'est pas remonté). Seule exception : la Préparation, qui n'a pas
+  // de contenu sans dossier → on retombe sur Suivi. On n'agit qu'au changement
+  // de chantier (pas quand l'utilisateur ouvre lui-même Préparation à vide).
+  const prevProjectId = useRef(project.id);
+  useEffect(() => {
+    if (prevProjectId.current === project.id) return;
+    prevProjectId.current = project.id;
+    if (tab === 'preparation' && !dossier) setTab('suivi');
+  }, [project.id, tab, dossier]);
 
   const attention = buildChantierAttention(dossier, events);
   const nbReservesOuvertes = reservesOuvertes(events).length;
