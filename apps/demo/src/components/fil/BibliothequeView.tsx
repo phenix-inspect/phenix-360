@@ -101,7 +101,7 @@ export function BibliothequeView({
           title={images.length === 0 ? 'La bibliothèque est vide' : 'Aucune photo pour ce filtre'}
           description={
             images.length === 0
-              ? 'Chaque photo partagée dans Le Fil viendra se ranger ici, prête à être retrouvée.'
+              ? 'Chaque photo partagée dans le récit du chantier viendra se ranger ici, prête à être retrouvée.'
               : 'Essayez un autre filtre pour retrouver vos photos.'
           }
         />

@@ -17,11 +17,11 @@ export function CoupDeCoeurButton({
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      className={`inline-flex items-center gap-2 text-sm transition-colors duration-base [&_svg]:size-5 ${
-        active ? 'text-gold-700' : 'text-muted-foreground hover:text-foreground'
+      className={`inline-flex items-center gap-2 text-sm transition-colors duration-base [&_svg]:size-5 [&_svg]:transition-transform ${
+        active ? 'font-medium text-red-500' : 'text-muted-foreground hover:text-foreground'
       }`}
     >
-      <Heart aria-hidden className={active ? 'fill-current' : ''} />
+      <Heart aria-hidden className={active ? 'scale-110 fill-red-500 text-red-500' : ''} />
       <span>Coup de cœur</span>
     </button>
   );

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Badge, Card, CardContent } from '@phenix360/ui';
-import { CalendarRange, FileText, Palette } from 'lucide-react';
+import { CalendarRange, ClipboardList, FileText, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
@@ -55,6 +55,10 @@ export function ClientView({
   const updates = clientFeed(events).filter(
     (e) => e.type === 'compte_rendu' || e.type === 'document',
   );
+  // Sections distinctes et lisibles pour le client (VISION Art. 11) : les
+  // documents d'un côté, les comptes rendus de l'autre.
+  const clientDocuments = updates.filter((e) => e.type === 'document');
+  const comptesRendus = updates.filter((e) => e.type === 'compte_rendu');
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -95,32 +99,6 @@ export function ClientView({
     });
   };
 
-  const requestModification = async (d: ClientDecision, message: string) => {
-    if (!dossier) return;
-    const sel = dossier.selections.find((s) => s.id === d.id);
-    if (!sel) return;
-    demo.saveDossier(project.id, {
-      ...dossier,
-      selections: dossier.selections.map((s) =>
-        s.id === d.id ? { ...s, statut: 'a_choisir', modificationRequested: true } : s,
-      ),
-    });
-    const content = buildDecisionContent({
-      kind: 'modification',
-      origin: 'client',
-      selection: sel,
-      statutApres: 'a_choisir',
-      message,
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'decision',
-      visibility: decisionVisibility('modification'),
-      state: 'publie',
-      content,
-    });
-  };
   const decisions = pendingClientDecisions(events);
   const action = nextClientAction(project, events);
   // La décision prioritaire est déjà portée par le bandeau : on liste le reste.
@@ -163,7 +141,6 @@ export function ClientView({
           <ClientDecisionBanner
             decision={clientDecision}
             onValidate={(optionId) => validateDecision(clientDecision, optionId)}
-            onModify={(message) => requestModification(clientDecision, message)}
           />
         ) : (
           <SmartBanner project={project} events={events} actor={actor} />
@@ -241,16 +218,30 @@ export function ClientView({
         </section>
       )}
 
-      {updates.length > 0 && (
+      {clientDocuments.length > 0 && (
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <FileText aria-hidden />
-            <h2 className="font-serif text-lg font-semibold tracking-tight">
-              Comptes rendus & documents
-            </h2>
+            <h2 className="font-serif text-lg font-semibold tracking-tight">Documents</h2>
           </div>
           <div className="space-y-4">
-            {updates.map((e) => (
+            {clientDocuments.map((e) => (
+              <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
+                <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {comptesRendus.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+            <ClipboardList aria-hidden />
+            <h2 className="font-serif text-lg font-semibold tracking-tight">Comptes rendus</h2>
+          </div>
+          <div className="space-y-4">
+            {comptesRendus.map((e) => (
               <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
                 <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
               </div>

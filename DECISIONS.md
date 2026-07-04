@@ -36,7 +36,32 @@ Impact : …
 > Lecture produit : ce que ça suggère (sans trancher la solution).
 > ```
 
-_En attente des premières journées de chantier._
+```
+04/07 — cherché · Aperçu client
+Fait : le conducteur voulait vérifier ce que voit le client d'un AUTRE chantier
+que l'actif ; il se retrouvait bloqué sur le chantier actif.
+Lecture produit : l'aperçu client doit être multi-chantiers — « quel chantier je
+regarde » doit pouvoir changer sans quitter la vue.
+
+04/07 — hésité · « Le Fil »
+Fait : le nom « Le Fil » n'évoque rien de premium ni de client.
+Lecture produit : le récit visuel du chantier gagne un nom parlant, orienté client.
+
+04/07 — perdu · Commentaire client sous une photo
+Fait : quand un client commente une photo, le conducteur risque de ne jamais le
+voir (noyé dans l'espace client).
+Lecture produit : un signal doit remonter au conducteur, et l'échange doit pouvoir
+se tenir SOUS l'élément partagé (conversation contextuelle, pas une messagerie).
+
+04/07 — friction · Décision client « Je souhaite une modification »
+Fait : l'option de demande de modification brouillait la décision.
+Lecture produit : garder la décision client nette et rassurante (choisir / valider).
+
+04/07 — posture · Partage aux artisans
+Fait : l'app n'est pas encore prête à être mise entre les mains des artisans.
+Lecture produit : masquer toute invitation artisan tant que ce n'est pas assumé
+(sans rien jeter du travail déjà fait).
+```
 
 ---
 

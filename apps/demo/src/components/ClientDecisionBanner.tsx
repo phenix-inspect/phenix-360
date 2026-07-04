@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Textarea } from '@phenix360/ui';
+import { Button } from '@phenix360/ui';
 import { Lock, Sparkles } from 'lucide-react';
 import { proposalNoun, type ClientDecision } from '@phenix360/core';
 import { fmtDate } from '../lib/format';
@@ -10,22 +10,18 @@ import { ProposalGallery } from './ProposalGallery';
  * (« Une décision vous attend ») ; au clic, le client voit UNIQUEMENT la
  * décision concernée. Quand PHÉNIX a préparé des propositions, il les présente
  * comme des ambiances soignées (photo + titre + description) ; le client
- * sélectionne celle qu'il préfère. Jamais de délais fournisseurs, de
+ * sélectionne celle qu'il préfère et valide. Jamais de délais fournisseurs, de
  * dépendances, de commandes, de calculs internes ni d'alertes conducteur.
  */
 export function ClientDecisionBanner({
   decision,
   onValidate,
-  onModify,
 }: {
   decision: ClientDecision;
   onValidate: (optionId?: string) => Promise<void>;
-  onModify: (message: string) => Promise<void>;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const [modifying, setModifying] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
   const cat = decision.categorie.toLowerCase();
@@ -37,16 +33,6 @@ export function ClientDecisionBanner({
     setBusy(true);
     await onValidate(selectedId ?? undefined);
     setBusy(false);
-    setOpen(false);
-  };
-
-  const sendModification = async () => {
-    if (!message.trim()) return;
-    setBusy(true);
-    await onModify(message.trim());
-    setBusy(false);
-    setMessage('');
-    setModifying(false);
     setOpen(false);
   };
 
@@ -102,7 +88,7 @@ export function ClientDecisionBanner({
             </Button>
           )}
 
-          {open && !modifying && (
+          {open && (
             <div className="space-y-4">
               {hasOptions && (
                 <ProposalGallery
@@ -115,55 +101,11 @@ export function ClientDecisionBanner({
                 <Button size="sm" disabled={busy || !canValidate} onClick={() => void validate()}>
                   {hasOptions ? 'Valider mon choix' : 'Valider le choix proposé'}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => setModifying(true)}
-                >
-                  {hasOptions ? 'Je souhaite une modification' : 'Demander une modification'}
-                </Button>
               </div>
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5">
                 <Lock aria-hidden />
                 Votre choix sera enregistré et partagé avec l'équipe projet.
               </p>
-            </div>
-          )}
-
-          {open && modifying && (
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-foreground">
-                Que souhaitez-vous modifier ?
-                <Textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={3}
-                  autoFocus
-                  placeholder="Décrivez ce que vous aimeriez changer…"
-                  className="mt-1.5"
-                />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  disabled={busy || !message.trim()}
-                  onClick={() => void sendModification()}
-                >
-                  Envoyer ma demande
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => {
-                    setModifying(false);
-                    setMessage('');
-                  }}
-                >
-                  Annuler
-                </Button>
-              </div>
             </div>
           )}
         </div>

@@ -63,7 +63,9 @@ export function FilView({
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <Images aria-hidden />
-            <h2 className="font-serif text-xl font-semibold tracking-tight">Le Fil</h2>
+            <h2 className="font-serif text-xl font-semibold tracking-tight">
+              Le récit du chantier
+            </h2>
           </div>
           <p className="text-sm text-muted-foreground">
             {view === 'fil'
@@ -76,7 +78,7 @@ export function FilView({
             value={view}
             onValueChange={setView}
             options={[
-              { value: 'fil', label: 'Le Fil' },
+              { value: 'fil', label: 'Récit' },
               { value: 'bibliotheque', label: 'Bibliothèque' },
             ]}
             aria-label="Changer de vue"
@@ -92,7 +94,7 @@ export function FilView({
       {vide ? (
         <EmptyState
           icon={<Images aria-hidden />}
-          title="Le Fil commence bientôt"
+          title="Le récit du chantier commence bientôt"
           description={
             canCompose
               ? 'Créez un premier moment : il ouvrira l’histoire du chantier.'

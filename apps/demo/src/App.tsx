@@ -40,11 +40,18 @@ type ChantierFormState = { mode: 'create' } | { mode: 'edit'; projectId: Project
 
 type ViewMode = 'aujourdhui' | 'soir' | 'compagnon' | 'artisan' | 'client';
 
-const VIEW_OPTIONS = [
-  { value: 'aujourdhui' as const, label: 'Aujourd’hui' },
-  { value: 'compagnon' as const, label: 'Chantier' },
-  { value: 'artisan' as const, label: 'Artisan' },
-  { value: 'client' as const, label: 'Espace client' },
+/**
+ * RC1 : l'application n'est pas encore partagée aux artisans. On MASQUE toute
+ * l'interface artisan (aucune invitation visible) sans rien supprimer — le code
+ * `ArtisanView` reste, réactivable en repassant ce drapeau à `true`.
+ */
+const SHOW_ARTISAN = false;
+
+const VIEW_OPTIONS: { value: ViewMode; label: string }[] = [
+  { value: 'aujourdhui', label: 'Aujourd’hui' },
+  { value: 'compagnon', label: 'Chantier' },
+  ...(SHOW_ARTISAN ? [{ value: 'artisan' as const, label: 'Artisan' }] : []),
+  { value: 'client', label: 'Espace client' },
 ];
 
 export function App(): React.JSX.Element {
@@ -146,7 +153,24 @@ export function App(): React.JSX.Element {
               <span aria-hidden className="text-border">
                 ·
               </span>
-              <span className="truncate font-medium text-foreground">{anchor.name}</span>
+              {view === 'client' && snap.projects.length > 1 ? (
+                // Aperçu client : le conducteur choisit LE chantier à prévisualiser
+                // (pilote le chantier actif, une seule vérité partagée entre vues).
+                <select
+                  value={activeProject?.id ?? ''}
+                  onChange={(e) => demo.setActiveProject(projectId(e.target.value))}
+                  aria-label="Choisir le chantier à prévisualiser"
+                  className="max-w-[60vw] truncate rounded-md border border-border bg-surface px-2 py-0.5 text-sm font-medium text-foreground"
+                >
+                  {snap.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="truncate font-medium text-foreground">{anchor.name}</span>
+              )}
             </div>
           </div>
         )}

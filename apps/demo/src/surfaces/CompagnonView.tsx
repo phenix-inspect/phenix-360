@@ -161,7 +161,7 @@ export function CompagnonView({
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           <TabsTrigger value="preparation">Préparation</TabsTrigger>
-          <TabsTrigger value="fil">Le Fil</TabsTrigger>
+          <TabsTrigger value="fil">Récit</TabsTrigger>
           <TabsTrigger value="reserves">
             <span className="flex items-center gap-1.5">
               Réserves
