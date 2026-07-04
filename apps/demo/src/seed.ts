@@ -147,6 +147,60 @@ export function buildDemoSeed(): DemoSeed {
         libelle: 'Devis plomberie — lot sanitaire',
       },
     },
+    // Document partagé au client AVEC un vrai fichier (data URL) : ouvrable dans
+    // un nouvel onglet. Démontre l'ouverture réelle côté client.
+    {
+      id: eventId(uuid()),
+      projectId: pid,
+      type: 'document',
+      actor: compagnon,
+      visibility: 'client',
+      state: 'publie',
+      captureId: null,
+      createdAt: daysAgo(6),
+      publishedBy: compaId,
+      publishedAt: daysAgo(6),
+      content: {
+        attachment: {
+          id: attachmentId(uuid()),
+          kind: 'document',
+          bucket: 'demo',
+          storagePath: `${pid}/${uuid()}.png`,
+          mimeType: 'image/png',
+          fileName: 'Plan-salle-de-bain.png',
+          dataUrl:
+            'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+          createdAt: daysAgo(6),
+        },
+        libelle: 'Plan de la salle de bain',
+      },
+    },
+    // Document INTERNE (visibilité interne) : visible du conducteur seul, JAMAIS
+    // du client. Sert de garde-fou client-safe.
+    {
+      id: eventId(uuid()),
+      projectId: pid,
+      type: 'document',
+      actor: compagnon,
+      visibility: 'interne',
+      state: 'publie',
+      captureId: null,
+      createdAt: daysAgo(7),
+      publishedBy: compaId,
+      publishedAt: daysAgo(7),
+      content: {
+        attachment: {
+          id: attachmentId(uuid()),
+          kind: 'document',
+          bucket: 'demo',
+          storagePath: `${pid}/${uuid()}.pdf`,
+          mimeType: 'application/pdf',
+          fileName: 'Contrat-sous-traitant.pdf',
+          createdAt: daysAgo(7),
+        },
+        libelle: 'Contrat sous-traitant (interne)',
+      },
+    },
     // Question du CLIENT à PHÉNIX, en attente de réponse (le conducteur répond,
     // il ne se crée pas de tâche interne). Reste interne tant que non répondue.
     {

@@ -3,6 +3,7 @@ import { ROLE_LABEL, type Event } from '@phenix360/core';
 import { Avatar } from './Avatar';
 import { PhotoTile } from './PhotoTile';
 import { DocumentLink } from './DocumentLink';
+import { openAttachment } from '../lib/document';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { fmtDate } from '../lib/format';
 
@@ -20,6 +21,10 @@ export function MomentCard({
 }): React.JSX.Element {
   const title = eventTitle(event);
   const description = eventDescription(event);
+  // Document RÉELLEMENT ouvrable = un fichier attaché (data URL). Sinon on n'offre
+  // aucun lien (ni titre cliquable) : « disponible prochainement ».
+  const openableDoc =
+    event.type === 'document' && event.content.attachment.dataUrl ? event.content.attachment : null;
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -55,21 +60,33 @@ export function MomentCard({
                     : 'Compte rendu'}
             </span>
           )}
-          <h3 className="font-serif text-lg font-semibold tracking-tight text-foreground">
-            {title}
-          </h3>
+          {openableDoc ? (
+            <button
+              type="button"
+              onClick={() => openAttachment(openableDoc)}
+              className="block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <h3 className="font-serif text-lg font-semibold tracking-tight text-foreground underline-offset-4 transition-colors hover:text-gold-700 hover:underline">
+                {title}
+              </h3>
+            </button>
+          ) : (
+            <h3 className="font-serif text-lg font-semibold tracking-tight text-foreground">
+              {title}
+            </h3>
+          )}
           {description != null && (
             <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
           )}
           {event.type === 'document' &&
-            (event.content.attachment.dataUrl ? (
+            (openableDoc ? (
               <span className="mt-1 inline-flex">
-                <DocumentLink attachment={event.content.attachment} />
+                <DocumentLink attachment={openableDoc} />
               </span>
             ) : (
-              <span className="mt-1 inline-flex items-center gap-2 rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-muted-foreground">
+              <span className="mt-1 inline-flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted px-3 py-2 text-sm text-muted-foreground [&_svg]:size-4">
                 <FileText aria-hidden />
-                {event.content.attachment.fileName ?? `${event.content.libelle}.pdf`}
+                Document disponible prochainement
               </span>
             ))}
         </div>

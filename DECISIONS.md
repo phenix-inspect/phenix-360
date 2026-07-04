@@ -141,6 +141,18 @@ h = 1,25 × largeur) à 6/5 (h ≈ 0,83 × largeur, ≈ 33 % plus court), l'imag
 en object-cover (aucun écrasement), coins arrondis et plein écran inchangés. Le
 récit se parcourt alors comme un fil social. Le plein écran (galerie) garde son
 4/5 : c'est le FLUX qu'on densifie, pas la lecture d'une photo.
+
+04/07 — bug d'ouverture · Documents côté client
+Fait : le client clique un document et « rien ne s'ouvre ». Deux causes : (1) les
+documents seedés n'ont pas de fichier → aucun lien (mais rien ne le disait) ; (2)
+les vrais documents utilisaient `<a download>` (téléchargement silencieux) au lieu
+d'ouvrir un aperçu.
+Lecture produit : un document AVEC fichier s'ouvre dans un nouvel onglet (titre
+cliquable + bouton « Ouvrir le document »), via un Blob (les navigateurs bloquent
+la navigation directe vers une URL `data:`). Un document SANS fichier n'affiche
+aucun faux lien : « Document disponible prochainement ». Client-safe inchangé (un
+document interne ne fuit jamais). Piège technique : `window.open(url,'noopener')`
+renvoie toujours `null` → on ouvre par une ancre `target="_blank"`.
 ```
 
 ---
