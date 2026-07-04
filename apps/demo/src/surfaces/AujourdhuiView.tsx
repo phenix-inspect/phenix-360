@@ -9,19 +9,24 @@ import {
   reservesOuvertes,
   type Event,
   type ChantierResume,
+  type DecisionEvent,
 } from '@phenix360/core';
 import {
+  Check,
   ChevronRight,
   Flag,
   HelpCircle,
   ListChecks,
   MessageSquare,
   MoonStar,
+  PackageCheck,
   Sunrise,
   Truck,
   X,
 } from 'lucide-react';
 import {
+  choixClientValidesATraiter,
+  demo,
   mostRecentPendingClientMoment,
   nameOf,
   pendingClientCommentCount,
@@ -36,18 +41,22 @@ import type { CompagnonTab } from './CompagnonView';
  */
 
 /** Les compteurs filtrables et ce qu'ils ouvrent (onglet du chantier). */
-type FilterKind = 'decisions' | 'actions' | 'reserves' | 'questions' | 'livraisons';
+type FilterKind = 'decisions' | 'choix' | 'actions' | 'reserves' | 'questions' | 'livraisons';
 
-const FILTERS: Record<
-  FilterKind,
-  { title: string; tab: CompagnonTab; count: (c: ChantierResume) => number }
-> = {
-  decisions: { title: 'Décisions client à traiter', tab: 'suivi', count: (c) => c.decisions },
-  actions: { title: 'Actions à suivre', tab: 'suivi', count: (c) => c.actions },
-  reserves: { title: 'Réserves à lever', tab: 'reserves', count: (c) => c.reserves },
-  questions: { title: 'Questions client à répondre', tab: 'suivi', count: (c) => c.questions },
-  livraisons: { title: 'Livraisons à contrôler', tab: 'preparation', count: (c) => c.livraisons },
+const FILTERS: Record<FilterKind, { title: string; tab: CompagnonTab }> = {
+  decisions: { title: 'Décisions client en attente', tab: 'suivi' },
+  choix: { title: 'Choix client validés à traiter', tab: 'historique' },
+  actions: { title: 'Actions à suivre', tab: 'suivi' },
+  reserves: { title: 'Réserves à lever', tab: 'reserves' },
+  questions: { title: 'Questions client à répondre', tab: 'suivi' },
+  livraisons: { title: 'Livraisons à contrôler', tab: 'preparation' },
 };
+
+/** Libellé d'un choix validé : la catégorie et l'option retenue (ou délégation). */
+function choixLabel(e: DecisionEvent): string {
+  const c = e.content;
+  return c.optionLabel ? `${c.categorie} — ${c.optionLabel}` : `Choix ${c.categorie.toLowerCase()}`;
+}
 
 export function AujourdhuiView({
   snap,
@@ -78,10 +87,36 @@ export function AujourdhuiView({
     month: 'long',
   });
 
-  const phrase = buildPhrase(t);
+  // Choix client VALIDÉS à prendre en compte (device-local : moins ceux déjà
+  // traités). Symétrique des décisions « en attente » : ici, c'est au conducteur
+  // d'agir (commander, prévenir l'artisan, planifier).
+  const choixItems = (projectId: string): DecisionEvent[] =>
+    choixClientValidesATraiter(snap, projectId);
+  const totalChoix = briefing.chantiers.reduce((s, c) => s + choixItems(c.projectId).length, 0);
+
+  const phrase = buildPhrase({ ...t, choix: totalChoix });
 
   const activeId =
     snap.projects.find((p) => p.id === snap.activeProjectId)?.id ?? snap.projects[0]?.id;
+
+  // Compteur d'un chantier pour un filtre donné (les 5 issus du briefing + les
+  // choix validés, device-local).
+  const countFor = (kind: FilterKind, c: ChantierResume): number => {
+    switch (kind) {
+      case 'decisions':
+        return c.decisions;
+      case 'choix':
+        return choixItems(c.projectId).length;
+      case 'actions':
+        return c.actions;
+      case 'reserves':
+        return c.reserves;
+      case 'questions':
+        return c.questions;
+      case 'livraisons':
+        return c.livraisons;
+    }
+  };
 
   // Les ÉLÉMENTS PRÉCIS d'un chantier pour un compteur donné — mêmes sélecteurs
   // que ceux qui produisent les compteurs (`buildDayBriefing`), donc cohérence
@@ -91,6 +126,8 @@ export function AujourdhuiView({
     switch (kind) {
       case 'decisions':
         return pendingClientDecisions(events).map((d) => ({ key: d.eventId, label: d.question }));
+      case 'choix':
+        return choixItems(projectId).map((e) => ({ key: e.id, label: choixLabel(e) }));
       case 'actions':
         return actionsOuvertes(events).map((e) => ({
           key: e.id,
@@ -122,7 +159,7 @@ export function AujourdhuiView({
 
   // Chantiers concernés par le filtre courant (ceux qui ont au moins un élément).
   const shown = filter
-    ? briefing.chantiers.filter((c) => FILTERS[filter].count(c) > 0)
+    ? briefing.chantiers.filter((c) => countFor(filter, c) > 0)
     : briefing.chantiers;
 
   return (
@@ -139,15 +176,25 @@ export function AujourdhuiView({
         <p className="text-base text-muted-foreground">{phrase}</p>
       </div>
 
-      {/* Ce qui réclame votre attention — chaque compteur FILTRE la journée */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+      {/* Ce qui réclame votre attention — chaque compteur FILTRE la journée.
+          Les deux faces d'une décision : le client doit agir (en attente) /
+          le conducteur doit agir (choix validés). */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat
           icon={<HelpCircle aria-hidden />}
           value={t.decisions}
-          label="décisions clients"
+          label="décisions en attente"
           accent
           active={filter === 'decisions'}
           onActivate={() => activateFilter('decisions')}
+        />
+        <Stat
+          icon={<PackageCheck aria-hidden />}
+          value={totalChoix}
+          label="choix validés à traiter"
+          accent
+          active={filter === 'choix'}
+          onActivate={() => activateFilter('choix')}
         />
         <Stat
           icon={<ListChecks aria-hidden />}
@@ -208,6 +255,9 @@ export function AujourdhuiView({
                     active={c.projectId === activeId}
                     items={itemsFor(filter, c.projectId)}
                     onOpenItem={() => onOpenChantier(c.projectId, FILTERS[filter].tab)}
+                    onTreatItem={
+                      filter === 'choix' ? (key) => demo.markChoixTraite(key) : undefined
+                    }
                   />
                 ))}
               </div>
@@ -263,9 +313,11 @@ function buildPhrase(t: {
   decisions: number;
   questions: number;
   actions: number;
+  choix: number;
 }): string {
   const bits: string[] = [];
   if (t.decisions > 0) bits.push(`${t.decisions} décision${t.decisions > 1 ? 's' : ''} client`);
+  if (t.choix > 0) bits.push(`${t.choix} choix client à traiter`);
   if (t.actions > 0) bits.push(`${t.actions} action${t.actions > 1 ? 's' : ''} à suivre`);
   if (t.questions > 0) bits.push(`${t.questions} réponse${t.questions > 1 ? 's' : ''} à donner`);
   if (t.reserves > 0) bits.push(`${t.reserves} réserve${t.reserves > 1 ? 's' : ''} à lever`);
@@ -335,6 +387,7 @@ function ChantierFilteredCard({
   active,
   items,
   onOpenItem,
+  onTreatItem,
 }: {
   name: string;
   clientName: string;
@@ -342,6 +395,8 @@ function ChantierFilteredCard({
   active?: boolean;
   items: { key: string; label: string }[];
   onOpenItem: () => void;
+  /** Action rapide par élément (ex. « Pris en compte » pour un choix validé). */
+  onTreatItem?: (key: string) => void;
 }): React.JSX.Element {
   return (
     <div
@@ -362,15 +417,25 @@ function ChantierFilteredCard({
       </div>
       <ul className="mt-3 space-y-1.5">
         {items.map((it) => (
-          <li key={it.key}>
+          <li key={it.key} className="flex items-stretch gap-1.5">
             <button
               type="button"
               onClick={onOpenItem}
-              className="flex w-full items-center gap-2 rounded-lg border border-border bg-paper-50 px-3 py-2 text-left text-sm text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-paper-50 px-3 py-2 text-left text-sm text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="min-w-0 flex-1 truncate">{it.label}</span>
               <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             </button>
+            {onTreatItem && (
+              <button
+                type="button"
+                onClick={() => onTreatItem(it.key)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-ink-900 px-2.5 text-xs font-semibold text-paper-0 transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5"
+              >
+                <Check aria-hidden />
+                Pris en compte
+              </button>
+            )}
           </li>
         ))}
       </ul>

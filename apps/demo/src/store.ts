@@ -22,6 +22,7 @@ import {
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
   buildDecisionContent,
+  choixClientValides,
   coupDeCoeurId as toCoupId,
   decisionVisibility,
   filPhotoId as toFilPhotoId,
@@ -36,6 +37,7 @@ import {
   type CommCanal,
   type Contact,
   type CoupDeCoeur,
+  type DecisionEvent,
   type DemandeResolution,
   type ActionPriorite,
   type Event,
@@ -92,6 +94,10 @@ const CONTACTS_KEY = 'phenix-demo:contacts:v1';
 // Ce n'est pas un fait du Journal (qui reste l'unique source de vérité) mais un
 // simple accusé de lecture qui éteint les notifications une fois consultées.
 const SEEN_KEY = 'phenix-demo:seen:v1';
+// Choix client validés « pris en compte » par le conducteur (device-local) :
+// `decisionEventId → ISO`. Éteint la notification « choix à traiter » une fois
+// l'action engagée (commande, artisan, planning). Accusé, pas un fait métier.
+const CHOIX_TRAITES_KEY = 'phenix-demo:choix-traites:v1';
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -228,6 +234,8 @@ export interface DemoSnapshot extends BackendState {
   clientTarget: ClientTarget | null;
   /** Accusés de lecture des Moments, par rôle (éteint les notifications). */
   seen: SeenState;
+  /** Choix client validés « pris en compte » : `decisionEventId → ISO`. */
+  choixTraites: Record<string, string>;
   /**
    * L'espace de travail est-il initialisé ? `false` au tout premier lancement :
    * on propose alors un CHOIX (découvrir la démo / démarrer à vide) plutôt que
@@ -269,6 +277,7 @@ function build(): DemoSnapshot {
     momentFocus,
     clientTarget,
     seen: readJson<SeenState>(SEEN_KEY, {}),
+    choixTraites: readJson<Record<string, string>>(CHOIX_TRAITES_KEY, {}),
     seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
   };
 }
@@ -294,6 +303,7 @@ const WORKSPACE_KEYS = [
   SHARES_KEY,
   CONTACTS_KEY,
   SEEN_KEY,
+  CHOIX_TRAITES_KEY,
 ] as const;
 
 /** Marqueur du format de sauvegarde (pour reconnaître un fichier valide). */
@@ -382,6 +392,17 @@ export const demo = {
     forRole[momentId] = new Date().toISOString();
     seen[role] = forRole;
     localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    refresh();
+    broadcast();
+  },
+  /**
+   * Marque un choix client validé comme PRIS EN COMPTE par le conducteur : il a
+   * lancé l'action (commande, artisan, planning). Éteint la notification.
+   */
+  markChoixTraite(decisionEventId: string): void {
+    const map = readJson<Record<string, string>>(CHOIX_TRAITES_KEY, {});
+    map[decisionEventId] = new Date().toISOString();
+    localStorage.setItem(CHOIX_TRAITES_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -1785,6 +1806,20 @@ export function mostRecentPendingTeamMoment(
   projectId: string | null | undefined,
 ): string | undefined {
   return mostRecentMoment(snap, projectId, pendingTeamMoments(snap, projectId));
+}
+
+/**
+ * Choix client validés que le CONDUCTEUR doit encore prendre en compte : les
+ * choix validés du chantier, moins ceux déjà marqués « pris en compte » (accusé
+ * local). Symétrique des décisions « en attente » — ici, c'est à lui d'agir.
+ */
+export function choixClientValidesATraiter(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): DecisionEvent[] {
+  if (!projectId) return [];
+  const events = snap.events.filter((e) => e.projectId === projectId);
+  return choixClientValides(events).filter((e) => snap.choixTraites[e.id] === undefined);
 }
 
 /** Le Fil d'un projet (moments + annotations + zones). */

@@ -6,7 +6,7 @@
  * ADR-004 §4). Sélecteurs purs, sans dépendance — réutilisables côté interface
  * PHÉNIX, espace client, et passerelle/assistant.
  */
-import type { DocumentEvent, Event, PhotoEvent, DemandeEvent } from './event.js';
+import type { DecisionEvent, DocumentEvent, Event, PhotoEvent, DemandeEvent } from './event.js';
 import {
   isCompteRendu,
   isDecision,
@@ -152,6 +152,22 @@ export function projectHistory(events: Event[]): Event[] {
 /** Décisions en attente du client (anciennes d'abord : on traite la plus vieille). */
 export function pendingClientDecisions(events: Event[]): Decision[] {
   return sortByDate(events.filter(isAwaitingClientDecision), 'asc').map(toDecision);
+}
+
+/**
+ * Choix VALIDÉS par le client (une ambiance/option retenue, ou choix confié à
+ * PHÉNIX). Symétrique de `pendingClientDecisions` : là où celui-ci dit « le
+ * client doit agir », celui-ci dit « le CONDUCTEUR doit agir » (commander,
+ * prévenir l'artisan, mettre à jour le planning). Récents d'abord. Lecture
+ * filtrée du journal — l'« accusé de prise en compte » vit côté application.
+ */
+export function choixClientValides(events: Event[]): DecisionEvent[] {
+  return sortByDate(
+    events
+      .filter(isDecision)
+      .filter((e) => e.content.kind === 'validee' || e.content.kind === 'deleguee'),
+    'desc',
+  );
 }
 
 /** État du bandeau d'accueil client — une seule priorité. */

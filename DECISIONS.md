@@ -81,6 +81,17 @@ Tension notée (non tranchée) : côté conducteur, « consulter = éteindre » 
 masquer un commentaire encore SANS RÉPONSE. À surveiller en terrain : faut-il, un
 jour, distinguer « lu » de « traité » côté conducteur ? Pour l'instant, un seul
 état « lu » — la simplicité prime.
+
+04/07 — cherché · Décisions client — l'AUTRE sens
+Fait : quand le client VALIDE un choix (ex. une ambiance), le conducteur ne le
+voyait nulle part de façon proactive ; or c'est le signal qui déclenche une
+commande, un appel à l'artisan, une mise à jour du planning.
+Lecture produit : une décision a DEUX faces — « le client doit agir » (en
+attente) et « le conducteur doit agir » (choix validé). Aujourd'hui doit porter
+les deux. Ici, contrairement au commentaire, « consulter » ne suffit pas :
+c'est une action à engager → on distingue « validé » de « pris en compte », et
+seul le geste explicite « Pris en compte » éteint la notification (le radar ne
+doit pas retomber sur un simple coup d'œil).
 ```
 
 ---

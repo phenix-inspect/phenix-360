@@ -20,9 +20,9 @@ try {
   await openDemo(page);
 
   await assert('Le compteur « décisions clients » FILTRE la journée', async () => {
-    await page.getByRole('button', { name: /Filtrer.*décisions clients/i }).click();
+    await page.getByRole('button', { name: /Filtrer.*décisions en attente/i }).click();
     await page
-      .getByRole('heading', { name: 'Décisions client à traiter' })
+      .getByRole('heading', { name: 'Décisions client en attente' })
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
@@ -75,7 +75,7 @@ try {
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByRole('button', { name: /Filtrer.*décisions clients/i }).click();
+    await page.getByRole('button', { name: /Filtrer.*décisions en attente/i }).click();
     await page.getByText(DECISION_LYON).first().click();
     await page
       .getByRole('tab', { name: 'Suivi', selected: true })
