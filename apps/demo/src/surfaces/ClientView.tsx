@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Badge, Card, CardContent } from '@phenix360/ui';
-import { CalendarRange, ClipboardList, FileText, Palette } from 'lucide-react';
+import { CalendarRange, ClipboardList, FileText, MessageCircle, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   buildClientDecisions,
@@ -15,7 +15,7 @@ import {
   type EventActor,
   type Project,
 } from '@phenix360/core';
-import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, nameOf, pendingTeamMessageCount, type DemoSnapshot } from '../store';
 import { SmartBanner } from '../components/SmartBanner';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
@@ -59,6 +59,9 @@ export function ClientView({
   // documents d'un côté, les comptes rendus de l'autre.
   const clientDocuments = updates.filter((e) => e.type === 'document');
   const comptesRendus = updates.filter((e) => e.type === 'compte_rendu');
+  // Notification client : l'équipe a laissé un mot sur le récit (symétrique du
+  // signal conducteur). Un clic emmène le client vers le récit.
+  const teamMessages = pendingTeamMessageCount(snap, project.id);
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -136,6 +139,22 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
+      {teamMessages > 0 && (
+        <button
+          type="button"
+          onClick={() =>
+            document
+              .getElementById('section-fil')
+              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }
+          className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
+        >
+          <MessageCircle aria-hidden />
+          Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} — voir le
+          récit
+        </button>
+      )}
+
       <div id="section-decision" className="rounded-2xl">
         {clientDecision ? (
           <ClientDecisionBanner

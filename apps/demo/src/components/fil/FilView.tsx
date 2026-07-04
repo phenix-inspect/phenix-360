@@ -11,7 +11,14 @@ import {
   type Project,
 } from '@phenix360/core';
 import { ImagePlus, Images } from 'lucide-react';
-import { demo, filOf, nameOf, pendingClientMoments, type DemoSnapshot } from '../../store';
+import {
+  demo,
+  filOf,
+  nameOf,
+  pendingClientMoments,
+  pendingTeamMoments,
+  type DemoSnapshot,
+} from '../../store';
 import { FilMoment } from './FilMoment';
 import { BibliothequeView } from './BibliothequeView';
 import { MomentComposer } from './MomentComposer';
@@ -41,7 +48,15 @@ export function FilView({
   const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
   const [gallery, setGallery] = useState<{ moment: Moment; photoId?: string } | null>(null);
   const { moments, coups, messages, zones, annotations } = filOf(snap, project.id);
-  const pending = pendingClientMoments(snap, project.id);
+  // Signal « nouveau message » symétrique : côté conducteur, un commentaire client
+  // en attente ; côté client, un mot de l'équipe non encore vu.
+  const viewerIsClient = actor.role === 'client';
+  const pending = viewerIsClient
+    ? pendingTeamMoments(snap, project.id)
+    : pendingClientMoments(snap, project.id);
+  const pendingText = viewerIsClient
+    ? 'Nouveau message de votre équipe'
+    : 'Nouveau commentaire du client — à vous de répondre';
   const viewer: AudienceGroup = actor.role === 'client' ? 'client' : 'phenix';
   const entries = filDuChantier(moments, { viewer });
   const images = bibliothequeImages(moments, { viewer });
@@ -137,8 +152,8 @@ export function FilView({
                 locked={momentVerrouille(entry.moment.id, coups, messages)}
                 canDelete={canCompose}
                 canShare={canCompose}
-                // Signal « nouveau commentaire client » côté conducteur uniquement.
-                pendingComment={actor.role !== 'client' && pending.has(entry.moment.id)}
+                pendingComment={pending.has(entry.moment.id)}
+                pendingText={pendingText}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)

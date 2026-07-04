@@ -32,6 +32,7 @@ export function FilMoment({
   canDelete,
   canShare,
   pendingComment = false,
+  pendingText = 'Nouveau commentaire du client — à vous de répondre',
   onToggleCoup,
   onSendMessage,
   onOpenGallery,
@@ -48,8 +49,10 @@ export function FilMoment({
   canDelete: boolean;
   /** Le conducteur peut voir l'état de partage et publier au client. */
   canShare: boolean;
-  /** Le client a laissé le dernier message → réponse du conducteur attendue. */
+  /** Un message est en attente sous ce Moment (côté conducteur OU client). */
   pendingComment?: boolean;
+  /** Libellé du signal (dépend du point de vue). */
+  pendingText?: string;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
   onOpenGallery: () => void;
@@ -89,7 +92,7 @@ export function FilMoment({
       <div className="space-y-5 p-6">
         {pendingComment && (
           <div className="flex items-center gap-1.5 rounded-lg bg-gold-100 px-3 py-1.5 text-xs font-medium text-gold-800 [&_svg]:size-3.5">
-            <MessageCircle aria-hidden /> Nouveau commentaire du client — à vous de répondre
+            <MessageCircle aria-hidden /> {pendingText}
           </div>
         )}
         {/* Auteur + date (+ pièce discrète) */}

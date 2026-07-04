@@ -1609,12 +1609,27 @@ export function communicationsOf(snap: DemoSnapshot, contactId: string): Event[]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Dernier message de chaque Moment (source unique des « en attente »). */
+function lastMessagePerMoment(messages: Message[]): Map<string, Message> {
+  const byMoment = new Map<string, Message[]>();
+  for (const m of messages) {
+    const arr = byMoment.get(m.momentId) ?? [];
+    arr.push(m);
+    byMoment.set(m.momentId, arr);
+  }
+  const last = new Map<string, Message>();
+  for (const [id, arr] of byMoment) {
+    const l = [...arr].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+    if (l) last.set(id, l);
+  }
+  return last;
+}
+
 /**
- * Moments d'un chantier dont le DERNIER message est du CLIENT — donc en attente
- * d'une réponse du conducteur (« la balle est dans son camp »). Sert à ne jamais
- * perdre un commentaire client : signalé dans Aujourd'hui + sur le Moment. Le
- * simple fait que le conducteur réponde vide l'état (son message devient le
- * dernier). Aucun modèle « lu/non-lu » : on lit l'ordre des messages.
+ * Moments dont le DERNIER message est du CLIENT — en attente d'une réponse du
+ * CONDUCTEUR (« la balle est dans son camp »). Signalé dans Aujourd'hui + sur le
+ * Moment. Répondre vide l'état (le message du conducteur devient le dernier).
+ * Aucun modèle « lu/non-lu » : on lit l'ordre des messages.
  */
 export function pendingClientMoments(
   snap: DemoSnapshot,
@@ -1622,16 +1637,8 @@ export function pendingClientMoments(
 ): Set<string> {
   const pending = new Set<string>();
   if (!projectId) return pending;
-  const byMoment = new Map<string, Message[]>();
-  for (const m of snap.fil.messages[projectId] ?? []) {
-    const arr = byMoment.get(m.momentId) ?? [];
-    arr.push(m);
-    byMoment.set(m.momentId, arr);
-  }
-  for (const [momentId, arr] of byMoment) {
-    const last = [...arr].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
-    if (last && last.authorRole === 'client') pending.add(momentId);
-  }
+  for (const [id, last] of lastMessagePerMoment(snap.fil.messages[projectId] ?? []))
+    if (last.authorRole === 'client') pending.add(id);
   return pending;
 }
 
@@ -1641,6 +1648,34 @@ export function pendingClientCommentCount(
   projectId: string | null | undefined,
 ): number {
   return pendingClientMoments(snap, projectId).size;
+}
+
+/**
+ * SYMÉTRIQUE côté client : moments PARTAGÉS au client dont le dernier message est
+ * de l'ÉQUIPE (conducteur). C'est un mot du conducteur que le client n'a pas
+ * encore vu/traité → on le notifie dans son espace. Répondre (côté client) vide
+ * l'état. Ne concerne que les moments visibles du client (jamais l'interne).
+ */
+export function pendingTeamMoments(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): Set<string> {
+  const pending = new Set<string>();
+  if (!projectId) return pending;
+  const shared = new Set<string>(
+    (snap.fil.moments[projectId] ?? []).filter(momentPartageClient).map((m) => m.id),
+  );
+  for (const [id, last] of lastMessagePerMoment(snap.fil.messages[projectId] ?? []))
+    if (shared.has(id) && last.authorRole !== 'client') pending.add(id);
+  return pending;
+}
+
+/** Nombre de moments avec un message d'équipe en attente côté client. */
+export function pendingTeamMessageCount(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): number {
+  return pendingTeamMoments(snap, projectId).size;
 }
 
 /** Le Fil d'un projet (moments + annotations + zones). */

@@ -70,9 +70,23 @@ try {
   });
 
   await assert(
-    'Client-safe : la réponse conducteur reste dans le récit partagé (pas de fuite interne)',
+    'Notification CLIENT : l’équipe a répondu → signalé dans l’espace client',
     async () => {
       await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      await page
+        .getByText(/Votre équipe vous a laissé.*message/)
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      await page
+        .getByText('Nouveau message de votre équipe')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    },
+  );
+
+  await assert(
+    'Client-safe : la réponse conducteur reste dans le récit partagé (pas de fuite interne)',
+    async () => {
       await page.waitForTimeout(500);
       // La réponse est visible au client (récit partagé) — c'est voulu ; mais rien
       // d'interne ne fuit à côté.
