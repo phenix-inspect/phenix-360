@@ -594,3 +594,27 @@ source de vérité).
 (dépôt → bibliothèque, résolution du fichier via l'événement). Gate vert
 (typecheck/lint/prettier/build). `documents.test` 5/5 (dépôt → fourni + fichier
 ouvrable, remontée au Journal, client-safe), preparation 9/9. VISION Art. 7, 8, 9.
+
+## 04/07/2026 — RC1 : commentaires client → conducteur (sans read/unread, sans messagerie)
+
+**Décision (retours terrain 7 & 8) :** un commentaire client ne doit jamais se
+perdre. Le conducteur est SIGNALÉ dans « Aujourd'hui » (badge « N commentaire(s)
+client » sur la carte chantier), le clic ouvre **droit sur le Récit**, et le
+Moment concerné porte « Nouveau commentaire du client ». Le conducteur **répond
+dans le fil contextuel** déjà existant sous le Moment (aucune messagerie globale).
+
+**Mécanique :** aucun modèle « lu / non-lu » — l'état est **dérivé de l'ordre des
+messages** : un Moment est « en attente » si le DERNIER message de son fil est du
+client (`pendingClientMoments`). Répondre suffit à vider le signal (le message du
+conducteur devient le dernier). Réversible, sans nouvelle donnée persistée.
+
+**Sans nouvel écran ni concept :** on réutilise Aujourd'hui, la carte chantier,
+l'onglet Récit, le fil de messages existant (le client commentait déjà, le
+conducteur pouvait déjà répondre — ce qui manquait, c'était le SIGNAL).
+**Alternatives rejetées :** centre de notifications dédié (nouvel écran) ;
+messagerie globale (hors contexte) ; drapeau lu/non-lu persisté (état en plus).
+
+**Impact :** store `pendingClientMoments` / `pendingClientCommentCount` ;
+`AujourdhuiView` (badge + ouverture ciblée), `App`/`CompagnonView` (onglet
+d'ouverture imposé), `FilView`/`FilMoment` (marqueur conducteur). `comments.test`
+7/7. VISION Art. 3, 9, 11.

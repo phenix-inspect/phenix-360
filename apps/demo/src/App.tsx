@@ -60,6 +60,8 @@ export function App(): React.JSX.Element {
   const [creating, setCreating] = useState(false);
   const [annuaire, setAnnuaire] = useState(false);
   const [managing, setManaging] = useState(false);
+  // Onglet d'ouverture imposé au chantier (ex. « Récit » depuis un commentaire client).
+  const [compaTab, setCompaTab] = useState<'fil' | undefined>(undefined);
   const [chantierForm, setChantierForm] = useState<ChantierFormState>(null);
 
   // Tout premier lancement : on propose un choix (démo / à vide) au lieu de
@@ -193,8 +195,9 @@ export function App(): React.JSX.Element {
           ) : (
             <AujourdhuiView
               snap={snap}
-              onOpenChantier={(id) => {
+              onOpenChantier={(id, tab) => {
                 demo.setActiveProject(projectId(id));
+                setCompaTab(tab);
                 setView('compagnon');
               }}
               onCloturer={() => setView('soir')}
@@ -205,7 +208,7 @@ export function App(): React.JSX.Element {
         ) : activeProject === null ? (
           <NoProject onNew={() => setCreating(true)} />
         ) : view === 'compagnon' ? (
-          <CompagnonView snap={snap} project={activeProject} />
+          <CompagnonView snap={snap} project={activeProject} initialTab={compaTab} />
         ) : view === 'artisan' ? (
           <ArtisanView snap={snap} project={activeProject} />
         ) : (

@@ -15,7 +15,7 @@ import {
   Sunrise,
   Truck,
 } from 'lucide-react';
-import { nameOf, type DemoSnapshot } from '../store';
+import { nameOf, pendingClientCommentCount, type DemoSnapshot } from '../store';
 
 /**
  * « Aujourd'hui » — le point du matin. Le conducteur ouvre PHÉNIX et voit SA
@@ -28,7 +28,7 @@ export function AujourdhuiView({
   onCloturer,
 }: {
   snap: DemoSnapshot;
-  onOpenChantier: (projectId: string) => void;
+  onOpenChantier: (projectId: string, tab?: 'fil') => void;
   onCloturer: () => void;
 }): React.JSX.Element {
   const compagnon = snap.members.find((m) => m.role === 'compagnon');
@@ -138,16 +138,21 @@ export function AujourdhuiView({
           Mes chantiers ({t.chantiers})
         </h2>
         <div className="space-y-2">
-          {briefing.chantiers.map((c) => (
-            <ChantierCard
-              key={c.projectId}
-              domId={`chantier-${c.projectId}`}
-              chantier={c}
-              clientName={nameOf(snap, projectClientId(snap, c.projectId))}
-              active={c.projectId === activeId}
-              onOpen={() => onOpenChantier(c.projectId)}
-            />
-          ))}
+          {briefing.chantiers.map((c) => {
+            const comments = pendingClientCommentCount(snap, c.projectId);
+            return (
+              <ChantierCard
+                key={c.projectId}
+                domId={`chantier-${c.projectId}`}
+                chantier={c}
+                clientName={nameOf(snap, projectClientId(snap, c.projectId))}
+                active={c.projectId === activeId}
+                clientComments={comments}
+                // Un commentaire client en attente → on ouvre droit sur le Récit.
+                onOpen={() => onOpenChantier(c.projectId, comments > 0 ? 'fil' : undefined)}
+              />
+            );
+          })}
         </div>
       </section>
 
@@ -231,16 +236,23 @@ function ChantierCard({
   chantier,
   clientName,
   active,
+  clientComments = 0,
   onOpen,
 }: {
   domId: string;
   chantier: ChantierResume;
   clientName: string;
   active?: boolean;
+  clientComments?: number;
   onOpen: () => void;
 }): React.JSX.Element {
   const c = chantier;
   const badges: { label: string; accent?: boolean }[] = [];
+  if (clientComments > 0)
+    badges.push({
+      label: `${clientComments} commentaire${clientComments > 1 ? 's' : ''} client`,
+      accent: true,
+    });
   if (c.decisions > 0) badges.push({ label: `${c.decisions} décision client`, accent: true });
   if (c.actions > 0)
     badges.push({ label: `${c.actions} action${c.actions > 1 ? 's' : ''}`, accent: true });

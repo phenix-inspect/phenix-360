@@ -67,12 +67,17 @@ interface ActionDef {
   icon: React.ReactNode;
 }
 
+type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique';
+
 export function CompagnonView({
   snap,
   project,
+  initialTab,
 }: {
   snap: DemoSnapshot;
   project: Project;
+  /** Onglet d'ouverture imposé (ex. « Récit » quand un client a commenté). */
+  initialTab?: CompagnonTab;
 }): React.JSX.Element {
   const actor = compagnonActor(snap, project);
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
@@ -82,9 +87,9 @@ export function CompagnonView({
   const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
-  // lancement (onglet Préparation) ; sinon, le suivi du jour.
-  const [tab, setTab] = useState<'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique'>(
-    dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi',
+  // lancement (onglet Préparation) ; sinon, le suivi du jour — sauf onglet imposé.
+  const [tab, setTab] = useState<CompagnonTab>(
+    initialTab ?? (dossier && project.status === 'en_preparation' ? 'preparation' : 'suivi'),
   );
 
   const attention = buildChantierAttention(dossier, events);

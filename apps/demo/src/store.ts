@@ -1609,6 +1609,40 @@ export function communicationsOf(snap: DemoSnapshot, contactId: string): Event[]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/**
+ * Moments d'un chantier dont le DERNIER message est du CLIENT — donc en attente
+ * d'une réponse du conducteur (« la balle est dans son camp »). Sert à ne jamais
+ * perdre un commentaire client : signalé dans Aujourd'hui + sur le Moment. Le
+ * simple fait que le conducteur réponde vide l'état (son message devient le
+ * dernier). Aucun modèle « lu/non-lu » : on lit l'ordre des messages.
+ */
+export function pendingClientMoments(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): Set<string> {
+  const pending = new Set<string>();
+  if (!projectId) return pending;
+  const byMoment = new Map<string, Message[]>();
+  for (const m of snap.fil.messages[projectId] ?? []) {
+    const arr = byMoment.get(m.momentId) ?? [];
+    arr.push(m);
+    byMoment.set(m.momentId, arr);
+  }
+  for (const [momentId, arr] of byMoment) {
+    const last = [...arr].sort((a, b) => a.createdAt.localeCompare(b.createdAt)).at(-1);
+    if (last && last.authorRole === 'client') pending.add(momentId);
+  }
+  return pending;
+}
+
+/** Nombre de moments en attente d'une réponse du conducteur (commentaires clients). */
+export function pendingClientCommentCount(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): number {
+  return pendingClientMoments(snap, projectId).size;
+}
+
 /** Le Fil d'un projet (moments + annotations + zones). */
 export function filOf(
   snap: DemoSnapshot,
