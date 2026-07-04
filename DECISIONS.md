@@ -213,6 +213,23 @@ statuts présents), et un simple dropdown sur l'écran chantier pour la transiti
 unique : le même `status` alimente Aujourd'hui, le chantier, l'aperçu client et
 l'export/import. Rejeté (challenge) : un écran « Liste des chantiers » — Aujourd'hui
 reste le seul point d'entrée, on l'enrichit, on n'ajoute pas de page.
+
+04/07 — cherché · Retrouver le bon dossier quand il y en a beaucoup (filtres)
+Fait : à 3 chantiers ça va ; à 20, « Mes chantiers » devient une liste à faire
+défiler. Le conducteur veut isoler vite : par statut, par ville, par client, par
+« ce qui reste à faire » (Art. 3 piloter la journée, Art. 10 ne rien laisser
+tomber).
+Lecture produit : Aujourd'hui devient un vrai tableau de pilotage, sans nouvel
+écran. Défi UX assumé (Art. 11) : quatre filtres visibles en permanence
+alourdiraient l'écran. On garde donc le STATUT en puces toujours visibles (le tri
+le plus fréquent, au coup d'œil) et on REPLIE ville / client / urgence derrière un
+bouton « Filtres » (badge du nombre d'affinages actifs). Tout se combine, à
+l'instant ; « Réinitialiser » remet à plat ; le titre compte les chantiers
+affichés (« 2 sur 3 ») ; « aucun résultat » affiche un message clair + une sortie.
+Rien d'inventé : la ville est DÉRIVÉE de l'adresse (jamais de valeur creuse si
+l'adresse manque), le client vient du carnet, l'urgence relit les mêmes compteurs
+que le matin. Dette réglée au passage : l'adresse du chantier principal ne vivait
+que dans le dossier — on la porte aussi sur le projet pour que la ville se dérive.
 ```
 
 ---

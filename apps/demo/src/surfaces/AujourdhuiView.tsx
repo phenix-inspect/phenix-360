@@ -23,6 +23,7 @@ import {
   MessageSquare,
   MoonStar,
   PackageCheck,
+  SlidersHorizontal,
   Sunrise,
   Truck,
   X,
@@ -36,6 +37,7 @@ import {
   type DemoSnapshot,
 } from '../store';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_SHORT } from '../lib/status';
+import { cityOf } from '../lib/ville';
 import type { CompagnonTab } from './CompagnonView';
 
 /**
@@ -62,6 +64,18 @@ function choixLabel(e: DecisionEvent): string {
   return c.optionLabel ? `${c.categorie} — ${c.optionLabel}` : `Choix ${c.categorie.toLowerCase()}`;
 }
 
+/** Les axes d'« urgence » qui filtrent la liste des chantiers (ce qui reste à faire). */
+type UrgenceKind = 'actions' | 'decisions' | 'reserves' | 'commentaires' | 'livraisons';
+
+const URGENCE_LABEL: Record<UrgenceKind, string> = {
+  actions: 'Avec actions à faire',
+  decisions: 'Avec décisions client',
+  reserves: 'Avec réserves à lever',
+  commentaires: 'Avec commentaires client',
+  livraisons: 'Avec livraisons',
+};
+const URGENCE_KINDS = Object.keys(URGENCE_LABEL) as UrgenceKind[];
+
 export function AujourdhuiView({
   snap,
   onOpenChantier,
@@ -74,8 +88,14 @@ export function AujourdhuiView({
   const compagnon = snap.members.find((m) => m.role === 'compagnon');
   const prenom = compagnon ? nameOf(snap, compagnon.userId) : 'Mickaël';
   const [filter, setFilter] = useState<FilterKind | null>(null);
-  // Filtre par STATUT métier (barre au-dessus de « Mes chantiers »). 'all' = tous.
+  // Filtres de pilotage de la liste « Mes chantiers ». Ils se COMBINENT tous.
+  // Statut : barre de puces toujours visible (le plus consulté au coup d'œil).
   const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
+  // Ville / client / urgence : affinages, repliés derrière « Filtres ».
+  const [villeFilter, setVilleFilter] = useState<string | 'all'>('all');
+  const [clientFilter, setClientFilter] = useState<string | 'all'>('all');
+  const [urgenceFilter, setUrgenceFilter] = useState<UrgenceKind | 'all'>('all');
+  const [showFilters, setShowFilters] = useState(false);
 
   const eventsByProject: Record<string, Event[]> = {};
   for (const e of snap.events) (eventsByProject[e.projectId] ??= []).push(e);
@@ -168,14 +188,69 @@ export function AujourdhuiView({
     ? briefing.chantiers.filter((c) => countFor(filter, c) > 0)
     : briefing.chantiers;
 
-  // Répartition par STATUT métier (source de vérité : project.status, porté par
-  // ChantierResume). Sert la barre de filtres et le filtrage instantané.
+  // --- Filtres de pilotage (statut / ville / client / urgence), combinés. ---
+  const projectById = (id: string) => snap.projects.find((p) => p.id === id);
+  const villeOf = (c: ChantierResume): string | null => cityOf(projectById(c.projectId)?.address);
+  const clientIdOf = (c: ChantierResume): string | undefined =>
+    projectById(c.projectId)?.clientId ?? undefined;
+
+  // Options DÉRIVÉES des chantiers (aucune saisie) : on n'affiche que le réel.
+  const villeOptions = Array.from(
+    new Set(briefing.chantiers.map(villeOf).filter((v): v is string => v !== null)),
+  ).sort((a, b) => a.localeCompare(b, 'fr'));
+  const clientOptions = Array.from(
+    new Set(briefing.chantiers.map(clientIdOf).filter((v): v is string => v !== undefined)),
+  )
+    .map((id) => ({ id, name: nameOf(snap, id) }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+
+  const matchVille = (c: ChantierResume): boolean =>
+    villeFilter === 'all' || villeOf(c) === villeFilter;
+  const matchClient = (c: ChantierResume): boolean =>
+    clientFilter === 'all' || clientIdOf(c) === clientFilter;
+  const hasUrgence = (c: ChantierResume, k: UrgenceKind): boolean => {
+    switch (k) {
+      case 'actions':
+        return c.actions > 0;
+      case 'decisions':
+        return c.decisions > 0;
+      case 'reserves':
+        return c.reserves > 0;
+      case 'commentaires':
+        return pendingClientCommentCount(snap, c.projectId) > 0;
+      case 'livraisons':
+        return c.livraisons > 0;
+    }
+  };
+  const matchUrgence = (c: ChantierResume): boolean =>
+    urgenceFilter === 'all' || hasUrgence(c, urgenceFilter);
+
+  // Base = tous les axes SAUF le statut, pour garder des compteurs de statut
+  // justes quand un autre filtre est actif (source de vérité : project.status).
+  const baseChantiers = briefing.chantiers.filter(
+    (c) => matchVille(c) && matchClient(c) && matchUrgence(c),
+  );
   const statusCount = (s: ProjectStatus): number =>
-    briefing.chantiers.filter((c) => c.status === s).length;
-  const chantiersByStatus =
-    statusFilter === 'all'
-      ? briefing.chantiers
-      : briefing.chantiers.filter((c) => c.status === statusFilter);
+    baseChantiers.filter((c) => c.status === s).length;
+  const chantiersFiltered = baseChantiers.filter(
+    (c) => statusFilter === 'all' || c.status === statusFilter,
+  );
+
+  const anyFilterActive =
+    statusFilter !== 'all' ||
+    villeFilter !== 'all' ||
+    clientFilter !== 'all' ||
+    urgenceFilter !== 'all';
+  const advancedActiveCount =
+    (villeFilter !== 'all' ? 1 : 0) +
+    (clientFilter !== 'all' ? 1 : 0) +
+    (urgenceFilter !== 'all' ? 1 : 0);
+  const resetFilters = (): void => {
+    setStatusFilter('all');
+    setVilleFilter('all');
+    setClientFilter('all');
+    setUrgenceFilter('all');
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -280,15 +355,36 @@ export function AujourdhuiView({
           </>
         ) : (
           <>
-            <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
-              Mes chantiers ({t.chantiers})
-            </h2>
-            {/* Barre de filtres par STATUT — un clic filtre la liste, sans recharger
-                ni ouvrir d'écran. « Tous » d'abord, puis chaque statut présent. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="font-serif text-lg font-semibold tracking-tight text-foreground">
+                Mes chantiers ({chantiersFiltered.length}
+                {chantiersFiltered.length !== t.chantiers ? ` sur ${t.chantiers}` : ''})
+              </h2>
+              <div className="flex items-center gap-2">
+                {anyFilterActive && (
+                  <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    <X aria-hidden /> Réinitialiser
+                  </Button>
+                )}
+                <Button
+                  variant={advancedActiveCount > 0 ? 'outline' : 'ghost'}
+                  size="sm"
+                  onClick={() => setShowFilters((v) => !v)}
+                  aria-expanded={showFilters}
+                >
+                  <SlidersHorizontal aria-hidden /> Filtres
+                  {advancedActiveCount > 0 ? ` (${advancedActiveCount})` : ''}
+                </Button>
+              </div>
+            </div>
+
+            {/* STATUT — puces toujours visibles : le tri le plus fréquent, au coup
+                d'œil. « Tous » d'abord, puis chaque statut présent (compteur juste,
+                cohérent avec les autres filtres actifs). */}
             <div className="flex flex-wrap gap-2">
               <StatusChip
                 label="Tous"
-                count={t.chantiers}
+                count={baseChantiers.length}
                 active={statusFilter === 'all'}
                 onClick={() => setStatusFilter('all')}
               />
@@ -302,28 +398,76 @@ export function AujourdhuiView({
                 />
               ))}
             </div>
-            <div className="space-y-2">
-              {chantiersByStatus.map((c) => {
-                const comments = pendingClientCommentCount(snap, c.projectId);
-                return (
-                  <ChantierCard
-                    key={c.projectId}
-                    domId={`chantier-${c.projectId}`}
-                    chantier={c}
-                    clientName={nameOf(snap, projectClientId(snap, c.projectId))}
-                    active={c.projectId === activeId}
-                    clientComments={comments}
-                    onOpen={() =>
-                      onOpenChantier(
-                        c.projectId,
-                        comments > 0 ? 'fil' : undefined,
-                        comments > 0 ? mostRecentPendingClientMoment(snap, c.projectId) : undefined,
-                      )
-                    }
-                  />
-                );
-              })}
-            </div>
+
+            {/* Affinages VILLE / CLIENT / URGENCE — repliés derrière « Filtres »
+                pour garder l'écran simple (Art. 11). Ils se combinent au statut. */}
+            {showFilters && (
+              <div className="grid gap-3 rounded-xl border border-border bg-surface p-3 sm:grid-cols-3">
+                <FilterSelect
+                  label="Ville"
+                  ariaLabel="Filtrer par ville"
+                  value={villeFilter}
+                  onChange={setVilleFilter}
+                  allLabel="Toutes les villes"
+                  options={villeOptions.map((v) => ({ value: v, label: v }))}
+                  emptyHint={villeOptions.length === 0 ? 'Aucune ville renseignée' : undefined}
+                />
+                <FilterSelect
+                  label="Client"
+                  ariaLabel="Filtrer par client"
+                  value={clientFilter}
+                  onChange={setClientFilter}
+                  allLabel="Tous les clients"
+                  options={clientOptions.map((c) => ({ value: c.id, label: c.name }))}
+                />
+                <FilterSelect
+                  label="Urgence"
+                  ariaLabel="Filtrer par urgence"
+                  value={urgenceFilter}
+                  onChange={(v) => setUrgenceFilter(v as UrgenceKind | 'all')}
+                  allLabel="Toutes"
+                  options={URGENCE_KINDS.map((k) => ({ value: k, label: URGENCE_LABEL[k] }))}
+                />
+              </div>
+            )}
+
+            {chantiersFiltered.length === 0 ? (
+              <div className="space-y-3 rounded-xl border border-dashed border-border bg-surface p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Aucun chantier ne correspond à ces filtres.
+                </p>
+                <div className="flex justify-center">
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    <X aria-hidden /> Réinitialiser les filtres
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {chantiersFiltered.map((c) => {
+                  const comments = pendingClientCommentCount(snap, c.projectId);
+                  return (
+                    <ChantierCard
+                      key={c.projectId}
+                      domId={`chantier-${c.projectId}`}
+                      chantier={c}
+                      clientName={nameOf(snap, projectClientId(snap, c.projectId))}
+                      active={c.projectId === activeId}
+                      clientComments={comments}
+                      onOpen={() =>
+                        onOpenChantier(
+                          c.projectId,
+                          comments > 0 ? 'fil' : undefined,
+                          comments > 0
+                            ? mostRecentPendingClientMoment(snap, c.projectId)
+                            : undefined,
+                        )
+                      }
+                    />
+                  );
+                })}
+              </div>
+            )}
           </>
         )}
       </section>
@@ -438,6 +582,46 @@ function StatusChip({
       {label}
       <span className={active ? 'text-gold-700' : 'text-foreground'}>({count})</span>
     </button>
+  );
+}
+
+/** Un select d'affinage (ville / client / urgence) : libellé + « tout » + options. */
+function FilterSelect({
+  label,
+  ariaLabel,
+  value,
+  onChange,
+  allLabel,
+  options,
+  emptyHint,
+}: {
+  label: string;
+  ariaLabel: string;
+  value: string;
+  onChange: (v: string) => void;
+  allLabel: string;
+  options: { value: string; label: string }[];
+  /** Message quand aucune option n'est dérivable (ex. aucune ville renseignée). */
+  emptyHint?: string;
+}): React.JSX.Element {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-medium text-muted-foreground">{label}</span>
+      <select
+        aria-label={ariaLabel}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={options.length === 0}
+        className="rounded-lg border border-input bg-surface px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400 disabled:opacity-60"
+      >
+        <option value="all">{emptyHint ?? allLabel}</option>
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

@@ -287,6 +287,7 @@ export function buildDemoSeed(): DemoSeed {
     id: pid,
     name: 'Appartement Lyon 6e',
     clientId,
+    address: '8 rue Vauban, 69006 Lyon',
     status: 'en_cours',
     currentStep: currentStep(events),
     createdAt: daysAgo(20),
@@ -860,6 +861,7 @@ export function buildDemoSeed(): DemoSeed {
   const makeChantier = (opts: {
     name: string;
     clientName: string;
+    address?: string;
     step: ProjectStep;
     status?: ProjectStatus;
     startedDaysAgo: number;
@@ -944,6 +946,7 @@ export function buildDemoSeed(): DemoSeed {
       id: cid,
       name: opts.name,
       clientId: clId,
+      address: opts.address,
       status: opts.status ?? 'en_cours',
       currentStep: opts.step,
       createdAt: daysAgo(opts.startedDaysAgo),
@@ -970,6 +973,7 @@ export function buildDemoSeed(): DemoSeed {
   makeChantier({
     name: 'Maison Écully',
     clientName: 'M. Dubois',
+    address: '12 chemin des Cuers, 69130 Écully',
     step: 'second_oeuvre',
     status: 'pre_reception',
     startedDaysAgo: 30,
@@ -982,6 +986,7 @@ export function buildDemoSeed(): DemoSeed {
   makeChantier({
     name: 'Duplex Croix-Rousse',
     clientName: 'Mme Bernard',
+    address: '5 rue des Pierres Plantées, 69004 Lyon',
     step: 'finitions',
     status: 'levee_reserves',
     startedDaysAgo: 55,
