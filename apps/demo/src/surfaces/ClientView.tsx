@@ -1,12 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Card, CardContent } from '@phenix360/ui';
 import { CalendarRange, ClipboardList, FileText, MessageCircle, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
+  bibliothequeImages,
   buildClientDecisions,
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
+  filDuChantier,
   isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
@@ -18,6 +20,7 @@ import {
 import {
   demo,
   dossierOf,
+  filOf,
   mostRecentPendingTeamMoment,
   nameOf,
   pendingTeamMessageCount,
@@ -69,6 +72,12 @@ export function ClientView({
   // Notification client : l'équipe a laissé un mot sur le récit (symétrique du
   // signal conducteur). Un clic emmène le client vers le récit.
   const teamMessages = pendingTeamMessageCount(snap, project.id);
+  // Le Récit et la Bibliothèque sont deux vues d'une même section : le sommaire
+  // pilote la vue affichée (Récit ↔ Bibliothèque) en plus du défilement.
+  const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
+  const filMoments = filOf(snap, project.id).moments;
+  const hasRecit = filDuChantier(filMoments, { viewer: 'client' }).some((e) => e.kind === 'moment');
+  const hasBiblio = bibliothequeImages(filMoments, { viewer: 'client' }).length > 0;
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -117,6 +126,47 @@ export function ClientView({
       ? decisions.filter((d) => d.eventId !== action.decision.eventId)
       : decisions;
 
+  // Sommaire horizontal : un raccourci vers chaque section de la page. Aucun
+  // nouvel écran — juste un défilement fluide. Une puce n'apparaît que si sa
+  // section a du contenu (VISION Art. 11 : jamais d'entrée creuse).
+  const goTo = (id: string): void =>
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const hasDecisions = clientDecision !== null || decisions.length > 0;
+  const sommaire: { label: string; onClick: () => void }[] = [
+    ...(hasDecisions ? [{ label: 'Décisions', onClick: () => goTo('section-decision') }] : []),
+    ...(dossier && dossierDated
+      ? [{ label: 'Planning', onClick: () => goTo('section-etapes') }]
+      : []),
+    ...(clientDocuments.length > 0
+      ? [{ label: 'Documents', onClick: () => goTo('section-documents') }]
+      : []),
+    ...(comptesRendus.length > 0
+      ? [{ label: 'Comptes rendus', onClick: () => goTo('section-comptes') }]
+      : []),
+    ...(hasRecit
+      ? [
+          {
+            label: 'Récit',
+            onClick: () => {
+              setFilView('fil');
+              goTo('section-fil');
+            },
+          },
+        ]
+      : []),
+    ...(hasBiblio
+      ? [
+          {
+            label: 'Bibliothèque',
+            onClick: () => {
+              setFilView('bibliotheque');
+              goTo('section-fil');
+            },
+          },
+        ]
+      : []),
+  ];
+
   // Navigation PHÉNIX : on ouvre l'écran ciblé (défilement + repère visuel).
   const clientTarget = snap.clientTarget;
   useEffect(() => {
@@ -146,6 +196,24 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
+      {sommaire.length > 0 && (
+        <nav
+          aria-label="Sommaire de votre espace"
+          className="flex flex-wrap gap-2 border-b border-border pb-4"
+        >
+          {sommaire.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={s.onClick}
+              className="inline-flex items-center rounded-full border border-border bg-surface px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 hover:text-gold-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
+      )}
+
       {teamMessages > 0 && (
         <button
           type="button"
@@ -167,7 +235,7 @@ export function ClientView({
         </button>
       )}
 
-      <div id="section-decision" className="rounded-2xl">
+      <div id="section-decision" className="scroll-mt-24 rounded-2xl">
         {clientDecision ? (
           <ClientDecisionBanner
             decision={clientDecision}
@@ -185,12 +253,19 @@ export function ClientView({
         </CardContent>
       </Card>
 
-      <div id="section-fil" className="rounded-2xl">
-        <FilView snap={snap} project={project} actor={actor} canCompose={false} />
+      <div id="section-fil" className="scroll-mt-24 rounded-2xl">
+        <FilView
+          snap={snap}
+          project={project}
+          actor={actor}
+          canCompose={false}
+          view={filView}
+          onViewChange={setFilView}
+        />
       </div>
 
       {dossier && dossierDated && (
-        <section id="section-etapes" className="space-y-3 rounded-2xl">
+        <section id="section-etapes" className="scroll-mt-24 space-y-3 rounded-2xl">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <CalendarRange aria-hidden />
             <h2 className="font-serif text-lg font-semibold tracking-tight">
@@ -250,7 +325,7 @@ export function ClientView({
       )}
 
       {clientDocuments.length > 0 && (
-        <section className="space-y-4">
+        <section id="section-documents" className="scroll-mt-24 space-y-4">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <FileText aria-hidden />
             <h2 className="font-serif text-lg font-semibold tracking-tight">Documents</h2>
@@ -266,7 +341,7 @@ export function ClientView({
       )}
 
       {comptesRendus.length > 0 && (
-        <section className="space-y-4">
+        <section id="section-comptes" className="scroll-mt-24 space-y-4">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <ClipboardList aria-hidden />
             <h2 className="font-serif text-lg font-semibold tracking-tight">Comptes rendus</h2>

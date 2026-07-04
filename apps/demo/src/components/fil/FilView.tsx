@@ -38,14 +38,23 @@ export function FilView({
   project,
   actor,
   canCompose,
+  view: viewProp,
+  onViewChange,
 }: {
   snap: DemoSnapshot;
   project: Project;
   actor: EventActor;
   canCompose: boolean;
+  /** Vue contrôlée (Récit / Bibliothèque) — le parent pilote (sommaire client). */
+  view?: 'fil' | 'bibliotheque';
+  onViewChange?: (view: 'fil' | 'bibliotheque') => void;
 }): React.JSX.Element {
   const [composing, setComposing] = useState(false);
-  const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
+  // Vue interne par défaut ; contrôlée si le parent fournit `view`/`onViewChange`.
+  const [internalView, setInternalView] = useState<'fil' | 'bibliotheque'>('fil');
+  const view = viewProp ?? internalView;
+  const setView = (v: 'fil' | 'bibliotheque'): void =>
+    onViewChange ? onViewChange(v) : setInternalView(v);
   const [gallery, setGallery] = useState<{ moment: Moment; photoId?: string } | null>(null);
   // Moment sur lequel poser le curseur de réponse (ouvert depuis une notification).
   const [focusMomentId, setFocusMomentId] = useState<string | null>(null);

@@ -92,6 +92,15 @@ les deux. Ici, contrairement au commentaire, « consulter » ne suffit pas :
 c'est une action à engager → on distingue « validé » de « pris en compte », et
 seul le geste explicite « Pris en compte » éteint la notification (le radar ne
 doit pas retomber sur un simple coup d'œil).
+
+04/07 — cherché · Se repérer dans l'Espace client
+Fait : la page client s'allonge (décisions, planning, documents, comptes rendus,
+récit, bibliothèque) ; le client défile longuement pour retrouver une section.
+Lecture produit : un simple sommaire de puces en haut, qui défile vers la
+section, suffit — pas d'onglets, pas d'écran. Une puce ne s'affiche que si sa
+section existe (jamais d'entrée creuse). Récit et Bibliothèque étant deux vues
+d'une même section, leur puce défile ET bascule la vue (sinon la puce est vide
+de sens).
 ```
 
 ---
