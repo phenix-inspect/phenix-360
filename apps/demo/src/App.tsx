@@ -217,19 +217,12 @@ export function App(): React.JSX.Element {
                 setView('compagnon');
               }}
               onCancel={() => setCreating(false)}
-              onQuickCreate={() => {
-                setCreating(false);
-                setChantierForm({ mode: 'create' });
-              }}
             />
           ) : annuaire ? (
             <Annuaire />
           ) : view === 'aujourdhui' ? (
             snap.projects.length === 0 ? (
-              <NoProject
-                onDeposer={() => setCreating(true)}
-                onVide={() => setChantierForm({ mode: 'create' })}
-              />
+              <NoProject onNew={() => setCreating(true)} />
             ) : (
               <AujourdhuiView
                 snap={snap}
@@ -247,10 +240,7 @@ export function App(): React.JSX.Element {
           ) : view === 'soir' ? (
             <PointDuSoirView snap={snap} onPreparerDemain={() => setView('aujourdhui')} />
           ) : activeProject === null ? (
-            <NoProject
-              onDeposer={() => setCreating(true)}
-              onVide={() => setChantierForm({ mode: 'create' })}
-            />
+            <NoProject onNew={() => setCreating(true)} />
           ) : view === 'compagnon' ? (
             <CompagnonView snap={snap} project={activeProject} initialTab={compaTab} />
           ) : view === 'artisan' ? (
@@ -265,10 +255,6 @@ export function App(): React.JSX.Element {
         open={managing}
         canEdit={activeProject !== null}
         onClose={() => setManaging(false)}
-        onNewChantier={() => {
-          setManaging(false);
-          setChantierForm({ mode: 'create' });
-        }}
         onEditChantier={() => {
           if (!activeProject) return;
           setManaging(false);
@@ -292,26 +278,17 @@ export function App(): React.JSX.Element {
   );
 }
 
-function NoProject({
-  onDeposer,
-  onVide,
-}: {
-  onDeposer: () => void;
-  onVide: () => void;
-}): React.JSX.Element {
+function NoProject({ onNew }: { onNew: () => void }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-xl py-10">
       <EmptyState
         icon={<HardHat aria-hidden />}
         title="Aucun chantier pour l'instant"
-        description="Déposez votre dossier (devis, plans, photos…) et PHÉNIX prépare le chantier pour vous. Ou créez un chantier vide, ou rechargez la démonstration."
+        description="Déposez votre dossier (devis, plans, photos…) et PHÉNIX prépare le chantier — ou renseignez simplement le nom pour un chantier vide. Vous pouvez aussi recharger la démonstration."
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={onDeposer}>
-              <Sparkles aria-hidden /> Déposer mon dossier
-            </Button>
-            <Button variant="outline" onClick={onVide}>
-              <HardHat aria-hidden /> Chantier vide
+            <Button onClick={onNew}>
+              <Sparkles aria-hidden /> Nouveau chantier
             </Button>
             <Button variant="ghost" onClick={() => demo.loadDemo()}>
               Charger la démonstration
@@ -327,14 +304,12 @@ function ManageDialog({
   open,
   canEdit,
   onClose,
-  onNewChantier,
   onEditChantier,
   onGuided,
 }: {
   open: boolean;
   canEdit: boolean;
   onClose: () => void;
-  onNewChantier: () => void;
   onEditChantier: () => void;
   onGuided: () => void;
 }): React.JSX.Element {
@@ -436,14 +411,10 @@ function ManageDialog({
             )}
 
             <div className="grid gap-2">
-              {/* Par défaut : PHÉNIX prépare à partir du dossier déposé. */}
+              {/* Un seul parcours : déposer le dossier OU renseigner le nom. */}
               <Button className="justify-start" onClick={onGuided}>
                 <Sparkles aria-hidden />
-                Nouveau chantier — déposer le dossier
-              </Button>
-              <Button variant="outline" className="justify-start" onClick={onNewChantier}>
-                <HardHat aria-hidden />
-                Créer un chantier vide
+                Nouveau chantier
               </Button>
               {canEdit && (
                 <Button variant="outline" className="justify-start" onClick={onEditChantier}>

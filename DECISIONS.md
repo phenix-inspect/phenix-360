@@ -183,6 +183,19 @@ aujourd'hui, `setDossierAnalyzer` pour un LLM demain, sans toucher aux écrans),
 (c) matérialisé les images déposées en Moment « Avant travaux » du Récit, (d)
 ajouté l'acompte aux documents détectés. Aucun faux OCR : simulation déterministe,
 remplaçable derrière la même signature.
+
+04/07 — friction · Un seul « Nouveau chantier », scène + synthèse
+Fait : deux boutons (« vide » / « déposer le dossier ») imposaient un choix
+inutile en amont ; et « C'est prêt » ne montrait presque rien de ce que PHÉNIX
+avait construit.
+Lecture produit : UN SEUL parcours « Nouveau chantier ». On dépose → si documents,
+PHÉNIX analyse ; sinon, bascule naturelle en création rapide (nom/client/adresse)
+sur le MÊME écran, avec un bouton qui s'adapte. La scène « prépare » est enrichie
+(chaque étape révèle le RÉEL trouvé : client, adresse, N étapes/commandes/choix…).
+Et « C'est prêt » devient un écran de SYNTHÈSE (client, bien, planning, commandes
++ fournisseurs, décisions, documents, photos avant travaux, alertes) avant
+d'entrer — « Ajuster le dossier » reste dispo pour le détail. Moins de choix en
+amont, plus de preuve de travail.
 ```
 
 ---

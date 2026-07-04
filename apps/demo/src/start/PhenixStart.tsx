@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BrandLockup, Button } from '@phenix360/ui';
+import { BrandLockup, Button, Input } from '@phenix360/ui';
 import {
   PREPARATION_STAGES,
   buildDossierSummary,
@@ -8,13 +8,18 @@ import {
 } from '@phenix360/core';
 import {
   ArrowRight,
+  CalendarRange,
   CheckCircle2,
   FileText,
+  Image as ImageIcon,
   Loader2,
-  Pencil,
+  MapPin,
+  Package,
+  Palette,
   Sparkles,
   TriangleAlert,
   UploadCloud,
+  User,
   X,
 } from 'lucide-react';
 import { demo } from '../store';
@@ -22,7 +27,7 @@ import { mediaUploader } from '../lib/media';
 import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
 
-type Phase = 'drop' | 'analysis' | 'ready' | 'review';
+type Phase = 'drop' | 'analysis' | 'synthesis' | 'review';
 interface Dropped {
   id: string;
   name: string;
@@ -31,90 +36,114 @@ interface Dropped {
 }
 
 /**
- * Création du projet. Le conducteur ne remplit pas un logiciel : il dépose le
- * devis signé, PHÉNIX prend de l'avance, puis il DÉCOUVRE un projet déjà
- * préparé qu'il n'a plus qu'à ajuster. Rien n'est créé sans validation finale.
- * L'analyse passe par le PORT unique `demo.analyzeDossier` (mock déterministe
- * aujourd'hui, LLM demain, sans changer cet écran).
+ * Création du chantier — UN SEUL parcours. Le conducteur dépose son dossier :
+ *  • si des documents sont là, PHÉNIX les ANALYSE (port unique déterministe) et
+ *    construit le chantier, puis affiche une SYNTHÈSE de tout ce qu'il a préparé ;
+ *  • sinon, il bascule naturellement en création rapide (nom, client, adresse).
+ * Rien n'est créé sans validation finale.
  */
 export function PhenixStart({
   onCreated,
   onCancel,
-  onQuickCreate,
 }: {
   onCreated: () => void;
   onCancel: () => void;
-  /** Bascule vers la création rapide (chantier vide). */
-  onQuickCreate: () => void;
 }): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>('drop');
   const [files, setFiles] = useState<Dropped[]>([]);
   const [proposal, setProposal] = useState<ProjectProposal | null>(null);
+  const [name, setName] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [address, setAddress] = useState('');
 
-  const onAnalysisDone = async () => {
+  const photos = (): UploadedMedia[] =>
+    files.map((f) => f.media).filter((m): m is UploadedMedia => m != null);
+
+  const prepare = async (): Promise<void> => {
     const result = await demo.analyzeDossier({ files: files.map((f) => ({ name: f.name })) });
-    setProposal(result);
-    setPhase('ready');
+    setProposal(name.trim() ? { ...result, projectName: name.trim() } : result);
+    setPhase('analysis');
   };
 
-  const validate = async (edited: ProjectProposal) => {
-    const photos = files.map((f) => f.media).filter((m): m is UploadedMedia => m != null);
-    await demo.createFromProposal(edited, photos);
+  const quickCreate = async (): Promise<void> => {
+    await demo.createChantier({
+      name: name.trim(),
+      clientName: clientName.trim() || undefined,
+      address: address.trim() || undefined,
+      startStep: 'gros_oeuvre',
+    });
     onCreated();
   };
 
-  if (phase === 'analysis') return <AnalysisScreen onDone={() => void onAnalysisDone()} />;
-  if (phase === 'ready' && proposal)
+  const enter = async (p: ProjectProposal): Promise<void> => {
+    await demo.createFromProposal(p, photos());
+    onCreated();
+  };
+
+  if (phase === 'analysis' && proposal)
+    return <AnalysisScene proposal={proposal} onDone={() => setPhase('synthesis')} />;
+  if (phase === 'synthesis' && proposal)
     return (
-      <ReadyScreen
+      <SynthesisScreen
         proposal={proposal}
-        onContinue={(duration) => {
-          setProposal({
-            ...proposal,
-            dossier: {
-              ...proposal.dossier,
-              infos: { ...proposal.dossier.infos, duration },
-            },
-          });
-          setPhase('review');
-        }}
+        photosCount={photos().length}
+        onEnter={() => void enter(proposal)}
+        onAdjust={() => setPhase('review')}
       />
     );
   if (phase === 'review' && proposal)
     return (
       <ProposalReview
         proposal={proposal}
-        onValidate={(p) => void validate(p)}
-        onCancel={() => setPhase('ready')}
+        onValidate={(p) => void enter(p)}
+        onCancel={() => setPhase('synthesis')}
       />
     );
 
   return (
-    <DropScreen
+    <NewChantierScreen
       files={files}
       setFiles={setFiles}
-      onStart={() => setPhase('analysis')}
+      name={name}
+      setName={setName}
+      clientName={clientName}
+      setClientName={setClientName}
+      address={address}
+      setAddress={setAddress}
+      onPrepare={() => void prepare()}
+      onQuickCreate={() => void quickCreate()}
       onCancel={onCancel}
-      onQuickCreate={onQuickCreate}
     />
   );
 }
 
 /* -------------------------------------------------------------------------- *
- * 1. Le dossier arrive — le devis signé est la base, obligatoire
+ * 1. Nouveau chantier — un seul écran : déposer OU renseigner
  * -------------------------------------------------------------------------- */
-function DropScreen({
+function NewChantierScreen({
   files,
   setFiles,
-  onStart,
-  onCancel,
+  name,
+  setName,
+  clientName,
+  setClientName,
+  address,
+  setAddress,
+  onPrepare,
   onQuickCreate,
+  onCancel,
 }: {
   files: Dropped[];
   setFiles: React.Dispatch<React.SetStateAction<Dropped[]>>;
-  onStart: () => void;
-  onCancel: () => void;
+  name: string;
+  setName: (v: string) => void;
+  clientName: string;
+  setClientName: (v: string) => void;
+  address: string;
+  setAddress: (v: string) => void;
+  onPrepare: () => void;
   onQuickCreate: () => void;
+  onCancel: () => void;
 }): React.JSX.Element {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -124,8 +153,6 @@ function DropScreen({
     for (const file of Array.from(list)) {
       const id = crypto.randomUUID();
       setFiles((prev) => [...prev, { id, name: file.name }]);
-      // Les images deviennent des « photos avant travaux » : on prépare le média
-      // en arrière-plan (le nom s'affiche tout de suite).
       if (file.type.startsWith('image/')) {
         void mediaUploader(file).then((media) =>
           setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, media } : f))),
@@ -134,7 +161,8 @@ function DropScreen({
     }
   };
 
-  const hasDevis = files.some((f) => f.name.toLowerCase().includes('devis'));
+  const hasFiles = files.length > 0;
+  const canQuick = name.trim().length > 0;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -143,8 +171,8 @@ function DropScreen({
           Nouveau chantier
         </h1>
         <p className="mx-auto max-w-lg text-sm text-muted-foreground">
-          Pour commencer, déposez le devis signé — c'est la base de votre chantier. Je m'occupe du
-          reste.
+          Déposez votre dossier (devis, plans, photos…) : PHÉNIX prépare le chantier pour vous. Sans
+          document, renseignez simplement le nom pour créer un chantier vide.
         </p>
       </header>
 
@@ -161,7 +189,7 @@ function DropScreen({
           setOver(false);
           add(e.dataTransfer.files);
         }}
-        className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-12 text-center transition-colors duration-base ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        className={`flex w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 text-center transition-colors duration-base ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
           over ? 'border-primary bg-gold-50' : 'border-border bg-surface hover:border-gold-300'
         }`}
       >
@@ -169,11 +197,11 @@ function DropScreen({
           <UploadCloud aria-hidden />
         </span>
         <span className="font-serif text-lg font-semibold tracking-tight text-foreground">
-          Déposez le devis signé
+          Déposez votre dossier
         </span>
         <span className="max-w-md text-sm text-muted-foreground">
-          Ajoutez aussi, si vous les avez, acompte, plans, DPE, diagnostics, photos, CCTP,
-          descriptif architecte… Vous pourrez en ajouter à tout moment.
+          Devis, acompte, plans, DPE, diagnostics, photos, CCTP, descriptif architecte… Vous pourrez
+          en ajouter à tout moment.
         </span>
         <input
           ref={inputRef}
@@ -184,7 +212,7 @@ function DropScreen({
         />
       </button>
 
-      {files.length > 0 && (
+      {hasFiles && (
         <ul className="space-y-2">
           {files.map((f) => {
             const isDevis = f.name.toLowerCase().includes('devis');
@@ -214,40 +242,107 @@ function DropScreen({
         </ul>
       )}
 
+      {/* Renseignements — utiles à la création rapide, ou pour nommer le chantier
+          préparé. Toujours accessibles : le parcours reste unique. */}
+      <div className="grid gap-3 rounded-2xl border border-border bg-surface p-4">
+        <label className="flex flex-col gap-1.5 text-sm">
+          <span className="font-medium text-foreground">Nom du chantier</span>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex. Rénovation appartement Lyon 6e"
+            aria-label="Nom du chantier"
+          />
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-foreground">Client</span>
+            <Input
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Ex. Mme Martin"
+              aria-label="Nom du client"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-foreground">Adresse</span>
+            <Input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Ex. 12 rue de la République, Lyon"
+              aria-label="Adresse du chantier"
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <div className="flex flex-wrap items-center justify-end gap-2">
           <Button variant="ghost" onClick={onCancel}>
             Annuler
           </Button>
-          <Button onClick={onStart} disabled={!hasDevis}>
-            <Sparkles aria-hidden /> Préparer mon chantier
-          </Button>
+          {hasFiles ? (
+            <Button onClick={onPrepare}>
+              <Sparkles aria-hidden /> Préparer mon chantier
+            </Button>
+          ) : (
+            <Button onClick={onQuickCreate} disabled={!canQuick}>
+              Créer le chantier <ArrowRight aria-hidden />
+            </Button>
+          )}
         </div>
         <p className="text-right text-xs text-muted-foreground">
-          {hasDevis
-            ? 'Devis signé détecté — je peux préparer le chantier.'
-            : 'Le devis signé est obligatoire pour démarrer un chantier.'}
+          {hasFiles
+            ? 'Documents détectés — PHÉNIX peut préparer le chantier.'
+            : 'Aucun document : renseignez au moins le nom pour créer un chantier vide.'}
         </p>
-      </div>
-
-      {/* Échappatoire : créer un chantier vide (nom, client, adresse). */}
-      <div className="border-t border-border pt-4 text-center">
-        <button
-          type="button"
-          onClick={onQuickCreate}
-          className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
-        >
-          Je préfère créer un chantier vide (nom, client, adresse)
-        </button>
       </div>
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- *
- * 2. PHÉNIX prépare (progression sereine)
+ * 2. PHÉNIX prépare — la scène, ENRICHIE : chaque étape révèle ce qui a été
+ *    réellement trouvé dans le dossier (pas un simple minuteur).
  * -------------------------------------------------------------------------- */
-function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
+function stageDetail(i: number, p: ProjectProposal): string | null {
+  const d = p.dossier;
+  const classes = d.documents.filter((x) => x.status === 'fourni').length;
+  switch (i) {
+    case 0:
+      return `${d.documents.length} documents`;
+    case 1:
+      return d.infos.clientName ?? null;
+    case 2:
+      return d.infos.address ?? null;
+    case 3:
+      return (
+        [d.infos.propertyType, d.infos.surface ? `${d.infos.surface} m²` : null]
+          .filter(Boolean)
+          .join(' · ') || null
+      );
+    case 4:
+      return `${d.roadmap.length} étapes`;
+    case 5:
+      return `${d.orders.length} commandes`;
+    case 6:
+      return `${d.selections.length} choix client`;
+    case 7:
+      return d.infos.duration ?? null;
+    case 8:
+      return `${classes} classés`;
+    default:
+      return null;
+  }
+}
+
+function AnalysisScene({
+  proposal,
+  onDone,
+}: {
+  proposal: ProjectProposal;
+  onDone: () => void;
+}): React.JSX.Element {
   const [done, setDone] = useState(0);
 
   useEffect(() => {
@@ -255,7 +350,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
       const t = setTimeout(onDone, 500);
       return () => clearTimeout(t);
     }
-    const t = setTimeout(() => setDone((n) => n + 1), 460);
+    const t = setTimeout(() => setDone((n) => n + 1), 420);
     return () => clearTimeout(t);
   }, [done, onDone]);
 
@@ -270,6 +365,7 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
         {PREPARATION_STAGES.map((stage, i) => {
           const isDone = i < done;
           const isActive = i === done;
+          const detail = isDone ? stageDetail(i, proposal) : null;
           return (
             <li
               key={stage.label}
@@ -287,10 +383,13 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
                 )}
               </span>
               <span
-                className={`text-sm ${isDone || isActive ? 'text-foreground' : 'text-muted-foreground'}`}
+                className={`flex-1 text-sm ${isDone || isActive ? 'text-foreground' : 'text-muted-foreground'}`}
               >
                 {stage.label}
               </span>
+              {detail && (
+                <span className="shrink-0 text-xs font-medium text-gold-700">{detail}</span>
+              )}
             </li>
           );
         })}
@@ -300,160 +399,150 @@ function AnalysisScreen({ onDone }: { onDone: () => void }): React.JSX.Element {
 }
 
 /* -------------------------------------------------------------------------- *
- * 3. « Votre projet est prêt. » — résumé express + cadrage de la durée
- * -------------------------------------------------------------------------- *
- * PHÉNIX travaille avant le conducteur : il a CHERCHÉ la durée dans le devis
- * avant de la demander. Et il affiche d'abord un résumé express (durée annoncée
- * ⇆ durée réaliste, étapes, commandes critiques, décisions, risque principal)
- * pour qu'en quelques secondes le conducteur sente si le chantier est tendu.
- */
-const DURATION_PRESETS = ['6 semaines', '2 mois', '3 mois', '45 jours ouvrés'];
-
-function ReadyScreen({
+ * 3. SYNTHÈSE — « voici tout ce que j'ai préparé » avant d'entrer.
+ * -------------------------------------------------------------------------- */
+function SynthesisScreen({
   proposal,
-  onContinue,
+  photosCount,
+  onEnter,
+  onAdjust,
 }: {
   proposal: ProjectProposal;
-  onContinue: (duration: string) => void;
+  photosCount: number;
+  onEnter: () => void;
+  onAdjust: () => void;
 }): React.JSX.Element {
   const d = proposal.dossier;
-  const detected = d.infos.duration ?? null;
-  const [duration, setDuration] = useState(detected ?? '');
-  const [editing, setEditing] = useState(!detected);
-
-  const summary = buildDossierSummary({
-    ...d,
-    infos: { ...d.infos, duration: duration.trim() || undefined },
-  });
+  const s = buildDossierSummary(d);
+  const infos = d.infos;
+  const fournisseurs = [...new Set(d.orders.map((o) => o.fournisseur).filter(Boolean))] as string[];
+  const docsClasses = d.documents.filter((x) => x.status === 'fourni').length;
+  const docsAFournir = d.documents.filter(
+    (x) => x.status === 'a_fournir' || x.status === 'manquant',
+  ).length;
+  const contact = [infos.phone, infos.email].filter(Boolean).join(' · ');
+  const bien = [infos.propertyType, infos.surface ? `${infos.surface} m²` : null]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
-    <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center gap-6 py-10">
-      <div className="flex flex-col items-center gap-3 text-center">
+    <div className="mx-auto max-w-2xl space-y-6 pb-12">
+      <header className="flex flex-col items-center gap-3 py-2 text-center">
         <span className="flex size-16 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-8">
           <Sparkles aria-hidden />
         </span>
         <h1 className="font-serif text-4xl font-semibold tracking-tight text-foreground">
-          Votre projet est prêt.
+          {proposal.projectName}
         </h1>
         <p className="mx-auto max-w-md text-sm leading-relaxed text-muted-foreground">
-          J'ai préparé votre chantier à partir du devis signé. Voici l'essentiel — nous le
-          parcourrons ensuite ensemble.
+          Voici tout ce que j'ai préparé à partir de votre dossier. Vous pouvez entrer dans le
+          chantier — ou l'ajuster avant.
         </p>
-      </div>
+      </header>
 
-      {/* (4) Le résumé express, juste après l'analyse — avant même le planning. */}
-      <div className="w-full space-y-3 rounded-2xl border border-border bg-surface p-5 text-left">
-        <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
-          J'ai étudié votre dossier.
-        </p>
-        <ul className="space-y-2 text-sm">
-          <SummaryRow
-            label="Durée annoncée au client"
-            value={summary.announcedLabel ?? 'à préciser'}
-          />
-          <SummaryRow
-            label="Durée que j'estime réaliste"
-            value={fmtDuree(summary.estimatedDays)}
-            warn={summary.durationRisk}
-          />
-          <SummaryRow label="Étapes identifiées" value={String(summary.steps)} />
-          <SummaryRow label="Commandes critiques" value={String(summary.criticalOrders)} />
-          <SummaryRow label="Décisions client à obtenir" value={String(summary.clientDecisions)} />
-          <SummaryRow
-            label="Principal risque"
-            value={summary.mainRisk ?? 'aucun risque majeur détecté'}
-          />
-        </ul>
-      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <SynthCard icon={<User aria-hidden />} title="Le client">
+          <SynthLine strong={infos.clientName ?? 'À préciser'} />
+          {contact && <SynthLine muted={contact} />}
+        </SynthCard>
 
-      {/* (1) PHÉNIX a cherché la durée avant de la demander. */}
-      <div className="w-full space-y-3 rounded-2xl border border-border bg-surface p-5 text-left">
-        {detected && !editing ? (
-          <>
-            <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
-              J'ai trouvé dans votre devis une durée prévisionnelle de{' '}
-              <span className="text-gold-700">{detected}</span>.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Est-ce bien la durée que vous avez annoncée au client ?
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={() => onContinue(duration.trim())}>
-                <CheckCircle2 aria-hidden /> Oui, c'est exact
-              </Button>
-              <Button variant="outline" onClick={() => setEditing(true)}>
-                <Pencil aria-hidden /> Modifier
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
-              {detected
-                ? 'Quelle durée souhaitez-vous retenir ?'
-                : "Je n'ai pas trouvé de durée prévisionnelle dans votre devis."}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {detected
-                ? 'Ajustez la durée annoncée au client.'
-                : 'Quelle durée avez-vous annoncée au client ?'}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {DURATION_PRESETS.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => setDuration(preset)}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    duration === preset
-                      ? 'border-gold-400 bg-gold-100 font-medium text-gold-800'
-                      : 'border-border bg-paper-50 text-foreground hover:border-gold-300'
-                  }`}
-                >
-                  {preset}
-                </button>
-              ))}
-            </div>
-            <input
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="Ou saisissez librement (ex. 10 semaines)"
-              className="h-10 w-full rounded-lg border border-input bg-paper-50 px-3 text-sm text-foreground"
-            />
-            <Button
-              size="lg"
-              disabled={!duration.trim()}
-              onClick={() => onContinue(duration.trim())}
-            >
-              Découvrons votre projet <ArrowRight aria-hidden />
-            </Button>
-          </>
+        <SynthCard icon={<MapPin aria-hidden />} title="Le bien">
+          {infos.address && <SynthLine strong={infos.address} />}
+          {bien && <SynthLine muted={bien} />}
+          {infos.budget != null && (
+            <SynthLine muted={`Budget ${infos.budget.toLocaleString('fr-FR')} €`} />
+          )}
+        </SynthCard>
+
+        <SynthCard icon={<CalendarRange aria-hidden />} title="Le planning">
+          <SynthLine strong={`${s.steps} étapes`} />
+          <SynthLine
+            muted={`Annoncée ${s.announcedLabel ?? 'à préciser'} · estimée ${fmtDuree(s.estimatedDays)}`}
+            warn={s.durationRisk}
+          />
+        </SynthCard>
+
+        <SynthCard icon={<Package aria-hidden />} title="Les commandes">
+          <SynthLine strong={`${d.orders.length} commandes`} />
+          <SynthLine muted={`${s.criticalOrders} au délai critique`} warn={s.criticalOrders > 0} />
+          {fournisseurs.length > 0 && <SynthLine muted={fournisseurs.slice(0, 3).join(', ')} />}
+        </SynthCard>
+
+        <SynthCard icon={<Palette aria-hidden />} title="Les décisions client">
+          <SynthLine strong={`${s.clientDecisions} à obtenir`} />
+        </SynthCard>
+
+        <SynthCard icon={<FileText aria-hidden />} title="Les documents">
+          <SynthLine strong={`${docsClasses} classés`} />
+          {docsAFournir > 0 && <SynthLine muted={`${docsAFournir} à fournir`} />}
+        </SynthCard>
+
+        {photosCount > 0 && (
+          <SynthCard icon={<ImageIcon aria-hidden />} title="Photos avant travaux">
+            <SynthLine strong={`${photosCount} ajoutée${photosCount > 1 ? 's' : ''} au récit`} />
+          </SynthCard>
         )}
+
+        {s.mainRisk && (
+          <SynthCard icon={<TriangleAlert aria-hidden />} title="À surveiller" warn>
+            <SynthLine muted={s.mainRisk} warn />
+          </SynthCard>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+        <Button size="lg" onClick={onEnter}>
+          <CheckCircle2 aria-hidden /> Entrer dans le chantier
+        </Button>
+        <Button size="lg" variant="outline" onClick={onAdjust}>
+          Ajuster le dossier
+        </Button>
       </div>
     </div>
   );
 }
 
-function SummaryRow({
-  label,
-  value,
+function SynthCard({
+  icon,
+  title,
+  warn,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  warn?: boolean;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <div
+      className={`space-y-2 rounded-2xl border p-4 ${warn ? 'border-gold-300 bg-gold-50' : 'border-border bg-surface'}`}
+    >
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+        {icon}
+        {title}
+      </div>
+      <div className="space-y-0.5">{children}</div>
+    </div>
+  );
+}
+
+function SynthLine({
+  strong,
+  muted,
   warn,
 }: {
-  label: string;
-  value: string;
+  strong?: string;
+  muted?: string;
   warn?: boolean;
 }): React.JSX.Element {
   return (
-    <li className="flex items-baseline justify-between gap-3 border-b border-border pb-2 last:border-b-0 last:pb-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={`flex items-center gap-1.5 text-right font-medium [&_svg]:size-4 ${
-          warn ? 'text-gold-700' : 'text-foreground'
-        }`}
-      >
-        {warn && <TriangleAlert aria-hidden />}
-        {value}
-      </span>
-    </li>
+    <p
+      className={`flex items-center gap-1.5 text-sm [&_svg]:size-3.5 ${
+        strong ? 'font-medium text-foreground' : warn ? 'text-gold-700' : 'text-muted-foreground'
+      }`}
+    >
+      {warn && !strong && <TriangleAlert aria-hidden />}
+      {strong ?? muted}
+    </p>
   );
 }
