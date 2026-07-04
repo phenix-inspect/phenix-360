@@ -67,7 +67,7 @@ interface ActionDef {
   icon: React.ReactNode;
 }
 
-type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique';
+export type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique';
 
 export function CompagnonView({
   snap,

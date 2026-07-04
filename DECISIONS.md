@@ -61,6 +61,14 @@ Lecture produit : garder la décision client nette et rassurante (choisir / vali
 Fait : l'app n'est pas encore prête à être mise entre les mains des artisans.
 Lecture produit : masquer toute invitation artisan tant que ce n'est pas assumé
 (sans rien jeter du travail déjà fait).
+
+04/07 — cherché · Compteurs d'« Aujourd'hui »
+Fait : le conducteur clique sur un compteur (« décisions clients ») en espérant
+travailler DESSUS ; il n'obtenait qu'un défilement vers la liste de tous les
+chantiers, sans voir les éléments concernés.
+Lecture produit : un compteur du matin est un outil de tri, pas un simple total —
+il doit filtrer la journée sur les seuls chantiers concernés, montrer l'élément
+précis, et mener droit au bon endroit du chantier (pas une animation).
 ```
 
 ---

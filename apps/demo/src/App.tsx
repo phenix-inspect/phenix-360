@@ -28,7 +28,7 @@ import { projectId, type ProjectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { PointDuSoirView } from './surfaces/PointDuSoirView';
-import { CompagnonView } from './surfaces/CompagnonView';
+import { CompagnonView, type CompagnonTab } from './surfaces/CompagnonView';
 import { ArtisanView } from './surfaces/ArtisanView';
 import { ClientView } from './surfaces/ClientView';
 import { Annuaire } from './surfaces/Annuaire';
@@ -61,7 +61,7 @@ export function App(): React.JSX.Element {
   const [annuaire, setAnnuaire] = useState(false);
   const [managing, setManaging] = useState(false);
   // Onglet d'ouverture imposé au chantier (ex. « Récit » depuis un commentaire client).
-  const [compaTab, setCompaTab] = useState<'fil' | undefined>(undefined);
+  const [compaTab, setCompaTab] = useState<CompagnonTab | undefined>(undefined);
   // Aperçu client : PRÉVISUALISATION temporaire. On garde un chantier prévisualisé
   // LOCAL, qui ne touche JAMAIS au chantier actif du conducteur. En quittant
   // l'aperçu, on réinitialise → on revient exactement où l'on était.
