@@ -210,9 +210,12 @@ export function App(): React.JSX.Element {
           ) : (
             <AujourdhuiView
               snap={snap}
-              onOpenChantier={(id, tab) => {
+              onOpenChantier={(id, tab, momentId) => {
                 demo.setActiveProject(projectId(id));
                 setCompaTab(tab);
+                // Notification « commentaire client » : on ouvre le Moment
+                // concerné dans le Récit (le conducteur = rôle « compagnon »).
+                if (momentId) demo.focusMoment(momentId, 'compagnon');
                 setView('compagnon');
               }}
               onCloturer={() => setView('soir')}

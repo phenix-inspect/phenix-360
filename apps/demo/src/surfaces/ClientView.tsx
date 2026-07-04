@@ -15,7 +15,14 @@ import {
   type EventActor,
   type Project,
 } from '@phenix360/core';
-import { demo, dossierOf, nameOf, pendingTeamMessageCount, type DemoSnapshot } from '../store';
+import {
+  demo,
+  dossierOf,
+  mostRecentPendingTeamMoment,
+  nameOf,
+  pendingTeamMessageCount,
+  type DemoSnapshot,
+} from '../store';
 import { SmartBanner } from '../components/SmartBanner';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
@@ -142,11 +149,16 @@ export function ClientView({
       {teamMessages > 0 && (
         <button
           type="button"
-          onClick={() =>
+          onClick={() => {
+            // Clic = navigation directe vers le Moment concerné + marquage lu.
+            // On s'assure d'abord que le Récit est à l'écran, puis le Récit
+            // ouvre précisément le Moment (défilement + curseur de réponse).
             document
               .getElementById('section-fil')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          }
+              ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const target = mostRecentPendingTeamMoment(snap, project.id);
+            if (target) demo.focusMoment(target, actor.role);
+          }}
           className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
         >
           <MessageCircle aria-hidden />

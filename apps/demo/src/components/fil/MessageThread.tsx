@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Input } from '@phenix360/ui';
 import { ROLE_LABEL, type Message } from '@phenix360/core';
 import { Send } from 'lucide-react';
@@ -13,12 +13,21 @@ export function MessageThread({
   messages,
   nameOf,
   onSend,
+  autoFocus = false,
 }: {
   messages: Message[];
   nameOf: (userId: string) => string;
   onSend: (texte: string) => void;
+  /** Poser le curseur dans le champ (ouvert depuis une notification). */
+  autoFocus?: boolean;
 }): React.JSX.Element {
   const [draft, setDraft] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Ouvert depuis une notification : le champ de réponse est prêt à écrire.
+  useEffect(() => {
+    if (autoFocus) inputRef.current?.focus();
+  }, [autoFocus]);
 
   const send = (): void => {
     const t = draft.trim();
@@ -50,6 +59,7 @@ export function MessageThread({
 
       <div className="flex gap-2">
         <Input
+          ref={inputRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Écrire un petit mot…"

@@ -69,6 +69,18 @@ chantiers, sans voir les éléments concernés.
 Lecture produit : un compteur du matin est un outil de tri, pas un simple total —
 il doit filtrer la journée sur les seuls chantiers concernés, montrer l'élément
 précis, et mener droit au bon endroit du chantier (pas une animation).
+
+04/07 — cherché · Notifications (client ET conducteur)
+Fait : une notification (« l'équipe vous a laissé 1 message », « 1 commentaire
+client ») menait vers une zone, pas vers l'ÉLÉMENT. Et elle restait tant qu'on
+n'avait pas répondu, alors qu'on l'avait déjà lue.
+Lecture produit : une notification est un raccourci qui porte une cible précise —
+clic = ouvrir le Moment concerné, curseur prêt, et la consultation suffit à
+l'éteindre (chacun, conducteur et client, a son propre « lu »).
+Tension notée (non tranchée) : côté conducteur, « consulter = éteindre » peut
+masquer un commentaire encore SANS RÉPONSE. À surveiller en terrain : faut-il, un
+jour, distinguer « lu » de « traité » côté conducteur ? Pour l'instant, un seul
+état « lu » — la simplicité prime.
 ```
 
 ---

@@ -33,6 +33,7 @@ export function FilMoment({
   canShare,
   pendingComment = false,
   pendingText = 'Nouveau commentaire du client — à vous de répondre',
+  focusReply = false,
   onToggleCoup,
   onSendMessage,
   onOpenGallery,
@@ -53,6 +54,8 @@ export function FilMoment({
   pendingComment?: boolean;
   /** Libellé du signal (dépend du point de vue). */
   pendingText?: string;
+  /** Poser le curseur dans la réponse (ouvert depuis une notification). */
+  focusReply?: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
   onOpenGallery: () => void;
@@ -66,7 +69,10 @@ export function FilMoment({
   const messagesMoment = messagesDuMoment(moment.id, messages);
 
   return (
-    <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
+    <article
+      id={`fil-moment-${moment.id}`}
+      className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
+    >
       {/* Grande photo (couverture), cadre net (mobile-friendly) — ouvre la galerie */}
       <button
         type="button"
@@ -175,7 +181,12 @@ export function FilMoment({
         </div>
 
         <div className="border-t border-border pt-4">
-          <MessageThread messages={messagesMoment} nameOf={nameOf} onSend={onSendMessage} />
+          <MessageThread
+            messages={messagesMoment}
+            nameOf={nameOf}
+            onSend={onSendMessage}
+            autoFocus={focusReply}
+          />
         </div>
       </div>
     </article>

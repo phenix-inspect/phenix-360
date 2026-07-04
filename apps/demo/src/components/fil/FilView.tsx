@@ -47,6 +47,8 @@ export function FilView({
   const [composing, setComposing] = useState(false);
   const [view, setView] = useState<'fil' | 'bibliotheque'>('fil');
   const [gallery, setGallery] = useState<{ moment: Moment; photoId?: string } | null>(null);
+  // Moment sur lequel poser le curseur de réponse (ouvert depuis une notification).
+  const [focusMomentId, setFocusMomentId] = useState<string | null>(null);
   const { moments, coups, messages, zones, annotations } = filOf(snap, project.id);
   // Signal « nouveau message » symétrique : côté conducteur, un commentaire client
   // en attente ; côté client, un mot de l'équipe non encore vu.
@@ -72,6 +74,34 @@ export function FilView({
     if (m) setGallery({ moment: m, ...(target.photoId ? { photoId: target.photoId } : {}) });
     demo.clearFilTarget();
   }, [target, moments]);
+
+  // Notification actionnable : on ouvre le Moment CONCERNÉ (pas tout le Récit).
+  // `role` cible le bon Récit en Côte à côte. Consulter = LU : on marque le
+  // Moment vu (éteint la notification), on défile jusqu'à lui, on le met en
+  // évidence et on pose le curseur dans la réponse.
+  const focus = snap.momentFocus;
+  useEffect(() => {
+    if (!focus || focus.role !== actor.role) return;
+    const m = moments.find((x) => x.id === focus.momentId);
+    if (!m) return; // pas dans ce Récit : un autre FilView le consommera.
+    demo.markMomentSeen(actor.role, focus.momentId);
+    setView('fil');
+    setFocusMomentId(focus.momentId);
+    demo.clearMomentFocus();
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`fil-moment-${focus.momentId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.animate?.(
+        [
+          { boxShadow: '0 0 0 0 rgba(169,128,58,0)' },
+          { boxShadow: '0 0 0 4px rgba(169,128,58,0.55)' },
+          { boxShadow: '0 0 0 0 rgba(169,128,58,0)' },
+        ],
+        { duration: 1600, easing: 'ease-out' },
+      );
+    });
+  }, [focus, moments, actor.role]);
 
   return (
     <div className="space-y-5">
@@ -154,6 +184,7 @@ export function FilView({
                 canShare={canCompose}
                 pendingComment={pending.has(entry.moment.id)}
                 pendingText={pendingText}
+                focusReply={focusMomentId === entry.moment.id}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)

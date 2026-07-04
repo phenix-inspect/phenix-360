@@ -88,6 +88,10 @@ const PHENIX_CONV_KEY = 'phenix-demo:phenix-conv:v1';
 const SHARES_KEY = 'phenix-demo:shares:v1';
 // Annuaire du conducteur (contacts) — global, réutilisable entre chantiers.
 const CONTACTS_KEY = 'phenix-demo:contacts:v1';
+// État « lu » des Moments, par RÔLE (device-local) : ce que CE poste a consulté.
+// Ce n'est pas un fait du Journal (qui reste l'unique source de vérité) mais un
+// simple accusé de lecture qui éteint les notifications une fois consultées.
+const SEEN_KEY = 'phenix-demo:seen:v1';
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -118,6 +122,23 @@ export interface PhenixMessage {
 export interface ClientTarget {
   kind: 'document' | 'decision' | 'etapes' | 'fil';
   ref?: string;
+}
+
+/**
+ * Accusés de lecture des Moments, par rôle : `role → momentId → ISO consulté`.
+ * Un message de l'AUTRE partie est « non lu » tant que le rôle n'a pas consulté
+ * le Moment depuis. Purement local (accusé de réception), jamais un fait métier.
+ */
+export type SeenState = Record<string, Record<string, string>>;
+
+/**
+ * Cible transitoire : ouvrir un Moment précis dans le Récit (depuis une
+ * notification), le mettre en évidence et poser le curseur dans la réponse.
+ * `role` cible le bon Récit en vue Côte à côte (conducteur vs client).
+ */
+export interface MomentFocus {
+  momentId: string;
+  role: string;
 }
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
@@ -201,8 +222,12 @@ export interface DemoSnapshot extends BackendState {
   contacts: Contact[];
   /** Cible transitoire : ouvrir une photo précise du Fil (lien retour). */
   filTarget: { momentId: string; photoId?: string } | null;
+  /** Cible transitoire : ouvrir un Moment précis du Récit (depuis une notification). */
+  momentFocus: MomentFocus | null;
   /** Cible transitoire : navigation PHÉNIX dans l'Espace client. */
   clientTarget: ClientTarget | null;
+  /** Accusés de lecture des Moments, par rôle (éteint les notifications). */
+  seen: SeenState;
   /**
    * L'espace de travail est-il initialisé ? `false` au tout premier lancement :
    * on propose alors un CHOIX (découvrir la démo / démarrer à vide) plutôt que
@@ -219,6 +244,7 @@ const listeners = new Set<() => void>();
 // Cibles transitoires (en mémoire) : lien retour « Voir la photo » + navigation
 // PHÉNIX. Déclarées AVANT build() (elles y sont lues) pour éviter tout TDZ.
 let filTarget: { momentId: string; photoId?: string } | null = null;
+let momentFocus: MomentFocus | null = null;
 let clientTarget: ClientTarget | null = null;
 let snapshot: DemoSnapshot = build();
 
@@ -240,7 +266,9 @@ function build(): DemoSnapshot {
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
     contacts: readJson<Contact[]>(CONTACTS_KEY, []),
     filTarget,
+    momentFocus,
     clientTarget,
+    seen: readJson<SeenState>(SEEN_KEY, {}),
     seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
   };
 }
@@ -265,6 +293,7 @@ const WORKSPACE_KEYS = [
   PHENIX_CONV_KEY,
   SHARES_KEY,
   CONTACTS_KEY,
+  SEEN_KEY,
 ] as const;
 
 /** Marqueur du format de sauvegarde (pour reconnaître un fichier valide). */
@@ -327,6 +356,34 @@ export const demo = {
   clearFilTarget(): void {
     filTarget = null;
     refresh();
+  },
+
+  /**
+   * Ouvre un Moment précis du Récit depuis une notification : le Récit défile
+   * jusqu'à lui, le met en évidence et pose le curseur dans la réponse. `role`
+   * cible le bon Récit (conducteur / client) en vue Côte à côte.
+   */
+  focusMoment(momentId: string, role: string): void {
+    momentFocus = { momentId, role };
+    refresh();
+  },
+  /** Cible consommée par le Récit. */
+  clearMomentFocus(): void {
+    momentFocus = null;
+    refresh();
+  },
+  /**
+   * Marque un Moment comme LU par un rôle (accusé de lecture local) : éteint la
+   * notification correspondante sans exiger de réponse. « Consulter suffit ».
+   */
+  markMomentSeen(role: string, momentId: string): void {
+    const seen = readJson<SeenState>(SEEN_KEY, {});
+    const forRole = seen[role] ?? {};
+    forRole[momentId] = new Date().toISOString();
+    seen[role] = forRole;
+    localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    refresh();
+    broadcast();
   },
 
   /** PHÉNIX ouvre un écran de l'Espace client (navigation). */
@@ -1625,11 +1682,17 @@ function lastMessagePerMoment(messages: Message[]): Map<string, Message> {
   return last;
 }
 
+/** Le Moment `id` a-t-il été consulté par `role` depuis son dernier message ? */
+function momentSeenSince(snap: DemoSnapshot, role: string, id: string, last: Message): boolean {
+  const at = snap.seen[role]?.[id];
+  return at !== undefined && at >= last.createdAt;
+}
+
 /**
  * Moments dont le DERNIER message est du CLIENT — en attente d'une réponse du
  * CONDUCTEUR (« la balle est dans son camp »). Signalé dans Aujourd'hui + sur le
- * Moment. Répondre vide l'état (le message du conducteur devient le dernier).
- * Aucun modèle « lu/non-lu » : on lit l'ordre des messages.
+ * Moment. S'éteint de DEUX façons : le conducteur RÉPOND (son message devient le
+ * dernier) OU il CONSULTE le Moment (accusé de lecture `seen['compagnon']`).
  */
 export function pendingClientMoments(
   snap: DemoSnapshot,
@@ -1638,7 +1701,8 @@ export function pendingClientMoments(
   const pending = new Set<string>();
   if (!projectId) return pending;
   for (const [id, last] of lastMessagePerMoment(snap.fil.messages[projectId] ?? []))
-    if (last.authorRole === 'client') pending.add(id);
+    if (last.authorRole === 'client' && !momentSeenSince(snap, 'compagnon', id, last))
+      pending.add(id);
   return pending;
 }
 
@@ -1666,7 +1730,12 @@ export function pendingTeamMoments(
     (snap.fil.moments[projectId] ?? []).filter(momentPartageClient).map((m) => m.id),
   );
   for (const [id, last] of lastMessagePerMoment(snap.fil.messages[projectId] ?? []))
-    if (shared.has(id) && last.authorRole !== 'client') pending.add(id);
+    if (
+      shared.has(id) &&
+      last.authorRole !== 'client' &&
+      !momentSeenSince(snap, 'client', id, last)
+    )
+      pending.add(id);
   return pending;
 }
 
@@ -1676,6 +1745,46 @@ export function pendingTeamMessageCount(
   projectId: string | null | undefined,
 ): number {
   return pendingTeamMoments(snap, projectId).size;
+}
+
+/**
+ * Le Moment le plus RÉCENT parmi un ensemble (dernier message le plus tardif) :
+ * la cible qu'une notification ouvre quand plusieurs sont en attente (« ouvrir
+ * la plus récente »). Le compteur, lui, montre le nombre total.
+ */
+function mostRecentMoment(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+  ids: Set<string>,
+): string | undefined {
+  if (!projectId || ids.size === 0) return undefined;
+  const last = lastMessagePerMoment(snap.fil.messages[projectId] ?? []);
+  let bestId: string | undefined;
+  let bestAt = '';
+  for (const id of ids) {
+    const at = last.get(id)?.createdAt ?? '';
+    if (at >= bestAt) {
+      bestAt = at;
+      bestId = id;
+    }
+  }
+  return bestId;
+}
+
+/** Le commentaire client le plus récent en attente (cible de la notification conducteur). */
+export function mostRecentPendingClientMoment(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): string | undefined {
+  return mostRecentMoment(snap, projectId, pendingClientMoments(snap, projectId));
+}
+
+/** Le message d'équipe le plus récent en attente (cible de la notification client). */
+export function mostRecentPendingTeamMoment(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): string | undefined {
+  return mostRecentMoment(snap, projectId, pendingTeamMoments(snap, projectId));
 }
 
 /** Le Fil d'un projet (moments + annotations + zones). */

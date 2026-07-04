@@ -21,7 +21,12 @@ import {
   Truck,
   X,
 } from 'lucide-react';
-import { nameOf, pendingClientCommentCount, type DemoSnapshot } from '../store';
+import {
+  mostRecentPendingClientMoment,
+  nameOf,
+  pendingClientCommentCount,
+  type DemoSnapshot,
+} from '../store';
 import type { CompagnonTab } from './CompagnonView';
 
 /**
@@ -50,7 +55,7 @@ export function AujourdhuiView({
   onCloturer,
 }: {
   snap: DemoSnapshot;
-  onOpenChantier: (projectId: string, tab?: CompagnonTab) => void;
+  onOpenChantier: (projectId: string, tab?: CompagnonTab, momentId?: string) => void;
   onCloturer: () => void;
 }): React.JSX.Element {
   const compagnon = snap.members.find((m) => m.role === 'compagnon');
@@ -224,7 +229,13 @@ export function AujourdhuiView({
                     clientName={nameOf(snap, projectClientId(snap, c.projectId))}
                     active={c.projectId === activeId}
                     clientComments={comments}
-                    onOpen={() => onOpenChantier(c.projectId, comments > 0 ? 'fil' : undefined)}
+                    onOpen={() =>
+                      onOpenChantier(
+                        c.projectId,
+                        comments > 0 ? 'fil' : undefined,
+                        comments > 0 ? mostRecentPendingClientMoment(snap, c.projectId) : undefined,
+                      )
+                    }
                   />
                 );
               })}
