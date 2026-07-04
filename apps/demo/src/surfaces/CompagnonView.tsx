@@ -151,16 +151,19 @@ export function CompagnonView({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
+        {/* Le projet est le héros dès l'entrée : plus de « Bonjour / Projet
+            actuel » (déjà dit dans Aujourd'hui et la barre de contexte). */}
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-muted-foreground">Bonjour {actor.displayName}</p>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">Projet actuel</p>
-          </div>
-          <Button size="lg" onClick={() => setMissionPicker(true)}>
+          <ProjectHero
+            project={project}
+            clientName={nameOf(snap, project.clientId)}
+            compact
+            className="min-w-0 flex-1"
+          />
+          <Button size="lg" className="shrink-0" onClick={() => setMissionPicker(true)}>
             <Plus aria-hidden /> Nouvelle mission
           </Button>
         </div>
-        <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} compact />
         {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
       </div>
 

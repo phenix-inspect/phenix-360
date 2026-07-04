@@ -208,44 +208,48 @@ export function App(): React.JSX.Element {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-        {creating ? (
-          <PhenixStart
-            onCreated={() => {
-              setCreating(false);
-              setView('compagnon');
-            }}
-            onCancel={() => setCreating(false)}
-          />
-        ) : annuaire ? (
-          <Annuaire />
-        ) : view === 'aujourdhui' ? (
-          snap.projects.length === 0 ? (
-            <NoProject onNew={() => setChantierForm({ mode: 'create' })} />
-          ) : (
-            <AujourdhuiView
-              snap={snap}
-              onOpenChantier={(id, tab, momentId) => {
-                demo.setActiveProject(projectId(id));
-                setCompaTab(tab);
-                // Notification « commentaire client » : on ouvre le Moment
-                // concerné dans le Récit (le conducteur = rôle « compagnon »).
-                if (momentId) demo.focusMoment(momentId, 'compagnon');
+        {/* Clé = grand écran courant : rejoue une transition douce à chaque
+            changement d'écran (fluidité), pas aux changements internes. */}
+        <div key={creating ? 'creating' : annuaire ? 'annuaire' : view} className="view-enter">
+          {creating ? (
+            <PhenixStart
+              onCreated={() => {
+                setCreating(false);
                 setView('compagnon');
               }}
-              onCloturer={() => setView('soir')}
+              onCancel={() => setCreating(false)}
             />
-          )
-        ) : view === 'soir' ? (
-          <PointDuSoirView snap={snap} onPreparerDemain={() => setView('aujourdhui')} />
-        ) : activeProject === null ? (
-          <NoProject onNew={() => setCreating(true)} />
-        ) : view === 'compagnon' ? (
-          <CompagnonView snap={snap} project={activeProject} initialTab={compaTab} />
-        ) : view === 'artisan' ? (
-          <ArtisanView snap={snap} project={activeProject} />
-        ) : (
-          <ClientView snap={snap} project={previewProject ?? activeProject} />
-        )}
+          ) : annuaire ? (
+            <Annuaire />
+          ) : view === 'aujourdhui' ? (
+            snap.projects.length === 0 ? (
+              <NoProject onNew={() => setChantierForm({ mode: 'create' })} />
+            ) : (
+              <AujourdhuiView
+                snap={snap}
+                onOpenChantier={(id, tab, momentId) => {
+                  demo.setActiveProject(projectId(id));
+                  setCompaTab(tab);
+                  // Notification « commentaire client » : on ouvre le Moment
+                  // concerné dans le Récit (le conducteur = rôle « compagnon »).
+                  if (momentId) demo.focusMoment(momentId, 'compagnon');
+                  setView('compagnon');
+                }}
+                onCloturer={() => setView('soir')}
+              />
+            )
+          ) : view === 'soir' ? (
+            <PointDuSoirView snap={snap} onPreparerDemain={() => setView('aujourdhui')} />
+          ) : activeProject === null ? (
+            <NoProject onNew={() => setCreating(true)} />
+          ) : view === 'compagnon' ? (
+            <CompagnonView snap={snap} project={activeProject} initialTab={compaTab} />
+          ) : view === 'artisan' ? (
+            <ArtisanView snap={snap} project={activeProject} />
+          ) : (
+            <ClientView snap={snap} project={previewProject ?? activeProject} />
+          )}
+        </div>
       </main>
 
       <ManageDialog

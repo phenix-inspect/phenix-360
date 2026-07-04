@@ -7,3 +7,27 @@
     @apply bg-background font-sans text-foreground antialiased;
   }
 }
+
+@layer utilities {
+  /* Transition douce entre les grands écrans (Aujourd'hui / Chantier / Espace
+     client) : l'app se lit comme un tout, sans coupure sèche. Volontairement
+     brève pour ne jamais ralentir. Respecte « réduire les animations ». */
+  @keyframes view-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .view-enter {
+    animation: view-enter 180ms ease-out both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .view-enter {
+      animation: none;
+    }
+  }
+}

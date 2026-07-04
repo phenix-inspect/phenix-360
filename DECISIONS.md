@@ -153,6 +153,23 @@ la navigation directe vers une URL `data:`). Un document SANS fichier n'affiche
 aucun faux lien : « Document disponible prochainement ». Client-safe inchangé (un
 document interne ne fuit jamais). Piège technique : `window.open(url,'noopener')`
 renvoie toujours `null` → on ouvre par une ancre `target="_blank"`.
+
+04/07 — fluidité · Sprint Fluidité (audit UX, zéro fonctionnalité)
+Fait : audit conducteur + client à la recherche de frictions (clics/scrolls/
+doublons/hiérarchie/transitions). Deux corrections retenues, minimales :
+ • Chantier — suppression du bandeau « Bonjour Mickaël / Projet actuel » : il
+   redisait ce que la barre de contexte (« Chantier · … ») et Aujourd'hui disent
+   déjà, et repoussait le projet vers le bas. Le projet devient le héros dès
+   l'entrée ; « Nouvelle mission » remonte à côté du titre.
+ • Transition douce (opacity + 6px, 180 ms, respecte prefers-reduced-motion) au
+   changement de grand écran (Aujourd'hui/Chantier/Espace client) : l'app se lit
+   comme un tout, sans coupure sèche. Aucun effet sur les changements internes
+   (filtre, onglet, chantier).
+Rejeté volontairement (challenge) : (a) déplacer/supprimer le sélecteur Récit⇄
+Bibliothèque du Récit malgré la puce homonyme du sommaire — puce = saut, bascule
+= contrôle local, rôles distincts ; (b) fusionner « Nouvelle mission » et les
+grandes actions du Suivi — chevauchement réel MAIS ce serait un changement de
+CONCEPT → à discuter avant, pas à trancher seul.
 ```
 
 ---
