@@ -170,6 +170,19 @@ Bibliothèque du Récit malgré la puce homonyme du sommaire — puce = saut, ba
 = contrôle local, rôles distincts ; (b) fusionner « Nouvelle mission » et les
 grandes actions du Suivi — chevauchement réel MAIS ce serait un changement de
 CONCEPT → à discuter avant, pas à trancher seul.
+
+04/07 — cherché · Créer un chantier = déposer, pas remplir
+Fait : le parcours par défaut était le FORMULAIRE ; le parcours intelligent
+existait mais enfoui derrière un bouton fantôme « Parcours guidé ». Le conducteur
+ressaisissait ce que le devis contient déjà.
+Lecture produit : deux parcours, INTELLIGENT par défaut. On déposait déjà, PHÉNIX
+analysait déjà (scène « prépare » → « prêt ») via un moteur déterministe. On a
+juste (a) inversé la prominence (déposer le dossier = action principale ; chantier
+vide = échappatoire), (b) formalisé le PORT unique `demo.analyzeDossier` (mock
+aujourd'hui, `setDossierAnalyzer` pour un LLM demain, sans toucher aux écrans),
+(c) matérialisé les images déposées en Moment « Avant travaux » du Récit, (d)
+ajouté l'acompte aux documents détectés. Aucun faux OCR : simulation déterministe,
+remplaçable derrière la même signature.
 ```
 
 ---

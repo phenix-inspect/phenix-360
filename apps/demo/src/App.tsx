@@ -18,7 +18,6 @@ import {
   Eye,
   HardHat,
   Pencil,
-  PlusCircle,
   RotateCcw,
   Settings2,
   Sparkles,
@@ -218,12 +217,19 @@ export function App(): React.JSX.Element {
                 setView('compagnon');
               }}
               onCancel={() => setCreating(false)}
+              onQuickCreate={() => {
+                setCreating(false);
+                setChantierForm({ mode: 'create' });
+              }}
             />
           ) : annuaire ? (
             <Annuaire />
           ) : view === 'aujourdhui' ? (
             snap.projects.length === 0 ? (
-              <NoProject onNew={() => setChantierForm({ mode: 'create' })} />
+              <NoProject
+                onDeposer={() => setCreating(true)}
+                onVide={() => setChantierForm({ mode: 'create' })}
+              />
             ) : (
               <AujourdhuiView
                 snap={snap}
@@ -241,7 +247,10 @@ export function App(): React.JSX.Element {
           ) : view === 'soir' ? (
             <PointDuSoirView snap={snap} onPreparerDemain={() => setView('aujourdhui')} />
           ) : activeProject === null ? (
-            <NoProject onNew={() => setCreating(true)} />
+            <NoProject
+              onDeposer={() => setCreating(true)}
+              onVide={() => setChantierForm({ mode: 'create' })}
+            />
           ) : view === 'compagnon' ? (
             <CompagnonView snap={snap} project={activeProject} initialTab={compaTab} />
           ) : view === 'artisan' ? (
@@ -283,19 +292,28 @@ export function App(): React.JSX.Element {
   );
 }
 
-function NoProject({ onNew }: { onNew: () => void }): React.JSX.Element {
+function NoProject({
+  onDeposer,
+  onVide,
+}: {
+  onDeposer: () => void;
+  onVide: () => void;
+}): React.JSX.Element {
   return (
     <div className="mx-auto max-w-xl py-10">
       <EmptyState
         icon={<HardHat aria-hidden />}
         title="Aucun chantier pour l'instant"
-        description="Créez votre premier chantier — nom, client, adresse — et commencez à le suivre. Ou rechargez le chantier de démonstration pour explorer."
+        description="Déposez votre dossier (devis, plans, photos…) et PHÉNIX prépare le chantier pour vous. Ou créez un chantier vide, ou rechargez la démonstration."
         action={
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={onNew}>
-              <HardHat aria-hidden /> Créer un chantier
+            <Button onClick={onDeposer}>
+              <Sparkles aria-hidden /> Déposer mon dossier
             </Button>
-            <Button variant="outline" onClick={() => demo.loadDemo()}>
+            <Button variant="outline" onClick={onVide}>
+              <HardHat aria-hidden /> Chantier vide
+            </Button>
+            <Button variant="ghost" onClick={() => demo.loadDemo()}>
               Charger la démonstration
             </Button>
           </div>
@@ -418,9 +436,14 @@ function ManageDialog({
             )}
 
             <div className="grid gap-2">
+              {/* Par défaut : PHÉNIX prépare à partir du dossier déposé. */}
+              <Button className="justify-start" onClick={onGuided}>
+                <Sparkles aria-hidden />
+                Nouveau chantier — déposer le dossier
+              </Button>
               <Button variant="outline" className="justify-start" onClick={onNewChantier}>
                 <HardHat aria-hidden />
-                Nouveau chantier
+                Créer un chantier vide
               </Button>
               {canEdit && (
                 <Button variant="outline" className="justify-start" onClick={onEditChantier}>
@@ -428,14 +451,6 @@ function ManageDialog({
                   Modifier le chantier actif
                 </Button>
               )}
-              <Button
-                variant="ghost"
-                className="justify-start text-muted-foreground"
-                onClick={onGuided}
-              >
-                <PlusCircle aria-hidden />
-                Parcours guidé (déposer un dossier)
-              </Button>
             </div>
 
             <div className="grid gap-2 border-t border-border pt-3">

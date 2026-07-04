@@ -25,6 +25,9 @@ import {
   choixClientValides,
   coupDeCoeurId as toCoupId,
   decisionVisibility,
+  mockAnalyzeDossier,
+  type AnalyzeInput,
+  type DossierAnalyzer,
   filPhotoId as toFilPhotoId,
   messageId as toMessageId,
   momentId as toMomentId,
@@ -256,6 +259,10 @@ const listeners = new Set<() => void>();
 let filTarget: { momentId: string; photoId?: string } | null = null;
 let momentFocus: MomentFocus | null = null;
 let clientTarget: ClientTarget | null = null;
+// PORT D'ANALYSE (unique) — la simulation déterministe `mockAnalyzeDossier`
+// aujourd'hui, un vrai LLM demain via `setDossierAnalyzer`, SANS toucher aux
+// écrans : toute l'app passe par `demo.analyzeDossier`.
+let dossierAnalyzer: DossierAnalyzer = mockAnalyzeDossier;
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {
@@ -435,7 +442,21 @@ export const demo = {
    * Passe par les ports core (projet, membres, événements) ; le dossier préparé
    * est persisté à part (hors colonne vertébrale).
    */
-  async createFromProposal(proposal: ProjectProposal): Promise<ProjectId> {
+  /**
+   * PORT D'ANALYSE unique : la démo utilise `mockAnalyzeDossier` (déterministe),
+   * remplaçable par un vrai LLM via `setDossierAnalyzer` sans changer les écrans.
+   */
+  analyzeDossier(input: AnalyzeInput): Promise<ProjectProposal> {
+    return Promise.resolve(dossierAnalyzer(input));
+  },
+  setDossierAnalyzer(fn: DossierAnalyzer): void {
+    dossierAnalyzer = fn;
+  },
+
+  async createFromProposal(
+    proposal: ProjectProposal,
+    photosAvantTravaux: UploadedMedia[] = [],
+  ): Promise<ProjectId> {
     const clientId = toUserId(crypto.randomUUID());
     const compaId = toUserId(crypto.randomUUID());
     const project = await backend.createProject({
@@ -535,6 +556,19 @@ export const demo = {
     dossiers[project.id] = proposal.dossier;
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
+    // Photos déposées → un Moment « Avant travaux » dans le Récit (partagé au
+    // client) : l'état des lieux d'origine, matérialisé par PHÉNIX.
+    if (photosAvantTravaux.length > 0) {
+      demo.addMoment({
+        projectId: project.id,
+        actor: compaActor,
+        title: 'Avant travaux',
+        type: 'visite',
+        medias: photosAvantTravaux,
+        legende: 'État des lieux avant le démarrage du chantier',
+        shareWithClient: true,
+      });
+    }
     refresh();
     broadcast();
     return project.id;

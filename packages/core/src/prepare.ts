@@ -1933,6 +1933,12 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
       status: docStatus(has(files, 'devis'), 'a_fournir'),
       recommande: true,
     },
+    {
+      id: 'doc-acompte',
+      label: 'Acompte versé',
+      status: docStatus(has(files, 'acompte'), 'a_fournir'),
+      recommande: true,
+    },
     { id: 'doc-plans', label: 'Plans', status: docStatus(has(files, 'plan'), 'demande_client') },
     {
       id: 'doc-dpe',

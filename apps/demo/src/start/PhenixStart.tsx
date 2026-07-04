@@ -3,8 +3,8 @@ import { BrandLockup, Button } from '@phenix360/ui';
 import {
   PREPARATION_STAGES,
   buildDossierSummary,
-  mockAnalyzeDossier,
   type ProjectProposal,
+  type UploadedMedia,
 } from '@phenix360/core';
 import {
   ArrowRight,
@@ -18,6 +18,7 @@ import {
   X,
 } from 'lucide-react';
 import { demo } from '../store';
+import { mediaUploader } from '../lib/media';
 import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
 
@@ -25,32 +26,40 @@ type Phase = 'drop' | 'analysis' | 'ready' | 'review';
 interface Dropped {
   id: string;
   name: string;
+  /** Média prêt (photo) — matérialisé en « Avant travaux » à la création. */
+  media?: UploadedMedia;
 }
 
 /**
  * Création du projet. Le conducteur ne remplit pas un logiciel : il dépose le
  * devis signé, PHÉNIX prend de l'avance, puis il DÉCOUVRE un projet déjà
  * préparé qu'il n'a plus qu'à ajuster. Rien n'est créé sans validation finale.
+ * L'analyse passe par le PORT unique `demo.analyzeDossier` (mock déterministe
+ * aujourd'hui, LLM demain, sans changer cet écran).
  */
 export function PhenixStart({
   onCreated,
   onCancel,
+  onQuickCreate,
 }: {
   onCreated: () => void;
   onCancel: () => void;
+  /** Bascule vers la création rapide (chantier vide). */
+  onQuickCreate: () => void;
 }): React.JSX.Element {
   const [phase, setPhase] = useState<Phase>('drop');
   const [files, setFiles] = useState<Dropped[]>([]);
   const [proposal, setProposal] = useState<ProjectProposal | null>(null);
 
   const onAnalysisDone = async () => {
-    const result = await mockAnalyzeDossier({ files: files.map((f) => ({ name: f.name })) });
+    const result = await demo.analyzeDossier({ files: files.map((f) => ({ name: f.name })) });
     setProposal(result);
     setPhase('ready');
   };
 
   const validate = async (edited: ProjectProposal) => {
-    await demo.createFromProposal(edited);
+    const photos = files.map((f) => f.media).filter((m): m is UploadedMedia => m != null);
+    await demo.createFromProposal(edited, photos);
     onCreated();
   };
 
@@ -86,6 +95,7 @@ export function PhenixStart({
       setFiles={setFiles}
       onStart={() => setPhase('analysis')}
       onCancel={onCancel}
+      onQuickCreate={onQuickCreate}
     />
   );
 }
@@ -98,19 +108,30 @@ function DropScreen({
   setFiles,
   onStart,
   onCancel,
+  onQuickCreate,
 }: {
   files: Dropped[];
   setFiles: React.Dispatch<React.SetStateAction<Dropped[]>>;
   onStart: () => void;
   onCancel: () => void;
+  onQuickCreate: () => void;
 }): React.JSX.Element {
   const [over, setOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const add = (list: FileList | null) => {
+  const add = (list: FileList | null): void => {
     if (!list) return;
-    const next = Array.from(list).map((f) => ({ id: crypto.randomUUID(), name: f.name }));
-    setFiles((prev) => [...prev, ...next]);
+    for (const file of Array.from(list)) {
+      const id = crypto.randomUUID();
+      setFiles((prev) => [...prev, { id, name: file.name }]);
+      // Les images deviennent des « photos avant travaux » : on prépare le média
+      // en arrière-plan (le nom s'affiche tout de suite).
+      if (file.type.startsWith('image/')) {
+        void mediaUploader(file).then((media) =>
+          setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, media } : f))),
+        );
+      }
+    }
   };
 
   const hasDevis = files.some((f) => f.name.toLowerCase().includes('devis'));
@@ -151,8 +172,8 @@ function DropScreen({
           Déposez le devis signé
         </span>
         <span className="max-w-md text-sm text-muted-foreground">
-          Ajoutez aussi, si vous les avez, plans, DPE, diagnostics, photos, CCTP, descriptif
-          architecte… Vous pourrez en ajouter à tout moment.
+          Ajoutez aussi, si vous les avez, acompte, plans, DPE, diagnostics, photos, CCTP,
+          descriptif architecte… Vous pourrez en ajouter à tout moment.
         </span>
         <input
           ref={inputRef}
@@ -199,7 +220,7 @@ function DropScreen({
             Annuler
           </Button>
           <Button onClick={onStart} disabled={!hasDevis}>
-            <Sparkles aria-hidden /> PHÉNIX prépare le chantier
+            <Sparkles aria-hidden /> Préparer mon chantier
           </Button>
         </div>
         <p className="text-right text-xs text-muted-foreground">
@@ -207,6 +228,17 @@ function DropScreen({
             ? 'Devis signé détecté — je peux préparer le chantier.'
             : 'Le devis signé est obligatoire pour démarrer un chantier.'}
         </p>
+      </div>
+
+      {/* Échappatoire : créer un chantier vide (nom, client, adresse). */}
+      <div className="border-t border-border pt-4 text-center">
+        <button
+          type="button"
+          onClick={onQuickCreate}
+          className="text-sm font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+        >
+          Je préfère créer un chantier vide (nom, client, adresse)
+        </button>
       </div>
     </div>
   );
