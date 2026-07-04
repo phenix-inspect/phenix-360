@@ -132,6 +132,15 @@ aucun style. La couleur d'émotion (#e11d48) n'est pas un rôle de marque ; on l
 pose en style inline dans l'app (hors garde-fou tokens, comme les dégradés). Le
 « pop » se joue en Web Animations API (pas de keyframe globale). Rappel : le coup
 de cœur reste SANS compteur (émotion, pas métrique) — décision produit conservée.
+
+04/07 — encombrement · Hauteur des photos du récit
+Fait : la qualité des photos n'est pas en cause, mais leur HAUTEUR : une seule
+photo mange l'écran, on voit peu de moments, le récit perd en fluidité.
+Lecture produit : simple réglage de cadre — la couverture passe de 4/5 (portrait,
+h = 1,25 × largeur) à 6/5 (h ≈ 0,83 × largeur, ≈ 33 % plus court), l'image reste
+en object-cover (aucun écrasement), coins arrondis et plein écran inchangés. Le
+récit se parcourt alors comme un fil social. Le plein écran (galerie) garde son
+4/5 : c'est le FLUX qu'on densifie, pas la lecture d'une photo.
 ```
 
 ---

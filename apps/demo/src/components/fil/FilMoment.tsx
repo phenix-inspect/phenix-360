@@ -73,12 +73,15 @@ export function FilMoment({
       id={`fil-moment-${moment.id}`}
       className="scroll-mt-24 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm"
     >
-      {/* Grande photo (couverture), cadre net (mobile-friendly) — ouvre la galerie */}
+      {/* Grande photo (couverture) — cadre plus DENSE pour parcourir le récit
+          comme un fil social (≈ 33 % plus court que l'ancien 4/5), sans écraser
+          l'image (object-cover recadre). Coins arrondis via l'article. Le clic
+          ouvre toujours le plein écran. */}
       <button
         type="button"
         onClick={onOpenGallery}
         aria-label={count > 1 ? `Ouvrir l’album (${count} photos)` : 'Agrandir la photo'}
-        className="relative block aspect-[4/5] w-full bg-paper-100"
+        className="relative block aspect-[6/5] w-full bg-paper-100"
       >
         {cover && <FilImage photo={cover} />}
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-paper-0/90 px-2.5 py-1 text-xs font-medium text-ink-800 shadow-sm">
