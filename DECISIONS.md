@@ -111,6 +111,16 @@ Seule exception : la Préparation sans dossier n'a pas de contenu → retour sur
 Suivi. À noter (dette de test) : rendre le nom sélectionnable ajoute ses options
 au DOM ; un test visait « le nom » par son texte et attrapait désormais l'option
 cachée du menu → on cible le TITRE (heading), pas un texte ambigu.
+
+04/07 — cherché · Demander une décision au client depuis le terrain
+Fait : dans « Nouvelle mission », le conducteur ne trouvait pas comment demander
+un choix au client (carrelage, couleur, luminaire…) alors que c'est courant.
+Lecture produit : c'est une entrée « Décision client » dans Nouvelle mission —
+pas un module. On RÉUTILISE tout l'existant : une décision = une sélection
+proposée (déjà rendue par « Une décision vous attend » + galerie de propositions
+avec la délégation PHÉNIX intégrée), validée en un événement décision, suivie par
+le radar « choix validés ». Le neuf se limite à un formulaire de saisie et à deux
+champs (contexte, photos de la décision).
 ```
 
 ---

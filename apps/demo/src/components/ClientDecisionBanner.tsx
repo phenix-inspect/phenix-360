@@ -52,7 +52,8 @@ export function ClientDecisionBanner({
               {open ? `Votre validation ${cat} est attendue` : 'Une décision vous attend'}
             </h2>
             {open ? (
-              <div className="space-y-1 text-sm leading-relaxed text-ink-600">
+              <div className="space-y-2 text-sm leading-relaxed text-ink-600">
+                <p className="font-medium text-foreground">{decision.label}</p>
                 {decision.decideAvant && (
                   <p>
                     Pour conserver le planning prévu, j'ai besoin de votre validation avant le{' '}
@@ -62,7 +63,9 @@ export function ClientDecisionBanner({
                     .
                   </p>
                 )}
-                {hasOptions ? (
+                {decision.contexte ? (
+                  <p>{decision.contexte}</p>
+                ) : hasOptions ? (
                   <p>
                     J'ai préparé plusieurs {proposalNoun(decision.categorie)} pour votre {cat}.
                     Sélectionnez celle que vous préférez.
@@ -73,6 +76,18 @@ export function ClientDecisionBanner({
                       ? `Proposition : ${decision.detail}.`
                       : 'Indiquez-moi votre préférence.'}
                   </p>
+                )}
+                {decision.photos.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {decision.photos.map((src, i) => (
+                      <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        className="size-24 rounded-lg border border-gold-200 object-cover"
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             ) : (

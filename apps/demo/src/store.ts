@@ -36,9 +36,11 @@ import {
   type BackendState,
   type CommCanal,
   type Contact,
+  type ClientSelection,
   type CoupDeCoeur,
   type DecisionEvent,
   type DemandeResolution,
+  type SelectionOption,
   type ActionPriorite,
   type Event,
   type EventActor,
@@ -833,6 +835,51 @@ export const demo = {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     dossiers[projectId] = dossier;
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Crée une DÉCISION CLIENT depuis « Nouvelle mission » : un choix PROPOSÉ
+   * (titre + contexte + photos + options, la délégation PHÉNIX est offerte
+   * d'office par la galerie). Réutilise le modèle existant — une `ClientSelection`
+   * dans le dossier (donc `ensureDossier`) alimente « Une décision vous attend » ;
+   * une trace `decision`/`envoyee` (interne) est ajoutée au Journal (append-only).
+   */
+  async createClientDecision(
+    project: Project,
+    actor: EventActor,
+    input: { titre: string; contexte?: string; photos?: string[]; options: SelectionOption[] },
+  ): Promise<void> {
+    demo.ensureDossier(project);
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[project.id];
+    if (!dossier) return;
+    const selection: ClientSelection = {
+      id: crypto.randomUUID(),
+      categorie: input.titre,
+      label: input.titre,
+      statut: 'propose',
+      ...(input.contexte ? { contexte: input.contexte } : {}),
+      ...(input.photos && input.photos.length > 0 ? { photos: input.photos } : {}),
+      options: input.options,
+    };
+    dossiers[project.id] = { ...dossier, selections: [...dossier.selections, selection] };
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    const content = buildDecisionContent({
+      kind: 'envoyee',
+      origin: 'conducteur',
+      selection,
+      statutApres: 'propose',
+    });
+    await backend.appendEvent({
+      projectId: project.id,
+      actor,
+      type: 'decision',
+      visibility: decisionVisibility('envoyee'),
+      state: 'publie',
+      content,
+    });
     refresh();
     broadcast();
   },

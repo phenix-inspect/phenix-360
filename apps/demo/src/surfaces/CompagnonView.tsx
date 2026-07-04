@@ -52,6 +52,7 @@ import { FilView } from '../components/fil/FilView';
 import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
+import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
 import { MissionPicker } from '../components/mission/MissionPicker';
 import { MissionFlow } from '../components/mission/MissionFlow';
 
@@ -85,6 +86,7 @@ export function CompagnonView({
   const [composer, setComposer] = useState<ComposerKind | null>(null);
   const [missionPicker, setMissionPicker] = useState(false);
   const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
+  const [decisionComposer, setDecisionComposer] = useState(false);
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour — sauf onglet imposé.
@@ -228,7 +230,18 @@ export function CompagnonView({
             setMissionKind(kind);
             setMissionPicker(false);
           }}
+          onClientDecision={() => {
+            setMissionPicker(false);
+            setDecisionComposer(true);
+          }}
           onClose={() => setMissionPicker(false)}
+        />
+      )}
+
+      {decisionComposer && (
+        <ClientDecisionComposer
+          onCreate={(input) => demo.createClientDecision(project, actor, input)}
+          onClose={() => setDecisionComposer(false)}
         />
       )}
 

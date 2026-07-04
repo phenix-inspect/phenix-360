@@ -187,6 +187,10 @@ export interface ClientSelection {
   label: string;
   statut: SelectionStatus;
   detail?: string;
+  /** Explication libre du conducteur (le contexte de la décision, côté client). */
+  contexte?: string;
+  /** Photos qui illustrent la décision elle-même (data URLs), hors options. */
+  photos?: string[];
   /** Jusqu'à 5 propositions présentées au client (A–E). */
   options?: SelectionOption[];
   /** Proposition retenue (id) — par le client, ou par PHÉNIX après délégation. */
@@ -872,6 +876,10 @@ export interface ClientDecision {
   /** Date limite de décision (planning daté seulement), sur le calendrier métier. */
   decideAvant: string | null;
   status: ClientDecisionStatus;
+  /** Contexte libre rédigé par le conducteur (le cas échéant). */
+  contexte: string | null;
+  /** Photos illustrant la décision (data URLs), hors options. */
+  photos: string[];
   /** Propositions présentées au client (A–E), le cas échéant. */
   options: SelectionOption[];
 }
@@ -924,6 +932,8 @@ export function buildClientDecisions(
       stepLabel: phase?.label ?? null,
       decideAvant,
       status,
+      contexte: s.contexte ?? null,
+      photos: s.photos ?? [],
       options: s.options ?? [],
     };
   });
