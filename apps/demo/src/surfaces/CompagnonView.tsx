@@ -47,7 +47,6 @@ import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { DocumentLink } from '../components/DocumentLink';
-import { RoadmapProgress } from '../components/RoadmapProgress';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { HistoriqueView } from '../components/HistoriqueView';
@@ -190,7 +189,6 @@ export function CompagnonView({
           </label>
           <DeleteChantierButton projectId={project.id} name={project.name} className="ml-auto" />
         </div>
-        {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
       </div>
 
       <AttentionPanel

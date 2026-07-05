@@ -350,6 +350,22 @@ contact, d'en LIER un existant (y compris un contact global non rattaché, ex.
 de données et le store sont inchangés. Tests recalés sur le Carnet (création +
 liaison in-chantier) ; la préservation des contacts globaux à la suppression d'un
 chantier se vérifie désormais au niveau de la sauvegarde exportée. 27 suites vertes.
+
+05/07 — épure · Frise des lots retirée de l'écran Chantier
+Fait : en tête de l'écran Chantier, une frise numérotée listait tous les lots
+(Dépose · Gros œuvre · Plomberie · … · Réception). Elle n'apporte aucune aide à la
+décision et donne une impression d'usine à gaz.
+Lecture produit : on retire la représentation VISUELLE de surface (le composant
+`RoadmapProgress` au sommet de la fiche chantier, `CompagnonView`) pour aérer
+l'écran et concentrer l'attention sur ce qui demande une action (statut, mission,
+radar d'attention). La DONNÉE métier (feuille de route) est intacte : elle reste
+éditable et visible dans la Préparation (« Feuille de route & jalons » + Planning
+prévisionnel) et alimente toujours le planning. On garde donc la frise dans le
+bureau de Préparation (contexte de gestion volontaire, redondant-safe avec le
+planning juste en dessous) — supprimable aussi si le conducteur le souhaite. Test
+`chantier-epure` : la frise a disparu de l'entrée du chantier, l'écran reste
+complet et actionnable, la feuille de route reste disponible en Préparation.
+28 suites vertes.
 ```
 
 ---
