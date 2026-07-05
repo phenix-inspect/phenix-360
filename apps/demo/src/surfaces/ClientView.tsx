@@ -252,7 +252,14 @@ export function ClientView({
 
       <Card>
         <CardContent className="space-y-5 p-6">
-          <ProjectHero project={project} clientName={nameOf(snap, project.clientId)} />
+          {/* Côté client : statut seulement, JAMAIS le lot en cours (« Gros œuvre »
+              …) — c'est une info interne conducteur. Le détail se lit au Récit ou
+              se demande à Léon. */}
+          <ProjectHero
+            project={project}
+            clientName={nameOf(snap, project.clientId)}
+            showStep={false}
+          />
           {!dossier && <StepProgress current={project.currentStep} />}
         </CardContent>
       </Card>

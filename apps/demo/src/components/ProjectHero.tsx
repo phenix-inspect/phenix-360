@@ -5,17 +5,23 @@ import { PROJECT_STATUS_BADGE } from '../lib/status';
 
 /**
  * Le projet est le HÉROS de l'écran : grand titre éditorial, client, et l'état
- * du chantier (statut + étape courante) toujours visibles.
+ * du chantier (statut, + étape courante côté conducteur). Le LOT en cours
+ * (« Gros œuvre »…) est une information INTERNE conducteur : côté client, on ne
+ * montre que le statut (`showStep={false}`). Le client suit le détail via le
+ * Récit ou en demandant à Léon.
  */
 export function ProjectHero({
   project,
   clientName,
   compact = false,
+  showStep = true,
   className,
 }: {
   project: Project;
   clientName: string;
   compact?: boolean;
+  /** Affiche le badge du LOT en cours. Interne conducteur — false côté client. */
+  showStep?: boolean;
   className?: string;
 }): React.JSX.Element {
   return (
@@ -41,9 +47,11 @@ export function ProjectHero({
         <Badge variant={PROJECT_STATUS_BADGE[project.status]}>
           {PROJECT_STATUS_LABEL[project.status]}
         </Badge>
-        <Badge variant="gold">
-          {project.currentStep ? PROJECT_STEP_LABEL[project.currentStep] : 'Étape à venir'}
-        </Badge>
+        {showStep && (
+          <Badge variant="gold">
+            {project.currentStep ? PROJECT_STEP_LABEL[project.currentStep] : 'Étape à venir'}
+          </Badge>
+        )}
       </div>
     </div>
   );

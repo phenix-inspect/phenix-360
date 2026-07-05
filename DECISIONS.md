@@ -536,6 +536,18 @@ journal (N) » déplie l'archive complète (titre → « Journal du chantier »)
 AGIR (radar + 5 actions), pas pour feuilleter l'historique. Nouvelle suite
 `suivi-journal` (dernière activité par défaut, dépliage/repli) ; `client-documents`
 déplie le journal pour retrouver un document ancien. 31 suites vertes.
+
+05/07 — RC1 · Espace client : le badge du LOT en cours retiré
+Retour terrain : dans l'espace client, le héros affichait deux badges — le STATUT
+(« En cours ») ET le LOT en cours (« Gros œuvre »). Le lot est une information
+INTERNE conducteur : le client n'a pas besoin de savoir quel corps d'état est en
+cours (il le lit dans le Récit ou le demande à Léon). Côté client, on ne garde que
+le statut (Pas commencé / En cours / Pré-réception / Levée des réserves / Clôturé).
+`ProjectHero` reçoit un `showStep` (défaut true) ; l'espace client passe
+`showStep={false}`. Le conducteur, lui, continue de voir le lot en cours. Donnée
+vs affichage : rien n'est supprimé du modèle, on masque juste le lot côté client.
+Nouvelle suite `client-hero` (lot absent côté client, présent côté conducteur,
+statut conservé). 32 suites vertes.
 ```
 
 ---
