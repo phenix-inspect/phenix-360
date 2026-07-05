@@ -80,6 +80,12 @@ try {
     async () => {
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
       await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
+      // Le Suivi ne montre que la dernière activité : on déplie le journal complet
+      // pour retrouver un document déposé plus tôt.
+      await page
+        .getByRole('button', { name: /Voir tout le journal/ })
+        .click()
+        .catch(() => {});
       await page
         .getByText(INTERNE, { exact: false })
         .first()

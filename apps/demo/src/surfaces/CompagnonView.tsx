@@ -313,6 +313,12 @@ function SuiviTab({
 }): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
   const pendingReplies = questionsEnAttente(events).length;
+  // Le Suivi répond à « que faire sur CE chantier ? », pas à « que s'est-il
+  // passé ? » (c'est le Récit). Le journal complet est une ARCHIVE : on n'en
+  // montre que la dernière activité, dépliable à la demande (100 % conservé).
+  const [showAllJournal, setShowAllJournal] = useState(false);
+  const RECENT_JOURNAL = 4;
+  const journalEvents = showAllJournal ? events : events.slice(0, RECENT_JOURNAL);
 
   const actions: ActionDef[] = [
     { kind: 'compte_rendu', label: 'Nouveau compte rendu', icon: <NotebookPen aria-hidden /> },
@@ -371,7 +377,9 @@ function SuiviTab({
 
       <Card>
         <CardContent className="space-y-4 p-6">
-          <h3 className="text-sm font-medium text-foreground">Journal du chantier</h3>
+          <h3 className="text-sm font-medium text-foreground">
+            {showAllJournal ? 'Journal du chantier' : 'Dernière activité'}
+          </h3>
           {events.length === 0 ? (
             <EmptyState
               icon={<CalendarClock aria-hidden />}
@@ -383,7 +391,7 @@ function SuiviTab({
             />
           ) : (
             <Timeline>
-              {events.map((e) => {
+              {journalEvents.map((e) => {
                 const statut = e.type === 'reserve' ? reserveStatut(e, events) : null;
                 const badge = journalStatut(e, events);
                 const filSrc =
@@ -445,6 +453,16 @@ function SuiviTab({
                 );
               })}
             </Timeline>
+          )}
+          {events.length > RECENT_JOURNAL && (
+            <button
+              type="button"
+              onClick={() => setShowAllJournal((v) => !v)}
+              aria-expanded={showAllJournal}
+              className="text-sm font-medium text-gold-700 hover:underline"
+            >
+              {showAllJournal ? 'Réduire' : `Voir tout le journal (${events.length})`}
+            </button>
           )}
         </CardContent>
       </Card>

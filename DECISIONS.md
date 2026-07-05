@@ -524,6 +524,18 @@ travaux » — or c'est une preuve en cas de litige (capacité à conserver à 1
 On la RESTAURE mais REPLIÉE par défaut (accessible d'un « Voir »), utile surtout à
 la création, hors du regard quotidien. `preparation` vérifie qu'elle est bien
 repliée par défaut et dépliable à la demande. 30 suites vertes.
+
+05/07 — RC1 · Suivi : « Dernière activité » au lieu du Journal complet
+Une seule question par écran. Le Suivi répond à « que dois-je faire sur CE
+chantier aujourd'hui ? » — or le Journal du chantier (timeline complète) répond
+à « que s'est-il passé ? », la question du Récit. Deux questions sur un écran.
+On garde 100 % de la capacité mais on change le MOMENT : le Suivi ne montre que
+la « Dernière activité » (4 événements les plus récents) ; un lien « Voir tout le
+journal (N) » déplie l'archive complète (titre → « Journal du chantier »), et
+« Réduire » revient à la dernière activité. Le conducteur vient au Suivi pour
+AGIR (radar + 5 actions), pas pour feuilleter l'historique. Nouvelle suite
+`suivi-journal` (dernière activité par défaut, dépliage/repli) ; `client-documents`
+déplie le journal pour retrouver un document ancien. 31 suites vertes.
 ```
 
 ---
