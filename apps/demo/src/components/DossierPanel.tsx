@@ -49,7 +49,7 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
-import { PrepDocumentsSection } from './prep/PrepDocuments';
+import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -370,6 +370,8 @@ export function DossierPanel({
         patch={patch}
         onAskDocument={(docId, label) => void askDocument(docId, label)}
       />
+
+      <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
 
       {editing && (
         <OrderEditor

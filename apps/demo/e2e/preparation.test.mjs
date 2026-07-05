@@ -89,11 +89,23 @@ try {
       .waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('« Questions de PHÉNIX » et « Photos avant travaux » retirées', async () => {
+  await assert('« Questions de PHÉNIX » retirée du quotidien', async () => {
     if ((await page.getByRole('heading', { name: 'Questions de PHÉNIX' }).count()) > 0)
       throw new Error('la section Questions de PHÉNIX est encore présente');
-    if ((await page.getByText('Photos avant travaux', { exact: false }).count()) > 0)
-      throw new Error('la section Photos avant travaux est encore présente');
+  });
+
+  await assert('« Photos avant travaux » : conservées mais REPLIÉES (à la demande)', async () => {
+    // Preuve en cas de litige : on ne les efface pas, mais elles ne polluent pas
+    // le quotidien — repliées par défaut ; l'ajout n'apparaît qu'au clic sur « Voir ».
+    if ((await page.getByRole('button', { name: /Ajouter des photos/ }).count()) > 0)
+      throw new Error('les photos avant travaux sont dépliées par défaut');
+    await page
+      .getByRole('button', { name: /Photos avant travaux/ })
+      .first()
+      .click();
+    await page
+      .getByRole('button', { name: /Ajouter des photos/ })
+      .waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Client-safe : la préparation ne fuit jamais côté client', async () => {

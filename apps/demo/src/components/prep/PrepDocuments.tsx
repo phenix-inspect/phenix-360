@@ -9,11 +9,11 @@ import {
   type ProjectDocument,
   type ProjectDossier,
 } from '@phenix360/core';
-import { FileText, Paperclip, Plus, X } from 'lucide-react';
+import { Camera, ChevronDown, FileText, ImagePlus, Paperclip, Plus, X } from 'lucide-react';
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
 import { DocumentLink } from '../DocumentLink';
 import { demo, useDemo } from '../../store';
-import { readDocumentAttachment, MAX_DOC_MB } from '../../lib/upload';
+import { readDocumentAttachment, readPhotoAttachment, MAX_DOC_MB } from '../../lib/upload';
 
 const FILE_CATEGORIES = PREP_DOC_CATEGORIES.filter((c) => c !== 'photo_avant');
 
@@ -183,6 +183,118 @@ export function PrepDocumentsSection({
             </p>
           )}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Photos avant travaux — l'état des lieux visuel (preuve en cas de litige). Utile
+ * SURTOUT à la création : on ne les efface pas, mais on les tient REPLIÉES par
+ * défaut pour ne pas polluer le quotidien. Accessibles à la demande (« Voir »).
+ */
+export function PhotosAvantSection({
+  project,
+  dossier,
+  patch,
+}: {
+  project: Project;
+  dossier: ProjectDossier;
+  patch: (next: Partial<ProjectDossier>) => void;
+}): React.JSX.Element {
+  const photos = dossier.documents.filter((d) => d.categorie === 'photo_avant' && d.attachment);
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const onPick = async (files: FileList | null): Promise<void> => {
+    if (!files || files.length === 0) return;
+    setError(null);
+    const added: ProjectDocument[] = [];
+    for (const file of Array.from(files)) {
+      const res = await readPhotoAttachment(project.id, file);
+      if (!res.ok) {
+        setError(res.error);
+        break;
+      }
+      added.push({
+        id: crypto.randomUUID(),
+        label: res.value.fileName ?? 'Photo avant travaux',
+        categorie: 'photo_avant',
+        status: 'fourni',
+        attachment: res.value,
+      });
+    }
+    if (added.length) patch({ documents: [...dossier.documents, ...added] });
+  };
+
+  const remove = (id: string): void =>
+    patch({ documents: dossier.documents.filter((d) => d.id !== id) });
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex w-full items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4"
+        >
+          <Camera aria-hidden className="text-gold-600" />
+          Photos avant travaux
+          <span className="text-muted-foreground">({photos.length})</span>
+          <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
+            {open ? 'Masquer' : 'Voir'}
+            <ChevronDown aria-hidden className={open ? 'rotate-180' : undefined} />
+          </span>
+        </button>
+
+        {open && (
+          <div className="mt-3 space-y-3">
+            {photos.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {photos.map((d) => (
+                  <div key={d.id} className="relative overflow-hidden rounded-lg">
+                    <img
+                      src={d.attachment!.dataUrl}
+                      alt={d.label}
+                      className="aspect-square w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      aria-label={`Retirer ${d.label}`}
+                      onClick={() => remove(d.id)}
+                      className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-full bg-ink-900/70 text-paper-0 [&_svg]:size-3.5"
+                    >
+                      <X aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              data-testid="prep-photo-file"
+              onChange={(e) => {
+                void onPick(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+              <ImagePlus aria-hidden /> Ajouter des photos
+            </Button>
+            {error && (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

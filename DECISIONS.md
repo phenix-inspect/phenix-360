@@ -509,6 +509,21 @@ validée avec l'utilisateur (« Préparation — dégraisser »).
 Aucune capacité perdue : dépôt de photos avant à la création, infos éditables
 ailleurs, devis à un clic. Tests : `preparation` couvre le devis replié + les deux
 retraits. 30 suites vertes.
+
+05/07 — RC1 · Philosophie affinée : DÉPLACER plutôt qu'effacer + une question/écran
+Précision produit importante : le problème n'est pas le nombre de fonctionnalités,
+c'est qu'elles apparaissent au MAUVAIS MOMENT. Nouvelle question à se poser : « à
+quel moment du cycle de vie cette info est-elle utile ? » Si c'est uniquement à la
+création / pré-réception / clôture, elle ne doit plus polluer le quotidien — mais
+on la DÉPLACE, on ne l'efface pas. Et chaque écran répond à UNE seule question
+(Aujourd'hui → que faire aujourd'hui ; Suivi → que faire sur CE chantier ;
+Préparation → prêt à démarrer ? ; Récit → que s'est-il passé ; Réserves → que
+reste-t-il à lever ; Espace client → où en est mon projet).
+Correction concrète : au dégraissage précédent j'avais SUPPRIMÉ « Photos avant
+travaux » — or c'est une preuve en cas de litige (capacité à conserver à 100 %).
+On la RESTAURE mais REPLIÉE par défaut (accessible d'un « Voir »), utile surtout à
+la création, hors du regard quotidien. `preparation` vérifie qu'elle est bien
+repliée par défaut et dépliable à la demande. 30 suites vertes.
 ```
 
 ---
