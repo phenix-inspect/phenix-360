@@ -472,6 +472,25 @@ retirée aussi (togglePin, pinnedOf, l'état `pins`, la clé de stockage). Aucun
 capacité perdue : tout événement reste tracé au Journal du chantier. Tests recalés
 (decisions, client-decision, documents, mission, client-documents, chantier-epure).
 Suite complète verte. 29 suites.
+
+05/07 — RC1 · Widget PHÉNIX / Léon : concierge flottant compact
+Peut-on faire sans nouvel écran ni concept ? Oui — ajustement UX du widget
+existant. Retour terrain : dans l'espace client, PHÉNIX s'ouvrait en GRAND panneau
+plein écran avec fond assombri (`fixed inset-0`, drawer `h-full`) — envahissant,
+rupture de navigation. Deux corrections.
+- BUG RÉEL de scroll : le bouton flottant (`position: fixed`) était piégé par un
+  ANCÊTRE transformé (transform/filter crée un bloc conteneur pour les `fixed`),
+  si bien qu'il défilait avec le contenu (mesuré à y=7055 dans un viewport de 740)
+  et disparaissait. Corrigé en rendant le widget via un PORTAL sur `<body>` : il
+  est désormais réellement ancré au viewport, toujours en bas à droite, à tout
+  scroll, sur desktop / tablette / mobile.
+- Panneau COMPACT : la bulle fait ~380 px de large (min(380, 100vw−2.5rem)), une
+  hauteur bornée (min(72vh, 560px), scroll interne), sans fond assombri — l'espace
+  client reste visible et navigable derrière. Fermeture d'un geste (X), historique
+  de conversation conservé, réponses + navigation intelligente (document / récit /
+  planning) inchangées. Nouvelle suite e2e `phenix-widget` (bouton visible au
+  scroll, panneau compact non plein écran, Q/R, recherche document, navigation,
+  3 tailles d'écran, zéro console). 30 suites vertes.
 ```
 
 ---

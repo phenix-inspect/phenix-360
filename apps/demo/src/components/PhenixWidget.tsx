@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@phenix360/ui';
 import { isDemande, type EventActor, type Project } from '@phenix360/core';
 import type { PhenixAction } from '@phenix360/core';
@@ -82,14 +83,18 @@ export function PhenixWidget({
     if (msg?.autoOpen && msg.action) navigate(msg.action);
   };
 
-  return (
+  // Rendu via un PORTAL sur <body> : le widget doit rester ancré au VIEWPORT
+  // (position: fixed). Sans portal, un ancêtre transformé (transform/filter)
+  // devient le bloc conteneur du « fixed » → le bouton se met à défiler avec le
+  // contenu et peut disparaître. Le portal garantit « toujours en bas à droite ».
+  return createPortal(
     <>
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Ouvrir PHÉNIX"
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2.5 rounded-full bg-ink-900 py-3 pl-3 pr-5 text-paper-0 shadow-lg transition-transform duration-base hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2"
+          className="fixed bottom-5 right-5 z-modal inline-flex items-center gap-2.5 rounded-full bg-ink-900 py-3 pl-3 pr-5 text-paper-0 shadow-lg transition-transform duration-base hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 focus-visible:ring-offset-2"
         >
           <LeonAvatar className="size-9" />
           <span className="text-left leading-tight">
@@ -100,95 +105,92 @@ export function PhenixWidget({
       )}
 
       {open && (
-        <div className="fixed inset-0 z-modal flex justify-end">
-          <button
-            type="button"
-            aria-label="Fermer"
-            onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-ink-900/40 backdrop-blur-sm"
-          />
-          <aside className="relative flex h-full w-full max-w-md flex-col bg-background shadow-lg">
-            {/* Header */}
-            <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-              <LeonAvatar className="size-10" />
-              <div className="flex-1">
-                <p className="font-serif text-lg font-semibold leading-tight text-foreground">
-                  PHÉNIX
-                </p>
-                <p className="text-xs text-muted-foreground">Votre suivi de chantier, en direct.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Fermer"
-                className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
-              >
-                <X aria-hidden />
-              </button>
-            </header>
-
-            {/* Thread */}
-            <div ref={threadRef} className="flex-1 space-y-4 overflow-y-auto px-5 py-5">
-              <PhenixBubble
-                text={
-                  'Bonjour 👋 J’ai votre chantier sous les yeux. Posez-moi votre question, ' +
-                  'je vous réponds simplement.'
-                }
-              />
-              {messages.map((m) => (
-                <MessageRow
-                  key={m.id}
-                  m={m}
-                  reponse={reponseFor(m.demandeRef)}
-                  onNavigate={navigate}
-                />
-              ))}
+        // Petite bulle flottante — jamais plein écran, jamais de fond assombri :
+        // le client garde son espace visible et navigable derrière (Art. 11).
+        <div
+          role="dialog"
+          aria-label="PHÉNIX, votre concierge de chantier"
+          className="fixed bottom-5 right-5 z-modal flex h-[min(72vh,560px)] w-[min(380px,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-2xl border border-border bg-background shadow-2xl"
+        >
+          {/* Header compact */}
+          <header className="flex items-center gap-2.5 border-b border-border px-4 py-3">
+            <LeonAvatar className="size-9" />
+            <div className="min-w-0 flex-1 leading-tight">
+              <p className="font-serif text-base font-semibold text-foreground">PHÉNIX</p>
+              <p className="truncate text-xs text-muted-foreground">Votre concierge de chantier</p>
             </div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Fermer"
+              className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
+            >
+              <X aria-hidden />
+            </button>
+          </header>
 
-            {/* Footer */}
-            <footer className="border-t border-border px-5 py-4">
-              {messages.length === 0 && (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {SUGGESTIONS.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => void send(s)}
-                      className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-gold-300 hover:text-foreground"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      void send(draft);
-                    }
-                  }}
-                  rows={1}
-                  placeholder="Écrivez à PHÉNIX…"
-                  className="max-h-28 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-input bg-surface px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
-                />
-                <Button
-                  size="icon"
-                  aria-label="Envoyer"
-                  disabled={!draft.trim() || busy}
-                  onClick={() => void send(draft)}
-                >
-                  <Send aria-hidden />
-                </Button>
+          {/* Thread — scroll interne */}
+          <div ref={threadRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+            <PhenixBubble
+              text={
+                'Bonjour 👋 J’ai votre chantier sous les yeux. Posez-moi votre question, ' +
+                'je vous réponds simplement.'
+              }
+            />
+            {messages.map((m) => (
+              <MessageRow
+                key={m.id}
+                m={m}
+                reponse={reponseFor(m.demandeRef)}
+                onNavigate={navigate}
+              />
+            ))}
+          </div>
+
+          {/* Footer */}
+          <footer className="border-t border-border px-4 py-3">
+            {messages.length === 0 && (
+              <div className="mb-2.5 flex flex-wrap gap-2">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => void send(s)}
+                    className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-gold-300 hover:text-foreground"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            </footer>
-          </aside>
+            )}
+            <div className="flex items-end gap-2">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(draft);
+                  }
+                }}
+                rows={1}
+                placeholder="Écrivez à PHÉNIX…"
+                className="max-h-28 min-h-[2.75rem] flex-1 resize-none rounded-xl border border-input bg-surface px-3.5 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+              />
+              <Button
+                size="icon"
+                aria-label="Envoyer"
+                disabled={!draft.trim() || busy}
+                onClick={() => void send(draft)}
+              >
+                <Send aria-hidden />
+              </Button>
+            </div>
+          </footer>
         </div>
       )}
-    </>
+    </>,
+    document.body,
   );
 }
 
