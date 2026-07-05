@@ -462,6 +462,8 @@ export function buildDemoSeed(): DemoSeed {
     ],
     documents: [
       { id: 'd1', label: 'Devis signé', status: 'fourni', recommande: true },
+      // Acompte payé : chantier en cours → dossier partageable au client.
+      { id: 'd5', label: 'Acompte versé', status: 'fourni', recommande: true },
       { id: 'd2', label: 'Plans', status: 'fourni' },
       { id: 'd3', label: 'DPE', status: 'a_fournir', recommande: true },
       { id: 'd4', label: "Attestation d'assurance", status: 'fourni' },
@@ -857,6 +859,7 @@ export function buildDemoSeed(): DemoSeed {
   const extraProjects: Project[] = [];
   const extraMembers: ProjectMember[] = [];
   const extraEvents: Event[] = [];
+  const extraDossiers: Record<string, ProjectDossier> = {};
 
   const makeChantier = (opts: {
     name: string;
@@ -951,6 +954,31 @@ export function buildDemoSeed(): DemoSeed {
       currentStep: opts.step,
       createdAt: daysAgo(opts.startedDaysAgo),
     });
+    // Dossier partageable (chantier avancé) : les 3 bloquants sont validés —
+    // devis signé, acompte versé, date officielle fixée. Roadmap standard pour
+    // le planning client (grandes étapes seulement).
+    extraDossiers[cid] = {
+      infos: {
+        clientName: opts.clientName,
+        ...(opts.address ? { address: opts.address } : {}),
+        startDate: new Date(Date.now() - opts.startedDaysAgo * 86_400_000)
+          .toISOString()
+          .slice(0, 10),
+      },
+      roadmap: ['Dépose', 'Gros œuvre', 'Second œuvre', 'Finitions', 'Réception'].map(
+        (label, i) => ({ id: `${cid}-step-${i + 1}`, label }),
+      ),
+      planning: [],
+      orders: [],
+      selections: [],
+      documents: [
+        { id: `${cid}-devis`, label: 'Devis signé', status: 'fourni', recommande: true },
+        { id: `${cid}-acompte`, label: 'Acompte versé', status: 'fourni', recommande: true },
+      ],
+      questions: [],
+      sources: [],
+      createdAt: daysAgo(opts.startedDaysAgo),
+    };
     extraMembers.push(
       {
         id: projectMemberId(uuid()),
@@ -1081,7 +1109,7 @@ export function buildDemoSeed(): DemoSeed {
     },
     people: { [compaId]: 'Mickaël', [clientId]: 'Mme Martin', ...extraPeople },
     activeProjectId: pid,
-    dossiers: { [pid]: dossier },
+    dossiers: { [pid]: dossier, ...extraDossiers },
     contacts,
     fil: {
       moments: { [pid]: moments },

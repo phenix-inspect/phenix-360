@@ -2000,7 +2000,9 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   if (montant != null) infos.budget = montant;
   const duree = fields.delais?.match(/(\d+\s*(?:semaines?|mois|jours?|ans?))/i);
   if (duree) infos.duration = duree[1];
-  if (fields.startDate) infos.startDate = fields.startDate;
+  // IMPORTANT : la date « Début des travaux » du devis est ADMINISTRATIVE — jamais
+  // la vraie date officielle de démarrage. On ne préremplit donc PAS
+  // `infos.startDate` : le conducteur la saisit à la main (bloquant partage client).
 
   // Feuille de route DÉRIVÉE des lots réellement détectés (jamais inventée).
   const roadmap: RoadmapStep[] = fields.prestations.map((label, i) => ({

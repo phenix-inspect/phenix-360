@@ -1,7 +1,8 @@
 /**
- * Bureau de préparation : verdict « prêt à démarrer », budget (prévisionnel /
- * engagé / restant), check-list dérivée + manuelle, intervenants = Carnet
- * (Contacts), client-safe.
+ * Bureau de préparation : bloc « partage client » (3 bloquants validés →
+ * « Prêt à partager »), budget (prévisionnel / engagé / restant), check-list
+ * dérivée + manuelle, alertes NON bloquantes, client-safe. (Section
+ * « Intervenants du chantier » retirée — contacts accessibles ailleurs.)
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -18,15 +19,15 @@ async function setBudget(v) {
 
 try {
   await openDemo(page);
+  await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
+  await page.getByRole('tab', { name: /Préparation/ }).click();
 
-  await assert('Ouvrir le bureau de préparation (verdict + budget + check-list)', async () => {
-    await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-    await page.getByRole('tab', { name: /Préparation/ }).click();
+  await assert('Le chantier seedé est PRÊT À PARTAGER (3 bloquants validés)', async () => {
     await page
-      .getByText(/Presque prêt|Prêt à démarrer|Pas encore prêt/)
+      .getByText('Prêt à partager au client')
       .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByText('points prêts').waitFor({ state: 'visible', timeout: 4000 });
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await page.getByText('bloquants validés').first().waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Budget : prévisionnel · engagé · restant', async () => {
@@ -43,23 +44,21 @@ try {
     await page.getByText('Devis signé').first().waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('Éditer le budget sous l’engagé → dépassé + « Pas encore prêt »', async () => {
+  await assert('Budget sous l’engagé → ALERTE non bloquante (pas un blocage partage)', async () => {
     await setBudget(5000);
     await page
       .getByText(/budget dépassé/i)
       .first()
       .waitFor({ state: 'visible', timeout: 4000 });
-    await page.getByText('Pas encore prêt').waitFor({ state: 'visible', timeout: 4000 });
-  });
-
-  await assert('Relever le budget → le blocage disparaît', async () => {
-    await setBudget(80000);
+    // Le partage reste possible : un dépassement budget est une alerte, pas un bloquant client.
+    await page.getByText('Prêt à partager au client').first().waitFor({ state: 'visible' });
+    // On ouvre le bloc pour voir l'alerte.
+    await page.getByRole('button', { name: /Prêt à partager au client/ }).click();
     await page
-      .getByText('Pas encore prêt')
-      .waitFor({ state: 'hidden', timeout: 4000 })
-      .catch(() => {});
-    if ((await page.getByText('Pas encore prêt').count()) > 0)
-      throw new Error('verdict toujours bloqué');
+      .getByText(/Budget engagé au-dessus du prévisionnel/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await setBudget(80000);
   });
 
   await assert('Check-list manuelle : ajouter un point', async () => {
@@ -68,22 +67,15 @@ try {
     await page.getByText('Clés récupérées').waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('Intervenants = Carnet unique : ajouter un artisan (Contact)', async () => {
-    await page.getByRole('heading', { name: 'Intervenants du chantier' }).scrollIntoViewIfNeeded();
-    await page
-      .getByRole('button', { name: /Nouveau contact/ })
-      .first()
-      .click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByLabel('Nom du contact').fill('Menuiserie Bois');
-    await dialog.getByRole('button', { name: /Créer le contact/ }).click();
-    await page.getByText('Menuiserie Bois').first().waitFor({ state: 'visible', timeout: 5000 });
+  await assert('« Intervenants du chantier » a disparu de la Préparation', async () => {
+    if ((await page.getByText('Intervenants du chantier').count()) > 0)
+      throw new Error('la section Intervenants est encore présente');
   });
 
   await assert('Client-safe : la préparation ne fuit jamais côté client', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     await page.waitForTimeout(600);
-    for (const secret of ['Check-list de lancement', 'SARL Aqua', 'Menuiserie Bois']) {
+    for (const secret of ['Check-list de lancement', 'Clés récupérées', 'Points bloquants']) {
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
     }

@@ -93,30 +93,55 @@ try {
     await page.getByRole('button', { name: 'Fermer' }).first().click();
   });
 
-  await assert('Un chantier daté (devis futur) affiche « dans environ … semaines »', async () => {
-    await page.getByRole('button', { name: 'Gérer' }).click();
-    await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
-    await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
-    await page
-      .locator('input[type=file]')
-      .first()
-      .setInputFiles([
-        {
-          name: 'Devis_futur.pdf',
-          mimeType: 'application/pdf',
-          buffer: phenixDevisPdf({ debut: futureDate() }),
-        },
-      ]);
-    await page.getByRole('button', { name: /Préparer mon chantier/ }).click();
-    await page.getByRole('button', { name: /Entrer dans le chantier/ }).click();
-    await page
-      .getByRole('heading', { name: /Jean Testeur/ })
-      .first()
-      .waitFor({ state: 'visible', timeout: 8000 });
-    await openClient();
-    if (!(await planText()).includes('dans environ'))
-      throw new Error('l’estimation « dans environ … semaines » ne s’affiche pas');
-  });
+  await assert(
+    'Devis futur : la date du devis ne préremplit PAS le démarrage → « Pas encore prêt »',
+    async () => {
+      await page.getByRole('button', { name: 'Gérer' }).click();
+      await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
+      await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
+      await page
+        .locator('input[type=file]')
+        .first()
+        .setInputFiles([
+          {
+            name: 'Devis_futur.pdf',
+            mimeType: 'application/pdf',
+            buffer: phenixDevisPdf({ debut: futureDate() }),
+          },
+        ]);
+      await page.getByRole('button', { name: /Préparer mon chantier/ }).click();
+      await page.getByRole('button', { name: /Entrer dans le chantier/ }).click();
+      await page
+        .getByRole('heading', { name: /Jean Testeur/ })
+        .first()
+        .waitFor({ state: 'visible', timeout: 8000 });
+      // Le devis a été LU (« Devis signé » validé) mais la date du devis n'a PAS
+      // fixé le démarrage : le dossier reste « Pas encore prêt » (1/3 bloquant).
+      await page.getByRole('tab', { name: /Préparation/ }).click();
+      await page.getByText('Pas encore prêt').first().waitFor({ state: 'visible', timeout: 6000 });
+    },
+  );
+
+  await assert(
+    'Après acompte + date officielle (à la main), statut PAS COMMENCÉ → « dans environ … semaines »',
+    async () => {
+      // On lève les deux bloquants restants À LA MAIN (jamais la date du devis).
+      await page.getByRole('button', { name: 'Marquer comme payé' }).click();
+      const iso = new Date(Date.now() + 42 * 86_400_000).toISOString().slice(0, 10);
+      await page.getByLabel('Date officielle de démarrage').fill(iso);
+      await page
+        .getByText('Prêt à partager au client')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      // Le statut reste « Pas commencé » → le planning client montre une ESTIMATION.
+      await openClient();
+      const t = await planText();
+      if (!t.includes('dans environ'))
+        throw new Error('l’estimation « dans environ … semaines » ne s’affiche pas');
+      if (t.includes('début officiel'))
+        throw new Error('une date officielle est affichée avant le démarrage');
+    },
+  );
 
   await assert('Zéro erreur console', async () => {
     if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));

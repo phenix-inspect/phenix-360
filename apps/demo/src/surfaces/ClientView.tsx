@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Badge, Card, CardContent } from '@phenix360/ui';
-import { CalendarRange, ClipboardList, FileText, MessageCircle, Palette } from 'lucide-react';
+import { CalendarRange, ClipboardList, FileText, Lock, MessageCircle, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
   bibliothequeImages,
   buildClientDecisions,
+  buildClientShareReadiness,
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
@@ -190,6 +191,13 @@ export function ClientView({
     demo.clearClientTarget();
   }, [clientTarget]);
 
+  // GARDE-FOU PARTAGE : tant que les 3 bloquants ne sont pas validés (devis signé,
+  // acompte payé, date officielle fixée à la main), le dossier n'est PAS
+  // partageable. Le conducteur voit un écran INTERNE — aucun contenu client ne
+  // s'affiche (récit, documents, décisions, planning), aucune fuite possible.
+  const share = buildClientShareReadiness(dossier);
+  if (!share.shareable) return <EspaceClientNonPret missing={share.missing} />;
+
   return (
     <div className="space-y-6">
       {sommaire.length > 0 && (
@@ -353,6 +361,46 @@ export function ClientView({
       )}
 
       <PhenixWidget snap={snap} project={project} actor={actor} />
+    </div>
+  );
+}
+
+/**
+ * Écran INTERNE conducteur (jamais montré au client) : le dossier n'est pas encore
+ * partageable. On liste précisément ce qui bloque, sans afficher AUCUN contenu
+ * client (récit, documents, décisions, planning) → aucune fuite possible.
+ */
+function EspaceClientNonPret({ missing }: { missing: string[] }): React.JSX.Element {
+  return (
+    <div className="mx-auto max-w-xl py-10">
+      <div className="space-y-4 rounded-2xl border border-gold-300 bg-gold-50 p-6 text-center">
+        <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-7">
+          <Lock aria-hidden />
+        </span>
+        <div className="space-y-1">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
+            Espace client non prêt
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Le dossier n’est pas encore partageable. Ces éléments sont obligatoires avant d’ouvrir
+            l’espace au client.
+          </p>
+        </div>
+        <ul className="mx-auto max-w-sm space-y-1.5 text-left">
+          {missing.map((m) => (
+            <li
+              key={m}
+              className="flex items-center gap-2 rounded-lg border border-gold-200 bg-surface px-3 py-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-destructive"
+            >
+              <Lock aria-hidden />
+              Il manque : <span className="font-medium">{m}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          Complétez ces points dans l’onglet Préparation pour partager l’espace client.
+        </p>
+      </div>
     </div>
   );
 }

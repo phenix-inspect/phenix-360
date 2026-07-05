@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Button, Card, CardContent, Input } from '@phenix360/ui';
 import {
+  buildClientShareReadiness,
   buildPreparation,
   type ChecklistTone,
-  type PrepVerdict,
+  type ClientShareReadiness,
   type PreparationSummary,
   type ProjectDossier,
 } from '@phenix360/core';
@@ -12,16 +13,17 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
+  ChevronDown,
   Circle,
   ListChecks,
+  Lock,
   Plus,
   Truck,
-  Users,
   Wallet,
   X,
   XCircle,
 } from 'lucide-react';
-import { fmtDateShort, fmtMoney } from '../lib/format';
+import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 
 /**
  * BUREAU DE PRÉPARATION (EPIC 5) — le cockpit qui répond en 30 secondes à
@@ -37,9 +39,10 @@ export function PreparationCockpit({
   patch: (next: Partial<ProjectDossier>) => void;
 }): React.JSX.Element {
   const prep: PreparationSummary = buildPreparation(dossier);
+  const share = buildClientShareReadiness(dossier);
   return (
     <div className="space-y-4">
-      <ReadinessBanner readiness={prep.readiness} nbBloquants={prep.bloquants.length} />
+      <ClientShareBlock dossier={dossier} share={share} prep={prep} patch={patch} />
       <BudgetSummary
         budget={prep.budget}
         onSave={(v) => patch({ budgetPrevisionnel: v })}
@@ -47,68 +50,190 @@ export function PreparationCockpit({
       />
       <div className="grid gap-4 lg:grid-cols-2">
         <LaunchChecklist prep={prep} dossier={dossier} patch={patch} />
-        <div className="space-y-4">
-          {prep.bloquants.length > 0 && <BlockersList prep={prep} />}
-          <KeyDates prep={prep} />
-        </div>
+        <KeyDates prep={prep} />
       </div>
     </div>
   );
 }
 
-/* ------------------------------- Verdict --------------------------------- */
+/* -------- Partage client : 3 bloquants actionnables + alertes ------------ */
 
-const VERDICT: Record<
-  PrepVerdict,
-  { label: string; sub: string; box: string; icon: React.ReactNode }
-> = {
-  pret: {
-    label: 'Prêt à démarrer',
-    sub: 'Tous les points de lancement sont au vert.',
-    box: 'border-success/40 bg-success/5',
-    icon: <CheckCircle2 aria-hidden className="text-success" />,
-  },
-  presque: {
-    label: 'Presque prêt',
-    sub: 'Quelques points restent à vérifier avant de lancer.',
-    box: 'border-gold-300 bg-gold-50',
-    icon: <AlertTriangle aria-hidden className="text-gold-700" />,
-  },
-  pas_pret: {
-    label: 'Pas encore prêt',
-    sub: 'Un ou plusieurs points bloquent le démarrage.',
-    box: 'border-destructive/40 bg-destructive/5',
-    icon: <XCircle aria-hidden className="text-destructive" />,
-  },
-};
+/** Alertes NON bloquantes (informatives) dérivées du dossier + préparation. */
+function computeAlerts(dossier: ProjectDossier, prep: PreparationSummary): string[] {
+  const alerts: string[] = [];
+  for (const d of dossier.documents)
+    if (d.recommande && d.status !== 'fourni' && !/devis|acompte|arrhes/i.test(d.label))
+      alerts.push(`Document à fournir : ${d.label}`);
+  const aCommander = dossier.orders.filter((o) => o.statut === 'a_commander').length;
+  if (aCommander > 0) alerts.push(`${aCommander} commande(s) à prévoir`);
+  if (dossier.planning.length === 0) alerts.push('Planning prévisionnel à affiner');
+  if (prep.budget.depasse) alerts.push('Budget engagé au-dessus du prévisionnel');
+  const enRetard = prep.bloquants.filter((b) => b.kind === 'decision').length;
+  if (enRetard > 0) alerts.push(`${enRetard} décision(s) client en retard`);
+  return alerts;
+}
 
-function ReadinessBanner({
-  readiness,
-  nbBloquants,
+function ClientShareBlock({
+  dossier,
+  share,
+  prep,
+  patch,
 }: {
-  readiness: PreparationSummary['readiness'];
-  nbBloquants: number;
+  dossier: ProjectDossier;
+  share: ClientShareReadiness;
+  prep: PreparationSummary;
+  patch: (next: Partial<ProjectDossier>) => void;
 }): React.JSX.Element {
-  const v = VERDICT[readiness.verdict];
+  // Ouvert d'office quand ce n'est pas prêt : le conducteur voit TOUT DE SUITE
+  // ce qui bloque, sans chercher.
+  const [open, setOpen] = useState(!share.shareable);
+  const alerts = computeAlerts(dossier, prep);
+
+  const acompteDoc = dossier.documents.find((d) => /acompte|arrhes/i.test(d.label));
+  const acomptePaid = acompteDoc?.status === 'fourni';
+  const toggleAcompte = (): void => {
+    if (acompteDoc)
+      patch({
+        documents: dossier.documents.map((d) =>
+          d.id === acompteDoc.id ? { ...d, status: acomptePaid ? 'a_fournir' : 'fourni' } : d,
+        ),
+      });
+    else
+      patch({
+        documents: [
+          ...dossier.documents,
+          { id: 'doc-acompte', label: 'Acompte versé', status: 'fourni', categorie: 'autre' },
+        ],
+      });
+  };
+  const setStartDate = (v: string): void =>
+    patch({ infos: { ...dossier.infos, ...(v ? { startDate: v } : { startDate: undefined }) } });
+
+  const box = share.shareable
+    ? 'border-success/40 bg-success/5'
+    : 'border-destructive/40 bg-destructive/5';
+  const done = share.blockers.filter((b) => b.done).length;
+
   return (
-    <div className={`flex flex-wrap items-center gap-4 rounded-2xl border p-5 ${v.box}`}>
-      <span className="grid size-12 shrink-0 place-items-center [&_svg]:size-8">{v.icon}</span>
-      <div className="min-w-0 flex-1">
-        <p className="font-serif text-2xl font-semibold tracking-tight text-foreground">
-          {v.label}
-        </p>
-        <p className="text-sm text-muted-foreground">{v.sub}</p>
-      </div>
-      <div className="text-right">
-        <p className="font-serif text-3xl font-semibold text-foreground">
-          {readiness.prets}
-          <span className="text-lg text-muted-foreground">/{readiness.total}</span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          points prêts
-          {nbBloquants > 0 ? ` · ${nbBloquants} bloquant${nbBloquants > 1 ? 's' : ''}` : ''}
-        </p>
-      </div>
+    <div className={`overflow-hidden rounded-2xl border ${box}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full flex-wrap items-center gap-4 p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+      >
+        <span className="grid size-12 shrink-0 place-items-center [&_svg]:size-8">
+          {share.shareable ? (
+            <CheckCircle2 aria-hidden className="text-success" />
+          ) : (
+            <XCircle aria-hidden className="text-destructive" />
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-serif text-2xl font-semibold tracking-tight text-foreground">
+            {share.shareable ? 'Prêt à partager au client' : 'Pas encore prêt'}
+          </span>
+          <span className="block text-sm text-muted-foreground">
+            {share.shareable
+              ? 'Les 3 éléments obligatoires sont validés — l’espace client est accessible.'
+              : 'Le dossier n’est pas partageable au client. Voir ce qui bloque.'}
+          </span>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="text-right">
+            <span className="block font-serif text-3xl font-semibold text-foreground">
+              {done}
+              <span className="text-lg text-muted-foreground">/3</span>
+            </span>
+            <span className="block text-xs text-muted-foreground">bloquants validés</span>
+          </span>
+          <ChevronDown
+            aria-hidden
+            className={`size-5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+        </span>
+      </button>
+
+      {open && (
+        <div className="space-y-4 border-t border-border bg-surface/60 p-5">
+          {/* BLOQUANTS AVANT PARTAGE CLIENT */}
+          <div className="space-y-2">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-destructive [&_svg]:size-4">
+              <Lock aria-hidden /> Bloquants avant partage client
+            </h3>
+            <ul className="space-y-1.5">
+              {share.blockers.map((b) => (
+                <li
+                  key={b.key}
+                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                >
+                  <span className="[&_svg]:size-4">
+                    {b.done ? (
+                      <CheckCircle2 aria-hidden className="text-success" />
+                    ) : (
+                      <XCircle aria-hidden className="text-destructive" />
+                    )}
+                  </span>
+                  <span className="flex-1 font-medium text-foreground">{b.label}</span>
+                  {b.key === 'acompte' && (
+                    <Button
+                      size="sm"
+                      variant={b.done ? 'ghost' : 'outline'}
+                      onClick={toggleAcompte}
+                    >
+                      {b.done ? 'Annuler' : 'Marquer comme payé'}
+                    </Button>
+                  )}
+                  {b.key === 'demarrage' &&
+                    (b.done ? (
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">
+                          {dossier.infos.startDate ? fmtDate(dossier.infos.startDate) : ''}
+                        </span>
+                        <Button size="sm" variant="ghost" onClick={() => setStartDate('')}>
+                          Effacer
+                        </Button>
+                      </span>
+                    ) : (
+                      <input
+                        type="date"
+                        aria-label="Date officielle de démarrage"
+                        value={dossier.infos.startDate ?? ''}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="rounded-lg border border-input bg-surface px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+                      />
+                    ))}
+                  {b.key === 'devis' && !b.done && (
+                    <span className="text-xs text-muted-foreground">
+                      Déposez le devis signé (Documents)
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* ALERTES NON BLOQUANTES */}
+          {alerts.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-gold-700 [&_svg]:size-4">
+                <AlertTriangle aria-hidden /> Alertes (non bloquantes)
+              </h3>
+              <ul className="space-y-1.5">
+                {alerts.map((a) => (
+                  <li
+                    key={a}
+                    className="flex items-start gap-2 text-sm text-muted-foreground [&_svg]:mt-0.5 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-gold-600"
+                  >
+                    <AlertTriangle aria-hidden />
+                    <span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -324,33 +449,6 @@ function LaunchChecklist({
     </Card>
   );
 }
-
-/* ------------------------------ Bloquants -------------------------------- */
-
-function BlockersList({ prep }: { prep: PreparationSummary }): React.JSX.Element {
-  return (
-    <Card className="border-destructive/40">
-      <CardContent className="space-y-2 p-4">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-destructive [&_svg]:size-4">
-          <AlertTriangle aria-hidden /> Points bloquants
-        </h3>
-        <ul className="space-y-1.5">
-          {prep.bloquants.map((b) => (
-            <li
-              key={b.id}
-              className="flex items-start gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-destructive"
-            >
-              <XCircle aria-hidden className="mt-0.5 shrink-0" />
-              <span>{b.message}</span>
-            </li>
-          ))}
-        </ul>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ---------------------------- Intervenants ------------------------------- */
 
 /* ------------------------------- Dates ----------------------------------- */
 

@@ -2,7 +2,8 @@
  * RC1 — Bascule rapide entre chantiers (retour terrain).
  * Dans la vue Chantier, le nom du chantier ancré devient un SÉLECTEUR : on change
  * de chantier sans repasser par Aujourd'hui, on reste en vue Chantier, et l'onglet
- * courant est conservé — sauf la Préparation sans dossier, qui retombe sur Suivi.
+ * courant est conservé (tous les chantiers seedés sont prêts pour le client, donc
+ * dotés d'un dossier de préparation).
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -47,17 +48,22 @@ try {
     },
   );
 
-  await assert('Préparation sans dossier → retombe sur Suivi au changement', async () => {
-    // Retour sur un chantier AVEC dossier, onglet Préparation.
+  await assert('Changer de chantier CONSERVE aussi la Préparation (dossier prêt)', async () => {
+    // Sur un chantier AVEC dossier, onglet Préparation.
     await selector().selectOption({ label: 'Appartement Lyon 6e' });
     await page.getByRole('tab', { name: 'Préparation' }).click();
     await page
       .getByRole('tab', { name: 'Préparation', selected: true })
       .waitFor({ state: 'visible', timeout: 5000 });
-    // Bascule vers un chantier SANS dossier → l'onglet retombe sur Suivi.
+    // Bascule vers un autre chantier prêt (dossier présent) → l'onglet Préparation
+    // est CONSERVÉ, et le cockpit affiche le dossier du NOUVEAU chantier.
     await selector().selectOption({ label: 'Duplex Croix-Rousse' });
     await page
-      .getByRole('tab', { name: 'Suivi', selected: true })
+      .getByRole('tab', { name: 'Préparation', selected: true })
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await page
+      .getByText(/bloquants validés/)
+      .first()
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 

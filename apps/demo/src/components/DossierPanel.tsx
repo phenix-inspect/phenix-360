@@ -36,7 +36,6 @@ import {
 } from '@phenix360/core';
 import {
   Banknote,
-  BookUser,
   CalendarDays,
   ListChecks,
   MessageSquareWarning,
@@ -57,7 +56,6 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
-import { CarnetChantier } from './contacts/CarnetChantier';
 import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
@@ -342,10 +340,6 @@ export function DossierPanel({
           />
         </Section>
       )}
-
-      <Section icon={<BookUser aria-hidden />} title="Intervenants du chantier">
-        <CarnetChantier project={project} />
-      </Section>
 
       <Section
         icon={<Banknote aria-hidden />}

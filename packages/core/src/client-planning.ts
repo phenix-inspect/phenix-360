@@ -19,6 +19,48 @@ import { PROJECT_STATUSES, type ProjectStatus } from './project.js';
 import { addCalendarDays } from './calendar.js';
 import { buildSmartPlanning, type ProjectDossier } from './prepare.js';
 
+/* -------------------------------------------------------------------------- *
+ * PARTAGE CLIENT — 3 bloquants obligatoires avant d'ouvrir l'espace client
+ * -------------------------------------------------------------------------- *
+ * Règle métier : le dossier n'est PARTAGEABLE au client que si les 3 éléments
+ * fondateurs sont validés — devis signé, acompte payé, ET date officielle de
+ * démarrage fixée À LA MAIN par le conducteur (jamais celle du devis, qui est
+ * administrative). Tant qu'un manque, l'espace client reste fermé. Les autres
+ * points de préparation sont de simples ALERTES, jamais bloquants.
+ */
+export interface ClientShareBlocker {
+  key: 'devis' | 'acompte' | 'demarrage';
+  label: string;
+  done: boolean;
+}
+export interface ClientShareReadiness {
+  /** Les 3 bloquants sont validés → le dossier peut être partagé au client. */
+  shareable: boolean;
+  blockers: ClientShareBlocker[];
+  /** Libellés des bloquants encore manquants. */
+  missing: string[];
+}
+
+export function buildClientShareReadiness(dossier: ProjectDossier | null): ClientShareReadiness {
+  const docs = dossier?.documents ?? [];
+  const fourni = (re: RegExp): boolean =>
+    docs.some((d) => re.test(d.label) && d.status === 'fourni');
+  const devisSigne = Boolean(dossier?.devis) || fourni(/devis/i);
+  const acomptePaye = fourni(/acompte|arrhes/i);
+  const demarrageFixe = Boolean(dossier?.infos.startDate);
+
+  const blockers: ClientShareBlocker[] = [
+    { key: 'devis', label: 'Devis signé', done: devisSigne },
+    { key: 'acompte', label: 'Acompte payé', done: acomptePaye },
+    { key: 'demarrage', label: 'Date officielle de démarrage', done: demarrageFixe },
+  ];
+  return {
+    shareable: blockers.every((b) => b.done),
+    blockers,
+    missing: blockers.filter((b) => !b.done).map((b) => b.label),
+  };
+}
+
 export type ClientMilestoneState = 'done' | 'current' | 'upcoming';
 
 export interface ClientMilestone {

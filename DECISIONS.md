@@ -366,6 +366,37 @@ planning juste en dessous) — supprimable aussi si le conducteur le souhaite. T
 `chantier-epure` : la frise a disparu de l'entrée du chantier, l'écran reste
 complet et actionnable, la feuille de route reste disponible en Préparation.
 28 suites vertes.
+
+05/07 — RC1 · Nettoyage Préparation + règles de démarrage client
+Peut-on résoudre sans nouvel écran ni nouveau concept ? OUI : on nettoie l'existant
+et on rend les blocages INTELLIGIBLES, sans rien ajouter.
+Trois décisions liées.
+(1) La section « Intervenants du chantier » disparaît de la Préparation : c'était un
+annuaire déguisé de plus. Le modèle Contact est intact — on joint toujours le monde
+depuis LÀ où le besoin naît (responsable de réserve → « Joindre », fournisseur de
+commande, client). Rien perdu, une liste en moins à tenir.
+(2) La date « Début des travaux » du devis n'est PLUS jamais la date officielle de
+démarrage. C'est une donnée ADMINISTRATIVE ; la vraie date est saisie À LA MAIN par
+le conducteur. `realAnalyzeDossier` ne préremplit donc plus `infos.startDate`
+(l'extraction documentaire de la date reste, mais ne pilote plus rien). Tant que la
+date n'est pas posée, le chantier reste « Pas encore prêt ».
+(3) « Pas encore prêt » = espace client INACCESSIBLE. Nouveau sélecteur PUR
+`buildClientShareReadiness(dossier)` (core) : 3 bloquants obligatoires avant partage
+— devis signé, acompte payé, date officielle fixée. S'il en manque un, l'Espace
+client affiche un écran INTERNE conducteur (« Espace client non prêt · il manque… »)
+et NE rend AUCUN contenu client (aucune fuite possible). Le bloc de tête de la
+Préparation devient actionnable et OUVERT d'office quand ça bloque : « Bloquants
+avant partage client » (3, validé/manquant, avec les gestes pour lever acompte +
+date) VISUELLEMENT séparés des « Alertes (non bloquantes) » (documents, commandes,
+planning, budget…). Les 3 validés → « Prêt à partager », espace client ouvert, le
+planning client suit la logique déjà en place (estimation avant démarrage, dates
+après). Chantiers seedés (Lyon + Écully + Croix-Rousse) rendus partageables pour
+rester cohérents. Tests : `preparation` réécrit (bloc partage, budget, check-list,
+alertes, Intervenants absent, client-safe), `contacts` recalé sur « Joindre » depuis
+les Réserves, `client-planning` mis à jour (devis futur → bloqué → acompte + date à
+la main → « dans environ … semaines »), nouvelle suite `client-partage` (3 validés →
+accessible ; sans acompte / sans date / sans devis → bloqué ; séparation
+bloquants/alertes ; date du devis ne fixe pas le démarrage). 29 suites vertes.
 ```
 
 ---

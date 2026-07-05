@@ -1,7 +1,8 @@
 /**
  * Consolidation 1 — Contacts base unique. Réserve.responsable, Commande.
  * fournisseur et l'identité client référencent l'annuaire (plus de texte libre) ;
- * les intervenants du chantier sont des Contacts. Client-safe préservé.
+ * les contacts vivent DANS leur contexte (réserve, commande, client), plus dans
+ * une section « Intervenants » séparée (retirée). Client-safe préservé.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -14,20 +15,16 @@ try {
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
 
   await assert(
-    'Intervenants = Carnet unique : artisans/fournisseurs sont des Contacts',
+    '« Intervenants du chantier » retiré — plus de section annuaire séparée',
     async () => {
       await page.getByRole('tab', { name: 'Préparation' }).click();
       await page
-        .getByRole('heading', { name: 'Intervenants du chantier' })
-        .scrollIntoViewIfNeeded();
-      if ((await page.getByLabel(/Nom — Artisans/).count()) > 0)
-        throw new Error('champ intervenant texte encore présent');
-      for (const n of ['Karim Bouaziz', 'Élec Pro', 'Carrelage Lyonnais', 'Showroom Mobalpa']) {
-        await page
-          .getByText(n, { exact: false })
-          .first()
-          .waitFor({ state: 'visible', timeout: 5000 });
-      }
+        .getByRole('heading', { name: 'Commandes' })
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // La section n'existe plus : les contacts sont joints DANS leur contexte
+      // (responsable de réserve, fournisseur de commande, client) — cf. ci-dessous.
+      if ((await page.getByRole('heading', { name: 'Intervenants du chantier' }).count()) > 0)
+        throw new Error('la section Intervenants est encore présente');
     },
   );
 
