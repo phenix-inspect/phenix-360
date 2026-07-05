@@ -548,6 +548,20 @@ le statut (Pas commencé / En cours / Pré-réception / Levée des réserves / C
 vs affichage : rien n'est supprimé du modèle, on masque juste le lot côté client.
 Nouvelle suite `client-hero` (lot absent côté client, présent côté conducteur,
 statut conservé). 32 suites vertes.
+
+05/07 — RC1 · Déploiement démo : Vercel + gate mot de passe temporaire
+Objectif : mettre la démo en ligne (Mac + téléphone) sans galérer avec le local.
+Reste 100 % front (localStorage, pas de backend). Ajout de `vercel.json` (install
+workspace pnpm, build @phenix360/demo, sert apps/demo/dist en SPA) → import
+turnkey depuis la PR. Pour protéger la démo gratuitement, un GATE mot de passe
+TEMPORAIRE (`PasswordGate`, pas une vraie auth, ni le futur système d'auth) :
+mot de passe = variable d'env `VITE_DEMO_PASSWORD` (build Vercel) ; AUCUNE
+variable → aucun gate (dev + e2e accessibles, zéro régression) ; session gardée
+en localStorage (persiste au reload) ; bouton « Verrouiller ». Contrôle 100 %
+client (dissuasif, pas confidentiel — le mot de passe est dans le bundle).
+Testabilité : `window.__PHENIX_GATE_PW__` simule la variable sans rebuild
+(bypass propre). Nouvelle suite `gate` (sans var → accessible ; avec var → écran ;
+mauvais/bon mdp ; persistance ; verrouiller). 33 suites vertes.
 ```
 
 ---
