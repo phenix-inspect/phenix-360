@@ -23,6 +23,8 @@ export interface DevisFields {
   montantHT?: number;
   /** Date du devis au format ISO (YYYY-MM-DD) si convertible, sinon brute. */
   date?: string;
+  /** Date de DÉBUT des travaux (ISO) si mentionnée — alimente le planning client. */
+  startDate?: string;
   /** Prestations / lots principaux détectés (libellés canoniques). */
   prestations: string[];
   /** Pièces concernées détectées. */
@@ -235,6 +237,7 @@ function parsePhenixAmoDevis(text: string, pieces: string[], materiaux: string[]
   if (ht) f.montantHT = parseAmount(ht[1]!);
 
   const debut = joined.match(/Début des travaux[^\n]*?(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (debut) f.startDate = parseFrDate(debut[1]!) ?? undefined;
   const duree = joined.match(/Durée estimée[^\n]*?(\d+\s*(?:mois|semaines?|jours?|ans?))/i);
   const delais = [debut ? `Début le ${debut[1]}` : null, duree ? `durée ${duree[1]}` : null].filter(
     Boolean,

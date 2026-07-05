@@ -22,6 +22,7 @@ export * from './calendar.js';
 export * from './devis.js';
 export * from './devis-extract.js';
 export * from './prepare.js';
+export * from './client-planning.js';
 export * from './fil.js';
 export * from './mission.js';
 export * from './journee.js';

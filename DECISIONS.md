@@ -315,6 +315,27 @@ horizontalement (`max-w-full overflow-x-auto`, onglets `shrink-0`) au lieu de
 pousser la page. Aucun autre débordement, aucune modale bloquée, aucune erreur
 console. Résultat : 26 suites vertes (~230 vérifications). Les autres écarts
 rencontrés étaient des sélecteurs de test, pas des bugs applicatifs.
+
+05/07 — recadrage · Planning client trop détaillé (retour au premium)
+Fait : le planning client montrait le chantier LOT PAR LOT (plomberie, peinture,
+électricité…) avec des dates par étape — trop technique, et surtout un engagement
+implicite (« vous aviez prévu le carrelage mardi »). Le client ne veut pas exécuter
+le chantier, il veut savoir OÙ EN EST son projet.
+Lecture produit : on garde l'écran Planning, on SIMPLIFIE son contenu (pas de
+nouvel écran ni concept). Le planning client devient 5 grands jalons de cycle de
+vie — Projet validé · Préparation · Démarrage · Pré-réception · Réception —,
+JAMAIS les lots (le détail est réservé à Léon : « où en est la salle de bain ? »).
+Il ÉVOLUE tout seul selon le STATUT métier (source de vérité déjà en place) : avant
+le démarrage officiel (« Pas commencé ») → aucune date, une estimation seulement
+(« démarrage estimé : dans environ 6 semaines », jamais de promesse) ; dès « En
+cours » → bascule automatique sur des dates estimées (début officiel, pré-réception
+estimée, réception estimée). Une phrase de contexte rassurante clôt le bloc, jamais
+anxiogène. Sélecteur PUR `buildClientPlanning(status, dossier)` (core, testable) ;
+la frise détaillée par lots reste côté CONDUCTEUR. Au passage : on extrait la date
+« Début des travaux » du devis Phenix-amo → `infos.startDate`, ce qui alimente
+l'estimation « dans environ … semaines ». Nouvelle suite e2e `client-planning`
+(estimations avant / dates après / 5 jalons max / aucun lot / Léon répond encore).
+27 suites vertes.
 ```
 
 ---

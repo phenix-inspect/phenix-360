@@ -2000,6 +2000,7 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   if (montant != null) infos.budget = montant;
   const duree = fields.delais?.match(/(\d+\s*(?:semaines?|mois|jours?|ans?))/i);
   if (duree) infos.duration = duree[1];
+  if (fields.startDate) infos.startDate = fields.startDate;
 
   // Feuille de route DÉRIVÉE des lots réellement détectés (jamais inventée).
   const roadmap: RoadmapStep[] = fields.prestations.map((label, i) => ({

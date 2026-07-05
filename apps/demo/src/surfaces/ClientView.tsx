@@ -52,8 +52,6 @@ export function ClientView({
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
   const dossier = dossierOf(snap, project.id);
-  // Le client ne voit le planning qu'une fois la date de démarrage validée.
-  const dossierDated = Boolean(dossier?.infos.startDate);
   // Décision client la plus urgente que le client peut traiter (un choix
   // proposé à valider). Prioritaire sur le bandeau intelligent générique.
   const clientDecision = dossier
@@ -134,9 +132,7 @@ export function ClientView({
   const hasDecisions = clientDecision !== null || decisions.length > 0;
   const sommaire: { label: string; onClick: () => void }[] = [
     ...(hasDecisions ? [{ label: 'Décisions', onClick: () => goTo('section-decision') }] : []),
-    ...(dossier && dossierDated
-      ? [{ label: 'Planning', onClick: () => goTo('section-etapes') }]
-      : []),
+    ...(dossier ? [{ label: 'Planning', onClick: () => goTo('section-etapes') }] : []),
     ...(clientDocuments.length > 0
       ? [{ label: 'Documents', onClick: () => goTo('section-documents') }]
       : []),
@@ -264,7 +260,7 @@ export function ClientView({
         />
       </div>
 
-      {dossier && dossierDated && (
+      {dossier && (
         <section id="section-etapes" className="scroll-mt-24 space-y-3 rounded-2xl">
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <CalendarRange aria-hidden />
@@ -272,7 +268,7 @@ export function ClientView({
               Les grandes étapes du chantier
             </h2>
           </div>
-          <GrandesEtapes dossier={dossier} />
+          <GrandesEtapes status={project.status} dossier={dossier} />
         </section>
       )}
 
