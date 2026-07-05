@@ -106,7 +106,6 @@ export function DevisBreakdown({
                     key={s.id}
                     icon={<Palette aria-hidden />}
                     label={`Choix · ${s.categorie}`}
-                    onClick={onOpen ? () => onOpen(`selection-${s.id}`) : undefined}
                   />
                 ))}
                 {documents.map((d) => (

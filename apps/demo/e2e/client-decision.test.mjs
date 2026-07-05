@@ -102,7 +102,7 @@ try {
 
   await assert('CONDUCTEUR — Aujourd’hui affiche le choix validé, exact', async () => {
     await page.getByRole('tab', { name: /Aujourd/ }).click();
-    const counter = page.getByRole('button', { name: /Filtrer.*choix validés à traiter/i });
+    const counter = page.getByRole('button', { name: /Filtrer.*à traiter/i });
     await counter.waitFor({ state: 'visible', timeout: 5000 });
     await counter.click();
     await page

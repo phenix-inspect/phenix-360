@@ -14,7 +14,6 @@ import {
 import {
   ORDER_STATUS_LABEL,
   ORDER_STATUSES,
-  SELECTION_STATUS_LABEL,
   buildClientDecisions,
   avenantImpact,
   buildDecisionContent,
@@ -35,7 +34,6 @@ import {
   Banknote,
   CalendarDays,
   MessageSquareWarning,
-  Palette,
   Pencil,
   Plus,
   Receipt,
@@ -348,37 +346,6 @@ export function DossierPanel({
           />
         </Section>
       )}
-
-      <Section
-        icon={<Palette aria-hidden />}
-        title="Choix client"
-        count={dossier.selections.length}
-      >
-        <div className="grid gap-2 sm:grid-cols-2">
-          {dossier.selections.map((s) => (
-            <div
-              key={s.id}
-              id={`selection-${s.id}`}
-              className="rounded-lg border border-border bg-surface p-3"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-medium uppercase tracking-wide text-gold-700">
-                  {s.categorie}
-                </span>
-                <Badge
-                  variant={
-                    s.statut === 'valide' ? 'success' : s.statut === 'propose' ? 'info' : 'neutral'
-                  }
-                >
-                  {SELECTION_STATUS_LABEL[s.statut]}
-                </Badge>
-              </div>
-              <p className="mt-1 text-sm text-foreground">{s.label}</p>
-              {s.detail && <p className="text-xs text-muted-foreground">{s.detail}</p>}
-            </div>
-          ))}
-        </div>
-      </Section>
 
       <PrepDocumentsSection
         project={project}

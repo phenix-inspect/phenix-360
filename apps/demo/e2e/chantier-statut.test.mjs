@@ -85,7 +85,7 @@ try {
     await page
       .getByRole('heading', { name: /Mes chantiers \(3\)/ })
       .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByRole('button', { name: /Filtrer.*décisions en attente/i }).waitFor({
+    await page.getByRole('button', { name: /Filtrer.*à traiter/i }).waitFor({
       state: 'visible',
     });
   });

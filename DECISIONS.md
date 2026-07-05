@@ -442,6 +442,22 @@ validés / actions / réserves / réponses / livraisons) — 4 nuances de « à 
 à obtenir · Propositions · Choix client en lecture seule) — la grille en lecture
 seule est le maillon faible (elle ne sert plus que d'ancre au devis). Ces deux
 coupes touchent des écrans cœur et attendent le feu vert.
+
+05/07 — RC1 · Deux coupes validées (Aujourd'hui à 3 compteurs, Choix client retiré)
+Feu vert donné sur les deux coupes de l'audit 5 secondes.
+- AUJOURD'HUI : 6 compteurs → 3. Le matin doit se lire d'un coup d'œil. « À traiter
+  aujourd'hui » agrège les quatre natures de tâche conducteur (décisions client,
+  choix validés, actions, réponses) ; « Réserves à lever » et « Livraisons à
+  contrôler » gardent leur compteur (flux distincts). Aucune capacité perdue : la
+  vue filtrée liste les éléments précis, chacun PRÉFIXÉ par sa nature (« Décision
+  client · … », « Choix validé · … », « Action · … », « Question client · … ») et
+  ouvrant le bon onglet ; le geste « Pris en compte » reste sur les choix validés.
+- PRÉPARATION : la grille « Choix client » (lecture seule) est retirée — les choix
+  à obtenir restent dans « Décisions client à obtenir » (actionnable, datées) et
+  les propositions dans « Propositions préparées par PHÉNIX ». La puce « Choix » du
+  devis devient informative (elle n'a plus à faire défiler vers une grille).
+Tests recalés (aujourdhui, decisions, client-decision, chantier-filtres,
+chantier-statut) ; suite complète verte. 29 suites.
 ```
 
 ---

@@ -18,11 +18,8 @@ import {
   Check,
   ChevronRight,
   Flag,
-  HelpCircle,
   ListChecks,
-  MessageSquare,
   MoonStar,
-  PackageCheck,
   SlidersHorizontal,
   Sunrise,
   Truck,
@@ -46,17 +43,24 @@ import type { CompagnonTab } from './CompagnonView';
  * chantier. Aucune donnée inventée : tout est agrégé des faits (Art. 7 & 8).
  */
 
-/** Les compteurs filtrables et ce qu'ils ouvrent (onglet du chantier). */
-type FilterKind = 'decisions' | 'choix' | 'actions' | 'reserves' | 'questions' | 'livraisons';
+/**
+ * Trois compteurs seulement — le matin doit se lire en cinq secondes. « À traiter »
+ * agrège tout ce que le conducteur doit faire côté client/dossier (décisions,
+ * choix validés, actions, réponses) ; les Réserves et les Livraisons gardent leur
+ * propre compteur car ce sont des flux distincts. Chaque élément ouvre le bon
+ * onglet (routage porté par l'élément, pas par le compteur).
+ */
+type FilterKind = 'a_traiter' | 'reserves' | 'livraisons';
 
-const FILTERS: Record<FilterKind, { title: string; tab: CompagnonTab }> = {
-  decisions: { title: 'Décisions client en attente', tab: 'suivi' },
-  choix: { title: 'Choix client validés à traiter', tab: 'historique' },
-  actions: { title: 'Actions à suivre', tab: 'suivi' },
-  reserves: { title: 'Réserves à lever', tab: 'reserves' },
-  questions: { title: 'Questions client à répondre', tab: 'suivi' },
-  livraisons: { title: 'Livraisons à contrôler', tab: 'preparation' },
+const FILTERS: Record<FilterKind, { title: string }> = {
+  a_traiter: { title: 'À traiter aujourd’hui' },
+  reserves: { title: 'Réserves à lever' },
+  livraisons: { title: 'Livraisons à contrôler' },
 };
+
+/** Un élément à traiter : son libellé, l'onglet à ouvrir, et s'il se « traite »
+ *  d'un geste (choix validé → « Pris en compte »). */
+type TaskItem = { key: string; label: string; tab: CompagnonTab; treatable?: boolean };
 
 /** Libellé d'un choix validé : la catégorie et l'option retenue (ou délégation). */
 function choixLabel(e: DecisionEvent): string {
@@ -125,20 +129,14 @@ export function AujourdhuiView({
   const activeId =
     snap.projects.find((p) => p.id === snap.activeProjectId)?.id ?? snap.projects[0]?.id;
 
-  // Compteur d'un chantier pour un filtre donné (les 5 issus du briefing + les
-  // choix validés, device-local).
+  // Compteur d'un chantier pour un filtre donné. « À traiter » agrège les quatre
+  // natures de tâche conducteur ; réserves et livraisons restent distinctes.
   const countFor = (kind: FilterKind, c: ChantierResume): number => {
     switch (kind) {
-      case 'decisions':
-        return c.decisions;
-      case 'choix':
-        return choixItems(c.projectId).length;
-      case 'actions':
-        return c.actions;
+      case 'a_traiter':
+        return c.decisions + choixItems(c.projectId).length + c.actions + c.questions;
       case 'reserves':
         return c.reserves;
-      case 'questions':
-        return c.questions;
       case 'livraisons':
         return c.livraisons;
     }
@@ -146,32 +144,47 @@ export function AujourdhuiView({
 
   // Les ÉLÉMENTS PRÉCIS d'un chantier pour un compteur donné — mêmes sélecteurs
   // que ceux qui produisent les compteurs (`buildDayBriefing`), donc cohérence
-  // garantie entre le nombre et la liste. Aucune donnée inventée.
-  const itemsFor = (kind: FilterKind, projectId: string): { key: string; label: string }[] => {
+  // garantie entre le nombre et la liste. Chaque élément porte l'onglet à ouvrir.
+  const itemsFor = (kind: FilterKind, projectId: string): TaskItem[] => {
     const events = eventsByProject[projectId] ?? [];
     switch (kind) {
-      case 'decisions':
-        return pendingClientDecisions(events).map((d) => ({ key: d.eventId, label: d.question }));
-      case 'choix':
-        return choixItems(projectId).map((e) => ({ key: e.id, label: choixLabel(e) }));
-      case 'actions':
-        return actionsOuvertes(events).map((e) => ({
-          key: e.id,
-          label: e.type === 'action' ? e.content.libelle : '',
-        }));
+      case 'a_traiter':
+        return [
+          ...pendingClientDecisions(events).map((d) => ({
+            key: d.eventId,
+            label: `Décision client · ${d.question}`,
+            tab: 'suivi' as CompagnonTab,
+          })),
+          ...choixItems(projectId).map((e) => ({
+            key: e.id,
+            label: `Choix validé · ${choixLabel(e)}`,
+            tab: 'historique' as CompagnonTab,
+            treatable: true,
+          })),
+          ...actionsOuvertes(events).map((e) => ({
+            key: e.id,
+            label: `Action · ${e.type === 'action' ? e.content.libelle : ''}`,
+            tab: 'suivi' as CompagnonTab,
+          })),
+          ...questionsEnAttente(events).map((e) => ({
+            key: e.id,
+            label: `Question client · ${e.content.question}`,
+            tab: 'suivi' as CompagnonTab,
+          })),
+        ];
       case 'reserves':
         return reservesOuvertes(events).map((r) => ({
           key: r.id,
           label: `Réserve n°${r.content.numero} · ${r.content.libelle}`,
+          tab: 'reserves' as CompagnonTab,
         }));
-      case 'questions':
-        return questionsEnAttente(events).map((e) => ({ key: e.id, label: e.content.question }));
       case 'livraisons':
         return (snap.dossiers[projectId]?.orders ?? [])
           .filter((o) => o.statut === 'commandee')
           .map((o) => ({
             key: o.id,
             label: o.fournisseur ? `${o.label} · ${o.fournisseur}` : o.label,
+            tab: 'preparation' as CompagnonTab,
           }));
     }
   };
@@ -266,33 +279,17 @@ export function AujourdhuiView({
         <p className="text-base text-muted-foreground">{phrase}</p>
       </div>
 
-      {/* Ce qui réclame votre attention — chaque compteur FILTRE la journée.
-          Les deux faces d'une décision : le client doit agir (en attente) /
-          le conducteur doit agir (choix validés). */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat
-          icon={<HelpCircle aria-hidden />}
-          value={t.decisions}
-          label="décisions en attente"
-          accent
-          active={filter === 'decisions'}
-          onActivate={() => activateFilter('decisions')}
-        />
-        <Stat
-          icon={<PackageCheck aria-hidden />}
-          value={totalChoix}
-          label="choix validés à traiter"
-          accent
-          active={filter === 'choix'}
-          onActivate={() => activateFilter('choix')}
-        />
+      {/* Ce qui réclame votre attention — trois compteurs, lus en cinq secondes.
+          « À traiter » regroupe tout ce qui est sur votre bureau (décisions,
+          choix validés, actions, réponses) ; Réserves et Livraisons à part. */}
+      <div className="grid grid-cols-3 gap-3">
         <Stat
           icon={<ListChecks aria-hidden />}
-          value={t.actions}
-          label="actions à suivre"
+          value={t.decisions + totalChoix + t.actions + t.questions}
+          label="à traiter aujourd’hui"
           accent
-          active={filter === 'actions'}
-          onActivate={() => activateFilter('actions')}
+          active={filter === 'a_traiter'}
+          onActivate={() => activateFilter('a_traiter')}
         />
         <Stat
           icon={<Flag aria-hidden />}
@@ -303,16 +300,9 @@ export function AujourdhuiView({
           onActivate={() => activateFilter('reserves')}
         />
         <Stat
-          icon={<MessageSquare aria-hidden />}
-          value={t.questions}
-          label="réponses à donner"
-          active={filter === 'questions'}
-          onActivate={() => activateFilter('questions')}
-        />
-        <Stat
           icon={<Truck aria-hidden />}
           value={t.livraisons}
-          label="livraisons prévues"
+          label="livraisons à contrôler"
           active={filter === 'livraisons'}
           onActivate={() => activateFilter('livraisons')}
         />
@@ -344,10 +334,8 @@ export function AujourdhuiView({
                     step={c.step ? PROJECT_STEP_LABEL[c.step] : 'En préparation'}
                     active={c.projectId === activeId}
                     items={itemsFor(filter, c.projectId)}
-                    onOpenItem={() => onOpenChantier(c.projectId, FILTERS[filter].tab)}
-                    onTreatItem={
-                      filter === 'choix' ? (key) => demo.markChoixTraite(key) : undefined
-                    }
+                    onOpenItem={(item) => onOpenChantier(c.projectId, item.tab)}
+                    onTreatItem={(key) => demo.markChoixTraite(key)}
                   />
                 ))}
               </div>
@@ -640,8 +628,8 @@ function ChantierFilteredCard({
   clientName: string;
   step: string;
   active?: boolean;
-  items: { key: string; label: string }[];
-  onOpenItem: () => void;
+  items: TaskItem[];
+  onOpenItem: (item: TaskItem) => void;
   /** Action rapide par élément (ex. « Pris en compte » pour un choix validé). */
   onTreatItem?: (key: string) => void;
 }): React.JSX.Element {
@@ -667,13 +655,13 @@ function ChantierFilteredCard({
           <li key={it.key} className="flex items-stretch gap-1.5">
             <button
               type="button"
-              onClick={onOpenItem}
+              onClick={() => onOpenItem(it)}
               className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-border bg-paper-50 px-3 py-2 text-left text-sm text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="min-w-0 flex-1 truncate">{it.label}</span>
               <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
             </button>
-            {onTreatItem && (
+            {it.treatable && onTreatItem && (
               <button
                 type="button"
                 onClick={() => onTreatItem(it.key)}

@@ -100,8 +100,8 @@ try {
   });
 
   await assert('Non-régression : les compteurs du matin filtrent toujours la journée', async () => {
-    await page.getByRole('button', { name: /Filtrer.*décisions en attente/i }).click();
-    await heading('Décisions client en attente').waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByRole('button', { name: /Filtrer.*à traiter/i }).click();
+    await heading(/À traiter aujourd/i).waitFor({ state: 'visible', timeout: 5000 });
     await page.getByRole('button', { name: /Tout afficher/ }).click();
     await heading(/Mes chantiers \(3\)/).waitFor({ state: 'visible', timeout: 5000 });
   });
