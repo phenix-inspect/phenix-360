@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { projectId, type ProjectId } from '@phenix360/core';
 import { demo, useDemo } from './store';
+import { DeleteChantierButton } from './components/DeleteChantierButton';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { PointDuSoirView } from './surfaces/PointDuSoirView';
 import { CompagnonView, type CompagnonTab } from './surfaces/CompagnonView';
@@ -441,6 +442,27 @@ function ManageDialog({
                 Importer une sauvegarde
               </Button>
             </div>
+
+            {snap.projects.length > 0 && (
+              <div className="grid gap-2 border-t border-border pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Supprimer un chantier
+                </p>
+                <ul className="grid gap-1">
+                  {snap.projects.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-1.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
+                        {p.name}
+                      </span>
+                      <DeleteChantierButton projectId={p.id} name={p.name} compact />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid gap-2 border-t border-border pt-3">
               <Button

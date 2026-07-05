@@ -58,6 +58,7 @@ import { Composer, type ComposerKind } from '../components/Composer';
 import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
 import { MissionPicker } from '../components/mission/MissionPicker';
 import { MissionFlow } from '../components/mission/MissionFlow';
+import { DeleteChantierButton } from '../components/DeleteChantierButton';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'compagnon');
@@ -167,24 +168,28 @@ export function CompagnonView({
             <Plus aria-hidden /> Nouvelle mission
           </Button>
         </div>
-        {/* Statut métier — modifiable à la main (transitions manuelles, RC1). */}
-        <label className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="font-medium text-muted-foreground">Statut du chantier</span>
-          <select
-            value={project.status}
-            onChange={(e) =>
-              void demo.updateProject(project.id, { status: e.target.value as ProjectStatus })
-            }
-            aria-label="Statut du chantier"
-            className="rounded-lg border border-input bg-surface px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
-          >
-            {PROJECT_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {PROJECT_STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
+        {/* Statut métier — modifiable à la main (transitions manuelles, RC1) ;
+            à droite, la suppression protégée du chantier actif. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="font-medium text-muted-foreground">Statut du chantier</span>
+            <select
+              value={project.status}
+              onChange={(e) =>
+                void demo.updateProject(project.id, { status: e.target.value as ProjectStatus })
+              }
+              aria-label="Statut du chantier"
+              className="rounded-lg border border-input bg-surface px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+            >
+              {PROJECT_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {PROJECT_STATUS_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <DeleteChantierButton projectId={project.id} name={project.name} className="ml-auto" />
+        </div>
         {dossier && <RoadmapProgress roadmap={dossier.roadmap} />}
       </div>
 

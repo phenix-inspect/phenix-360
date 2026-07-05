@@ -48,6 +48,8 @@ export interface ProjectRepository {
   getProject(id: ProjectId): Promise<Project | null>;
   listProjects(): Promise<Project[]>;
   updateProject(id: ProjectId, patch: ProjectPatch): Promise<Project>;
+  /** Supprime un projet et TOUTES ses données colonne vertébrale (membres, événements). */
+  deleteProject(id: ProjectId): Promise<void>;
   listMembers(projectId: ProjectId): Promise<ProjectMember[]>;
   addMember(input: NewMember): Promise<ProjectMember>;
 }

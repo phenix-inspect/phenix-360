@@ -106,6 +106,15 @@ export class InMemoryBackend implements Backend {
     return project;
   }
 
+  /** Supprime le projet et sa colonne vertébrale (membres + événements). Local, append-only ailleurs. */
+  async deleteProject(id: ProjectId): Promise<void> {
+    const state = this.read();
+    state.projects = state.projects.filter((p) => p.id !== id);
+    state.members = state.members.filter((m) => m.projectId !== id);
+    state.events = state.events.filter((e) => e.projectId !== id);
+    this.write(state);
+  }
+
   async listMembers(projectId: ProjectId): Promise<ProjectMember[]> {
     return this.read().members.filter((m) => m.projectId === projectId);
   }

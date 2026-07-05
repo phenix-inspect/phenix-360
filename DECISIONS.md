@@ -252,6 +252,24 @@ vides tant qu'on ne peut pas les extraire honnêtement (ce sera le rôle du LLM,
 brancher derrière le même port `setDossierAnalyzer`, sans toucher aux écrans). On
 échange donc une démo « riche mais fausse » contre une lecture « juste, parfois
 partielle » — la confiance prime.
+
+05/07 — besoin · Pouvoir recommencer proprement (supprimer un chantier)
+Fait : chantier créé par erreur, analyse de devis ratée, envie de repartir net —
+mais aucun moyen de supprimer UN chantier (seul « Repartir de zéro » existait, et
+il efface TOUT). Le conducteur reste coincé avec des chantiers fantômes.
+Lecture produit : action destructive PROTÉGÉE, sans nouvel écran. Un bouton
+« Supprimer » (poubelle) dans « Gérer » (n'importe quel chantier, en liste) et sur
+la fiche du chantier actif, tous deux ouvrant une simple confirmation
+(« supprime le chantier et toutes ses données locales · irréversible »). 100 %
+local, aucun backend : on retire la colonne vertébrale (projet + membres +
+événements, via un vrai `deleteProject` ajouté au port) PUIS toutes les données
+rattachées par `projectId` (dossier, pins, Fil/récit, conversation PHÉNIX,
+partages) et les marqueurs device-local (choix pris en compte, accusés de lecture).
+Deux garde-fous : (a) les CONTACTS sont globaux — on ne retire que le LIEN vers ce
+chantier ; un contact encore rattaché ailleurs (ou global sans lien) n'est jamais
+supprimé ; (b) si le chantier supprimé était actif, on bascule vers un autre, ou
+vers l'état vide s'il n'en reste aucun. Export/import restent cohérents (mêmes
+clés). La suppression complète le cycle de vie : créer, lire, ajuster, supprimer.
 ```
 
 ---

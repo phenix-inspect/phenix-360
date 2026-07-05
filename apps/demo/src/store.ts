@@ -648,6 +648,103 @@ export const demo = {
   },
 
   /**
+   * SUPPRIME un chantier et TOUTES ses données locales (100 % local, aucun
+   * backend). Retire le projet, ses membres et ses événements (colonne
+   * vertébrale) puis toutes les données rattachées par `projectId` (dossier,
+   * pins, Fil, conversation PHÉNIX, partages), les marqueurs device-local
+   * (choix traités, accusés de lecture des Moments) et les identités devenues
+   * orphelines. Les CONTACTS restent globaux : on retire seulement le lien vers
+   * ce chantier ; un contact référencé ailleurs n'est jamais supprimé. Si le
+   * chantier supprimé était actif, on bascule vers un autre (ou l'état vide).
+   */
+  async deleteChantier(id: ProjectId): Promise<void> {
+    const before = kv.load() ?? emptyState();
+    // À collecter AVANT suppression (pour nettoyer les données dérivées).
+    const eventIds = new Set<string>(
+      before.events.filter((e) => e.projectId === id).map((e) => e.id),
+    );
+    const memberUserIds = before.members.filter((m) => m.projectId === id).map((m) => m.userId);
+    const filMoments = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
+    const momentIds = new Set<string>((filMoments[id] ?? []).map((m) => m.id));
+
+    // 1) Colonne vertébrale : projet + membres + événements.
+    await backend.deleteProject(id);
+
+    // 2) Toutes les données rattachées par projectId (une entrée par projet).
+    for (const key of [
+      DOSSIERS_KEY,
+      PINS_KEY,
+      FIL_MOMENTS_KEY,
+      FIL_COUPS_KEY,
+      FIL_MESSAGES_KEY,
+      FIL_ZONES_KEY,
+      FIL_ANNOTATIONS_KEY,
+      PHENIX_CONV_KEY,
+      SHARES_KEY,
+    ]) {
+      const obj = readJson<Record<string, unknown>>(key, {});
+      if (id in obj) {
+        delete obj[id];
+        localStorage.setItem(key, JSON.stringify(obj));
+      }
+    }
+
+    // 3) Choix client « pris en compte » : entrées liées aux événements du projet.
+    const choix = readJson<Record<string, string>>(CHOIX_TRAITES_KEY, {});
+    let choixChanged = false;
+    for (const k of Object.keys(choix))
+      if (eventIds.has(k)) {
+        delete choix[k];
+        choixChanged = true;
+      }
+    if (choixChanged) localStorage.setItem(CHOIX_TRAITES_KEY, JSON.stringify(choix));
+
+    // 4) Accusés de lecture des Moments (par rôle) pour les Moments du projet.
+    const seen = readJson<SeenState>(SEEN_KEY, {});
+    let seenChanged = false;
+    for (const role of Object.keys(seen))
+      for (const mid of Object.keys(seen[role] ?? {}))
+        if (momentIds.has(mid)) {
+          delete seen[role]![mid];
+          seenChanged = true;
+        }
+    if (seenChanged) localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+
+    // 5) Identités (noms) devenues orphelines : plus référencées par aucun membre.
+    const after = kv.load() ?? emptyState();
+    const stillUsed = new Set(after.members.map((m) => m.userId));
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    let peopleChanged = false;
+    for (const uid of memberUserIds)
+      if (!stillUsed.has(uid) && uid in people) {
+        delete people[uid];
+        peopleChanged = true;
+      }
+    if (peopleChanged) localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+
+    // 6) Contacts : on retire le LIEN vers ce chantier ; on ne supprime le
+    // contact que s'il n'est plus rattaché à aucun autre chantier (jamais un
+    // contact global encore utilisé ailleurs).
+    const contacts = readJson<Contact[]>(CONTACTS_KEY, []);
+    const nextContacts = contacts.flatMap((c) => {
+      if (!c.projectIds.includes(id)) return [c];
+      const projectIds = c.projectIds.filter((pid) => pid !== id);
+      return projectIds.length > 0 ? [{ ...c, projectIds }] : [];
+    });
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(nextContacts));
+
+    // 7) Chantier actif : bascule vers un autre chantier, ou l'état vide.
+    const active = readJson<ProjectId | null>(ACTIVE_KEY, null);
+    if (active === id) {
+      const next = after.projects[0]?.id ?? null;
+      localStorage.setItem(ACTIVE_KEY, JSON.stringify(next));
+    }
+
+    refresh();
+    broadcast();
+  },
+
+  /**
    * Garantit qu'un chantier a un DOSSIER de préparation (EPIC 1). Un chantier
    * créé à la main n'en a pas : on en crée un vide, amorcé depuis ses infos
    * (client, adresse) et la feuille de route standard. Idempotent.
