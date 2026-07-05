@@ -428,6 +428,20 @@ cockpit, et la « Note de lancement » narrative). On tranche.
 Aucune capacité perdue : chaque information retirée survit ailleurs (alertes,
 Documents, Planning). Tests recalés (preparation, client-partage, chantier-switch,
 chantier-epure, consolidation) ; suite complète verte. 29 suites.
+
+05/07 — RC1 · Règle des 5 secondes + correctif d'un clic mort
+Nouvelle barre d'acceptation : chaque écran doit se comprendre en moins de 5
+secondes ; si le conducteur doit réfléchir à OÙ cliquer, l'écran est encore trop
+chargé. En passant l'app à ce crible, une régression de l'épure : la puce
+« Vigilance » du devis pointait vers l'ancre `note-lancement` de la « Note de
+lancement » supprimée → clic mort. Corrigé : la puce devient informative (le
+message reste au survol), plus aucun clic sans effet. Audit consigné pour la
+suite : (1) « Aujourd'hui » aligne 6 compteurs très proches (décisions / choix
+validés / actions / réserves / réponses / livraisons) — 4 nuances de « à faire »,
+à resserrer ; (2) la Préparation garde 3 blocs autour des choix client (Décisions
+à obtenir · Propositions · Choix client en lecture seule) — la grille en lecture
+seule est le maillon faible (elle ne sert plus que d'ancre au devis). Ces deux
+coupes touchent des écrans cœur et attendent le feu vert.
 ```
 
 ---

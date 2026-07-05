@@ -124,7 +124,6 @@ export function DevisBreakdown({
                     icon={<TriangleAlert aria-hidden />}
                     label="Vigilance"
                     title={v.message}
-                    onClick={onOpen ? () => onOpen('note-lancement') : undefined}
                   />
                 ))}
               </div>
