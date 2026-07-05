@@ -61,8 +61,9 @@ try {
     await page
       .getByRole('tab', { name: 'Préparation', selected: true })
       .waitFor({ state: 'visible', timeout: 6000 });
+    // Le cockpit du NOUVEAU chantier s'affiche (check-list de partage, chantier prêt).
     await page
-      .getByText(/bloquants validés/)
+      .getByText('Prêt à partager au client')
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
   });

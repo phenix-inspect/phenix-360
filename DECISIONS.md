@@ -397,6 +397,37 @@ les Réserves, `client-planning` mis à jour (devis futur → bloqué → acompt
 la main → « dans environ … semaines »), nouvelle suite `client-partage` (3 validés →
 accessible ; sans acompte / sans date / sans devis → bloqué ; séparation
 bloquants/alertes ; date du devis ne fixe pas le démarrage). 29 suites vertes.
+
+05/07 — RC1 · Épure du bureau de Préparation (suppressions, zéro ajout)
+Peut-on faire sans nouvel écran ni concept ? Oui — c'est de la suppression pure.
+Après tests terrain, la Préparation s'était alourdie : le MÊME état de préparation
+était affiché TROIS fois (la check-list de partage, la check-list « auto » du
+cockpit, et la « Note de lancement » narrative). On tranche.
+- SUPPRIMÉ « Ma note de lancement » (grande carte or) : doublon narratif de la
+  check-list de partage — « ce qui mérite votre attention » = les alertes, « ce que
+  je conseille » = les demandes de documents (déjà dans Documents), les compteurs
+  « préparé » = du remplissage.
+- SUPPRIMÉ « Mémoire du projet » (paragraphe de compteurs, jamais actionnable).
+- SUPPRIMÉ « Feuille de route & jalons » : doublon du Planning prévisionnel, qui
+  liste déjà toutes les étapes datées + la frise.
+- SUPPRIMÉ la check-list AUTO du cockpit (devis/plans/budget/date/planning/
+  décisions/commandes) : troisième copie de l'état de préparation, désormais porté
+  par la seule check-list de partage. La « Check-list de lancement » ne garde que
+  les points MANUELS du conducteur (« clés récupérées »…).
+- SUPPRIMÉ la carte « Prochaines dates » du cockpit (les dates vivent dans le
+  Planning).
+- Bloc « Pas encore prêt » → vraie CHECK-LIST toujours visible : ❌/✅ Devis signé ·
+  Acompte reçu · Date officielle fixée. Plus aucun dépliage : le conducteur ne
+  cherche jamais ce qui manque. Les trois cochés → ✅ « prêt à partager ». Le reste
+  = alertes non bloquantes, clairement séparées.
+- Cartes financières FUSIONNÉES : trois grandes cartes (Prévisionnel / Engagé /
+  Restant) → une seule ligne compacte lue en deux secondes ; le prévisionnel s'édite
+  en place.
+- Fichiers morts supprimés (LaunchNotePanel, RoadmapProgress, CarnetChantier,
+  ContactCard).
+Aucune capacité perdue : chaque information retirée survit ailleurs (alertes,
+Documents, Planning). Tests recalés (preparation, client-partage, chantier-switch,
+chantier-epure, consolidation) ; suite complète verte. 29 suites.
 ```
 
 ---

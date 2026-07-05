@@ -41,11 +41,11 @@ try {
   });
 
   await assert('Les données de feuille de route restent disponibles (Préparation)', async () => {
-    // On ne supprime QUE la représentation visuelle de surface : la préparation
-    // conserve la feuille de route (donnée métier intacte).
+    // La donnée métier (étapes) est intacte : elle alimente directement le
+    // Planning prévisionnel (on ne double plus la liste des étapes au-dessus).
     await page.getByRole('tab', { name: 'Préparation' }).click();
     await page
-      .getByRole('heading', { name: /Feuille de route/ })
+      .getByRole('heading', { name: /Planning prévisionnel/ })
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
   });

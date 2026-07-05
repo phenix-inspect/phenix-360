@@ -22,15 +22,22 @@ try {
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
   await page.getByRole('tab', { name: /Préparation/ }).click();
 
-  await assert('Le chantier seedé est PRÊT À PARTAGER (3 bloquants validés)', async () => {
+  await assert('Le chantier seedé est PRÊT À PARTAGER (3 éléments validés)', async () => {
     await page
       .getByText('Prêt à partager au client')
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
-    await page.getByText('bloquants validés').first().waitFor({ state: 'visible', timeout: 4000 });
+    await page
+      .getByText('éléments obligatoires validés')
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await page
+      .getByText('Le chantier est prêt à être partagé au client.')
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('Budget : prévisionnel · engagé · restant', async () => {
+  await assert('Budget compact : prévisionnel · engagé · restant sur une ligne', async () => {
     await page
       .getByText('Prévisionnel', { exact: true })
       .first()
@@ -39,9 +46,9 @@ try {
     await page.getByText('Restant', { exact: true }).waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('Check-list de lancement dérivée (devis signé au vert)', async () => {
-    await page.getByText('Check-list de lancement').waitFor({ state: 'visible', timeout: 4000 });
-    await page.getByText('Devis signé').first().waitFor({ state: 'visible', timeout: 4000 });
+  await assert('La check-list de partage montre les 3 éléments obligatoires', async () => {
+    for (const b of ['Devis signé', 'Acompte payé', 'Date officielle de démarrage'])
+      await page.getByText(b, { exact: true }).first().waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Budget sous l’engagé → ALERTE non bloquante (pas un blocage partage)', async () => {
@@ -52,8 +59,7 @@ try {
       .waitFor({ state: 'visible', timeout: 4000 });
     // Le partage reste possible : un dépassement budget est une alerte, pas un bloquant client.
     await page.getByText('Prêt à partager au client').first().waitFor({ state: 'visible' });
-    // On ouvre le bloc pour voir l'alerte.
-    await page.getByRole('button', { name: /Prêt à partager au client/ }).click();
+    // L'alerte est TOUJOURS visible (aucun dépliage nécessaire).
     await page
       .getByText(/Budget engagé au-dessus du prévisionnel/i)
       .first()

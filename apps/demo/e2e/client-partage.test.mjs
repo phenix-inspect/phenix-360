@@ -24,11 +24,13 @@ const openClient = async () => {
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
   await page.waitForTimeout(500);
 };
-// Déplie le bloc « partage client » s'il est replié (il l'est quand c'est prêt).
-const expandShareBlock = async () => {
-  const header = page.getByRole('button').filter({ hasText: 'bloquants validés' }).first();
-  await header.waitFor({ state: 'visible', timeout: 6000 });
-  if ((await header.getAttribute('aria-expanded')) === 'false') await header.click();
+// La check-list de partage est TOUJOURS visible (aucun dépliage) : on attend
+// simplement que le cockpit soit rendu.
+const waitShareBlock = async () => {
+  await page
+    .getByText('éléments obligatoires validés')
+    .first()
+    .waitFor({ state: 'visible', timeout: 6000 });
 };
 const acompteRow = () => page.locator('li').filter({ hasText: 'Acompte payé' }).first();
 const dateRow = () =>
@@ -54,7 +56,7 @@ try {
 
   await assert('Sans acompte → espace client BLOQUÉ (« il manque : Acompte payé »)', async () => {
     await openPreparation();
-    await expandShareBlock();
+    await waitShareBlock();
     await acompteRow().getByRole('button', { name: 'Annuler' }).click(); // acompte → non payé
     await openClient();
     await page
@@ -68,7 +70,7 @@ try {
 
   await assert('Sans date officielle → espace client BLOQUÉ', async () => {
     await openPreparation();
-    await expandShareBlock();
+    await waitShareBlock();
     await acompteRow().getByRole('button', { name: 'Marquer comme payé' }).click(); // acompte remis
     await dateRow().getByRole('button', { name: 'Effacer' }).click(); // date effacée
     await openClient();
@@ -81,13 +83,11 @@ try {
       .waitFor({ state: 'visible', timeout: 4000 });
   });
 
-  await assert('Le bloc « Pas encore prêt » sépare BLOQUANTS et ALERTES', async () => {
+  await assert('« Pas encore prêt » : check-list toujours visible + ALERTES séparées', async () => {
     await openPreparation();
-    await expandShareBlock(); // ouvert d'office (non partageable)
+    await waitShareBlock(); // check-list toujours visible (non partageable)
     await page.getByText('Pas encore prêt').first().waitFor({ state: 'visible', timeout: 4000 });
-    await page
-      .getByRole('heading', { name: 'Bloquants avant partage client' })
-      .waitFor({ state: 'visible', timeout: 4000 });
+    // Les 3 éléments obligatoires sont listés directement (aucun dépliage).
     for (const b of ['Devis signé', 'Acompte payé', 'Date officielle de démarrage'])
       await page.getByText(b, { exact: true }).first().waitFor({ state: 'visible' });
     // La section ALERTES est distincte (non bloquantes).
@@ -130,7 +130,7 @@ try {
     // On valide d'abord acompte + date (2 bloquants), puis on RETIRE le devis :
     // l'espace doit rester bloqué sur le seul « Devis signé ».
     await openPreparation();
-    await expandShareBlock();
+    await waitShareBlock();
     await acompteRow().getByRole('button', { name: 'Marquer comme payé' }).click();
     const iso = new Date(Date.now() + 42 * 86_400_000).toISOString().slice(0, 10);
     await page.getByLabel('Date officielle de démarrage').fill(iso);

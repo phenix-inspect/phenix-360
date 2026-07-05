@@ -18,15 +18,12 @@ import {
   buildClientDecisions,
   avenantImpact,
   buildDecisionContent,
-  buildProjectMemory,
   consolidateDevis,
   decisionVisibility,
-  studyProject,
   type Avenant,
   type AvenantImpact,
   type ClientDecisionStatus,
   type DevisPoste,
-  type Event,
   type EventActor,
   type Order,
   type OrderStatus,
@@ -37,7 +34,6 @@ import {
 import {
   Banknote,
   CalendarDays,
-  ListChecks,
   MessageSquareWarning,
   Palette,
   Pencil,
@@ -49,9 +45,7 @@ import {
 import { demo, useDemo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { ContactPicker } from './contacts/ContactPicker';
-import { RoadmapProgress } from './RoadmapProgress';
 import { DevisBreakdown } from './DevisBreakdown';
-import { LaunchNotePanel } from './LaunchNotePanel';
 import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
@@ -63,15 +57,11 @@ export function DossierPanel({
   project,
   dossier,
   actor,
-  events,
 }: {
   project: Project;
   dossier: ProjectDossier;
   actor: EventActor;
-  events: Event[];
 }): React.JSX.Element {
-  const memory = buildProjectMemory(dossier);
-  const note = studyProject(dossier, events);
   const [editing, setEditing] = useState<Order | null>(null);
   // Avenant fraîchement déposé → PHÉNIX affiche sa mini-note d'intégration.
   const [integratedNumero, setIntegratedNumero] = useState<number | null>(null);
@@ -91,12 +81,6 @@ export function DossierPanel({
     const o: Order = { id: crypto.randomUUID(), label: 'Nouvelle commande', statut: 'a_commander' };
     patch({ orders: [...dossier.orders, o] });
     setEditing(o);
-  };
-
-  const addRoadmapStep = (label: string) => {
-    const l = label.trim();
-    if (!l) return;
-    patch({ roadmap: [...dossier.roadmap, { id: crypto.randomUUID(), label: l }] });
   };
 
   // Le conducteur envoie (ou renvoie) les propositions au client.
@@ -279,16 +263,6 @@ export function DossierPanel({
     <div className="space-y-6">
       <PreparationCockpit dossier={dossier} patch={patch} />
 
-      <div id="note-lancement">
-        <LaunchNotePanel
-          note={note}
-          onAskDocument={(docId) => {
-            const d = dossier.documents.find((x) => x.id === docId);
-            if (d) void askDocument(d.id, d.label);
-          }}
-        />
-      </div>
-
       <CoordonneesCard project={project} dossier={dossier} patch={patch} />
 
       {dossier.devis && (
@@ -320,15 +294,6 @@ export function DossierPanel({
           />
         </Section>
       )}
-
-      <Section
-        icon={<ListChecks aria-hidden />}
-        title="Feuille de route & jalons"
-        count={dossier.roadmap.length}
-      >
-        {dossier.roadmap.length > 0 && <RoadmapProgress roadmap={dossier.roadmap} />}
-        <RoadmapAdder onAdd={addRoadmapStep} />
-      </Section>
 
       {dossier.roadmap.length > 0 && (
         <Section icon={<CalendarDays aria-hidden />} title="Planning prévisionnel">
@@ -434,15 +399,6 @@ export function DossierPanel({
         </Section>
       )}
 
-      <Section icon={<Sparkles aria-hidden />} title="Mémoire du projet">
-        <p className="text-sm text-muted-foreground">
-          L’assistant PHÉNIX connaît déjà {memory.travaux.length} lots de travaux,{' '}
-          {memory.commandes.length} commandes, {memory.choix.length} choix client et{' '}
-          {memory.garanties.length} garanties. Il pourra répondre aux questions du client et des
-          équipes.
-        </p>
-      </Section>
-
       {editing && (
         <OrderEditor
           order={editing}
@@ -452,31 +408,6 @@ export function DossierPanel({
           onClose={() => setEditing(null)}
         />
       )}
-    </div>
-  );
-}
-
-function RoadmapAdder({ onAdd }: { onAdd: (label: string) => void }): React.JSX.Element {
-  const [label, setLabel] = useState('');
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <Input
-        value={label}
-        onChange={(e) => setLabel(e.target.value)}
-        placeholder="Ajouter un jalon (ex. Réception, Livraison cuisine)"
-        aria-label="Nouveau jalon"
-        className="min-w-48 flex-1"
-      />
-      <Button
-        size="sm"
-        onClick={() => {
-          onAdd(label);
-          setLabel('');
-        }}
-        disabled={!label.trim()}
-      >
-        <Plus aria-hidden /> Ajouter un jalon
-      </Button>
     </div>
   );
 }

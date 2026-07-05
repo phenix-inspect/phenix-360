@@ -3,33 +3,29 @@ import { Button, Card, CardContent, Input } from '@phenix360/ui';
 import {
   buildClientShareReadiness,
   buildPreparation,
-  type ChecklistTone,
   type ClientShareReadiness,
   type PreparationSummary,
   type ProjectDossier,
 } from '@phenix360/core';
 import {
   AlertTriangle,
-  CalendarClock,
   Check,
   CheckCircle2,
-  ChevronDown,
   Circle,
   ListChecks,
-  Lock,
   Plus,
-  Truck,
   Wallet,
   X,
   XCircle,
 } from 'lucide-react';
-import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
+import { fmtDate, fmtMoney } from '../lib/format';
 
 /**
- * BUREAU DE PRÉPARATION (EPIC 5) — le cockpit qui répond en 30 secondes à
- * « ce chantier peut-il démarrer ? ». Lecture pure de `buildPreparation`
- * (déterministe, aucune IA) : verdict → budget → check-list → bloquants →
- * intervenants → dates. Le détail complet du dossier reste juste dessous.
+ * BUREAU DE PRÉPARATION (EPIC 5) — réduit à l'essentiel : « ce chantier peut-il
+ * partir chez le client, oui ou non ? ». Un seul juge de paix (la check-list de
+ * partage, toujours visible), un budget lisible en deux secondes, et la check-list
+ * personnelle du conducteur. Le reste du dossier (devis, planning, commandes,
+ * décisions, documents) vit dans ses sections dédiées, plus bas.
  */
 export function PreparationCockpit({
   dossier,
@@ -43,20 +39,17 @@ export function PreparationCockpit({
   return (
     <div className="space-y-4">
       <ClientShareBlock dossier={dossier} share={share} prep={prep} patch={patch} />
-      <BudgetSummary
+      <CompactBudget
         budget={prep.budget}
         onSave={(v) => patch({ budgetPrevisionnel: v })}
         onReset={() => patch({ budgetPrevisionnel: undefined })}
       />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <LaunchChecklist prep={prep} dossier={dossier} patch={patch} />
-        <KeyDates prep={prep} />
-      </div>
+      <LaunchChecklist dossier={dossier} patch={patch} />
     </div>
   );
 }
 
-/* -------- Partage client : 3 bloquants actionnables + alertes ------------ */
+/* -------- Partage client : la check-list qui décide du partage ------------ */
 
 /** Alertes NON bloquantes (informatives) dérivées du dossier + préparation. */
 function computeAlerts(dossier: ProjectDossier, prep: PreparationSummary): string[] {
@@ -73,6 +66,12 @@ function computeAlerts(dossier: ProjectDossier, prep: PreparationSummary): strin
   return alerts;
 }
 
+/**
+ * La check-list de partage — TOUJOURS dépliée : le conducteur ne cherche jamais
+ * ce qui manque. Trois éléments obligatoires (devis signé · acompte reçu · date
+ * officielle fixée), chacun coché ✅ ou barré ❌ avec le geste pour le lever.
+ * Les trois cochés → le chantier part chez le client. Le reste = alertes.
+ */
 function ClientShareBlock({
   dossier,
   share,
@@ -84,9 +83,6 @@ function ClientShareBlock({
   prep: PreparationSummary;
   patch: (next: Partial<ProjectDossier>) => void;
 }): React.JSX.Element {
-  // Ouvert d'office quand ce n'est pas prêt : le conducteur voit TOUT DE SUITE
-  // ce qui bloque, sans chercher.
-  const [open, setOpen] = useState(!share.shareable);
   const alerts = computeAlerts(dossier, prep);
 
   const acompteDoc = dossier.documents.find((d) => /acompte|arrhes/i.test(d.label));
@@ -115,13 +111,8 @@ function ClientShareBlock({
   const done = share.blockers.filter((b) => b.done).length;
 
   return (
-    <div className={`overflow-hidden rounded-2xl border ${box}`}>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        className="flex w-full flex-wrap items-center gap-4 p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-      >
+    <div className={`space-y-4 rounded-2xl border p-5 ${box}`}>
+      <div className="flex flex-wrap items-center gap-4">
         <span className="grid size-12 shrink-0 place-items-center [&_svg]:size-8">
           {share.shareable ? (
             <CheckCircle2 aria-hidden className="text-success" />
@@ -129,109 +120,86 @@ function ClientShareBlock({
             <XCircle aria-hidden className="text-destructive" />
           )}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-serif text-2xl font-semibold tracking-tight text-foreground">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
             {share.shareable ? 'Prêt à partager au client' : 'Pas encore prêt'}
-          </span>
-          <span className="block text-sm text-muted-foreground">
-            {share.shareable
-              ? 'Les 3 éléments obligatoires sont validés — l’espace client est accessible.'
-              : 'Le dossier n’est pas partageable au client. Voir ce qui bloque.'}
-          </span>
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="text-right">
-            <span className="block font-serif text-3xl font-semibold text-foreground">
-              {done}
-              <span className="text-lg text-muted-foreground">/3</span>
+          </h2>
+          <p className="text-sm text-muted-foreground">{done} / 3 éléments obligatoires validés</p>
+        </div>
+      </div>
+
+      {/* La check-list, toujours visible. */}
+      <ul className="space-y-1.5">
+        {share.blockers.map((b) => (
+          <li
+            key={b.key}
+            className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+          >
+            <span className="[&_svg]:size-4">
+              {b.done ? (
+                <CheckCircle2 aria-hidden className="text-success" />
+              ) : (
+                <XCircle aria-hidden className="text-destructive" />
+              )}
             </span>
-            <span className="block text-xs text-muted-foreground">bloquants validés</span>
-          </span>
-          <ChevronDown
-            aria-hidden
-            className={`size-5 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
-          />
-        </span>
-      </button>
-
-      {open && (
-        <div className="space-y-4 border-t border-border bg-surface/60 p-5">
-          {/* BLOQUANTS AVANT PARTAGE CLIENT */}
-          <div className="space-y-2">
-            <h3 className="flex items-center gap-2 text-sm font-semibold text-destructive [&_svg]:size-4">
-              <Lock aria-hidden /> Bloquants avant partage client
-            </h3>
-            <ul className="space-y-1.5">
-              {share.blockers.map((b) => (
-                <li
-                  key={b.key}
-                  className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                >
-                  <span className="[&_svg]:size-4">
-                    {b.done ? (
-                      <CheckCircle2 aria-hidden className="text-success" />
-                    ) : (
-                      <XCircle aria-hidden className="text-destructive" />
-                    )}
+            <span className="flex-1 font-medium text-foreground">{b.label}</span>
+            {b.key === 'acompte' && (
+              <Button size="sm" variant={b.done ? 'ghost' : 'outline'} onClick={toggleAcompte}>
+                {b.done ? 'Annuler' : 'Marquer comme payé'}
+              </Button>
+            )}
+            {b.key === 'demarrage' &&
+              (b.done ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {dossier.infos.startDate ? fmtDate(dossier.infos.startDate) : ''}
                   </span>
-                  <span className="flex-1 font-medium text-foreground">{b.label}</span>
-                  {b.key === 'acompte' && (
-                    <Button
-                      size="sm"
-                      variant={b.done ? 'ghost' : 'outline'}
-                      onClick={toggleAcompte}
-                    >
-                      {b.done ? 'Annuler' : 'Marquer comme payé'}
-                    </Button>
-                  )}
-                  {b.key === 'demarrage' &&
-                    (b.done ? (
-                      <span className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">
-                          {dossier.infos.startDate ? fmtDate(dossier.infos.startDate) : ''}
-                        </span>
-                        <Button size="sm" variant="ghost" onClick={() => setStartDate('')}>
-                          Effacer
-                        </Button>
-                      </span>
-                    ) : (
-                      <input
-                        type="date"
-                        aria-label="Date officielle de démarrage"
-                        value={dossier.infos.startDate ?? ''}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="rounded-lg border border-input bg-surface px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
-                      />
-                    ))}
-                  {b.key === 'devis' && !b.done && (
-                    <span className="text-xs text-muted-foreground">
-                      Déposez le devis signé (Documents)
-                    </span>
-                  )}
-                </li>
+                  <Button size="sm" variant="ghost" onClick={() => setStartDate('')}>
+                    Effacer
+                  </Button>
+                </span>
+              ) : (
+                <input
+                  type="date"
+                  aria-label="Date officielle de démarrage"
+                  value={dossier.infos.startDate ?? ''}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="rounded-lg border border-input bg-surface px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+                />
               ))}
-            </ul>
-          </div>
+            {b.key === 'devis' && !b.done && (
+              <span className="text-xs text-muted-foreground">
+                Déposez le devis signé (Documents)
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
 
-          {/* ALERTES NON BLOQUANTES */}
-          {alerts.length > 0 && (
-            <div className="space-y-2">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-gold-700 [&_svg]:size-4">
-                <AlertTriangle aria-hidden /> Alertes (non bloquantes)
-              </h3>
-              <ul className="space-y-1.5">
-                {alerts.map((a) => (
-                  <li
-                    key={a}
-                    className="flex items-start gap-2 text-sm text-muted-foreground [&_svg]:mt-0.5 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-gold-600"
-                  >
-                    <AlertTriangle aria-hidden />
-                    <span>{a}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+      {share.shareable && (
+        <p className="flex items-center gap-2 text-sm font-medium text-success [&_svg]:size-4">
+          <CheckCircle2 aria-hidden />
+          Le chantier est prêt à être partagé au client.
+        </p>
+      )}
+
+      {/* Alertes NON bloquantes — jamais un blocage, juste à surveiller. */}
+      {alerts.length > 0 && (
+        <div className="space-y-1.5 border-t border-border pt-3">
+          <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gold-700 [&_svg]:size-4">
+            <AlertTriangle aria-hidden /> Alertes (non bloquantes)
+          </h3>
+          <ul className="space-y-1">
+            {alerts.map((a) => (
+              <li
+                key={a}
+                className="flex items-start gap-2 text-sm text-muted-foreground [&_svg]:mt-0.5 [&_svg]:size-3.5 [&_svg]:shrink-0 [&_svg]:text-gold-600"
+              >
+                <AlertTriangle aria-hidden />
+                <span>{a}</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
@@ -240,7 +208,11 @@ function ClientShareBlock({
 
 /* -------------------------------- Budget --------------------------------- */
 
-function BudgetSummary({
+/**
+ * Budget lisible en deux secondes : une seule carte, une seule ligne —
+ * prévisionnel · engagé · restant. Le prévisionnel s'édite en place.
+ */
+function CompactBudget({
   budget,
   onSave,
   onReset,
@@ -259,109 +231,111 @@ function BudgetSummary({
   };
 
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-gold-600">
-              <Wallet aria-hidden /> Prévisionnel
-            </p>
-            {!editing && (
-              <button
-                type="button"
-                onClick={() => {
-                  setValue(String(budget.previsionnel || ''));
-                  setEditing(true);
-                }}
-                className="text-xs font-medium text-gold-700 hover:underline"
-              >
-                Modifier
-              </button>
-            )}
-          </div>
+    <Card className={budget.depasse ? 'border-destructive/40' : undefined}>
+      <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4">
+        <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-gold-600">
+          <Wallet aria-hidden /> Budget
+        </span>
+
+        <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-2">
           {editing ? (
-            <div className="mt-1 flex items-center gap-1.5">
+            <span className="flex items-center gap-1.5">
               <Input
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && save()}
                 inputMode="numeric"
                 aria-label="Budget prévisionnel"
-                className="h-9"
+                className="h-9 w-32"
                 autoFocus
               />
               <Button size="icon" aria-label="Enregistrer" onClick={save}>
                 <Check aria-hidden />
               </Button>
-            </div>
+            </span>
           ) : (
-            <p className="mt-1 font-serif text-2xl font-semibold text-foreground">
-              {budget.previsionnel > 0 ? fmtMoney(budget.previsionnel) : '—'}
-            </p>
+            <Stat
+              label="Prévisionnel"
+              value={budget.previsionnel > 0 ? fmtMoney(budget.previsionnel) : '—'}
+              action={
+                <button
+                  type="button"
+                  onClick={() => {
+                    setValue(String(budget.previsionnel || ''));
+                    setEditing(true);
+                  }}
+                  className="text-[0.7rem] font-medium text-gold-700 hover:underline"
+                >
+                  Modifier
+                </button>
+              }
+            />
           )}
-          <p className="mt-0.5 text-[0.7rem] text-muted-foreground">
-            {budget.source === 'saisi' ? (
-              <button type="button" onClick={onReset} className="hover:underline">
-                saisi · revenir au devis
-              </button>
-            ) : budget.source === 'devis' ? (
-              'd’après le devis signé'
-            ) : budget.source === 'infos' ? (
-              'd’après le dossier'
-            ) : (
-              'à renseigner'
-            )}
-          </p>
-        </CardContent>
-      </Card>
+          <Divider />
+          <Stat label="Engagé" value={fmtMoney(budget.engage)} />
+          <Divider />
+          <Stat label="Restant" value={fmtMoney(budget.restant)} danger={budget.restant < 0} />
+        </div>
 
-      <Card>
-        <CardContent className="p-4">
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-gold-600">
-            <Wallet aria-hidden /> Engagé
-          </p>
-          <p className="mt-1 font-serif text-2xl font-semibold text-foreground">
-            {fmtMoney(budget.engage)}
-          </p>
-          <p className="mt-0.5 text-[0.7rem] text-muted-foreground">commandes déjà passées</p>
-        </CardContent>
-      </Card>
-
-      <Card className={budget.depasse ? 'border-destructive/40' : undefined}>
-        <CardContent className="p-4">
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5 [&_svg]:text-gold-600">
-            <Wallet aria-hidden /> Restant
-          </p>
-          <p
-            className={`mt-1 font-serif text-2xl font-semibold ${
-              budget.restant < 0 ? 'text-destructive' : 'text-foreground'
-            }`}
-          >
-            {fmtMoney(budget.restant)}
-          </p>
-          <p className="mt-0.5 text-[0.7rem] text-muted-foreground">
-            {budget.depasse ? 'budget dépassé' : 'prévisionnel − engagé'}
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+        <span className="text-[0.7rem] text-muted-foreground">
+          {budget.depasse ? (
+            <span className="font-medium text-destructive">budget dépassé</span>
+          ) : budget.source === 'saisi' ? (
+            <button type="button" onClick={onReset} className="hover:underline">
+              saisi · revenir au devis
+            </button>
+          ) : budget.source === 'devis' ? (
+            'd’après le devis signé'
+          ) : budget.source === 'infos' ? (
+            'd’après le dossier'
+          ) : (
+            'à renseigner'
+          )}
+        </span>
+      </CardContent>
+    </Card>
   );
+}
+
+function Stat({
+  label,
+  value,
+  danger,
+  action,
+}: {
+  label: string;
+  value: string;
+  danger?: boolean;
+  action?: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <span className="inline-flex items-baseline gap-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span
+        className={`font-serif text-lg font-semibold ${danger ? 'text-destructive' : 'text-foreground'}`}
+      >
+        {value}
+      </span>
+      {action}
+    </span>
+  );
+}
+
+function Divider(): React.JSX.Element {
+  return <span aria-hidden className="hidden h-5 w-px bg-border sm:block" />;
 }
 
 /* ------------------------------ Check-list ------------------------------- */
 
-const TONE_ICON: Record<ChecklistTone, React.ReactNode> = {
-  fait: <CheckCircle2 aria-hidden className="text-success" />,
-  a_verifier: <AlertTriangle aria-hidden className="text-gold-600" />,
-  bloquant: <XCircle aria-hidden className="text-destructive" />,
-};
-
+/**
+ * La check-list PERSONNELLE du conducteur (« clés récupérées »…). Purement
+ * manuelle : l'état de préparation du dossier est déjà porté par la check-list de
+ * partage ci-dessus — on ne le répète pas ici.
+ */
 function LaunchChecklist({
-  prep,
   dossier,
   patch,
 }: {
-  prep: PreparationSummary;
   dossier: ProjectDossier;
   patch: (next: Partial<ProjectDossier>) => void;
 }): React.JSX.Element {
@@ -378,8 +352,6 @@ function LaunchChecklist({
     patch({ checklist: manual.map((c) => (c.id === id ? { ...c, done: !c.done } : c)) });
   const remove = (id: string): void => patch({ checklist: manual.filter((c) => c.id !== id) });
 
-  const autoItems = prep.checklist.filter((c) => c.auto);
-
   return (
     <Card>
       <CardContent className="space-y-3 p-4">
@@ -387,18 +359,8 @@ function LaunchChecklist({
           <ListChecks aria-hidden /> Check-list de lancement
         </h3>
 
-        <ul className="space-y-1.5">
-          {autoItems.map((c) => (
-            <li key={c.id} className="flex items-center gap-2.5 text-sm [&_svg]:size-4">
-              {TONE_ICON[c.tone]}
-              <span className="flex-1 text-foreground">{c.label}</span>
-              {c.detail && <span className="text-xs text-muted-foreground">{c.detail}</span>}
-            </li>
-          ))}
-        </ul>
-
         {manual.length > 0 && (
-          <ul className="space-y-1.5 border-t border-border pt-2.5">
+          <ul className="space-y-1.5">
             {manual.map((c) => (
               <li key={c.id} className="flex items-center gap-2.5 text-sm">
                 <button
@@ -432,7 +394,7 @@ function LaunchChecklist({
           </ul>
         )}
 
-        <div className="flex items-center gap-2 border-t border-border pt-2.5">
+        <div className="flex items-center gap-2">
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
@@ -445,44 +407,6 @@ function LaunchChecklist({
             <Plus aria-hidden />
           </Button>
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ------------------------------- Dates ----------------------------------- */
-
-const DATE_ICON = {
-  demarrage: <CalendarClock aria-hidden />,
-  jalon: <Circle aria-hidden />,
-  livraison: <Truck aria-hidden />,
-};
-
-function KeyDates({ prep }: { prep: PreparationSummary }): React.JSX.Element {
-  return (
-    <Card>
-      <CardContent className="space-y-2 p-4">
-        <h3 className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
-          <CalendarClock aria-hidden /> Prochaines dates
-        </h3>
-        {prep.datesImportantes.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Aucune date à venir.</p>
-        ) : (
-          <ul className="space-y-1.5">
-            {prep.datesImportantes.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center gap-2.5 text-sm [&_svg]:size-3.5 [&_svg]:text-gold-600"
-              >
-                {DATE_ICON[d.kind]}
-                <span className="flex-1 text-foreground">{d.label}</span>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {fmtDateShort(d.date)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
       </CardContent>
     </Card>
   );

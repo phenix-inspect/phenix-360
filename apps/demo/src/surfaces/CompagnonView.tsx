@@ -218,7 +218,7 @@ export function CompagnonView({
         <TabsContent value="suivi">{suivi}</TabsContent>
         <TabsContent value="preparation">
           {dossier ? (
-            <DossierPanel project={project} dossier={dossier} actor={actor} events={events} />
+            <DossierPanel project={project} dossier={dossier} actor={actor} />
           ) : (
             <PrepEmpty project={project} />
           )}
