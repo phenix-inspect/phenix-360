@@ -1,0 +1,49 @@
+name: Deploy demo (GitHub Pages)
+
+on:
+  push:
+    branches: [claude/phenix-360-scaffold-setup-2lz0ro]
+  workflow_dispatch:
+
+# Droits nécessaires au déploiement Pages depuis Actions.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build demo (base Pages + gate mot de passe)
+        env:
+          PAGES_BASE: /phenix-360/
+          # Mot de passe du gate : variable de repo DEMO_PASSWORD si définie,
+          # sinon une valeur RC1 par défaut (démo privée, zéro configuration).
+          DEMO_PASSWORD: ${{ vars.DEMO_PASSWORD }}
+        run: |
+          export VITE_DEMO_PASSWORD="${DEMO_PASSWORD:-phenix-rc1}"
+          pnpm --filter @phenix360/demo build
+          cp apps/demo/dist/index.html apps/demo/dist/404.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/demo/dist
+      - id: deployment
+        uses: actions/deploy-pages@v4
