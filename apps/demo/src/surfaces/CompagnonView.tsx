@@ -49,7 +49,6 @@ import { PhotoTile } from '../components/PhotoTile';
 import { DocumentLink } from '../components/DocumentLink';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
-import { HistoriqueView } from '../components/HistoriqueView';
 import { FilView } from '../components/fil/FilView';
 import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
@@ -71,7 +70,7 @@ interface ActionDef {
   icon: React.ReactNode;
 }
 
-export type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique';
+export type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves';
 
 export function CompagnonView({
   snap,
@@ -199,9 +198,7 @@ export function CompagnonView({
 
       <Tabs
         value={tab}
-        onValueChange={(v) =>
-          setTab(v as 'suivi' | 'preparation' | 'fil' | 'reserves' | 'historique')
-        }
+        onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'fil' | 'reserves')}
       >
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
@@ -213,7 +210,6 @@ export function CompagnonView({
               {nbReservesOuvertes > 0 && <Badge variant="warning">{nbReservesOuvertes}</Badge>}
             </span>
           </TabsTrigger>
-          <TabsTrigger value="historique">Historique</TabsTrigger>
         </TabsList>
         <TabsContent value="suivi">{suivi}</TabsContent>
         <TabsContent value="preparation">
@@ -235,9 +231,6 @@ export function CompagnonView({
             onLeverReserve={setLever}
             onOpenFilPhoto={openFilPhoto}
           />
-        </TabsContent>
-        <TabsContent value="historique">
-          <HistoriqueView snap={snap} project={project} />
         </TabsContent>
       </Tabs>
 

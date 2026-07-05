@@ -56,11 +56,12 @@ try {
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Le clic sur le choix ouvre le chantier à l’Historique', async () => {
+  await assert('Le clic sur le choix ouvre le chantier au Suivi (Journal)', async () => {
     await page.getByText(CHOIX).first().click();
     await page
-      .getByRole('tab', { name: /Historique/, selected: true })
+      .getByRole('tab', { name: 'Suivi', selected: true })
       .waitFor({ state: 'visible', timeout: 6000 });
+    // La décision est tracée dans le Journal du chantier (Suivi).
     await page
       .getByText(/Décision client · Cuisine/)
       .first()

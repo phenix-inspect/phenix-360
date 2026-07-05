@@ -458,6 +458,20 @@ Feu vert donné sur les deux coupes de l'audit 5 secondes.
   devis devient informative (elle n'a plus à faire défiler vers une grille).
 Tests recalés (aujourdhui, decisions, client-decision, chantier-filtres,
 chantier-statut) ; suite complète verte. 29 suites.
+
+05/07 — RC1 · Le cockpit : suppression de l'onglet « Historique »
+Nouveau crible : si un conducteur expérimenté ne regarde JAMAIS un bloc pendant
+une semaine de chantier, ce bloc ne mérite plus d'exister. Passé au crible, le
+chantier avait TROIS fils chronologiques : le Journal (Suivi, le log de travail),
+le Récit (l'histoire côté client) et l'Historique (jalons + épinglés, une archive
+rétrospective). L'Historique n'est pas ouvert en semaine → supprimé (5 onglets
+chantier → 4). Le clic « choix validé » d'Aujourd'hui ouvre désormais le Suivi,
+où la décision figure déjà (le Journal montre tous les événements). La
+fonctionnalité d'épinglage, seule à vivre dans l'Historique, était de fait morte :
+retirée aussi (togglePin, pinnedOf, l'état `pins`, la clé de stockage). Aucune
+capacité perdue : tout événement reste tracé au Journal du chantier. Tests recalés
+(decisions, client-decision, documents, mission, client-documents, chantier-epure).
+Suite complète verte. 29 suites.
 ```
 
 ---

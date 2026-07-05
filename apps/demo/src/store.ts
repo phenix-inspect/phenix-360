@@ -81,7 +81,6 @@ const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
 const ACTIVE_KEY = 'phenix-demo:active:v1';
 const DOSSIERS_KEY = 'phenix-demo:dossiers:v1';
-const PINS_KEY = 'phenix-demo:pins:v1';
 const SEEDED_KEY = 'phenix-demo:seeded:v1';
 // Le Fil — agrégat distinct du Journal (persisté à part, par projet).
 const FIL_MOMENTS_KEY = 'phenix-demo:fil-moments:v1';
@@ -215,8 +214,6 @@ export interface DemoSnapshot extends BackendState {
   activeProjectId: ProjectId | null;
   /** projectId → dossier préparé par PHÉNIX Start (hors colonne vertébrale). */
   dossiers: Record<string, ProjectDossier>;
-  /** projectId → eventIds épinglés à l'historique (annotation, hors journal). */
-  pins: Record<string, string[]>;
   /** Le Fil (par projet) — agrégat distinct du Journal. */
   fil: {
     moments: Record<string, Moment[]>;
@@ -271,7 +268,6 @@ function build(): DemoSnapshot {
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
-    pins: readJson<Record<string, string[]>>(PINS_KEY, {}),
     fil: {
       moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
       coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
@@ -302,7 +298,6 @@ const WORKSPACE_KEYS = [
   PEOPLE_KEY,
   ACTIVE_KEY,
   DOSSIERS_KEY,
-  PINS_KEY,
   FIL_MOMENTS_KEY,
   FIL_COUPS_KEY,
   FIL_MESSAGES_KEY,
@@ -673,7 +668,6 @@ export const demo = {
     // 2) Toutes les données rattachées par projectId (une entrée par projet).
     for (const key of [
       DOSSIERS_KEY,
-      PINS_KEY,
       FIL_MOMENTS_KEY,
       FIL_COUPS_KEY,
       FIL_MESSAGES_KEY,
@@ -1011,22 +1005,6 @@ export const demo = {
       state: 'publie',
       content,
     });
-    refresh();
-    broadcast();
-  },
-
-  /**
-   * Épingle / retire un événement de l'historique. C'est une ANNOTATION (on
-   * référence l'événement du journal), jamais une copie — le journal reste la
-   * source unique.
-   */
-  togglePin(projectId: ProjectId, eventId: string): void {
-    const pins = readJson<Record<string, string[]>>(PINS_KEY, {});
-    const current = pins[projectId] ?? [];
-    pins[projectId] = current.includes(eventId)
-      ? current.filter((id) => id !== eventId)
-      : [...current, eventId];
-    localStorage.setItem(PINS_KEY, JSON.stringify(pins));
     refresh();
     broadcast();
   },
@@ -1711,7 +1689,6 @@ export const demo = {
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
-    localStorage.removeItem(PINS_KEY);
     localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(fil.moments));
     localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
     localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
@@ -1826,12 +1803,6 @@ export function dossierOf(
 ): ProjectDossier | null {
   if (!projectId) return null;
   return snap.dossiers[projectId] ?? null;
-}
-
-/** Identifiants d'événements épinglés à l'historique d'un projet. */
-export function pinnedOf(snap: DemoSnapshot, projectId: string | null | undefined): Set<string> {
-  if (!projectId) return new Set();
-  return new Set(snap.pins[projectId] ?? []);
 }
 
 /** Le fil de conversation PHÉNIX d'un projet (côté client). */

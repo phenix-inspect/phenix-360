@@ -68,7 +68,7 @@ try {
     await page.getByRole('tab', { name: 'Récit' }).click();
     await page.waitForTimeout(300);
     if ((await page.getByText(/dalle terminé/).count()) === 0) {
-      await page.getByRole('tab', { name: 'Historique' }).click();
+      await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
       await page.waitForTimeout(300);
     }
     if ((await page.getByText(/dalle terminé/).count()) === 0)

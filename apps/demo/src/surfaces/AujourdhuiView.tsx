@@ -158,7 +158,7 @@ export function AujourdhuiView({
           ...choixItems(projectId).map((e) => ({
             key: e.id,
             label: `Choix validé · ${choixLabel(e)}`,
-            tab: 'historique' as CompagnonTab,
+            tab: 'suivi' as CompagnonTab,
             treatable: true,
           })),
           ...actionsOuvertes(events).map((e) => ({

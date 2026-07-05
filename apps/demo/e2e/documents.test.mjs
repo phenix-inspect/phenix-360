@@ -40,7 +40,7 @@ try {
   );
 
   await assert('Base UNIQUE : le document préparé remonte au Journal (fini le silo)', async () => {
-    await page.getByRole('tab', { name: /Historique/ }).click();
+    await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
     await page.getByText(DOC).first().waitFor({ state: 'visible', timeout: 5000 });
   });
 

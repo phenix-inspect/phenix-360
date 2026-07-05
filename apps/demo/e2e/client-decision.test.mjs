@@ -111,10 +111,10 @@ try {
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Le Journal garde la trace (Historique)', async () => {
+  await assert('Le Journal garde la trace (Suivi)', async () => {
     await page.getByText(`${TITRE} — ${OPT_A}`).first().click();
     await page
-      .getByRole('tab', { name: /Historique/, selected: true })
+      .getByRole('tab', { name: 'Suivi', selected: true })
       .waitFor({ state: 'visible', timeout: 6000 });
     await page
       .getByText(new RegExp(`Décision client · ${TITRE}`))

@@ -76,10 +76,10 @@ try {
   });
 
   await assert(
-    'Non-régression conducteur : il voit bien le document interne (Historique)',
+    'Non-régression conducteur : il voit bien le document interne (Suivi / Journal)',
     async () => {
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-      await page.getByRole('tab', { name: /Historique/ }).click();
+      await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
       await page
         .getByText(INTERNE, { exact: false })
         .first()
