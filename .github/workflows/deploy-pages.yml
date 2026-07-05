@@ -1,0 +1,65 @@
+name: Déploiement démo (GitHub Pages)
+
+# Déploie la démo PHÉNIX 360 sur GitHub Pages (dépôt public).
+# Sert sous https://phenix-inspect.github.io/phenix-360/ → base = /phenix-360/.
+# Gate RC1 activé via VITE_DEMO_PASSWORD (variable de dépôt `DEMO_PASSWORD`,
+# défaut `phenix2026`) — protection dissuasive, pas une vraie auth.
+
+on:
+  push:
+    branches: [claude/phenix-360-scaffold-setup-2lz0ro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement à la fois ; on ne coupe pas un déploiement en cours.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build de la démo (base /phenix-360/)
+        run: pnpm --filter @phenix360/demo build
+        env:
+          PAGES_BASE: /phenix-360/
+          VITE_DEMO_PASSWORD: ${{ vars.DEMO_PASSWORD || 'phenix2026' }}
+
+      - name: Fallback SPA (404 → index.html)
+        run: cp apps/demo/dist/index.html apps/demo/dist/404.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/demo/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
