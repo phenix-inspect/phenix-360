@@ -58,34 +58,33 @@ try {
     await dialog.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {});
   });
 
-  await assert('Annuaire global : recherche et filtre par rôle', async () => {
-    await page.getByRole('button', { name: 'Annuaire' }).click();
-    await page
-      .getByRole('heading', { name: 'Annuaire' })
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByLabel('Rechercher un contact').fill('Mobalpa');
-    await card('Mobalpa').waitFor({ state: 'visible', timeout: 4000 });
-    if ((await page.getByText('Karim Bouaziz').count()) > 0)
-      throw new Error('la recherche ne filtre pas');
-    await page.getByLabel('Rechercher un contact').fill('');
-    await page.getByRole('button', { name: 'Artisan', exact: true }).click();
-    await card('Karim Bouaziz').waitFor({ state: 'visible', timeout: 4000 });
-    if ((await page.getByText('Showroom Mobalpa').count()) > 0)
-      throw new Error('le filtre rôle ne filtre pas');
-    await page.getByRole('button', { name: 'Tous', exact: true }).click();
+  await assert('Carnet : LIER un contact global (non rattaché) au chantier', async () => {
+    // Les contacts restent accessibles DANS le chantier : « Lier un contact »
+    // permet de rattacher un contact global (ex. « Cabinet Vitruve ») au chantier.
+    await page.getByRole('button', { name: /Lier un contact/ }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog
+      .getByText('Cabinet Vitruve')
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await dialog
+      .locator('li', { hasText: 'Cabinet Vitruve' })
+      .getByRole('button', { name: /Lier/ })
+      .click();
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {});
+    await page.getByRole('heading', { name: 'Intervenants du chantier' }).scrollIntoViewIfNeeded();
+    await page.getByText('Cabinet Vitruve').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Créer un contact lié au chantier → visible au Carnet', async () => {
+  await assert('Carnet : CRÉER un contact dans le chantier → visible au Carnet', async () => {
     await page.getByRole('button', { name: /Nouveau contact/ }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Nom du contact').fill('Éric Peinture');
     await dialog.getByLabel('Rôle du contact').selectOption('artisan');
     await dialog.getByPlaceholder('06 12 34 56 78').fill('06 99 88 77 66');
-    await dialog.getByRole('button', { name: 'Appartement Lyon 6e' }).click();
     await dialog.getByRole('button', { name: /Créer le contact/ }).click();
     await card('Éric Peinture').waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByRole('button', { name: 'Annuaire' }).click(); // referme
-    await page.getByRole('tab', { name: 'Préparation' }).click();
     await page.getByRole('heading', { name: 'Intervenants du chantier' }).scrollIntoViewIfNeeded();
     await page.getByText('Éric Peinture').first().waitFor({ state: 'visible', timeout: 5000 });
   });

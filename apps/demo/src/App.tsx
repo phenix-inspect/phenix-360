@@ -12,7 +12,6 @@ import {
 } from '@phenix360/ui';
 import {
   AlertTriangle,
-  BookUser,
   Building2,
   Download,
   Eye,
@@ -31,7 +30,6 @@ import { PointDuSoirView } from './surfaces/PointDuSoirView';
 import { CompagnonView, type CompagnonTab } from './surfaces/CompagnonView';
 import { ArtisanView } from './surfaces/ArtisanView';
 import { ClientView } from './surfaces/ClientView';
-import { Annuaire } from './surfaces/Annuaire';
 import { PhenixStart } from './start/PhenixStart';
 import { Welcome } from './start/Welcome';
 import { ChantierForm, type ChantierValues } from './start/ChantierForm';
@@ -58,7 +56,6 @@ export function App(): React.JSX.Element {
   const snap = useDemo();
   const [view, setView] = useState<ViewMode>('aujourdhui');
   const [creating, setCreating] = useState(false);
-  const [annuaire, setAnnuaire] = useState(false);
   const [managing, setManaging] = useState(false);
   // Onglet d'ouverture imposé au chantier (ex. « Récit » depuis un commentaire client).
   const [compaTab, setCompaTab] = useState<CompagnonTab | undefined>(undefined);
@@ -88,7 +85,7 @@ export function App(): React.JSX.Element {
   // Ancrage de contexte : on sait TOUJOURS sur quel chantier on travaille et
   // quel espace on prévisualise. Rien sur « Aujourd'hui » (vue multi-chantiers).
   const anchor =
-    creating || annuaire || activeProject === null
+    creating || activeProject === null
       ? null
       : view === 'compagnon'
         ? { label: 'Chantier', name: activeProject.name, preview: false }
@@ -133,7 +130,6 @@ export function App(): React.JSX.Element {
   const backToToday = (): void => {
     setCreating(false);
     setChantierForm(null);
-    setAnnuaire(false);
     setClientPreviewId(null);
     setView('aujourdhui');
   };
@@ -158,7 +154,7 @@ export function App(): React.JSX.Element {
           >
             <BrandLockup size="lg" subtitle />
           </button>
-          {!creating && !annuaire && (
+          {!creating && (
             <SegmentedControl
               value={view === 'soir' ? 'aujourdhui' : view}
               onValueChange={setView}
@@ -166,19 +162,6 @@ export function App(): React.JSX.Element {
               aria-label="Choisir la vue"
             />
           )}
-          <Button
-            size="icon"
-            variant={annuaire ? 'secondary' : 'ghost'}
-            aria-label="Annuaire"
-            title="Annuaire"
-            aria-pressed={annuaire}
-            onClick={() => {
-              setCreating(false);
-              setAnnuaire((v) => !v);
-            }}
-          >
-            <BookUser aria-hidden />
-          </Button>
           <Button
             size="icon"
             variant="ghost"
@@ -238,7 +221,7 @@ export function App(): React.JSX.Element {
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         {/* Clé = grand écran courant : rejoue une transition douce à chaque
             changement d'écran (fluidité), pas aux changements internes. */}
-        <div key={creating ? 'creating' : annuaire ? 'annuaire' : view} className="view-enter">
+        <div key={creating ? 'creating' : view} className="view-enter">
           {creating ? (
             <PhenixStart
               onCreated={() => {
@@ -247,8 +230,6 @@ export function App(): React.JSX.Element {
               }}
               onCancel={() => setCreating(false)}
             />
-          ) : annuaire ? (
-            <Annuaire />
           ) : view === 'aujourdhui' ? (
             snap.projects.length === 0 ? (
               <NoProject onNew={() => setCreating(true)} />

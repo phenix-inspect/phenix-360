@@ -336,6 +336,20 @@ la frise détaillée par lots reste côté CONDUCTEUR. Au passage : on extrait l
 l'estimation « dans environ … semaines ». Nouvelle suite e2e `client-planning`
 (estimations avant / dates après / 5 jalons max / aucun lot / Léon répond encore).
 27 suites vertes.
+
+05/07 — épure · Suppression de l'écran Annuaire (contacts dans le chantier)
+Fait : un écran Annuaire GLOBAL (bouton dédié en tête) dupliquait ce que le Carnet
+du chantier fait déjà. Deux points d'entrée pour la même chose = charge mentale.
+Lecture produit : on SUPPRIME l'écran Annuaire et son bouton — pas le modèle
+Contact (il sert toujours aux appels / SMS / WhatsApp / mails et aux références
+artisans). Les contacts restent accessibles UNIQUEMENT dans le contexte du chantier
+(Préparation → « Intervenants du chantier », responsable de réserve, fournisseur de
+commande, client). Rien perdu : le Carnet du chantier permet déjà de créer un
+contact, d'en LIER un existant (y compris un contact global non rattaché, ex.
+« Cabinet Vitruve »), de l'éditer et de le joindre. Interface seulement — le modèle
+de données et le store sont inchangés. Tests recalés sur le Carnet (création +
+liaison in-chantier) ; la préservation des contacts globaux à la suppression d'un
+chantier se vérifie désormais au niveau de la sauvegarde exportée. 27 suites vertes.
 ```
 
 ---

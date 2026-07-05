@@ -98,15 +98,20 @@ try {
   await assert(
     'Un contact GLOBAL survit ; le contact client du chantier supprimé part',
     async () => {
-      await page.getByRole('button', { name: 'Annuaire' }).click();
-      await page.waitForTimeout(300);
+      // Vérifié au niveau des données (l'écran Annuaire n'existe plus) : la
+      // sauvegarde conserve le contact global mais retire le contact orphelin.
+      await gerer().click();
+      const dl = page.waitForEvent('download', { timeout: 6000 });
+      await page.getByRole('button', { name: /Exporter mes données/ }).click();
+      const { readFileSync } = await import('node:fs');
+      const content = readFileSync(await (await dl).path(), 'utf8');
+      await closeManage();
       // « Cabinet Vitruve » n'était rattaché à aucun chantier → conservé.
-      await page.getByText('Cabinet Vitruve').first().waitFor({ state: 'visible', timeout: 5000 });
-      // « Mme Martin » (cliente de Lyon, supprimé) → son lien contact est parti.
-      if (await seen(/Mme Martin/))
+      if (!content.includes('Cabinet Vitruve'))
+        throw new Error('un contact global a été supprimé à tort');
+      // « Mme Martin » (cliente de Lyon supprimé) → contact orphelin retiré.
+      if (content.includes('Mme Martin'))
         throw new Error('un contact orphelin du chantier supprimé a survécu');
-      await page.getByRole('button', { name: 'Annuaire' }).click();
-      await page.waitForTimeout(200);
     },
   );
 
