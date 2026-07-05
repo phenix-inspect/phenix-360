@@ -491,6 +491,24 @@ rupture de navigation. Deux corrections.
   planning) inchangées. Nouvelle suite e2e `phenix-widget` (bouton visible au
   scroll, panneau compact non plein écran, Q/R, recherche document, navigation,
   3 tailles d'écran, zéro console). 30 suites vertes.
+
+05/07 — RC1 · Préparation dégraissée (règle des 5 s, rôle Product Designer)
+Nouvelle doctrine : objectif = rendre l'app ÉVIDENTE, pas l'enrichir ; par défaut
+on RETIRE. Test de chaque écran : « un nouveau conducteur l'ouvre, en moins de 5 s
+il sait quoi faire ». La Préparation était le pire offenseur (long scroll). Passe
+validée avec l'utilisateur (« Préparation — dégraisser »).
+- SUPPRIMÉ « Questions de PHÉNIX » : questions IA de démarrage, remplies une fois à
+  la création, jamais rouvertes en semaine ; leur rôle (fixer date / compléter
+  infos) est déjà couvert par la check-list de partage et les Coordonnées.
+- SUPPRIMÉ « Photos avant travaux » : l'état des lieux se dépose une fois au début,
+  quasi jamais rouvert (le dépôt reste possible à la création, côté PHÉNIX Start).
+- REPLIÉ « Le devis » : le détail poste par poste est une RÉFÉRENCE, consultée
+  rarement — masquée par défaut derrière « Voir le devis » pour ne plus dominer le
+  scroll. L'en-tête (nb de lots) + « Déposer un avenant » restent visibles.
+- Code mort retiré (composant PhotosAvantSection, fonction QuestionsList).
+Aucune capacité perdue : dépôt de photos avant à la création, infos éditables
+ailleurs, devis à un clic. Tests : `preparation` couvre le devis replié + les deux
+retraits. 30 suites vertes.
 ```
 
 ---

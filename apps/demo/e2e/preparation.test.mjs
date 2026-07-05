@@ -78,6 +78,24 @@ try {
       throw new Error('la section Intervenants est encore présente');
   });
 
+  await assert('Le devis est REPLIÉ par défaut ; « Voir le devis » l’affiche', async () => {
+    // Le détail poste par poste ne doit pas alourdir la lecture : replié d'office.
+    if ((await page.getByText('Le devis signé est immuable', { exact: false }).count()) > 0)
+      throw new Error('le détail du devis est visible alors qu’il devrait être replié');
+    await page.getByRole('button', { name: /Voir le devis/ }).click();
+    await page
+      .getByText('Le devis signé est immuable', { exact: false })
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('« Questions de PHÉNIX » et « Photos avant travaux » retirées', async () => {
+    if ((await page.getByRole('heading', { name: 'Questions de PHÉNIX' }).count()) > 0)
+      throw new Error('la section Questions de PHÉNIX est encore présente');
+    if ((await page.getByText('Photos avant travaux', { exact: false }).count()) > 0)
+      throw new Error('la section Photos avant travaux est encore présente');
+  });
+
   await assert('Client-safe : la préparation ne fuit jamais côté client', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     await page.waitForTimeout(600);

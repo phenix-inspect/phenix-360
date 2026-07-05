@@ -33,6 +33,7 @@ import {
 import {
   Banknote,
   CalendarDays,
+  ChevronDown,
   MessageSquareWarning,
   Pencil,
   Plus,
@@ -48,7 +49,7 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
-import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
+import { PrepDocumentsSection } from './prep/PrepDocuments';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -63,6 +64,9 @@ export function DossierPanel({
   const [editing, setEditing] = useState<Order | null>(null);
   // Avenant fraîchement déposé → PHÉNIX affiche sa mini-note d'intégration.
   const [integratedNumero, setIntegratedNumero] = useState<number | null>(null);
+  // Le détail du devis (poste par poste) est une RÉFÉRENCE, consultée rarement en
+  // semaine : replié par défaut pour ne pas alourdir la lecture (règle des 5 s).
+  const [showDevis, setShowDevis] = useState(false);
 
   const patch = (next: Partial<ProjectDossier>) =>
     demo.saveDossier(project.id, { ...dossier, ...next });
@@ -269,9 +273,20 @@ export function DossierPanel({
           title="Le devis"
           count={consolidateDevis(dossier.devis, dossier.avenants).lots.length}
           action={
-            <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
-              <Plus aria-hidden /> Déposer un avenant signé
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
+                <Plus aria-hidden /> Déposer un avenant signé
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowDevis((v) => !v)}
+                aria-expanded={showDevis}
+              >
+                {showDevis ? 'Masquer' : 'Voir le devis'}
+                <ChevronDown className={showDevis ? 'rotate-180' : undefined} aria-hidden />
+              </Button>
+            </div>
           }
         >
           {integrated && (
@@ -284,12 +299,14 @@ export function DossierPanel({
               onClose={() => setIntegratedNumero(null)}
             />
           )}
-          <DevisBreakdown
-            devis={dossier.devis}
-            avenants={dossier.avenants}
-            dossier={dossier}
-            onOpen={openAnchor}
-          />
+          {showDevis && (
+            <DevisBreakdown
+              devis={dossier.devis}
+              avenants={dossier.avenants}
+              dossier={dossier}
+              onOpen={openAnchor}
+            />
+          )}
         </Section>
       )}
 
@@ -353,18 +370,6 @@ export function DossierPanel({
         patch={patch}
         onAskDocument={(docId, label) => void askDocument(docId, label)}
       />
-
-      <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
-
-      {dossier.questions.length > 0 && (
-        <Section
-          icon={<Sparkles aria-hidden />}
-          title="Questions de PHÉNIX"
-          count={dossier.questions.filter((q) => !q.answered).length}
-        >
-          <QuestionsList dossier={dossier} onSave={patch} />
-        </Section>
-      )}
 
       {editing && (
         <OrderEditor
@@ -630,53 +635,6 @@ function OrderEditor({
         </div>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function QuestionsList({
-  dossier,
-  onSave,
-}: {
-  dossier: ProjectDossier;
-  onSave: (next: Partial<ProjectDossier>) => void;
-}): React.JSX.Element {
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-
-  const answer = (id: string) => {
-    const text = (drafts[id] ?? '').trim();
-    if (!text) return;
-    const q = dossier.questions.find((x) => x.id === id);
-    const questions = dossier.questions.map((x) =>
-      x.id === id ? { ...x, answered: true, answer: text } : x,
-    );
-    const infos = q?.field ? { ...dossier.infos, [q.field]: text } : dossier.infos;
-    onSave({ questions, infos });
-  };
-
-  return (
-    <ul className="space-y-2">
-      {dossier.questions.map((q) => (
-        <li key={q.id} className="rounded-lg border border-border bg-surface p-3">
-          <p className="text-sm text-foreground">{q.question}</p>
-          {q.answered ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Réponse :</span> {q.answer}
-            </p>
-          ) : (
-            <div className="mt-2 flex gap-2">
-              <Input
-                value={drafts[q.id] ?? ''}
-                onChange={(e) => setDrafts((s) => ({ ...s, [q.id]: e.target.value }))}
-                placeholder="Répondre maintenant (ou plus tard)…"
-              />
-              <Button size="sm" onClick={() => answer(q.id)}>
-                Répondre
-              </Button>
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
   );
 }
 
