@@ -23,7 +23,10 @@ try {
 
   await assert('Chaque carte porte un badge de statut VISIBLE (au coup d’œil)', async () => {
     for (const label of ['En cours', 'Pré-réception', 'Levée des réserves']) {
-      await page.getByText(label, { exact: true }).first().waitFor({ state: 'visible', timeout: 5000 });
+      await page
+        .getByText(label, { exact: true })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
     }
   });
 
@@ -45,7 +48,10 @@ try {
 
   await assert('« Tous » restaure la liste complète', async () => {
     await statusChip(/^Tous \(3\)$/).click();
-    await page.getByText('Duplex Croix-Rousse').first().waitFor({ state: 'visible', timeout: 5000 });
+    await page
+      .getByText('Duplex Croix-Rousse')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
     await page.getByText('Appartement Lyon 6e').first().waitFor({ state: 'visible' });
   });
 

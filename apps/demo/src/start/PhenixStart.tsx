@@ -96,6 +96,15 @@ export function PhenixStart({
     onCreated();
   };
 
+  // Alternative temporaire (PDF non extractible) : analyser un texte collé à la
+  // main. Passe par le MÊME port d'analyse — rien d'inventé, on lit ce texte.
+  const analyzePastedText = async (pasted: string): Promise<void> => {
+    const result = await demo.analyzeDossier({
+      files: [{ name: 'devis-collé.txt', text: pasted }],
+    });
+    setProposal(name.trim() ? { ...result, projectName: name.trim() } : result);
+  };
+
   if (phase === 'analysis' && proposal)
     return <AnalysisScene proposal={proposal} onDone={() => setPhase('synthesis')} />;
   if (phase === 'synthesis' && proposal)
@@ -105,6 +114,7 @@ export function PhenixStart({
         photosCount={photos().length}
         onEnter={() => void enter(proposal)}
         onAdjust={() => setPhase('review')}
+        onAnalyzeText={(t) => void analyzePastedText(t)}
       />
     );
   if (phase === 'review' && proposal)
@@ -422,11 +432,13 @@ function SynthesisScreen({
   photosCount,
   onEnter,
   onAdjust,
+  onAnalyzeText,
 }: {
   proposal: ProjectProposal;
   photosCount: number;
   onEnter: () => void;
   onAdjust: () => void;
+  onAnalyzeText: (text: string) => void;
 }): React.JSX.Element {
   const d = proposal.dossier;
   const s = buildDossierSummary(d);
@@ -456,7 +468,9 @@ function SynthesisScreen({
         </p>
       </header>
 
-      {proposal.extraction && <DevisReadingCard extraction={proposal.extraction} />}
+      {proposal.extraction && (
+        <DevisReadingCard extraction={proposal.extraction} onAnalyzeText={onAnalyzeText} />
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <SynthCard icon={<User aria-hidden />} title="Le client">
@@ -533,22 +547,34 @@ function SynthesisScreen({
  * Le compte rendu de LECTURE RÉELLE du devis : ce que PHÉNIX a lu, ce qu'il n'a
  * pas trouvé, sa confiance. Jamais inventé. Si le PDF est une image, il le dit.
  */
-function DevisReadingCard({ extraction }: { extraction: DevisExtraction }): React.JSX.Element {
+function DevisReadingCard({
+  extraction,
+  onAnalyzeText,
+}: {
+  extraction: DevisExtraction;
+  /** Alternative temporaire : analyser du texte collé à la main. */
+  onAnalyzeText?: (text: string) => void;
+}): React.JSX.Element {
   if (extraction.imageOnly)
     return (
-      <div className="flex items-start gap-3 rounded-2xl border border-gold-300 bg-gold-50 p-4">
-        <span className="mt-0.5 text-gold-700 [&_svg]:size-5">
-          <ScanLine aria-hidden />
-        </span>
-        <div className="space-y-1">
-          <p className="font-medium text-foreground">
-            Ce devis semble être une image. Je ne peux pas encore le lire automatiquement.
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Aucun texte exploitable n'a été détecté (document scanné). La lecture par OCR arrivera —
-            en attendant, vous pouvez renseigner les informations à la main.
-          </p>
+      <div className="space-y-3 rounded-2xl border border-gold-300 bg-gold-50 p-4">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 text-gold-700 [&_svg]:size-5">
+            <ScanLine aria-hidden />
+          </span>
+          <div className="space-y-1">
+            <p className="font-medium text-foreground">
+              Le fichier est lisible à l'écran mais son texte n'est pas extractible automatiquement
+              pour l'instant.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Ce PDF est probablement scanné (image) ou protégé. La lecture par OCR arrivera — en
+              attendant, collez le texte du devis ci-dessous, ou renseignez les informations à la
+              main.
+            </p>
+          </div>
         </div>
+        {onAnalyzeText && <PasteDevisText onAnalyzeText={onAnalyzeText} />}
       </div>
     );
 
@@ -584,6 +610,35 @@ function DevisReadingCard({ extraction }: { extraction: DevisExtraction }): Reac
           Complétez à la main si besoin — je n'invente rien.
         </p>
       )}
+    </div>
+  );
+}
+
+/** Coller le texte d'un devis à la main (alternative en attendant l'OCR). */
+function PasteDevisText({
+  onAnalyzeText,
+}: {
+  onAnalyzeText: (text: string) => void;
+}): React.JSX.Element {
+  const [text, setText] = useState('');
+  return (
+    <div className="space-y-2 border-t border-gold-200 pt-3">
+      <label className="text-xs font-medium text-foreground" htmlFor="paste-devis">
+        Coller le texte du devis
+      </label>
+      <textarea
+        id="paste-devis"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={4}
+        placeholder="Sélectionnez le texte de votre devis (Ctrl/Cmd+A puis Ctrl/Cmd+C) et collez-le ici…"
+        className="w-full rounded-lg border border-input bg-surface px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+      />
+      <div className="flex justify-end">
+        <Button size="sm" disabled={text.trim().length < 20} onClick={() => onAnalyzeText(text)}>
+          <FileSearch aria-hidden /> Analyser ce texte
+        </Button>
+      </div>
     </div>
   );
 }

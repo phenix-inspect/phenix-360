@@ -193,8 +193,77 @@ const cleanLine = (s: string): string =>
     .trim();
 
 /**
+ * Reconnaît le format du logiciel de devis « Phenix-amo » (le format standard du
+ * conducteur) : en-tête émetteur constant + numéro de devis « N° D-AAAAMM-NNN ».
+ */
+function isPhenixAmoFormat(text: string): boolean {
+  return /Phenix-amo/i.test(text) || /N°\s*D-\d{6}-\d{3}/.test(text);
+}
+
+/**
+ * LECTEUR EXPERT du format Phenix-amo. Le texte (extrait par pdf.js) suit une
+ * mise en page fixe : bloc émetteur (Phenix-amo), bloc client (« M./Mme Nom /
+ * rue / CP Ville »), tableau de lots numérotés, totaux, acompte. On extrait donc
+ * précisément, plutôt que par heuristiques génériques. Pièces et matériaux
+ * restent détectés par mots-clés (utiles à la préparation du chantier).
+ */
+function parsePhenixAmoDevis(text: string, pieces: string[], materiaux: string[]): DevisFields {
+  const joined = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .join('\n');
+  const f: DevisFields = { prestations: [], pieces, materiaux, emetteur: 'Phenix-amo' };
+
+  // Bloc CLIENT : « M./Mme Nom » puis rue (avec un numéro) puis « CP Ville ».
+  const cli = joined.match(
+    /(M\.|Mme|Mlle|Mr|Monsieur|Madame)\s+([A-ZÀ-Ÿ][^\n]{1,50})\n([^\n]*\d[^\n]{2,60})\n(\d{5}\s+[A-Za-zÀ-ÿ' \-]{2,40})/,
+  );
+  if (cli) {
+    f.clientName = cleanLine(`${cli[1]} ${cli[2]}`);
+    f.address = cleanLine(`${cli[3]}, ${cli[4]}`);
+  }
+
+  const date = joined.match(/En date du\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (date) f.date = parseFrDate(date[1]!) ?? date[1];
+
+  const ttc =
+    joined.match(/Total\s+TTC\s+([\d ]+,\d{2})/i) ??
+    joined.match(/NET\s+À?\s*PAYER\s+([\d ]+,\d{2})/i);
+  if (ttc) f.montantTTC = parseAmount(ttc[1]!);
+  const ht = joined.match(/Total\s+net\s+HT\s+([\d ]+,\d{2})/i);
+  if (ht) f.montantHT = parseAmount(ht[1]!);
+
+  const debut = joined.match(/Début des travaux[^\n]*?(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  const duree = joined.match(/Durée estimée[^\n]*?(\d+\s*(?:mois|semaines?|jours?|ans?))/i);
+  const delais = [debut ? `Début le ${debut[1]}` : null, duree ? `durée ${duree[1]}` : null].filter(
+    Boolean,
+  );
+  if (delais.length) f.delais = delais.join(' · ');
+
+  const acompte = joined.match(/Acompte\s+de\s+\d+\s*%[^\n]*/i);
+  if (acompte) f.paiement = cleanLine(acompte[0]);
+
+  // Lots RÉELS : lignes « N [n.] TITRE … montant € » du tableau.
+  const lots: string[] = [];
+  for (const m of joined.matchAll(
+    /^\d+\s+([0-9.\s]*[A-ZÉÈÀ][A-ZÉÈÀ0-9 /'&.\-]{3,}?)\s+[\d ]+,\d{2}\s*€/gm,
+  )) {
+    const title = m[1]!
+      .replace(/^[0-9.\s]+/, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (title.length >= 3 && !lots.includes(title)) lots.push(title);
+  }
+  f.prestations = lots.length > 0 ? lots : collect(text.replace(/\s+/g, ' '), PRESTATION_RULES);
+
+  return f;
+}
+
+/**
  * Extrait les champs d'un devis à partir de son TEXTE réel (déterministe, pur).
- * Aucun champ n'est inventé : ce qui n'est pas trouvé reste absent.
+ * Aucun champ n'est inventé : ce qui n'est pas trouvé reste absent. Le format du
+ * logiciel officiel (Phenix-amo) a un lecteur DÉDIÉ ; sinon, heuristiques génériques.
  */
 export function extractDevisFields(rawText: string): DevisFields {
   // On garde les retours à la ligne pour les motifs « en tête de ligne », et une
@@ -202,10 +271,14 @@ export function extractDevisFields(rawText: string): DevisFields {
   const text = rawText.replace(/\u00a0/g, ' ');
   const flat = text.replace(/\s+/g, ' ');
 
+  const pieces = collect(flat, PIECE_RULES);
+  const materiaux = collect(flat, MATERIAU_RULES);
+  if (isPhenixAmoFormat(text)) return parsePhenixAmoDevis(text, pieces, materiaux);
+
   const fields: DevisFields = {
     prestations: collect(flat, PRESTATION_RULES),
-    pieces: collect(flat, PIECE_RULES),
-    materiaux: collect(flat, MATERIAU_RULES),
+    pieces,
+    materiaux,
   };
 
   const email = flat.match(/[\w.+-]+@[\w-]+\.[\w.-]+/);

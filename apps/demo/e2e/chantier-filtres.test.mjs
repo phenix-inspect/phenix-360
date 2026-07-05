@@ -42,7 +42,8 @@ try {
     await heading(/Mes chantiers \(2 sur 3\)/).waitFor({ state: 'visible', timeout: 5000 });
     await page.getByText(LYON, { exact: true }).first().waitFor({ state: 'visible' });
     await page.getByText(CROIX, { exact: true }).first().waitFor({ state: 'visible' });
-    if ((await visibleCount(ECULLY)) > 0) throw new Error('un chantier d’une autre ville est resté');
+    if ((await visibleCount(ECULLY)) > 0)
+      throw new Error('un chantier d’une autre ville est resté');
   });
 
   await assert('« Réinitialiser » restaure la liste complète', async () => {

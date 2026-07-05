@@ -270,6 +270,35 @@ chantier ; un contact encore rattaché ailleurs (ou global sans lien) n'est jama
 supprimé ; (b) si le chantier supprimé était actif, on bascule vers un autre, ou
 vers l'état vide s'il n'en reste aucun. Export/import restent cohérents (mêmes
 clés). La suppression complète le cycle de vie : créer, lire, ajuster, supprimer.
+
+05/07 — bloquant · « PHÉNIX ne lit AUCUN de mes vrais devis »
+Fait : après test terrain, les devis du logiciel officiel (Phenix-amo) ne sont pas
+lus. Diagnostic : ce sont des PDF à polices CID Identity-H — le flux de contenu ne
+contient que des IDENTIFIANTS DE GLYPHES, pas du texte ; le vrai texte vit dans les
+tables `ToUnicode`, avec des ressources de police résolues par page/XObject.
+L'extracteur maison (latin1 + FlateDecode) ne pouvait structurellement pas les lire.
+Lecture produit : on passe à un VRAI moteur PDF (pdf.js), 100 % local (worker
+embarqué par Vite, aucun réseau) — build LEGACY pour la compatibilité navigateurs
+(le build moderne exige `Math.sumPrecise`, trop récent). Puis, comme « je préfère
+une extraction fiable sur MON format qu'une générique moyenne », on ajoute un
+LECTEUR EXPERT dédié au format Phenix-amo (détecté par l'en-tête / le n° « D-
+AAAAMM-NNN ») : bloc client (« M./Mme Nom / rue / CP Ville »), n° et date, montant
+« Total TTC », lots RÉELS du tableau, « Durée estimée », « Acompte de X % ». Vérifié
+sur les 3 devis réels → client, adresse, montant, date, émetteur, lots, délais,
+acompte corrects, confiance 100 %, zéro invention. Le générique reste le fallback.
+Honnêteté maintenue : si un PDF n'a pas de couche texte (scan), message précis
+(« lisible à l'écran mais texte non extractible… ») + on n'est jamais bloqué — on
+peut COLLER le texte du devis à la main (même port d'analyse). Fixture de test
+anonymisée reproduisant la mise en page réelle (pas de vrai devis embarqué).
+
+05/07 — friction · « Je reste bloqué dans la création d'un chantier »
+Fait : entré dans l'édition d'un nouveau chantier, le conducteur ne trouvait pas la
+sortie. Il ne doit JAMAIS être coincé dans un flux.
+Lecture produit : le logo PHÉNIX (déjà en tête) devient l'échappatoire universel —
+un clic ramène à « Aujourd'hui ». S'il y a des données non enregistrées (création/
+édition en cours), on confirme d'abord (« Quitter la création du chantier ? Les
+données non enregistrées seront perdues. ») ; sinon retour direct. Pas de nouvel
+écran : on rend cliquable un élément déjà présent.
 ```
 
 ---

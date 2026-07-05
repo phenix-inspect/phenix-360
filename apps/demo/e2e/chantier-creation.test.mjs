@@ -60,13 +60,14 @@ try {
   });
 
   await assert('SYNTHÈSE : PHÉNIX montre ce qu’il a RÉELLEMENT lu dans le devis', async () => {
-    await page
-      .getByText('Lecture réelle du devis')
-      .waitFor({ state: 'visible', timeout: 12000 });
+    await page.getByText('Lecture réelle du devis').waitFor({ state: 'visible', timeout: 12000 });
     // Des données réellement extraites du texte du devis.
     await page.getByText('Mme Camille Martin').first().waitFor({ state: 'visible' });
     await page.getByText('24 rue Bugeaud, 69006 Lyon').first().waitFor({ state: 'visible' });
-    await page.getByText(/46\s?200/).first().waitFor({ state: 'visible' });
+    await page
+      .getByText(/46\s?200/)
+      .first()
+      .waitFor({ state: 'visible' });
     for (const bloc of ['Le client', 'Le bien', 'Les documents'])
       await page.getByText(bloc, { exact: true }).first().waitFor({ state: 'visible' });
   });

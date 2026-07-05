@@ -64,7 +64,7 @@ try {
     await backHome();
     await deposit(imagePdf(), 'devis-scanne.pdf');
     await page
-      .getByText('Ce devis semble être une image. Je ne peux pas encore le lire automatiquement.')
+      .getByText(/n'est pas extractible automatiquement pour l'instant/)
       .waitFor({ state: 'visible', timeout: 12000 });
     if (await seen(/Mme Camille Martin/)) throw new Error('des données ont été inventées');
   });

@@ -67,6 +67,7 @@ export function App(): React.JSX.Element {
   // l'aperçu, on réinitialise → on revient exactement où l'on était.
   const [clientPreviewId, setClientPreviewId] = useState<ProjectId | null>(null);
   const [chantierForm, setChantierForm] = useState<ChantierFormState>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   useEffect(() => {
     if (view !== 'client') setClientPreviewId(null);
@@ -125,11 +126,38 @@ export function App(): React.JSX.Element {
     setChantierForm(null);
   };
 
+  // Échappatoire universel : le logo ramène TOUJOURS à « Aujourd'hui ». Si une
+  // création/édition de chantier est en cours (données non enregistrées), on
+  // confirme d'abord — on ne perd rien sans le dire, on n'est jamais bloqué.
+  const inUnsavedFlow = creating || chantierForm !== null;
+  const backToToday = (): void => {
+    setCreating(false);
+    setChantierForm(null);
+    setAnnuaire(false);
+    setClientPreviewId(null);
+    setView('aujourdhui');
+  };
+  const goHome = (): void => {
+    if (inUnsavedFlow) {
+      setConfirmLeave(true);
+      return;
+    }
+    backToToday();
+  };
+
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-sticky border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-5 sm:px-6">
-          <BrandLockup size="lg" subtitle className="mr-auto" />
+          <button
+            type="button"
+            onClick={goHome}
+            aria-label="Revenir à l'accueil Aujourd'hui"
+            title="Accueil — Aujourd'hui"
+            className="mr-auto rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <BrandLockup size="lg" subtitle />
+          </button>
           {!creating && !annuaire && (
             <SegmentedControl
               value={view === 'soir' ? 'aujourdhui' : view}
@@ -275,6 +303,29 @@ export function App(): React.JSX.Element {
           onClose={() => setChantierForm(null)}
         />
       )}
+
+      <Dialog open={confirmLeave} onOpenChange={(o) => !o && setConfirmLeave(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quitter la création du chantier ?</DialogTitle>
+            <DialogDescription>Les données non enregistrées seront perdues.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setConfirmLeave(false)}>
+              Continuer la création
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setConfirmLeave(false);
+                backToToday();
+              }}
+            >
+              Quitter sans enregistrer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
