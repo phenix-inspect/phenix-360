@@ -299,6 +299,22 @@ un clic ramène à « Aujourd'hui ». S'il y a des données non enregistrées (c
 édition en cours), on confirme d'abord (« Quitter la création du chantier ? Les
 données non enregistrées seront perdues. ») ; sinon retour direct. Pas de nouvel
 écran : on rend cliquable un élément déjà présent.
+
+05/07 — QA · Passe de durcissement avant retest (casser l'app volontairement)
+Fait : avant un retest « comme une démo client demain matin », on pousse les tests
+loin — fichiers cassés (PDF non-PDF, PDF vide, mauvais format), flux abandonnés,
+reload en plein milieu, import invalide, plus AUCUN chantier, et 3 formats d'écran
+(iPhone / tablette / desktop). Quatre nouvelles suites e2e durables : `robustesse`,
+`mobile`, `mission` (capture → PHÉNIX comprend → valider), `client-concierge`
+(+ client-safe strict). Toutes dans `apps/demo/e2e/`, lancées par
+`pnpm --filter @phenix360/demo test:e2e`.
+Bug trouvé & corrigé : sur écran étroit (390 px), la barre d'onglets du chantier
+(Suivi/Préparation/Récit/Réserves/Historique) débordait de ~60 px → scroll latéral
+de toute la page. Correctif dans le design system : la `TabsList` défile désormais
+horizontalement (`max-w-full overflow-x-auto`, onglets `shrink-0`) au lieu de
+pousser la page. Aucun autre débordement, aucune modale bloquée, aucune erreur
+console. Résultat : 26 suites vertes (~230 vérifications). Les autres écarts
+rencontrés étaient des sélecteurs de test, pas des bugs applicatifs.
 ```
 
 ---
