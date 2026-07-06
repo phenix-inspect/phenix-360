@@ -1248,3 +1248,25 @@ points. Idempotent, sans écran ni concept nouveau.
 **Impact :** store `migrateDossierChecklists()` (appelée à l'init). Nouveau
 `checklist-migration.test` (dossier dégradé sans `checklist` → backfill au
 rechargement). Gate vert (e2e 38/38).
+
+## 06/07/2026 — Suivi : entrée unique « Nouvelle mission » (suppression des doublons)
+
+**Retour terrain :** dans « Chantier > Suivi », « Nouveau compte rendu » et
+« Ajouter des photos » font doublon avec « Nouvelle mission » — le conducteur
+hésite (« mission ou compte rendu ? photos ou mission ? »).
+
+**Principe produit :** une action = un seul point d'entrée. « Nouvelle mission »
+(MissionFlow → `createMission`) couvre DÉJÀ photos + compte rendu (+ mission,
+décision client, réserves, actions).
+
+**Décision (suppression de doublons, sans nouvel écran) :** on retire du Suivi les
+deux boutons « Nouveau compte rendu » et « Ajouter des photos ». Restent les
+actions SANS équivalent mission (Ajouter un document, Demander au client, Répondre
+au client) et « Nouvelle mission ». L'état vide du Journal pointe désormais vers
+« Nouvelle mission ». Aucune capacité retirée : le composer conserve ses types, et
+la mission produit bien un `compte_rendu` + des photos (Moment).
+
+**Impact :** `CompagnonView` (SuiviTab : `actions` sans `compte_rendu`/`photo`,
+prop `onNewMission`, CTA état vide → mission). Nouveau `suivi-entree-unique.test`
+(boutons disparus, mission crée un compte rendu + ajoute une photo, trace au
+Journal + Récit). Gate vert (e2e 39/39). VISION Art. 5, 8.

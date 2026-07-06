@@ -37,7 +37,6 @@ import {
   HardHat,
   HelpCircle,
   Image as ImageIcon,
-  NotebookPen,
   Plus,
   Reply,
 } from 'lucide-react';
@@ -145,6 +144,7 @@ export function CompagnonView({
       actor={actor}
       events={events}
       onCompose={setComposer}
+      onNewMission={() => setMissionPicker(true)}
       onOpenFilPhoto={openFilPhoto}
       onLeverReserve={setLever}
     />
@@ -300,6 +300,7 @@ function SuiviTab({
   actor,
   events,
   onCompose,
+  onNewMission,
   onOpenFilPhoto,
   onLeverReserve,
 }: {
@@ -308,6 +309,7 @@ function SuiviTab({
   actor: EventActor;
   events: Event[];
   onCompose: (kind: ComposerKind) => void;
+  onNewMission: () => void;
   onOpenFilPhoto: (momentId: string, photoId?: string) => void;
   onLeverReserve: (reserve: ReserveEvent) => void;
 }): React.JSX.Element {
@@ -320,9 +322,11 @@ function SuiviTab({
   const RECENT_JOURNAL = 4;
   const journalEvents = showAllJournal ? events : events.slice(0, RECENT_JOURNAL);
 
+  // « Nouvelle mission » est l'ENTRÉE UNIQUE pour photographier et rédiger un
+  // compte rendu (cf. MissionFlow → createMission). On ne duplique donc plus
+  // « Nouveau compte rendu » ni « Ajouter des photos » ici : une action = un seul
+  // point d'entrée. Restent les actions SANS équivalent mission.
   const actions: ActionDef[] = [
-    { kind: 'compte_rendu', label: 'Nouveau compte rendu', icon: <NotebookPen aria-hidden /> },
-    { kind: 'photo', label: 'Ajouter des photos', icon: <ImageIcon aria-hidden /> },
     { kind: 'document', label: 'Ajouter un document', icon: <FileText aria-hidden /> },
     { kind: 'demande', label: 'Demander au client', icon: <HelpCircle aria-hidden /> },
     { kind: 'repondre', label: 'Répondre au client', icon: <Reply aria-hidden /> },
@@ -384,10 +388,8 @@ function SuiviTab({
             <EmptyState
               icon={<CalendarClock aria-hidden />}
               title="Le journal est vide"
-              description="Votre première saisie ouvrira le journal du chantier."
-              action={
-                <Button onClick={() => onCompose('compte_rendu')}>Nouveau compte rendu</Button>
-              }
+              description="Votre première mission ouvrira le journal du chantier."
+              action={<Button onClick={onNewMission}>Nouvelle mission</Button>}
             />
           ) : (
             <Timeline>
