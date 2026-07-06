@@ -20,7 +20,7 @@ import {
   type ProjectId,
   type UserId,
 } from '../ids.js';
-import type { DemandeResolution, Event } from '../event.js';
+import type { DemandeResolution, Event, EventVisibility } from '../event.js';
 import type { Project, ProjectMember } from '../project.js';
 import { currentStep } from '../views.js';
 import type { Backend, NewEvent, NewMember, NewProject, ProjectPatch } from './repository.js';
@@ -168,6 +168,15 @@ export class InMemoryBackend implements Backend {
     event.publishedBy = publishedBy;
     event.publishedAt = now();
     this.refreshCurrentStep(state, event.projectId);
+    this.write(state);
+    return event;
+  }
+
+  async setEventVisibility(id: EventId, visibility: EventVisibility): Promise<Event> {
+    const state = this.read();
+    const event = state.events.find((e) => e.id === id);
+    if (!event) throw new Error(`Événement introuvable : ${id}`);
+    event.visibility = visibility;
     this.write(state);
     return event;
   }

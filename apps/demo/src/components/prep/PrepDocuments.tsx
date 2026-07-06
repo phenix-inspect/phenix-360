@@ -4,12 +4,23 @@ import {
   PREP_DOC_CATEGORIES,
   PREP_DOC_CATEGORY_LABEL,
   type EventAttachment,
+  type EventVisibility,
   type PrepDocCategory,
   type Project,
   type ProjectDocument,
   type ProjectDossier,
 } from '@phenix360/core';
-import { Camera, ChevronDown, FileText, ImagePlus, Paperclip, Plus, X } from 'lucide-react';
+import {
+  Camera,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  FileText,
+  ImagePlus,
+  Paperclip,
+  Plus,
+  X,
+} from 'lucide-react';
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
 import { DocumentLink } from '../DocumentLink';
 import { demo, useDemo } from '../../store';
@@ -38,19 +49,25 @@ export function PrepDocumentsSection({
   const docs = dossier.documents.filter((d) => d.categorie !== 'photo_avant');
   const [label, setLabel] = useState('');
   const [categorie, setCategorie] = useState<PrepDocCategory>('devis');
+  // Privé par défaut (anti-fuite) : le document ne part au client que sur choix.
+  const [visibility, setVisibility] = useState<EventVisibility>('interne');
   const [pending, setPending] = useState<EventAttachment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Le fichier vit dans la BIBLIOTHÈQUE (événement `document` du Journal) : on le
   // résout via `eventId`. Repli sur `attachment` pour d'anciennes données.
+  const documentEvent = (d: ProjectDocument) =>
+    d.eventId ? snap.events.find((e) => e.id === d.eventId && e.type === 'document') : undefined;
   const fileOf = (d: ProjectDocument): EventAttachment | undefined => {
-    if (d.eventId) {
-      const ev = snap.events.find((e) => e.id === d.eventId && e.type === 'document');
-      return ev?.type === 'document' ? ev.content.attachment : undefined;
-    }
+    const ev = documentEvent(d);
+    if (ev) return ev.type === 'document' ? ev.content.attachment : undefined;
     return d.attachment;
   };
+  // Visibilité courante d'un document PARTAGEABLE (avec fichier au Journal) ; null
+  // s'il n'a pas de fichier (rien à montrer au client).
+  const visibilityOf = (d: ProjectDocument): EventVisibility | null =>
+    documentEvent(d)?.visibility ?? null;
 
   const onPick = async (file: File | undefined): Promise<void> => {
     if (!file) return;
@@ -71,10 +88,12 @@ export function PrepDocumentsSection({
     void demo.addPrepDocument(project.id, {
       label: l,
       categorie,
+      visibility,
       ...(pending ? { attachment: pending } : {}),
     });
     setLabel('');
     setPending(null);
+    setVisibility('interne');
     setError(null);
   };
 
@@ -107,6 +126,33 @@ export function PrepDocumentsSection({
                 {(() => {
                   const att = fileOf(d);
                   return att ? <DocumentLink attachment={att} /> : null;
+                })()}
+                {(() => {
+                  // Bascule interne ↔ visible client (documents AVEC fichier).
+                  const vis = visibilityOf(d);
+                  if (!vis) return null;
+                  const shared = vis === 'client';
+                  return (
+                    <Button
+                      size="sm"
+                      variant={shared ? 'primary' : 'outline'}
+                      aria-label={
+                        shared
+                          ? `Rendre interne : ${d.label}`
+                          : `Rendre visible au client : ${d.label}`
+                      }
+                      onClick={() =>
+                        void demo.setPrepDocumentVisibility(
+                          project.id,
+                          d.id,
+                          shared ? 'interne' : 'client',
+                        )
+                      }
+                    >
+                      {shared ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+                      {shared ? 'Visible client' : 'Interne'}
+                    </Button>
+                  );
                 })()}
                 {(d.status === 'manquant' || d.status === 'a_fournir') && !fileOf(d) && (
                   <Button size="sm" variant="outline" onClick={() => onAskDocument(d.id, d.label)}>
@@ -147,6 +193,19 @@ export function PrepDocumentsSection({
               ))}
             </select>
           </div>
+          <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            Visibilité
+            <select
+              value={visibility}
+              onChange={(e) => setVisibility(e.target.value as EventVisibility)}
+              aria-label="Visibilité du document"
+              className="h-9 rounded-lg border border-input bg-surface px-2 text-sm text-foreground"
+            >
+              <option value="interne">Interne uniquement</option>
+              <option value="client">Visible client</option>
+            </select>
+            <span>Par défaut interne — évite toute fuite tant que vous ne partagez pas.</span>
+          </label>
           <input
             ref={fileRef}
             type="file"

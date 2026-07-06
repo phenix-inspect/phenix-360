@@ -1201,3 +1201,31 @@ Nouveau `checklist-lancement.test` (6 contrôles préremplis, 3 bloquants seuls
 bloquants, ajout/suppression, persistance reload + export/import) ; `preparation`
 recalé (libellé d'ajout hors liste standard). Gate vert (e2e 36/36).
 VISION Art. 5, 9.
+
+## 06/07/2026 — Partage des documents vers l'espace client (visibilité au dépôt)
+
+**Retour terrain :** en ajoutant un document, le conducteur doit décider s'il est
+visible ou non dans l'espace client ; et la section Documents du client doit
+afficher les VRAIS documents partagés.
+
+**Décision (sans nouveau module) :** on réutilise la VISIBILITÉ d'événement déjà
+en place (`interne` / `client`). Au dépôt d'un document, un sélecteur « Visibilité »
+(Interne uniquement / Visible client), **par défaut Interne** (anti-fuite). Chaque
+document AVEC fichier porte une bascule interne ↔ visible client, modifiable à tout
+moment — le client le voit apparaître / disparaître immédiatement.
+
+**Client-safe strict :** la section Documents du client (`ClientView`) ne montre
+que les événements `document` `visibility: client` ET publiés (`isVisibleToClient`).
+Un interne ne fuit jamais ; aucune carte vide n'est affichée s'il n'y a rien de
+partagé (section rendue seulement si `clientDocuments.length > 0`). Aucun partage
+automatique : un document reste interne tant qu'on ne le partage pas explicitement.
+
+**Impact :** core `EventRepository.setEventVisibility` + impl `InMemoryBackend`
+(événements déjà mutables, cf. `publishEvent`) ; store `addPrepDocument` (param
+`visibility`, défaut interne) + `setPrepDocumentVisibility` (agit sur l'événement
+du Journal, base unique) ; `PrepDocumentsSection` (sélecteur au dépôt + bascule
+par ligne). Export/import inchangé : l'événement (fichier + visibilité) est
+sérialisé tel quel. Nouveau `documents-partage.test` (interne invisible, partagé
+visible + ouvrable, changement de visibilité ↔ client, jamais de fuite, export/
+import conserve fichier + visibilité, non-régression). Gate vert (e2e 37/37).
+VISION Art. 7, 8, 9, 11.

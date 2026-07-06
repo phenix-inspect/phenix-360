@@ -26,9 +26,11 @@ import {
   coupDeCoeurId as toCoupId,
   decisionVisibility,
   defaultLaunchChecklist,
+  eventId as toEventId,
   realAnalyzeDossier,
   type AnalyzeInput,
   type DossierAnalyzer,
+  type EventVisibility,
   filPhotoId as toFilPhotoId,
   messageId as toMessageId,
   momentId as toMomentId,
@@ -912,7 +914,13 @@ export const demo = {
    */
   async addPrepDocument(
     projectId: ProjectId,
-    input: { label: string; categorie?: PrepDocCategory; attachment?: EventAttachment },
+    input: {
+      label: string;
+      categorie?: PrepDocCategory;
+      attachment?: EventAttachment;
+      /** Visibilité du document dans le Journal — INTERNE par défaut (anti-fuite). */
+      visibility?: EventVisibility;
+    },
   ): Promise<void> {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     const dossier = dossiers[projectId];
@@ -933,7 +941,8 @@ export const demo = {
         projectId,
         actor,
         type: 'document',
-        visibility: 'interne',
+        // Privé par défaut : un document ne part au client que sur choix explicite.
+        visibility: input.visibility ?? 'interne',
         state: 'publie',
         content: {
           attachment: input.attachment,
@@ -953,6 +962,25 @@ export const demo = {
     dossier.documents = [...dossier.documents, doc];
     dossiers[projectId] = dossier;
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Change la VISIBILITÉ d'un document de préparation (interne ↔ visible client).
+   * Agit sur l'événement `document` du Journal (base unique) : le client le voit
+   * apparaître / disparaître immédiatement. Sans fichier (donc sans événement),
+   * il n'y a rien à partager — l'appel est sans effet.
+   */
+  async setPrepDocumentVisibility(
+    projectId: ProjectId,
+    docId: string,
+    visibility: EventVisibility,
+  ): Promise<void> {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const doc = dossiers[projectId]?.documents.find((d) => d.id === docId);
+    if (!doc?.eventId) return;
+    await backend.setEventVisibility(toEventId(doc.eventId), visibility);
     refresh();
     broadcast();
   },

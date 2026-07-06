@@ -77,6 +77,8 @@ export interface EventRepository {
   appendEvent(input: NewEvent): Promise<Event>;
   /** Validation = ÉTAT : passe un événement à `publie` (ADR-002 §4). */
   publishEvent(id: EventId, publishedBy: UserId): Promise<Event>;
+  /** Change la VISIBILITÉ d'un événement (interne ↔ client) — partage a posteriori. */
+  setEventVisibility(id: EventId, visibility: EventVisibility): Promise<Event>;
   /** Résout une demande (réponse portée par la demande ; clôt le besoin). */
   resolveDemande(id: EventId, resolution: DemandeResolution): Promise<Event>;
 }
