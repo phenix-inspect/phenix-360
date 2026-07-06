@@ -74,8 +74,8 @@ export function DeleteChantierButton({
           <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-destructive">
             <AlertTriangle aria-hidden />
             <p>
-              Journal, missions, réserves, photos et récit, documents et conversations PHÉNIX seront
-              retirés. <strong>Cette action est irréversible.</strong>
+              Journal, missions, réserves, photos et coulisses, documents et conversations PHÉNIX
+              seront retirés. <strong>Cette action est irréversible.</strong>
             </p>
           </div>
           <div className="flex justify-end gap-2">

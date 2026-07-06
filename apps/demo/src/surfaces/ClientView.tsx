@@ -143,7 +143,7 @@ export function ClientView({
     ...(hasRecit
       ? [
           {
-            label: 'Récit',
+            label: 'Dans les coulisses',
             onClick: () => {
               setFilView('fil');
               goTo('section-fil');
@@ -234,8 +234,8 @@ export function ClientView({
           className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
         >
           <MessageCircle aria-hidden />
-          Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} — voir le
-          récit
+          Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} — voir les
+          coulisses
         </button>
       )}
 
@@ -253,7 +253,7 @@ export function ClientView({
       <Card>
         <CardContent className="space-y-5 p-6">
           {/* Côté client : statut seulement, JAMAIS le lot en cours (« Gros œuvre »
-              …) — c'est une info interne conducteur. Le détail se lit au Récit ou
+              …) — c'est une info interne conducteur. Le détail se lit dans les coulisses ou
               se demande à Léon. */}
           <ProjectHero
             project={project}

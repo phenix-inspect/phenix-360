@@ -26,7 +26,7 @@ try {
       'Planning',
       'Documents',
       'Comptes rendus',
-      'Récit',
+      'Dans les coulisses',
       'Bibliothèque',
     ])
       await chip(label).waitFor({ state: 'visible', timeout: 4000 });
@@ -59,8 +59,8 @@ try {
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Cliquer « Récit » rebascule en vue Récit', async () => {
-    await chip('Récit').click();
+  await assert('Cliquer « Dans les coulisses » rebascule en vue coulisses', async () => {
+    await chip('Dans les coulisses').click();
     await page
       .getByText('L’histoire de votre chantier, en images.')
       .first()

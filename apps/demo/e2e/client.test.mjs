@@ -21,15 +21,18 @@ try {
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Espace client : le récit est renommé « Le récit du chantier »', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
-    await page
-      .getByRole('heading', { name: 'Le récit du chantier' })
-      .first()
-      .waitFor({ state: 'visible', timeout: 6000 });
-    if ((await page.getByText('Le Fil', { exact: true }).count()) > 0)
-      throw new Error('« Le Fil » subsiste quelque part');
-  });
+  await assert(
+    'Espace client : la section s’intitule « Dans les coulisses du chantier »',
+    async () => {
+      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      await page
+        .getByRole('heading', { name: 'Dans les coulisses du chantier' })
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      if ((await page.getByText('Le Fil', { exact: true }).count()) > 0)
+        throw new Error('« Le Fil » subsiste quelque part');
+    },
+  );
 
   await assert('Sections client claires : Documents ET Comptes rendus séparés', async () => {
     await page

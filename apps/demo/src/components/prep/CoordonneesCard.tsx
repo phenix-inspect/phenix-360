@@ -94,7 +94,7 @@ export function CoordonneesCard({
           ))}
         </div>
         <p className="text-xs text-muted-foreground">
-          Le client accède à son Espace client (récit, décisions, documents partagés) dès qu'un
+          Le client accède à son Espace client (coulisses, décisions, documents partagés) dès qu'un
           chantier est créé pour lui. Ses coordonnées se modifient sur sa fiche contact.
         </p>
       </CardContent>

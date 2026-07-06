@@ -119,7 +119,7 @@ export function FilView({
           <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
             <Images aria-hidden />
             <h2 className="font-serif text-xl font-semibold tracking-tight">
-              Le récit du chantier
+              Dans les coulisses du chantier
             </h2>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -133,7 +133,7 @@ export function FilView({
             value={view}
             onValueChange={setView}
             options={[
-              { value: 'fil', label: 'Récit' },
+              { value: 'fil', label: 'Dans les coulisses' },
               { value: 'bibliotheque', label: 'Bibliothèque' },
             ]}
             aria-label="Changer de vue"
@@ -149,7 +149,7 @@ export function FilView({
       {vide ? (
         <EmptyState
           icon={<Images aria-hidden />}
-          title="Le récit du chantier commence bientôt"
+          title="Les coulisses du chantier commencent bientôt"
           description={
             canCompose
               ? 'Créez un premier moment : il ouvrira l’histoire du chantier.'

@@ -1292,3 +1292,29 @@ question ? » inchangé. Aucune autre modification fonctionnelle.
 **Vérifié :** build Pages (`PAGES_BASE=/phenix-360/`) référence bien
 `/phenix-360/leon.png` (au lieu de `/leon.png`). Nouveau `phenix-avatar.test`
 (image chargée, bouton ⇆ chat même `src`). Gate vert (e2e 40/40). VISION Art. 11.
+
+## 06/07/2026 — « Récit » → « Dans les coulisses » (vocabulaire premium)
+
+**Décision produit :** « Récit » est trop froid / administratif. On ne consulte
+pas un rapport : on découvre ce qui se passe quand on n'est pas sur le chantier.
+« Dans les coulisses » traduit cette promesse. Renommage PARTOUT dans l'UI,
+comportement inchangé (aucun nouvel écran, aucun nouveau concept).
+
+**Portée (vocabulaire seulement) :** onglet conducteur, sommaire + section client,
+bascule Coulisses/Bibliothèque, titres, textes, et les réponses de Léon dans le
+chat (`phenix.ts` : « … dans les coulisses de votre chantier », bouton « Voir les
+coulisses »). Les IDENTIFIANTS internes (`fil`, `filDuChantier`, `clientFeed`,
+valeur d'onglet `'fil'`) restent inchangés — le comportement ne bouge pas.
+
+**Note UX :** l'onglet « Dans les coulisses » est plus long, mais la barre
+d'onglets (`TabsList`) a déjà `max-w-full overflow-x-auto` + triggers
+`whitespace-nowrap` → défilement interne sur écran étroit, aucun débordement de
+page (mobile OK).
+
+**Impact :** libellés dans `CompagnonView`, `ClientView`, `FilView`,
+`BibliothequeView`, `CoordonneesCard`, `ReservesView`, `DeleteChantierButton`,
+`PhenixStart`, et `packages/core/phenix.ts`. Suites e2e recalées (tab/heading/chip)
+
+- nouveau `coulisses.test` (« Récit » absent de l'UI côté conducteur, client et
+  chat ; « Dans les coulisses » partout ; navigation intacte). Gate vert (e2e 41/41).
+  VISION Art. 11.

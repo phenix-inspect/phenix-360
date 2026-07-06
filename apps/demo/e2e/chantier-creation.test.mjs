@@ -81,7 +81,7 @@ try {
   });
 
   await assert('Les « photos avant travaux » sont bien au Récit', async () => {
-    await page.getByRole('tab', { name: 'Récit' }).click();
+    await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
     await page.getByText('Avant travaux').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 

@@ -65,7 +65,7 @@ try {
 
   await assert('La mission a laissé une trace (Récit / Journal du chantier)', async () => {
     // Une note se matérialise en Moment du Récit ; on la retrouve après création.
-    await page.getByRole('tab', { name: 'Récit' }).click();
+    await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
     await page.waitForTimeout(300);
     if ((await page.getByText(/dalle terminé/).count()) === 0) {
       await page.getByRole('tab', { name: 'Suivi', exact: true }).click();

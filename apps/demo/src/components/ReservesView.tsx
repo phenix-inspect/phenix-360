@@ -82,7 +82,7 @@ export function ReservesView({
         <EmptyState
           icon={<Flag aria-hidden />}
           title="Aucune réserve"
-          description="Ajoutez une réserve, ou créez-la depuis une photo annotée du récit du chantier : elle apparaîtra ici, prête à être suivie puis levée."
+          description="Ajoutez une réserve, ou créez-la depuis une photo annotée des coulisses du chantier : elle apparaîtra ici, prête à être suivie puis levée."
         />
       ) : (
         <div className="space-y-6">

@@ -76,7 +76,7 @@ try {
   });
 
   await assert('La photo est bien au Récit (aucune fonctionnalité perdue)', async () => {
-    await page.getByRole('tab', { name: 'Récit' }).click();
+    await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
     await page.waitForTimeout(400);
     // La mission a créé un Moment ; le récit s'est enrichi (au moins une image).
     if ((await page.locator('img').count()) === 0)

@@ -279,7 +279,7 @@ function projectKnowledge(input: PhenixInput): KnowledgeFact[] {
     for (const [label, count] of byZone) {
       facts.push({
         keys: [...tokenize(label), 'photo', 'photos'],
-        answer: `Vous avez ${count} photo${count > 1 ? 's' : ''} de « ${label} » dans votre récit.`,
+        answer: `Vous avez ${count} photo${count > 1 ? 's' : ''} de « ${label} » dans les coulisses de votre chantier.`,
         clientLabel: 'vos photos',
       });
     }
@@ -648,23 +648,23 @@ export function askPhenix(input: PhenixInput): PhenixReply {
           return nav(
             isCommand
               ? `Je vous ouvre les photos de ${zone}.`
-              : `Vous avez ${count} photo${count > 1 ? 's' : ''} de ${zone} dans votre récit.`,
+              : `Vous avez ${count} photo${count > 1 ? 's' : ''} de ${zone} dans les coulisses de votre chantier.`,
             'vos photos',
             { kind: 'photo', ref: latest.id, label: `Voir les photos de ${zone}` },
             isCommand,
           );
         }
         return reply(
-          `Je n'ai pas encore de photo de ${zone} dans votre récit ; dès qu'il y en aura, elles y apparaîtront.`,
+          `Je n'ai pas encore de photo de ${zone} dans les coulisses de votre chantier ; dès qu'il y en aura, elles y apparaîtront.`,
           'vos photos',
         );
       }
       return nav(
         isCommand
-          ? 'Je vous ouvre le récit en photos de votre chantier.'
-          : 'Les dernières photos de votre chantier sont dans votre récit.',
+          ? 'Je vous ouvre les coulisses en photos de votre chantier.'
+          : 'Les dernières photos de votre chantier sont dans les coulisses.',
         'vos photos',
-        { kind: 'fil', label: 'Voir le récit' },
+        { kind: 'fil', label: 'Voir les coulisses' },
         isCommand,
       );
     }

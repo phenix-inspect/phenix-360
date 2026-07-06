@@ -520,7 +520,9 @@ function SynthesisScreen({
 
         {photosCount > 0 && (
           <SynthCard icon={<ImageIcon aria-hidden />} title="Photos avant travaux">
-            <SynthLine strong={`${photosCount} ajoutée${photosCount > 1 ? 's' : ''} au récit`} />
+            <SynthLine
+              strong={`${photosCount} ajoutée${photosCount > 1 ? 's' : ''} aux coulisses`}
+            />
           </SynthCard>
         )}
 

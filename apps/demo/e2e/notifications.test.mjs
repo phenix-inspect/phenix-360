@@ -34,7 +34,7 @@ try {
   await assert('Le clic ouvre le Récit AU MOMENT concerné (pas tout le récit)', async () => {
     await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
     await page
-      .getByRole('heading', { name: 'Le récit du chantier' })
+      .getByRole('heading', { name: 'Dans les coulisses du chantier' })
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
     // Le Moment concerné (« Dalle coulée ») et son commentaire client sont là.

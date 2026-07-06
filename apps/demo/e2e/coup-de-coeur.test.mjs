@@ -18,7 +18,7 @@ const pressed = (btn) => btn.getAttribute('aria-pressed');
 /** Ouvre le Récit du chantier actif côté conducteur et rend le 1er cœur. */
 async function firstHeartButton() {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-  await page.getByRole('tab', { name: 'Récit' }).click();
+  await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
   const btn = page.getByRole('button', { name: /coup de cœur/i }).first();
   await btn.waitFor({ state: 'visible', timeout: 6000 });
   return btn;

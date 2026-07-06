@@ -19,7 +19,7 @@ const coverRatio = async () => {
 
 async function openRecit() {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-  await page.getByRole('tab', { name: 'Récit' }).click();
+  await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
   await cover().waitFor({ state: 'visible', timeout: 6000 });
 }
 
