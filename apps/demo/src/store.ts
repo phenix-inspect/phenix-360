@@ -263,6 +263,27 @@ let clientTarget: ClientTarget | null = null;
 // PHÉNIX lit le texte réellement extrait des PDF, sans rien inventer. Un vrai
 // LLM/OCR pourra le remplacer via `setDossierAnalyzer`, SANS toucher aux écrans.
 let dossierAnalyzer: DossierAnalyzer = realAnalyzeDossier;
+
+/**
+ * Migration douce : les chantiers créés AVANT la check-list standard n'ont pas de
+ * champ `checklist`. On le backfill avec la check-list PHÉNIX (le conducteur n'a
+ * jamais une liste vide). On NE TOUCHE PAS à un tableau vide : le conducteur a pu
+ * retirer volontairement tous les points. Idempotent.
+ */
+function migrateDossierChecklists(): void {
+  if (typeof localStorage === 'undefined') return;
+  const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+  let changed = false;
+  for (const d of Object.values(dossiers)) {
+    if (d.checklist === undefined) {
+      d.checklist = defaultLaunchChecklist();
+      changed = true;
+    }
+  }
+  if (changed) localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+}
+
+migrateDossierChecklists();
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {

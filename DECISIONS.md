@@ -1229,3 +1229,22 @@ sérialisé tel quel. Nouveau `documents-partage.test` (interne invisible, parta
 visible + ouvrable, changement de visibilité ↔ client, jamais de fuite, export/
 import conserve fichier + visibilité, non-régression). Gate vert (e2e 37/37).
 VISION Art. 7, 8, 9, 11.
+
+## 06/07/2026 — Check-list : migration des chantiers antérieurs (« liste vide »)
+
+**Retour terrain :** « ma check-list est vide, même sur un nouveau chantier ».
+Diagnostic : le code de préremplissage est bien en place (vérifié en UI sur les
+deux chemins de création — devis ET création rapide via `ensureDossier`) et
+déployé (le build du commit check-list a réussi ; seul l'étape `deploy-pages`
+d'un run intermédiaire avait échoué par concurrence Pages, le run suivant a
+déployé). La cause résiduelle : des chantiers déjà en `localStorage`, créés AVANT
+la fonctionnalité, n'ont pas de champ `checklist`.
+
+**Décision :** migration douce au chargement du store — tout dossier dont
+`checklist` est `undefined` reçoit la check-list PHÉNIX standard. On NE touche
+PAS à un tableau vide (`[]`) : le conducteur a pu retirer volontairement tous les
+points. Idempotent, sans écran ni concept nouveau.
+
+**Impact :** store `migrateDossierChecklists()` (appelée à l'init). Nouveau
+`checklist-migration.test` (dossier dégradé sans `checklist` → backfill au
+rechargement). Gate vert (e2e 38/38).
