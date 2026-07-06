@@ -430,6 +430,8 @@ export const DOCUMENT_STATUS_TONE: Record<
 /** Familles de documents d'un chantier (préparation). */
 export const PREP_DOC_CATEGORIES = [
   'devis',
+  'acompte',
+  'facture_finale',
   'plan',
   'diagnostic',
   'dpe',
@@ -442,6 +444,8 @@ export type PrepDocCategory = (typeof PREP_DOC_CATEGORIES)[number];
 
 export const PREP_DOC_CATEGORY_LABEL: Record<PrepDocCategory, string> = {
   devis: 'Devis',
+  acompte: 'Acompte',
+  facture_finale: 'Facture finale',
   plan: 'Plan',
   diagnostic: 'Diagnostic',
   dpe: 'DPE',
@@ -450,6 +454,15 @@ export const PREP_DOC_CATEGORY_LABEL: Record<PrepDocCategory, string> = {
   photo_avant: 'Photo avant travaux',
   autre: 'Autre',
 };
+
+/**
+ * Un document vaut-il PREUVE D'ACOMPTE ? Soit classé explicitement « Acompte »
+ * (catégorie), soit reconnu au libellé (rétro-compat des dossiers existants et de
+ * l'analyse du devis). Source unique de la règle « Acompte reçu » (checklist de
+ * partage client + cockpit de préparation), pour ne jamais diverger.
+ */
+export const isAcompteDocument = (doc: ProjectDocument): boolean =>
+  doc.categorie === 'acompte' || /acompte|arrhes/i.test(doc.label);
 
 export interface ProjectDocument {
   id: string;
@@ -1991,7 +2004,8 @@ function documentFromFile(name: string, i: number): ProjectDocument {
   const n = name.toLowerCase();
   const map: { re: RegExp; label: string; categorie: PrepDocCategory }[] = [
     { re: /devis/, label: 'Devis signé', categorie: 'devis' },
-    { re: /acompte/, label: 'Acompte versé', categorie: 'autre' },
+    { re: /acompte|arrhes/, label: 'Acompte versé', categorie: 'acompte' },
+    { re: /facture/, label: 'Facture finale', categorie: 'facture_finale' },
     { re: /plan/, label: 'Plans', categorie: 'plan' },
     { re: /dpe/, label: 'DPE', categorie: 'dpe' },
     { re: /diag|amiante|plomb/, label: 'Diagnostics', categorie: 'diagnostic' },

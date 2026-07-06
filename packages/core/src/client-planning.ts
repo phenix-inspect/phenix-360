@@ -16,7 +16,7 @@
  * client ne pourra pas dire « vous aviez prévu le carrelage mardi ».
  */
 import { PROJECT_STATUSES, type ProjectStatus } from './project.js';
-import { buildSmartPlanning, type ProjectDossier } from './prepare.js';
+import { buildSmartPlanning, isAcompteDocument, type ProjectDossier } from './prepare.js';
 
 /* -------------------------------------------------------------------------- *
  * PARTAGE CLIENT — 3 bloquants obligatoires avant d'ouvrir l'espace client
@@ -45,7 +45,9 @@ export function buildClientShareReadiness(dossier: ProjectDossier | null): Clien
   const fourni = (re: RegExp): boolean =>
     docs.some((d) => re.test(d.label) && d.status === 'fourni');
   const devisSigne = Boolean(dossier?.devis) || fourni(/devis/i);
-  const acomptePaye = fourni(/acompte|arrhes/i);
+  // « Acompte reçu » : validé par tout document FOURNI classé « Acompte » (ou
+  // reconnu au libellé) — un dépôt de preuve d'acompte suffit désormais.
+  const acomptePaye = docs.some((d) => d.status === 'fourni' && isAcompteDocument(d));
   const demarrageFixe = Boolean(dossier?.infos.startDate);
 
   const blockers: ClientShareBlocker[] = [

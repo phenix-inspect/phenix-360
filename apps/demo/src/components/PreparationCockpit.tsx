@@ -3,6 +3,7 @@ import { Button, Card, CardContent, Input } from '@phenix360/ui';
 import {
   buildClientShareReadiness,
   buildPreparation,
+  isAcompteDocument,
   type ClientShareReadiness,
   type PreparationSummary,
   type ProjectDossier,
@@ -55,7 +56,7 @@ export function PreparationCockpit({
 function computeAlerts(dossier: ProjectDossier, prep: PreparationSummary): string[] {
   const alerts: string[] = [];
   for (const d of dossier.documents)
-    if (d.recommande && d.status !== 'fourni' && !/devis|acompte|arrhes/i.test(d.label))
+    if (d.recommande && d.status !== 'fourni' && !/devis/i.test(d.label) && !isAcompteDocument(d))
       alerts.push(`Document à fournir : ${d.label}`);
   const aCommander = dossier.orders.filter((o) => o.statut === 'a_commander').length;
   if (aCommander > 0) alerts.push(`${aCommander} commande(s) à prévoir`);
@@ -85,20 +86,29 @@ function ClientShareBlock({
 }): React.JSX.Element {
   const alerts = computeAlerts(dossier, prep);
 
-  const acompteDoc = dossier.documents.find((d) => /acompte|arrhes/i.test(d.label));
-  const acomptePaid = acompteDoc?.status === 'fourni';
+  // « Acompte reçu » est validé dès qu'UN document d'acompte est fourni (règle du
+  // bloquant, source unique). Le bouton reflète cet état, jamais un seul document.
+  const acomptePaid = share.blockers.find((b) => b.key === 'acompte')?.done ?? false;
+  const acompteDoc = dossier.documents.find((d) => isAcompteDocument(d));
   const toggleAcompte = (): void => {
-    if (acompteDoc)
+    if (acomptePaid)
+      // Dévalider : toute preuve d'acompte fournie repasse en « à fournir ».
       patch({
         documents: dossier.documents.map((d) =>
-          d.id === acompteDoc.id ? { ...d, status: acomptePaid ? 'a_fournir' : 'fourni' } : d,
+          isAcompteDocument(d) && d.status === 'fourni' ? { ...d, status: 'a_fournir' } : d,
+        ),
+      });
+    else if (acompteDoc)
+      patch({
+        documents: dossier.documents.map((d) =>
+          d.id === acompteDoc.id ? { ...d, status: 'fourni' } : d,
         ),
       });
     else
       patch({
         documents: [
           ...dossier.documents,
-          { id: 'doc-acompte', label: 'Acompte versé', status: 'fourni', categorie: 'autre' },
+          { id: 'doc-acompte', label: 'Acompte versé', status: 'fourni', categorie: 'acompte' },
         ],
       });
   };

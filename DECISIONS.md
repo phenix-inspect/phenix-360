@@ -1143,3 +1143,33 @@ des jours (au lieu du défaut 60). Nouveau `planning-duree.test` (7/15/31/60 j :
 réception = début + durée, pré-réception proportionnelle, aucune date avant le
 début, conducteur ⇆ client cohérents). Gate vert (typecheck/lint/prettier/build,
 e2e 34/34). VISION Art. 9, 11.
+
+## 06/07/2026 — Documents : catégories « Acompte » et « Facture finale »
+
+**Besoin terrain :** les documents étaient trop orientés devis / plans /
+diagnostics. Le conducteur doit pouvoir déposer une **preuve d'acompte** et la
+**facture finale**, les retrouver dans Préparation / Documents, et les partager
+(ou non) au client.
+
+**Décision (sans nouvel écran ni concept) :** deux CATÉGORIES de documents en
+plus (`acompte`, `facture_finale`) dans la liste existante. Elles apparaissent
+automatiquement dans le sélecteur « Type de document » et dans les libellés.
+
+**Checklist de partage — source unique :** « Acompte reçu » est désormais validé
+par tout document FOURNI **classé « Acompte »** (ou reconnu au libellé, rétro-compat),
+via `isAcompteDocument` (core). Le bouton « Marquer comme payé / Annuler » du
+cockpit reflète ce même bloquant (plus de désynchronisation bouton ⇆ checklist).
+
+**Non bloquant / client-safe inchangé :** la facture finale n'entre jamais dans
+les 3 bloquants de partage (devis · acompte · date). Les documents restent
+INTERNES par défaut (invisibles côté client) et ne deviennent visibles que
+partagés — comportement existant, non modifié.
+
+**Impact :** core `PREP_DOC_CATEGORIES` (+`acompte`, +`facture_finale`) +
+`isAcompteDocument` ; `buildClientShareReadiness` (acompte par catégorie) ;
+`documentFromFile` (acompte→`acompte`, facture→`facture_finale`) ;
+`PreparationCockpit` (bouton aligné sur le bloquant, création en catégorie
+`acompte`). Export/import inchangé (catégories = simples chaînes). Nouveau
+`documents-acompte-facture.test` (dépôt Acompte→checklist validée, Facture finale
+interne + partagée, client-safe, 3 obligatoires). Gate vert (e2e 35/35).
+VISION Art. 7, 8, 9, 11.
