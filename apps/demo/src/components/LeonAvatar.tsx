@@ -1,14 +1,19 @@
 import { useState } from 'react';
-import { HardHat } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 
 /**
- * LEON — le visage de PHÉNIX. Léon Le Bricolo (AssistantByLeon) est l'avatar
- * officiel du concierge : bouton flottant, en-tête, chaque bulle, reprises.
+ * LEON — le visage de PHÉNIX. Léon Le Bricolo est l'avatar officiel du concierge :
+ * bouton flottant, en-tête, chaque bulle, reprises. Le MÊME avatar partout →
+ * identité cohérente (le conducteur comme le client parlent à Léon).
  *
- * L'image est servie depuis `apps/demo/public/leon.png` (déposez-y le PNG de
- * Léon : ce composant l'affiche partout, sans autre changement). Tant que le
- * fichier n'est pas présent, un repère neutre premium s'affiche (jamais l'étoile).
+ * L'image est servie depuis `apps/demo/public/leon.png`. On la résout via
+ * `import.meta.env.BASE_URL` : indispensable sous un sous-chemin (GitHub Pages
+ * sert la démo sous `/phenix-360/`, où un chemin racine `/leon.png` renverrait un
+ * 404). Repli NEUTRE (bulle de conversation) si l'image manque — jamais un casque
+ * de chantier (qui ne représente pas l'assistant), jamais une étoile.
  */
+const LEON_SRC = `${import.meta.env.BASE_URL}leon.png`;
+
 export function LeonAvatar({ className }: { className?: string }): React.JSX.Element {
   const [failed, setFailed] = useState(false);
   return (
@@ -18,11 +23,11 @@ export function LeonAvatar({ className }: { className?: string }): React.JSX.Ele
       }`}
     >
       {failed ? (
-        <HardHat aria-hidden className="size-[55%]" />
+        <MessageCircle aria-hidden className="size-[55%]" />
       ) : (
         <img
-          src="/leon.png"
-          alt="PHÉNIX"
+          src={LEON_SRC}
+          alt="Léon, l’assistant PHÉNIX"
           onError={() => setFailed(true)}
           className="size-full object-cover"
         />

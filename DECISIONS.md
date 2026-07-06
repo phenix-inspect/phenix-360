@@ -1270,3 +1270,25 @@ la mission produit bien un `compte_rendu` + des photos (Moment).
 prop `onNewMission`, CTA état vide → mission). Nouveau `suivi-entree-unique.test`
 (boutons disparus, mission crée un compte rendu + ajoute une photo, trace au
 Journal + Récit). Gate vert (e2e 39/39). VISION Art. 5, 8.
+
+## 06/07/2026 — Assistant IA : le visage de Léon (fin du casque de chantier)
+
+**Retour terrain :** le bouton flottant de l'assistant affichait un casque de
+chantier — il ne représente pas l'assistant et ne crée aucun lien émotionnel.
+
+**Cause réelle (pas qu'un choix d'icône) :** le bouton ET le chat utilisaient déjà
+`LeonAvatar`, qui affiche `public/leon.png`… mais via un chemin RACINE `/leon.png`.
+Sous GitHub Pages, la démo est servie sous `/phenix-360/` → `/leon.png` renvoyait
+un 404 → repli sur l'icône casque. En local (base `/`), le bug était masqué. Le
+conducteur voyait donc le casque uniquement en ligne.
+
+**Décision / correctif :** résoudre l'image via `import.meta.env.BASE_URL`
+(`${BASE_URL}leon.png`) → l'avatar de Léon se charge partout (local ET Pages).
+Bouton flottant et fenêtre de chat partagent EXACTEMENT le même `LeonAvatar` →
+identité cohérente. Le repli n'est plus un casque mais un repère NEUTRE (bulle de
+conversation), pour ne jamais réafficher le casque. Texte « PHÉNIX / Une
+question ? » inchangé. Aucune autre modification fonctionnelle.
+
+**Vérifié :** build Pages (`PAGES_BASE=/phenix-360/`) référence bien
+`/phenix-360/leon.png` (au lieu de `/leon.png`). Nouveau `phenix-avatar.test`
+(image chargée, bouton ⇆ chat même `src`). Gate vert (e2e 40/40). VISION Art. 11.
