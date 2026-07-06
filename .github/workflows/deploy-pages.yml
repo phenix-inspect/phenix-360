@@ -15,10 +15,13 @@ permissions:
   pages: write
   id-token: write
 
-# Un seul déploiement à la fois ; on ne coupe pas un déploiement en cours.
+# Un seul déploiement à la fois. En cas de pushs rapprochés, on ANNULE le run en
+# cours au profit du plus récent : sinon deux déploiements Pages se télescopent et
+# ÉCHOUENT tous les deux (le site reste bloqué sur une ancienne version). Le dernier
+# commit gagne toujours, proprement.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
