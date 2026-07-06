@@ -1173,3 +1173,31 @@ partagés — comportement existant, non modifié.
 `documents-acompte-facture.test` (dépôt Acompte→checklist validée, Facture finale
 interne + partagée, client-safe, 3 obligatoires). Gate vert (e2e 35/35).
 VISION Art. 7, 8, 9, 11.
+
+## 06/07/2026 — Check-list de lancement STANDARD (préremplie à la création)
+
+**Décision produit :** la « Check-list de lancement » devient la procédure
+standard PHÉNIX. Chaque NOUVEAU chantier démarre avec la même check-list — le
+conducteur n'a jamais une liste vide.
+
+**Sans nouvel écran ni concept :** on remplace la check-list manuelle VIDE par une
+check-list préremplie. Deux niveaux, déjà existants dans l'UI :
+• 🔴 3 bloquants (devis signé · acompte reçu · date de démarrage) — INCHANGÉS,
+portés par la check-list de PARTAGE, seuls à piloter l'ouverture de l'espace
+client et le passage « En cours » ;
+• 🟡 6 contrôles qualité PHÉNIX (clés · déclaration de travaux · panneau ·
+sous-traitants · commandes · accès), préremplis dans la check-list du dossier.
+INFORMATIFS : ils ne bloquent jamais. Le conducteur coche, ajoute, supprime.
+
+**Une seule source :** `defaultLaunchChecklist()` (core) — ids stables, tout
+décoché — injectée à CHAQUE création de dossier : les deux analyseurs
+(`realAnalyzeDossier`, `mockAnalyzeDossier`), `ensureDossier` (création rapide /
+import ancien) et le seed (chantiers de démo). Sauvegardée avec le chantier
+(`dossier.checklist`) → coches persistantes au rechargement et à l'export/import.
+
+**Impact :** core `PHENIX_LAUNCH_CHECKLIST` + `defaultLaunchChecklist` ; injection
+dans les 3 constructeurs de dossier + seed. Aucune logique bloquante ajoutée.
+Nouveau `checklist-lancement.test` (6 contrôles préremplis, 3 bloquants seuls
+bloquants, ajout/suppression, persistance reload + export/import) ; `preparation`
+recalé (libellé d'ajout hors liste standard). Gate vert (e2e 36/36).
+VISION Art. 5, 9.

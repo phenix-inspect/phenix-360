@@ -546,6 +546,27 @@ export interface ChecklistManuel {
   done: boolean;
 }
 
+/**
+ * Check-list de lancement STANDARD PHÉNIX — les CONTRÔLES QUALITÉ internes,
+ * préremplis à la création de CHAQUE chantier (le conducteur n'a jamais une
+ * check-list vide). Ils ne BLOQUENT JAMAIS : les 3 bloquants (devis signé ·
+ * acompte reçu · date de démarrage) vivent dans la check-list de PARTAGE, seuls
+ * à piloter l'ouverture de l'espace client et le passage « En cours ». Ici, le
+ * conducteur coche à son rythme, ajoute ses propres points, ou en retire.
+ */
+export const PHENIX_LAUNCH_CHECKLIST: readonly string[] = [
+  'Clés récupérées',
+  'Déclaration de travaux effectuée (si nécessaire)',
+  'Panneau de chantier posé',
+  'Sous-traitants informés',
+  'Commandes principales passées',
+  'Accès chantier confirmé',
+];
+
+/** Une COPIE fraîche de la check-list standard (ids stables, tout décoché). */
+export const defaultLaunchChecklist = (): ChecklistManuel[] =>
+  PHENIX_LAUNCH_CHECKLIST.map((label, i) => ({ id: `chk-${i + 1}`, label, done: false }));
+
 export interface ProjectDossier {
   infos: ProjectInfos;
   roadmap: RoadmapStep[];
@@ -2052,6 +2073,7 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
     selections: [],
     documents,
     questions: [],
+    checklist: defaultLaunchChecklist(),
     sources,
     createdAt: new Date().toISOString(),
     ...extra,
@@ -2479,6 +2501,7 @@ export const mockAnalyzeDossier: DossierAnalyzer = ({ files }) => {
     selections,
     documents,
     questions,
+    checklist: defaultLaunchChecklist(),
     devis,
     sources: files.map((f) => f.name),
     createdAt: new Date().toISOString(),

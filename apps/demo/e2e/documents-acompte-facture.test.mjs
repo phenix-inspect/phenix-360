@@ -15,7 +15,11 @@ const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2600 });
 const { assert, summary } = harness();
 
-const pdf = (name) => ({ name, mimeType: 'application/pdf', buffer: Buffer.from(`%PDF-1.4 ${name}`) });
+const pdf = (name) => ({
+  name,
+  mimeType: 'application/pdf',
+  buffer: Buffer.from(`%PDF-1.4 ${name}`),
+});
 const ACOMPTE_PDF = pdf('preuve-acompte.pdf');
 const FACTURE_PDF = pdf('facture-finale.pdf');
 const FACTURE_SHARED_PDF = pdf('facture-partagee.pdf');
@@ -43,7 +47,9 @@ try {
   await page
     .locator('input[type=file]')
     .first()
-    .setInputFiles([{ name: 'Devis.pdf', mimeType: 'application/pdf', buffer: phenixDevisPdf({}) }]);
+    .setInputFiles([
+      { name: 'Devis.pdf', mimeType: 'application/pdf', buffer: phenixDevisPdf({}) },
+    ]);
   await page.getByRole('button', { name: /Préparer mon chantier/ }).click();
   await page.getByRole('button', { name: /Entrer dans le chantier/ }).click();
   await page
@@ -75,16 +81,21 @@ try {
   await assert('Ajouter un document de type « Facture finale » → documents internes', async () => {
     await addPrepDoc('Facture finale interne', 'Facture finale', FACTURE_PDF);
     const row = page.locator('li').filter({ hasText: 'Facture finale interne' }).first();
-    await row.getByText('Facture finale', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
+    await row
+      .getByText('Facture finale', { exact: true })
+      .waitFor({ state: 'visible', timeout: 5000 });
     await row.getByText('Fourni').waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Facture finale NON bloquante (toujours 3 éléments obligatoires)', async () => {
     // La facture n'entre jamais dans les bloquants de partage (devis/acompte/date).
-    await page.getByText(/\/\s*3 éléments obligatoires validés/).first().waitFor({
-      state: 'visible',
-      timeout: 5000,
-    });
+    await page
+      .getByText(/\/\s*3 éléments obligatoires validés/)
+      .first()
+      .waitFor({
+        state: 'visible',
+        timeout: 5000,
+      });
     if ((await acompteRow().count()) === 0) throw new Error('checklist de partage introuvable');
   });
 
@@ -124,12 +135,21 @@ try {
       throw new Error('la facture interne fuit dans l’espace client');
   });
 
-  await assert('Non-régression : les deux documents restent dans les documents internes', async () => {
-    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: /Préparation/ }).click();
-    await page.getByText('Preuve de versement 30%').first().waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByText('Facture finale interne').first().waitFor({ state: 'visible', timeout: 5000 });
-  });
+  await assert(
+    'Non-régression : les deux documents restent dans les documents internes',
+    async () => {
+      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+      await page.getByRole('tab', { name: /Préparation/ }).click();
+      await page
+        .getByText('Preuve de versement 30%')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+      await page
+        .getByText('Facture finale interne')
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    },
+  );
 
   await assert('Zéro erreur console', async () => {
     if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));

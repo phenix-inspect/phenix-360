@@ -68,9 +68,12 @@ try {
   });
 
   await assert('Check-list manuelle : ajouter un point', async () => {
-    await page.getByLabel('Nouveau point de check-list').fill('Clés récupérées');
+    // Libellé hors check-list standard PHÉNIX (préremplie) pour tester l'ajout.
+    await page.getByLabel('Nouveau point de check-list').fill('Vérifier compteur électrique');
     await page.getByRole('button', { name: 'Ajouter le point' }).click();
-    await page.getByText('Clés récupérées').waitFor({ state: 'visible', timeout: 4000 });
+    await page
+      .getByText('Vérifier compteur électrique')
+      .waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('« Intervenants du chantier » a disparu de la Préparation', async () => {

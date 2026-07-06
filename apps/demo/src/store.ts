@@ -25,6 +25,7 @@ import {
   choixClientValides,
   coupDeCoeurId as toCoupId,
   decisionVisibility,
+  defaultLaunchChecklist,
   realAnalyzeDossier,
   type AnalyzeInput,
   type DossierAnalyzer,
@@ -759,6 +760,7 @@ export const demo = {
       selections: [],
       documents: [],
       questions: [],
+      checklist: defaultLaunchChecklist(),
       sources: [],
       createdAt: new Date().toISOString(),
     };

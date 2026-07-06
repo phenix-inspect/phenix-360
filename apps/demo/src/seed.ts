@@ -14,6 +14,7 @@ import {
   annotationId,
   attachmentId,
   buildPlanning,
+  defaultLaunchChecklist,
   coupDeCoeurId,
   currentStep,
   eventId,
@@ -653,6 +654,7 @@ export function buildDemoSeed(): DemoSeed {
         ],
       },
     ],
+    checklist: defaultLaunchChecklist(),
     sources: ['Devis-renovation-Martin.pdf', 'Plans-appartement.pdf'],
     createdAt: new Date().toISOString(),
   };
@@ -976,6 +978,7 @@ export function buildDemoSeed(): DemoSeed {
         { id: `${cid}-acompte`, label: 'Acompte versé', status: 'fourni', recommande: true },
       ],
       questions: [],
+      checklist: defaultLaunchChecklist(),
       sources: [],
       createdAt: daysAgo(opts.startedDaysAgo),
     };
