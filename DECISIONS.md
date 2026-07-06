@@ -1119,3 +1119,27 @@ messagerie globale (hors contexte) ; drapeau lu/non-lu persisté (état en plus)
 `AujourdhuiView` (badge + ouverture ciblée), `App`/`CompagnonView` (onglet
 d'ouverture imposé), `FilView`/`FilMoment` (marqueur conducteur). `comments.test`
 7/7. VISION Art. 3, 9, 11.
+
+## 06/07/2026 — Correctif : la DURÉE pilote le planning (source de vérité)
+
+**Bug terrain :** début 9 juillet + durée 31 jours produisait une réception le
+13 juillet et une **pré-réception le 6 juillet — AVANT le démarrage**. La durée
+estimée n'entrait pas dans le calcul : la réception était dérivée de la somme des
+durées d'étapes, et la pré-réception d'un écart figé (7 j).
+
+**Décision (modèle « durée = fin du chantier », validé) :** la durée (en jours)
+est la SOURCE DE VÉRITÉ. Réception = démarrage + durée. Pré-réception = réception
+− fenêtre de levée des réserves, exprimée en **proportion de la durée**
+(`LEVEE_RESERVES_RATIO` = 10 %, bornée à ≥ 1 j), **jamais un nombre de jours codé
+en dur**. Aucune date ne peut précéder le démarrage (pré-réception bornée au
+démarrage pour les chantiers très courts). Toute modification de la durée ou de la
+date recalcule immédiatement (sélecteurs purs, déjà réactifs).
+
+**Impact :** core `buildSmartPlanning` expose `endDate` (réception, désormais
+dérivée de la durée), `preReceptionDate`, `durationDays` — source unique partagée
+par le conducteur (« s'achève autour du ») et le client (`buildClientPlanning`,
+plus de `PRE_RECEPTION_LEAD`). `parseDurationDays` : un nombre nu (« 31 ») vaut
+des jours (au lieu du défaut 60). Nouveau `planning-duree.test` (7/15/31/60 j :
+réception = début + durée, pré-réception proportionnelle, aucune date avant le
+début, conducteur ⇆ client cohérents). Gate vert (typecheck/lint/prettier/build,
+e2e 34/34). VISION Art. 9, 11.

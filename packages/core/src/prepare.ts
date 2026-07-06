@@ -631,7 +631,12 @@ export function buildPlanning(
 export const parseDurationDays = (duration?: string): number => {
   if (!duration) return 60;
   const m = duration.match(/(\d+)\s*(mois|semaine|jour|an)/i);
-  if (!m) return 60;
+  if (!m) {
+    // Nombre nu (« 31 ») → jours calendaires : c'est une DURÉE, pas un défaut.
+    // Sans le moindre chiffre, faute de repère, défaut prudent.
+    const bare = duration.match(/\d+/);
+    return bare ? Number(bare[0]) : 60;
+  }
   const n = Number(m[1]);
   const u = (m[2] ?? '').toLowerCase();
   if (u.startsWith('an')) return n * 365;
@@ -994,7 +999,19 @@ export interface SmartPlanning {
   dated: boolean;
   startDate: string | null;
   phases: PlanningPhase[];
+  /**
+   * Réception estimée (fin du chantier) = démarrage + DURÉE (source de vérité).
+   * Jamais dérivée de la somme des durées d'étapes. null tant que non daté.
+   */
   endDate: string | null;
+  /**
+   * Pré-réception estimée = réception − fenêtre de levée des réserves (une
+   * PROPORTION de la durée, jamais un nombre de jours figé). Jamais antérieure au
+   * démarrage. null tant que non daté.
+   */
+  preReceptionDate: string | null;
+  /** Nombre de jours retenu pour dater le chantier (durée annoncée, sinon estimation). */
+  durationDays: number | null;
   /** Durée ANNONCÉE au client (jours) — cadrage connu dès le devis. null si non renseignée. */
   announcedDays: number | null;
   /** Libellé saisi de la durée annoncée (« 2 mois », « 45 jours ouvrés »). */
@@ -1007,6 +1024,40 @@ export interface SmartPlanning {
   marginDays: number;
   /** Une marge de sécurité confortable existe (sans risque). */
   comfortable: boolean;
+}
+
+/**
+ * Fenêtre de LEVÉE DES RÉSERVES entre la pré-réception et la réception. C'est une
+ * PROPORTION de la durée du chantier (règle métier), JAMAIS un nombre de jours
+ * codé en dur : un long chantier laisse plus de temps pour lever les réserves
+ * qu'un court. Bornée à au moins un jour, pour que la pré-réception précède
+ * toujours la réception.
+ */
+const LEVEE_RESERVES_RATIO = 0.1;
+const leveeReservesDays = (durationDays: number): number =>
+  Math.max(1, Math.round(durationDays * LEVEE_RESERVES_RATIO));
+
+/**
+ * Dates de jalons du client, DÉRIVÉES DE LA DURÉE (source de vérité), jamais de
+ * la somme des durées d'étapes :
+ *  • réception (fin du chantier)      = démarrage + durée ;
+ *  • pré-réception (avant la réception) = réception − fenêtre de levée des réserves,
+ *    et JAMAIS antérieure au démarrage.
+ * Renvoie { reception, preReception } = { null, null } tant que le chantier n'est
+ * pas daté ou que la durée est inconnue.
+ */
+function receptionMilestones(
+  startDate: string | null,
+  durationDays: number | null,
+): { reception: string | null; preReception: string | null } {
+  if (!startDate || durationDays == null || durationDays <= 0) {
+    return { reception: null, preReception: null };
+  }
+  const reception = addCalendarDays(startDate, durationDays);
+  const pre = addCalendarDays(reception, -leveeReservesDays(durationDays));
+  // Aucune date ne peut être antérieure au démarrage (chantiers très courts).
+  const preReception = pre < startDate ? startDate : pre;
+  return { reception, preReception };
 }
 
 /**
@@ -1023,12 +1074,22 @@ export function buildSmartPlanning(
   const durations = phaseDurations(dossier);
   const { announcedLabel, announcedDays, estimatedDays, risk, marginDays, comfortable } =
     durationCheck(dossier);
+  // La DURÉE pilote le planning : durée annoncée au client si connue, sinon
+  // l'estimation réaliste de PHÉNIX. C'est elle (et non la somme des étapes) qui
+  // date la réception.
+  const durationDays = announcedDays ?? (estimatedDays > 0 ? estimatedDays : null);
+  const startDate = dossier.infos.startDate ?? null;
+  const dated = Boolean(startDate);
+  const { reception, preReception } = receptionMilestones(dated ? startDate : null, durationDays);
+
   if (durations.length === 0) {
     return {
-      dated: false,
-      startDate: null,
+      dated,
+      startDate,
       phases: [],
-      endDate: null,
+      endDate: reception,
+      preReceptionDate: preReception,
+      durationDays,
       announcedDays,
       announcedLabel,
       estimatedDays,
@@ -1037,7 +1098,6 @@ export function buildSmartPlanning(
       comfortable,
     };
   }
-  const dated = Boolean(dossier.infos.startDate);
   const datedById = new Map(computePhaseDates(dossier).map((p) => [p.stepId, p]));
 
   const phases: PlanningPhase[] = durations.map((d) => {
@@ -1081,9 +1141,11 @@ export function buildSmartPlanning(
 
   return {
     dated,
-    startDate: dossier.infos.startDate ?? null,
+    startDate,
     phases,
-    endDate: dated ? (phases[phases.length - 1]!.end ?? null) : null,
+    endDate: reception,
+    preReceptionDate: preReception,
+    durationDays,
     announcedDays,
     announcedLabel,
     estimatedDays,

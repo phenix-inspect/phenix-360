@@ -54,8 +54,11 @@ const DEEP_LINK_GUARD = () => {
 };
 
 export async function session(browser, opts = {}) {
-  const { width = 1280, height = 1800, guardDeepLinks = false } = opts;
-  const ctx = await browser.newContext({ viewport: { width, height } });
+  const { width = 1280, height = 1800, guardDeepLinks = false, timezoneId } = opts;
+  const ctx = await browser.newContext({
+    viewport: { width, height },
+    ...(timezoneId ? { timezoneId } : {}),
+  });
   const page = await ctx.newPage();
   if (guardDeepLinks) await page.addInitScript(DEEP_LINK_GUARD);
   const consoleErrors = [];

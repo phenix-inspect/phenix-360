@@ -16,7 +16,6 @@
  * client ne pourra pas dire « vous aviez prévu le carrelage mardi ».
  */
 import { PROJECT_STATUSES, type ProjectStatus } from './project.js';
-import { addCalendarDays } from './calendar.js';
 import { buildSmartPlanning, type ProjectDossier } from './prepare.js';
 
 /* -------------------------------------------------------------------------- *
@@ -83,8 +82,6 @@ export interface ClientPlanning {
 }
 
 const DAY = 86_400_000;
-/** Jours ouvrés typiques entre la pré-réception et la réception (levée des réserves). */
-const PRE_RECEPTION_LEAD = 7;
 
 const MESSAGE: Record<ProjectStatus, string> = {
   pas_commence: 'Le chantier est actuellement en préparation.',
@@ -118,10 +115,10 @@ export function buildClientPlanning(
 
   const startDate = dossier?.infos.startDate ?? null;
   const planning = dossier ? buildSmartPlanning(dossier, nowMs) : null;
+  // Réception et pré-réception sont DÉRIVÉES DE LA DURÉE (source de vérité,
+  // calculées dans buildSmartPlanning) — jamais d'un écart figé ici.
   const receptionDate = planning?.endDate ?? null;
-  const prereceptionDate = receptionDate
-    ? addCalendarDays(receptionDate, -PRE_RECEPTION_LEAD)
-    : null;
+  const prereceptionDate = planning?.preReceptionDate ?? null;
 
   const milestones: ClientMilestone[] = [
     { key: 'valide', label: 'Projet validé', state: 'done', date: null, estimate: null },
