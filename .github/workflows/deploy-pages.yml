@@ -64,5 +64,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # 1re tentative. GitHub Pages renvoie parfois une erreur TRANSITOIRE
+      # (« Deployment failed, try again later ») sans rapport avec le build : on
+      # ne fait pas échouer le job, on réessaie.
       - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # 2e tentative seulement si la 1re a échoué (auto-guérison de l'aléa Pages).
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
