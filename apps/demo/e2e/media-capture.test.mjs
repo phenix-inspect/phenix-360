@@ -111,10 +111,10 @@ try {
   });
 
   // ---- Documents avec photo : PDF OU photo (prise sur mobile) -------------
+  // L'ajout d'un document passe par « Nouvelle mission → Ajouter un document ».
   await assert('DOCUMENTS — champ natif (PDF ou photo, sans capture)', async () => {
-    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-    const input = page.locator('[data-testid="prep-doc-file"]');
+    await newMission('Ajouter un document');
+    const input = page.getByRole('dialog').locator('input[type=file]');
     await input.waitFor({ state: 'attached', timeout: 6000 });
     const a = await mediaAttrs(input);
     if (!a.accept || !a.accept.includes('image/*'))
@@ -122,6 +122,7 @@ try {
     if (!a.accept.includes('pdf'))
       throw new Error(`le document n'accepte pas le PDF : ${a.accept}`);
     if (a.capture !== null) throw new Error('capture impose l’appareil photo');
+    await page.keyboard.press('Escape');
   });
 
   // ---- Desktop : comportement INCHANGÉ (mêmes attributs → même sélecteur) -

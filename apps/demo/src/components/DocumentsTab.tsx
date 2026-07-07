@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Badge, Button, Card, CardContent } from '@phenix360/ui';
 import { Download, Eye, EyeOff, FileText, Library } from 'lucide-react';
 import {
@@ -9,7 +10,9 @@ import {
 } from '@phenix360/core';
 import { demo } from '../store';
 import { DocumentButton } from './DocumentButton';
+import { DocumentFilterBar } from './DocumentFilterBar';
 import { PrepDocumentsSection } from './prep/PrepDocuments';
+import { filterDocuments, type DocFilter } from '../lib/documentFilter';
 import { generatedDocumentTitle } from '../lib/generatedDocument';
 import { fmtDate } from '../lib/format';
 
@@ -41,6 +44,8 @@ export function DocumentsTab({
     ),
     'desc',
   );
+  const [filter, setFilter] = useState<DocFilter>('tous');
+  const shown = filterDocuments(library, filter);
 
   const patch = (next: Partial<ProjectDossier>): void => {
     if (dossier) demo.saveDossier(project.id, { ...dossier, ...next });
@@ -84,14 +89,20 @@ export function DocumentsTab({
             <span className="text-muted-foreground">({library.length})</span>
           </h3>
 
+          <DocumentFilterBar events={library} value={filter} onChange={setFilter} />
+
           {library.length === 0 ? (
             <p className="rounded-lg border border-dashed border-border bg-surface p-3 text-sm text-muted-foreground">
               Devis, factures, plans, comptes rendus, PV de pré-réception et de réception… tous vos
-              documents se retrouveront ici.
+              documents se retrouveront ici. Un document s'ajoute via « Nouvelle mission ».
+            </p>
+          ) : shown.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border bg-surface p-3 text-sm text-muted-foreground">
+              Aucun document de ce type pour le moment.
             </p>
           ) : (
             <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-              {library.map((e) => (
+              {shown.map((e) => (
                 <li
                   key={e.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-surface px-3 py-2.5"

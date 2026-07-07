@@ -27,21 +27,28 @@ const clientDocs = () => page.locator('#section-documents');
 // Côté client, les documents sont une LISTE (<li>) dans l'onglet Documents.
 const clientCard = (label) => clientDocs().locator('li').filter({ hasText: label }).first();
 
-/** Ajoute un document de préparation (libellé + type + visibilité + fichier). */
-const addDoc = async (libelle, typeLabel, visibilityLabel, file) => {
-  await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
-  await page.getByLabel('Libellé du document').fill(libelle);
-  await page.getByLabel('Type de document').selectOption({ label: typeLabel });
-  await page.getByLabel('Visibilité du document').selectOption({ label: visibilityLabel });
-  await page.setInputFiles('[data-testid="prep-doc-file"]', file);
-  await page.getByRole('button', { name: new RegExp(file.name) }).waitFor({ timeout: 6000 });
-  await page.getByRole('button', { name: /Ajouter le document/ }).click();
-  await row(libelle).waitFor({ state: 'visible', timeout: 5000 });
-};
-
 const openDocuments = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
   await page.getByRole('tab', { name: 'Documents', exact: true }).click();
+};
+
+/**
+ * Ajoute un document via l'UNIQUE point d'entrée « Nouvelle mission → Ajouter un
+ * document » (libellé + visibilité + fichier) ; il rejoint la bibliothèque.
+ */
+const addDoc = async (libelle, visibilityLabel, file) => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: /Ajouter un document/ }).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Libellé du document').fill(libelle);
+  await dlg.locator('input[type=file]').setInputFiles(file);
+  await dlg.getByText(file.name).first().waitFor({ state: 'visible', timeout: 6000 });
+  await dlg.locator('select').selectOption({ label: visibilityLabel });
+  await dlg.getByRole('button', { name: 'Publier' }).click();
+  await dlg.waitFor({ state: 'hidden', timeout: 6000 });
+  await openDocuments();
+  await row(libelle).waitFor({ state: 'visible', timeout: 5000 });
 };
 const openClientDocs = async () => {
   await openClientTab(page, 'Documents');
@@ -64,17 +71,16 @@ const findEvent = (obj, libelle) => {
 try {
   await openDemo(page);
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-  await openDocuments();
 
-  await assert('Ajout d’un document INTERNE (visibilité par défaut)', async () => {
-    await addDoc('Partage-interne', 'Autre', 'Interne uniquement', INTERNE_PDF);
+  await assert('Ajout d’un document INTERNE', async () => {
+    await addDoc('Partage-interne', 'Interne', INTERNE_PDF);
     await row('Partage-interne')
-      .getByRole('button', { name: /Rendre visible au client/ })
+      .getByRole('button', { name: /Partager au client/ })
       .waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Ajout d’un document VISIBLE CLIENT', async () => {
-    await addDoc('Partage-client', 'Plan', 'Visible client', CLIENT_PDF);
+    await addDoc('Partage-client', 'Client', CLIENT_PDF);
     await row('Partage-client')
       .getByRole('button', { name: /Rendre interne/ })
       .waitFor({ state: 'visible', timeout: 4000 });
@@ -98,7 +104,7 @@ try {
   await assert('Changer un INTERNE → VISIBLE CLIENT met à jour l’espace client', async () => {
     await openDocuments();
     await row('Partage-interne')
-      .getByRole('button', { name: /Rendre visible au client/ })
+      .getByRole('button', { name: /Partager au client/ })
       .click();
     await openClientDocs();
     await clientCard('Partage-interne').waitFor({ state: 'visible', timeout: 6000 });

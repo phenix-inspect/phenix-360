@@ -1699,3 +1699,42 @@ le bon onglet, aucun doublon, toutes les notifications dans Aujourd'hui ouvrant 
 écran, photos hors Documents, documents hors Coulisses, zéro fuite, zéro erreur console).
 ~18 suites client recalées (navigation par sous-onglet). Gate vert (e2e 49/49). VISION
 Art. 3, 6, 8, 11.
+
+## 07/07/2026 — Documents : consultation seule + filtres par type (fin du doublon)
+
+**Décision produit (retour terrain) :** on ancre la règle unique de PHÉNIX — **créer →
+« + Nouvelle mission », consulter → « Documents ».** L'onglet Documents ne sert plus qu'à
+**consulter, filtrer, ouvrir et télécharger** ; il ne CRÉE plus rien.
+
+- **Suppression du doublon d'ajout.** Le formulaire « Ajouter un document » (+ bouton
+  « Ajouter le document ») quitte l'onglet Documents. L'ajout d'un document passe
+  désormais EXCLUSIVEMENT par « Nouvelle mission → Ajouter un document ». Il n'existe
+  plus deux façons d'ajouter un document.
+- **Filtre par type**, identique côté **conducteur** ET côté **client** : « Tous » +
+  Devis, Avenants, Acompte, Factures, Plans, Comptes rendus, Visites chantier,
+  Pré-réceptions, Réceptions, Réserves, Garanties, DOE, Autres. On n'affiche que les
+  familles réellement présentes (avec leur compte) — jamais de puce morte. Le filtrage
+  est une pure lecture : aucune donnée n'est modifiée (retour « Tous » = liste intacte).
+
+**Mécanique (déplacement + lecture, aucun nouveau concept) :** nouvelle lib pure
+`lib/documentFilter` (`documentFamily` déduit la famille d'un document depuis sa catégorie
+
+- son libellé, ou la nature structurée d'un compte rendu ; `presentFamilies` ;
+  `filterDocuments`) et composant partagé `DocumentFilterBar` (puces `role=tab`, masqué s'il
+  n'y a qu'une famille). Appliqué à la bibliothèque de `DocumentsTab` (conducteur) et à
+  `ClientDocuments` (client). `PrepDocumentsSection` perd son formulaire (le suivi
+  d'obtention, l'ouverture, « Demander au client » et le partage restent). La check-list de
+  partage « Acompte payé » se valide via le cockpit (« Marquer comme payé »), source unique
+  inchangée.
+
+**Alternatives rejetées :** garder le formulaire « au cas où » (le doublon qu'on
+supprime) ; afficher les 13 familles en dur, y compris vides (bruit) ; ajouter un
+sélecteur de catégorie au composer (nouveau champ non demandé — la famille se déduit).
+
+**Impact :** `lib/documentFilter` + `components/DocumentFilterBar` (nouveaux),
+`DocumentsTab` (filtre + plus de silo), `ClientDocuments` (filtre), `prep/PrepDocuments`
+(formulaire retiré). Nouveau `documents-filtres.test` (formulaire absent, ajout via
+Nouvelle mission uniquement, filtres conducteur + client, filtrage non destructif) ; tests
+d'ajout recalés vers Nouvelle mission : `documents`, `documents-partage`,
+`documents-acompte-facture`, `coulisses-photos`, `notifications-bidirect`, `media-capture`.
+Gate vert (e2e 50/50). VISION Art. 7, 8, 9, 11.

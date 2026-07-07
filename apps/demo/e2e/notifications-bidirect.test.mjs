@@ -98,22 +98,30 @@ try {
   // ---------------------------------------------------------------------------
   // CONDUCTEUR → CLIENT (2) : partager un document.
   // ---------------------------------------------------------------------------
-  await assert('CONDUCTEUR partage un document (Visible client)', async () => {
-    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-    await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
-    await page.getByLabel('Libellé du document').fill(DOC_LIBELLE);
-    await page.getByLabel('Type de document').selectOption({ label: 'Plan' });
-    await page.getByLabel('Visibilité du document').selectOption({ label: 'Visible client' });
-    await page.setInputFiles('[data-testid="prep-doc-file"]', DOC);
-    await page.getByRole('button', { name: new RegExp(DOC.name) }).waitFor({ timeout: 6000 });
-    await page.getByRole('button', { name: /Ajouter le document/ }).click();
-    await page
-      .locator('li')
-      .filter({ hasText: DOC_LIBELLE })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-  });
+  await assert(
+    'CONDUCTEUR partage un document (via Nouvelle mission, Visible client)',
+    async () => {
+      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+      await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+      await page.getByRole('button', { name: /Ajouter un document/ }).click();
+      const dlg = page.getByRole('dialog');
+      await dlg.getByLabel('Libellé du document').fill(DOC_LIBELLE);
+      await dlg.locator('input[type=file]').setInputFiles(DOC);
+      await dlg
+        .getByText(new RegExp(DOC.name))
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      await dlg.locator('select').selectOption({ label: 'Client' });
+      await dlg.getByRole('button', { name: 'Publier' }).click();
+      await dlg.waitFor({ state: 'hidden', timeout: 6000 });
+      await page.getByRole('tab', { name: 'Documents', exact: true }).click();
+      await page
+        .locator('li')
+        .filter({ hasText: DOC_LIBELLE })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    },
+  );
 
   await assert('CLIENT — reçoit la notification « document partagé »', async () => {
     await openClient();

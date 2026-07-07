@@ -84,15 +84,21 @@ try {
 
   // ---- Un document partagé → Documents, PAS les coulisses -----------------
   await assert('Document partagé → apparaît dans Documents, pas dans les coulisses', async () => {
+    // L'ajout passe par l'unique point d'entrée « Nouvelle mission ».
     await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+    await page.getByRole('button', { name: /Ajouter un document/ }).click();
+    const dlg = page.getByRole('dialog');
+    await dlg.getByLabel('Libellé du document').fill(DOC_LIBELLE);
+    await dlg.locator('input[type=file]').setInputFiles(photo(99));
+    await dlg
+      .getByText(/photo-99/)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await dlg.locator('select').selectOption({ label: 'Client' });
+    await dlg.getByRole('button', { name: 'Publier' }).click();
+    await dlg.waitFor({ state: 'hidden', timeout: 6000 });
     await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-    await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
-    await page.getByLabel('Libellé du document').fill(DOC_LIBELLE);
-    await page.getByLabel('Type de document').selectOption({ label: 'Plan' });
-    await page.getByLabel('Visibilité du document').selectOption({ label: 'Visible client' });
-    await page.setInputFiles('[data-testid="prep-doc-file"]', photo(99));
-    await page.getByRole('button', { name: /photo-99/ }).waitFor({ timeout: 6000 });
-    await page.getByRole('button', { name: /Ajouter le document/ }).click();
     await page.locator('li').filter({ hasText: DOC_LIBELLE }).first().waitFor({ state: 'visible' });
     // Côté client : présent dans l'onglet Documents, absent des coulisses.
     await openClient();

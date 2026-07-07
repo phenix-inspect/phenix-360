@@ -1,12 +1,14 @@
 /**
- * RC1 — Catégories documents : Acompte + Facture finale.
+ * RC1 — Acompte + Facture finale (sans formulaire d'ajout dans Documents).
  * ===========================================================================
- * Sans nouvel écran ni concept : deux catégories de documents en plus.
- *  • déposer un document de type « Acompte » ou « Facture finale » ;
- *  • un document classé « Acompte » (peu importe son libellé) valide la
- *    checklist « Acompte reçu » (source unique de la règle) ;
- *  • la facture finale n'est PAS bloquante au démarrage (toujours 3 obligatoires) ;
- *  • client-safe inchangé : interne → invisible côté client ; partagé → visible.
+ * L'ajout d'un document passe EXCLUSIVEMENT par « Nouvelle mission » ; l'onglet
+ * Documents ne sert qu'à consulter/filtrer. On vérifie que :
+ *  • l'acompte se valide depuis la check-list de préparation (« Marquer comme payé »),
+ *    source unique de la règle « Acompte payé » ;
+ *  • une facture ajoutée via Nouvelle mission rejoint la bibliothèque et se FILTRE
+ *    (famille « Factures ») ;
+ *  • la facture n'est JAMAIS bloquante au démarrage (toujours 3 obligatoires) ;
+ *  • client-safe : interne invisible / partagé visible côté client.
  */
 import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 import { phenixDevisPdf } from './pdf-fixtures.mjs';
@@ -20,22 +22,23 @@ const pdf = (name) => ({
   mimeType: 'application/pdf',
   buffer: Buffer.from(`%PDF-1.4 ${name}`),
 });
-const ACOMPTE_PDF = pdf('preuve-acompte.pdf');
 const FACTURE_PDF = pdf('facture-finale.pdf');
 const FACTURE_SHARED_PDF = pdf('facture-partagee.pdf');
 
 const acompteRow = () => page.locator('li').filter({ hasText: 'Acompte payé' }).first();
 
-/** Dépose un document (le dépôt vit dans l'onglet DOCUMENTS — bibliothèque unique). */
-const addPrepDoc = async (libelle, typeLabel, file) => {
-  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-  await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
-  await page.getByLabel('Libellé du document').fill(libelle);
-  await page.getByLabel('Type de document').selectOption({ label: typeLabel });
-  await page.setInputFiles('[data-testid="prep-doc-file"]', file);
-  // Attendre que le fichier soit lu (le bouton « Joindre » affiche son nom).
-  await page.getByRole('button', { name: new RegExp(file.name) }).waitFor({ timeout: 6000 });
-  await page.getByRole('button', { name: /Ajouter le document/ }).click();
+/** Ajoute un document via l'UNIQUE point d'entrée « Nouvelle mission ». */
+const addViaMission = async (libelle, visibilityLabel, file) => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: /Ajouter un document/ }).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.getByLabel('Libellé du document').fill(libelle);
+  await dlg.locator('input[type=file]').setInputFiles(file);
+  await dlg.getByText(file.name).first().waitFor({ state: 'visible', timeout: 6000 });
+  await dlg.locator('select').selectOption({ label: visibilityLabel });
+  await dlg.getByRole('button', { name: 'Publier' }).click();
+  await dlg.waitFor({ state: 'hidden', timeout: 6000 });
 };
 
 try {
@@ -59,47 +62,35 @@ try {
     .waitFor({ state: 'visible', timeout: 10000 });
   await page.getByRole('tab', { name: /Préparation/ }).click();
 
-  await assert('Départ : « Acompte reçu » n’est pas validé', async () => {
+  await assert('Départ : « Acompte payé » n’est pas validé', async () => {
     await acompteRow()
       .getByRole('button', { name: 'Marquer comme payé' })
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('Ajouter un document de type « Acompte » (fichier réel)', async () => {
-    // Libellé SANS le mot « acompte » : c'est la CATÉGORIE qui doit compter.
-    await addPrepDoc('Preuve de versement 30%', 'Acompte', ACOMPTE_PDF);
-    const row = page.locator('li').filter({ hasText: 'Preuve de versement 30%' }).first();
-    await row.getByText('Acompte', { exact: true }).waitFor({ state: 'visible', timeout: 5000 });
-    await row.getByText('Fourni').waitFor({ state: 'visible', timeout: 4000 });
-  });
-
-  await assert('La checklist « Acompte reçu » passe validée (via la catégorie)', async () => {
-    // La check-list de partage vit dans la Préparation (cockpit).
-    await page.getByRole('tab', { name: 'Préparation', exact: true }).click();
+  await assert('« Marquer comme payé » valide la check-list « Acompte payé »', async () => {
+    await acompteRow().getByRole('button', { name: 'Marquer comme payé' }).click();
     await acompteRow()
       .getByRole('button', { name: 'Annuler' })
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('Ajouter un document de type « Facture finale » → documents internes', async () => {
-    await addPrepDoc('Facture finale interne', 'Facture finale', FACTURE_PDF);
-    const row = page.locator('li').filter({ hasText: 'Facture finale interne' }).first();
-    await row
-      .getByText('Facture finale', { exact: true })
+  await assert('Ajouter une facture finale INTERNE via Nouvelle mission', async () => {
+    await addViaMission('Facture finale interne', 'Interne', FACTURE_PDF);
+    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
+    await page
+      .getByText('Facture finale interne')
+      .first()
       .waitFor({ state: 'visible', timeout: 5000 });
-    await row.getByText('Fourni').waitFor({ state: 'visible', timeout: 4000 });
   });
 
   await assert('Facture finale NON bloquante (toujours 3 éléments obligatoires)', async () => {
-    // La facture n'entre jamais dans les bloquants de partage (devis/acompte/date).
     await page.getByRole('tab', { name: 'Préparation', exact: true }).click();
     await page
       .getByText(/\/\s*3 éléments obligatoires validés/)
       .first()
-      .waitFor({
-        state: 'visible',
-        timeout: 5000,
-      });
+      .waitFor({ state: 'visible', timeout: 5000 });
     if ((await acompteRow().count()) === 0) throw new Error('checklist de partage introuvable');
   });
 
@@ -112,18 +103,8 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  // Partager UN document au client (« Ajouter un document » vit désormais dans
-  // « Nouvelle mission » — point d'entrée unique des créations).
-  await assert('Publier une facture PARTAGÉE au client', async () => {
-    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-    await page.getByRole('button', { name: /Ajouter un document/ }).click();
-    const dlg = page.getByRole('dialog');
-    await dlg.getByLabel('Libellé du document').fill('Facture finale partagee');
-    await dlg.locator('input[type=file]').setInputFiles(FACTURE_SHARED_PDF);
-    await dlg.getByText('facture-partagee.pdf').waitFor({ state: 'visible', timeout: 6000 });
-    // Visibilité « Client » par défaut — on publie.
-    await dlg.getByRole('button', { name: 'Publier' }).click();
-    await dlg.waitFor({ state: 'hidden', timeout: 6000 });
+  await assert('Publier une facture PARTAGÉE au client (via Nouvelle mission)', async () => {
+    await addViaMission('Facture finale partagee', 'Client', FACTURE_SHARED_PDF);
   });
 
   await assert('Client-safe : la facture PARTAGÉE est visible côté client', async () => {
@@ -139,22 +120,6 @@ try {
     if ((await page.getByText('Facture finale interne', { exact: false }).count()) > 0)
       throw new Error('la facture interne fuit dans l’espace client');
   });
-
-  await assert(
-    'Non-régression : les deux documents restent dans l’onglet Documents (internes)',
-    async () => {
-      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-      await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-      await page
-        .getByText('Preuve de versement 30%')
-        .first()
-        .waitFor({ state: 'visible', timeout: 5000 });
-      await page
-        .getByText('Facture finale interne')
-        .first()
-        .waitFor({ state: 'visible', timeout: 5000 });
-    },
-  );
 
   await assert('Zéro erreur console', async () => {
     if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));

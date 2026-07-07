@@ -1,40 +1,27 @@
 import { useRef, useState } from 'react';
-import { Button, Card, CardContent, Input } from '@phenix360/ui';
+import { Button, Card, CardContent } from '@phenix360/ui';
 import {
-  PREP_DOC_CATEGORIES,
   PREP_DOC_CATEGORY_LABEL,
   type EventAttachment,
   type EventVisibility,
-  type PrepDocCategory,
   type Project,
   type ProjectDocument,
   type ProjectDossier,
 } from '@phenix360/core';
-import {
-  Camera,
-  ChevronDown,
-  Eye,
-  EyeOff,
-  FileText,
-  ImagePlus,
-  Paperclip,
-  Plus,
-  X,
-} from 'lucide-react';
+import { Camera, ChevronDown, Eye, EyeOff, FileText, ImagePlus, X } from 'lucide-react';
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
 import { DocumentButton } from '../DocumentButton';
 import { DocumentLink } from '../DocumentLink';
 import { demo, useDemo } from '../../store';
-import { readDocumentAttachment, readPhotoAttachment, MAX_DOC_MB } from '../../lib/upload';
-import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../../lib/media';
-
-const FILE_CATEGORIES = PREP_DOC_CATEGORIES.filter((c) => c !== 'photo_avant');
+import { readPhotoAttachment } from '../../lib/upload';
+import { ACCEPT_IMAGE } from '../../lib/media';
 
 /**
  * Documents du chantier (EPIC 1 — Préparation) : devis, plans, diagnostics, DPE,
- * assurances, contrats… Chaque document a une famille, un état, et peut porter un
- * VRAI fichier (Lot 3) ouvrable. On peut aussi en ajouter un « à fournir » pour le
- * demander au client. VISION Art. 7, 8, 9.
+ * assurances, contrats… CONSULTATION uniquement — l'ajout d'un document passe
+ * EXCLUSIVEMENT par « Nouvelle mission → Ajouter un document » (un seul point
+ * d'entrée, aucun doublon). Ici on suit l'état d'obtention, on ouvre le fichier,
+ * on demande au client et on partage. VISION Art. 7, 8, 9.
  */
 export function PrepDocumentsSection({
   project,
@@ -49,13 +36,6 @@ export function PrepDocumentsSection({
 }): React.JSX.Element {
   const snap = useDemo();
   const docs = dossier.documents.filter((d) => d.categorie !== 'photo_avant');
-  const [label, setLabel] = useState('');
-  const [categorie, setCategorie] = useState<PrepDocCategory>('devis');
-  // Privé par défaut (anti-fuite) : le document ne part au client que sur choix.
-  const [visibility, setVisibility] = useState<EventVisibility>('interne');
-  const [pending, setPending] = useState<EventAttachment | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   // Le fichier vit dans la BIBLIOTHÈQUE (événement `document` du Journal) : on le
   // résout via `eventId`. Repli sur `attachment` pour d'anciennes données.
@@ -71,34 +51,6 @@ export function PrepDocumentsSection({
   const visibilityOf = (d: ProjectDocument): EventVisibility | null =>
     documentEvent(d)?.visibility ?? null;
 
-  const onPick = async (file: File | undefined): Promise<void> => {
-    if (!file) return;
-    setError(null);
-    const res = await readDocumentAttachment(project.id, file);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    setPending(res.value);
-    if (!label.trim()) setLabel(res.value.fileName ?? 'Document');
-  };
-
-  const add = (): void => {
-    const l = label.trim() || pending?.fileName || PREP_DOC_CATEGORY_LABEL[categorie];
-    // Le fichier rejoint la bibliothèque unique (événement Journal) ; la checklist
-    // ne fait que pointer vers lui (source unique — Consolidation Documents).
-    void demo.addPrepDocument(project.id, {
-      label: l,
-      categorie,
-      visibility,
-      ...(pending ? { attachment: pending } : {}),
-    });
-    setLabel('');
-    setPending(null);
-    setVisibility('interne');
-    setError(null);
-  };
-
   const remove = (id: string): void =>
     patch({ documents: dossier.documents.filter((d) => d.id !== id) });
 
@@ -111,7 +63,12 @@ export function PrepDocumentsSection({
           <span className="text-muted-foreground">({docs.length})</span>
         </h3>
 
-        {docs.length > 0 && (
+        {docs.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border bg-surface p-3 text-sm text-muted-foreground">
+            Les documents de préparation apparaîtront ici. Pour en ajouter un, passez par « Nouvelle
+            mission → Ajouter un document ».
+          </p>
+        ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
             {docs.map((d) => (
               <li
@@ -178,77 +135,6 @@ export function PrepDocumentsSection({
             ))}
           </ul>
         )}
-
-        <div className="space-y-2 rounded-lg border border-dashed border-border p-3">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Input
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              placeholder="Libellé (ex. Devis plomberie signé)"
-              aria-label="Libellé du document"
-            />
-            <select
-              value={categorie}
-              onChange={(e) => setCategorie(e.target.value as PrepDocCategory)}
-              aria-label="Type de document"
-              className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
-            >
-              {FILE_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {PREP_DOC_CATEGORY_LABEL[c]}
-                </option>
-              ))}
-            </select>
-          </div>
-          <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            Visibilité
-            <select
-              value={visibility}
-              onChange={(e) => setVisibility(e.target.value as EventVisibility)}
-              aria-label="Visibilité du document"
-              className="h-9 rounded-lg border border-input bg-surface px-2 text-sm text-foreground"
-            >
-              <option value="interne">Interne uniquement</option>
-              <option value="client">Visible client</option>
-            </select>
-            <span>Par défaut interne — évite toute fuite tant que vous ne partagez pas.</span>
-          </label>
-          <input
-            ref={fileRef}
-            type="file"
-            accept={ACCEPT_DOCUMENT}
-            className="hidden"
-            data-testid="prep-doc-file"
-            onChange={(e) => {
-              void onPick(e.target.files?.[0]);
-              e.target.value = '';
-            }}
-          />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
-              <Paperclip aria-hidden />{' '}
-              {pending ? pending.fileName : `Joindre un fichier (max ${MAX_DOC_MB} Mo)`}
-            </Button>
-            {pending && (
-              <button
-                type="button"
-                aria-label="Retirer le fichier"
-                onClick={() => setPending(null)}
-                className="text-muted-foreground hover:text-foreground [&_svg]:size-4"
-              >
-                <X aria-hidden />
-              </button>
-            )}
-            <Button size="sm" className="ml-auto" onClick={add}>
-              <Plus aria-hidden /> Ajouter le document
-            </Button>
-          </div>
-          {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-        </div>
       </CardContent>
     </Card>
   );
