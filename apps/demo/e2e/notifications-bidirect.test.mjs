@@ -76,15 +76,15 @@ try {
       mimeType: 'image/png',
       buffer: Buffer.from(PNG, 'base64'),
     });
-    await dialog.getByPlaceholder(/Réunion de chantier/).fill('Avancement du séjour');
+    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Avancement du séjour');
     await dialog.getByRole('checkbox').check(); // Partager avec le client
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
   });
 
-  await assert('CLIENT — reçoit la notification « nouvelle publication »', async () => {
+  await assert('CLIENT — reçoit la notification « nouvelles photos (coulisses) »', async () => {
     await openClient();
-    await notif(/Nouvelle publication de votre équipe/)
+    await notif(/Nouvelles photos ajoutées dans les coulisses/)
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
   });
@@ -133,7 +133,7 @@ try {
     // La notification consultée s'est éteinte (l'autre — la publication — demeure).
     if ((await notif(new RegExp(`Nouveau document partagé : ${DOC_LIBELLE}`)).count()) > 0)
       throw new Error('la notification document persiste après consultation');
-    await notif(/Nouvelle publication de votre équipe/)
+    await notif(/Nouvelles photos ajoutées dans les coulisses/)
       .first()
       .waitFor({ state: 'visible', timeout: 4000 });
   });

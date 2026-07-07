@@ -1,0 +1,203 @@
+/**
+ * RC1 — « Dans les coulisses » = album photo/vidéo UNIQUEMENT (brique plaisir).
+ * ===========================================================================
+ * Décision produit : les coulisses ne sont PAS l'historique du chantier. On y voit
+ * l'avancement en images (moments photo, albums), on aime, on commente — rien
+ * d'autre. Les documents, comptes rendus, PV, réserves vivent au Suivi / Documents /
+ * Comptes rendus, JAMAIS ici.
+ *   • un document partagé → Documents, pas les coulisses ;
+ *   • une pré-réception générée (compte rendu) → Suivi, pas les coulisses ;
+ *   • un album = 1 seul moment, jusqu'à 10 photos, 1 seule notification client ;
+ *   • cœur + commentaire sous l'album.
+ * Aucun nouvel écran : on clarifie le rôle des coulisses et on filtre le contenu.
+ */
+import { launch, session, harness, openDemo } from './harness.mjs';
+
+const browser = await launch();
+const { page, consoleErrors } = await session(browser, { height: 2800 });
+const { assert, summary } = harness();
+
+const PNG =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const photo = (i) => ({
+  name: `photo-${i}.png`,
+  mimeType: 'image/png',
+  buffer: Buffer.from(PNG, 'base64'),
+});
+const TWELVE = Array.from({ length: 12 }, (_, i) => photo(i));
+
+const ALBUM_TITLE = 'Avancement en images de la cuisine';
+const DOC_LIBELLE = 'Plan technique interne partage';
+const PRERECEPTION_OBS = 'Point de pre-reception : reprise du joint et retouche peinture.';
+
+const openCoulisses = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('tab', { name: 'Dans les coulisses' }).first().click();
+  await page
+    .getByRole('heading', { name: 'Dans les coulisses du chantier' })
+    .first()
+    .waitFor({ state: 'visible', timeout: 6000 });
+};
+const openClient = async () => {
+  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  await page.waitForTimeout(400);
+};
+
+/** Déroule une mission (capture → PHÉNIX comprend → valider → terminer). */
+const runMission = async (missionLabel, observation) => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: new RegExp(`^${missionLabel}`) }).click();
+  const draft = page.getByPlaceholder(/Dites ce qu/);
+  await draft.waitFor({ state: 'visible', timeout: 6000 });
+  await draft.fill(observation);
+  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
+  await page.getByRole('button', { name: /J.ai terminé/ }).click();
+  await page
+    .getByRole('button', { name: /^Valider$/ })
+    .waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByRole('button', { name: /^Valider$/ }).click();
+  await page
+    .getByRole('button', { name: /Terminer|Partager/ })
+    .first()
+    .waitFor({ state: 'visible', timeout: 8000 });
+  await page.getByRole('button', { name: /^Terminer$/ }).click();
+  await page
+    .getByRole('heading', { name: /Appartement Lyon 6e/ })
+    .first()
+    .waitFor({ state: 'visible', timeout: 6000 });
+};
+
+try {
+  await openDemo(page);
+
+  // ---- Un document partagé → Documents, PAS les coulisses -----------------
+  await assert('Document partagé → apparaît dans Documents, pas dans les coulisses', async () => {
+    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+    await page.getByRole('tab', { name: /Préparation/ }).click();
+    await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
+    await page.getByLabel('Libellé du document').fill(DOC_LIBELLE);
+    await page.getByLabel('Type de document').selectOption({ label: 'Plan' });
+    await page.getByLabel('Visibilité du document').selectOption({ label: 'Visible client' });
+    await page.setInputFiles('[data-testid="prep-doc-file"]', photo(99));
+    await page.getByRole('button', { name: /photo-99/ }).waitFor({ timeout: 6000 });
+    await page.getByRole('button', { name: /Ajouter le document/ }).click();
+    await page.locator('li').filter({ hasText: DOC_LIBELLE }).first().waitFor({ state: 'visible' });
+    // Côté client : présent dans Documents, absent des coulisses.
+    await openClient();
+    await page
+      .locator('#section-documents')
+      .getByText(DOC_LIBELLE)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+    if ((await page.locator('#section-fil').getByText(DOC_LIBELLE).count()) > 0)
+      throw new Error('le document apparaît dans les coulisses');
+  });
+
+  // ---- Une pré-réception générée → Suivi, PAS les coulisses ---------------
+  await assert('Pré-réception générée (compte rendu) → pas dans les coulisses', async () => {
+    await runMission('Pré-réception', PRERECEPTION_OBS);
+    await openCoulisses();
+    if ((await page.getByText(PRERECEPTION_OBS).count()) > 0)
+      throw new Error('la pré-réception apparaît dans les coulisses');
+    if ((await page.getByText('Liste des points à reprendre').count()) > 0)
+      throw new Error('le PV de pré-réception apparaît dans les coulisses');
+  });
+
+  // ---- Album : 1 photo → moment visible ----------------------------------
+  await assert('Ajout d’1 photo → un moment visible dans les coulisses', async () => {
+    await openCoulisses();
+    await page
+      .getByRole('button', { name: /Créer un moment/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('input[type=file]').setInputFiles(photo(1));
+    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Une première photo');
+    await dialog.getByRole('button', { name: /Créer le moment/ }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 8000 });
+    await page
+      .locator('article')
+      .filter({ hasText: 'Une première photo' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  // ---- Album : 10 photos max → UN SEUL album, limite respectée -----------
+  await assert('Ajout de 12 photos → un seul album, limité à 10 (partagé client)', async () => {
+    await page
+      .getByRole('button', { name: /Créer un moment/ })
+      .first()
+      .click();
+    const dialog = page.getByRole('dialog');
+    await dialog.locator('input[type=file]').setInputFiles(TWELVE);
+    // La limite est atteinte → « Album complet — 10 photos maximum ».
+    await dialog
+      .getByText(/Album complet — 10 photos maximum/)
+      .waitFor({ state: 'visible', timeout: 8000 });
+    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill(ALBUM_TITLE);
+    await dialog.getByRole('checkbox').check(); // Partager avec le client
+    await dialog.getByRole('button', { name: /Créer le moment/ }).click();
+    await dialog.waitFor({ state: 'detached', timeout: 8000 });
+    // Un SEUL moment/album, avec le badge « 10 photos ».
+    const album = page.locator('article').filter({ hasText: ALBUM_TITLE }).first();
+    await album.waitFor({ state: 'visible', timeout: 6000 });
+    await album.getByText('10 photos').first().waitFor({ state: 'visible', timeout: 5000 });
+    if ((await page.locator('article').filter({ hasText: ALBUM_TITLE }).count()) !== 1)
+      throw new Error('l’album n’est pas un moment unique');
+  });
+
+  // ---- Notification client UNIQUE pour l'album ---------------------------
+  await assert('Notification client UNIQUE pour l’album (pas une par photo)', async () => {
+    await openClient();
+    const notif = page
+      .locator('section[aria-label="Notifications"]')
+      .getByRole('button', { name: /Nouvelles photos ajoutées dans les coulisses/ });
+    await notif.first().waitFor({ state: 'visible', timeout: 6000 });
+    if ((await notif.count()) !== 1)
+      throw new Error(`attendu 1 notification album, vu ${await notif.count()}`);
+  });
+
+  // ---- Cœur + commentaire client sous l'album ----------------------------
+  await assert('Le client aime l’album (cœur rouge vif)', async () => {
+    const album = page.locator('#section-fil article').filter({ hasText: ALBUM_TITLE }).first();
+    await album.waitFor({ state: 'visible', timeout: 6000 });
+    const heart = album.getByRole('button', { name: /coup de cœur/i }).first();
+    await heart.click();
+    if ((await heart.getAttribute('aria-pressed')) === 'false') await heart.click();
+    if ((await heart.getAttribute('aria-pressed')) !== 'true')
+      throw new Error('le ❤️ n’est pas actif');
+  });
+
+  await assert('Le client commente sous l’album', async () => {
+    const album = page.locator('#section-fil article').filter({ hasText: ALBUM_TITLE }).first();
+    const input = album.getByPlaceholder(/Écrire un petit mot/);
+    await input.fill('Superbes photos, merci !');
+    await input.press('Enter');
+    await album
+      .getByText('Superbes photos, merci !')
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
+  });
+
+  // ---- Client-safe : rien de technique ne fuit dans les coulisses --------
+  await assert('Client-safe : ni document interne, ni PV, ni CR dans les coulisses', async () => {
+    await page.waitForTimeout(300);
+    const fil = page.locator('#section-fil');
+    for (const secret of [PRERECEPTION_OBS, 'Liste des points à reprendre', DOC_LIBELLE])
+      if ((await fil.getByText(secret, { exact: false }).count()) > 0)
+        throw new Error(`fuite dans les coulisses : « ${secret} »`);
+  });
+
+  await assert('Zéro erreur console', async () => {
+    if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));
+  });
+} catch (e) {
+  await assert('FATAL', async () => {
+    throw e;
+  });
+} finally {
+  const failed = summary(consoleErrors);
+  await browser.close();
+  process.exit(failed ? 1 : 0);
+}

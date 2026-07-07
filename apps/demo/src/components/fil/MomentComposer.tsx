@@ -10,10 +10,8 @@ import {
 } from '@phenix360/ui';
 import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Star, X } from 'lucide-react';
 import {
-  MOMENT_TYPES,
-  MOMENT_TYPE_SHORT,
+  MAX_ALBUM_PHOTOS,
   type EventActor,
-  type MomentType,
   type Project,
   type ProjectZone,
   type UploadedMedia,
@@ -27,11 +25,11 @@ interface Pick {
 }
 
 /**
- * Créer un MOMENT de chantier — le geste unique du conducteur. Il ne remplit pas
- * un formulaire : il choisit ce qu'il vit (type), ajoute des photos, dit ce
- * qu'il observe, qui était présent — et décide s'il le partage au client. Le
- * Moment est INTERNE par défaut : « privé par défaut → Partager → Espace client ».
- * Tout le reste (document, CR, réserve, historique) en découlera.
+ * Créer un MOMENT de chantier — l'ALBUM PHOTO des coulisses. Le conducteur ajoute
+ * jusqu'à 10 photos (un seul moment), un titre et un mot court, et décide s'il le
+ * partage au client. C'est la brique PLAISIR : pas de document, pas de compte
+ * rendu — juste l'avancement en images. Interne par défaut : « privé → Partager →
+ * Espace client ». Les livrables (CR, PV, réserves) passent par « Nouvelle mission ».
  */
 export function MomentComposer({
   project,
@@ -44,7 +42,6 @@ export function MomentComposer({
   zones: ProjectZone[];
   onClose: () => void;
 }): React.JSX.Element {
-  const [type, setType] = useState<MomentType>('etape');
   const [picks, setPicks] = useState<Pick[]>([]);
   const [coverKey, setCoverKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,7 +56,11 @@ export function MomentComposer({
     if (!files || files.length === 0) return;
     setBusy(true);
     try {
-      const uploaded = await Promise.all(Array.from(files).map((f) => mediaUploader(f)));
+      // Un album = 10 photos MAXIMUM : on ne prend que ce qui reste de place.
+      const remaining = MAX_ALBUM_PHOTOS - picks.length;
+      if (remaining <= 0) return;
+      const chosen = Array.from(files).slice(0, remaining);
+      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
       const next = uploaded.map((media) => ({ key: crypto.randomUUID(), media }));
       setPicks((p) => [...p, ...next]);
       setCoverKey((c) => c ?? next[0]?.key ?? null);
@@ -100,7 +101,6 @@ export function MomentComposer({
     demo.addMoment({
       projectId: project.id,
       actor,
-      type,
       title,
       medias: picks.map((p) => p.media),
       coverIndex,
@@ -121,36 +121,12 @@ export function MomentComposer({
         <DialogHeader>
           <DialogTitle>Créer un moment</DialogTitle>
           <DialogDescription>
-            Vous vivez votre chantier — PHÉNIX en fait un document. Ce moment reste interne tant que
-            vous ne le partagez pas.
+            L’album photo de votre chantier : jusqu’à {MAX_ALBUM_PHOTOS} photos en une fois (un seul
+            moment). Ce moment reste interne tant que vous ne le partagez pas.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Type de moment — groupe de boutons (jamais dans un <label>) */}
-          <Group label="Type de moment">
-            <div className="flex flex-wrap gap-2">
-              {MOMENT_TYPES.map((t) => {
-                const active = t === type;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setType(t)}
-                    className={`rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      active
-                        ? 'border-gold-400 bg-gold-100 font-medium text-gold-800'
-                        : 'border-border bg-surface text-muted-foreground hover:border-gold-300 hover:text-foreground'
-                    }`}
-                  >
-                    {MOMENT_TYPE_SHORT[t]}
-                  </button>
-                );
-              })}
-            </div>
-          </Group>
-
           {/* Aperçus + ajout */}
           {picks.length > 0 && (
             <div className="grid grid-cols-3 gap-2">
@@ -213,37 +189,45 @@ export function MomentComposer({
             </div>
           )}
 
-          <label className="block">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              className="sr-only"
-              onChange={(e) => void onPick(e.target.files)}
-            />
-            <span
-              className={`flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-border bg-paper-50 text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground ${
-                picks.length > 0 ? 'py-4' : 'aspect-[4/5]'
-              }`}
-            >
-              {busy ? (
-                <span className="inline-flex items-center gap-2 text-sm [&_svg]:size-5 [&_svg]:animate-spin">
-                  <Loader2 aria-hidden /> Traitement…
-                </span>
-              ) : (
-                <span className="inline-flex flex-col items-center gap-2 text-sm [&_svg]:size-7">
-                  <ImagePlus aria-hidden />
-                  {picks.length > 0 ? 'Ajouter des photos' : 'Choisir des photos'}
-                </span>
-              )}
-            </span>
-          </label>
+          {picks.length >= MAX_ALBUM_PHOTOS ? (
+            <p className="rounded-xl border border-dashed border-border bg-paper-50 px-3 py-3 text-center text-sm text-muted-foreground">
+              Album complet — {MAX_ALBUM_PHOTOS} photos maximum.
+            </p>
+          ) : (
+            <label className="block">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="sr-only"
+                onChange={(e) => void onPick(e.target.files)}
+              />
+              <span
+                className={`flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-border bg-paper-50 text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground ${
+                  picks.length > 0 ? 'py-4' : 'aspect-[4/5]'
+                }`}
+              >
+                {busy ? (
+                  <span className="inline-flex items-center gap-2 text-sm [&_svg]:size-5 [&_svg]:animate-spin">
+                    <Loader2 aria-hidden /> Traitement…
+                  </span>
+                ) : (
+                  <span className="inline-flex flex-col items-center gap-2 text-sm [&_svg]:size-7">
+                    <ImagePlus aria-hidden />
+                    {picks.length > 0
+                      ? `Ajouter des photos (${picks.length}/${MAX_ALBUM_PHOTOS})`
+                      : 'Choisir des photos'}
+                  </span>
+                )}
+              </span>
+            </label>
+          )}
 
           <Field label="Titre">
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex. Réunion de chantier hebdomadaire"
+              placeholder="Ex. Avancement de la cuisine"
               autoFocus
             />
           </Field>

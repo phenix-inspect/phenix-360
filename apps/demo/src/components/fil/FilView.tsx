@@ -5,6 +5,7 @@ import {
   bibliothequeImages,
   filDuChantier,
   momentVerrouille,
+  momentsCoulisses,
   type AudienceGroup,
   type EventActor,
   type Moment,
@@ -69,8 +70,11 @@ export function FilView({
     ? 'Nouveau message de votre équipe'
     : 'Nouveau commentaire du client — à vous de répondre';
   const viewer: AudienceGroup = actor.role === 'client' ? 'client' : 'phenix';
-  const entries = filDuChantier(moments, { viewer });
-  const images = bibliothequeImages(moments, { viewer });
+  // « Dans les coulisses » = album photo/vidéo UNIQUEMENT. On écarte les moments
+  // de travail (missions → comptes rendus / PV / documents), qui vivent au Suivi.
+  const albums = momentsCoulisses(moments);
+  const entries = filDuChantier(albums, { viewer });
+  const images = bibliothequeImages(albums, { viewer });
   const zoneLabel = (id?: string): string | undefined => zones.find((z) => z.id === id)?.label;
   const name = (userId: string): string => nameOf(snap, userId);
   const vide = entries.length === 0;

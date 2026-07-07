@@ -27,6 +27,8 @@ import {
   decisionVisibility,
   defaultLaunchChecklist,
   eventId as toEventId,
+  estMomentCoulisses,
+  MAX_ALBUM_PHOTOS,
   realAnalyzeDossier,
   type AnalyzeInput,
   type DossierAnalyzer,
@@ -626,14 +628,14 @@ export const demo = {
     dossiers[project.id] = proposal.dossier;
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
-    // Photos déposées → un Moment « Avant travaux » dans le Récit (partagé au
-    // client) : l'état des lieux d'origine, matérialisé par PHÉNIX.
+    // Photos déposées → un album « Avant travaux » dans les coulisses (partagé au
+    // client) : l'état des lieux d'origine, en images. C'est un moment PHOTO
+    // (type album par défaut), pas un moment de travail.
     if (photosAvantTravaux.length > 0) {
       demo.addMoment({
         projectId: project.id,
         actor: compaActor,
         title: 'Avant travaux',
-        type: 'visite',
         medias: photosAvantTravaux,
         legende: 'État des lieux avant le démarrage du chantier',
         shareWithClient: true,
@@ -1134,12 +1136,14 @@ export const demo = {
     shareWithClient?: boolean;
   }): void {
     if (input.medias.length === 0) return;
+    // Un album = 10 photos MAXIMUM (garde-fou : on tronque au besoin).
+    const medias = input.medias.slice(0, MAX_ALBUM_PHOTOS);
     const now = new Date().toISOString();
-    const coverIdx = Math.min(Math.max(input.coverIndex ?? 0, 0), input.medias.length - 1);
+    const coverIdx = Math.min(Math.max(input.coverIndex ?? 0, 0), medias.length - 1);
     const legende = input.legende?.trim();
     const observations = input.observations?.trim();
     const intervenants = (input.intervenants ?? []).map((s) => s.trim()).filter(Boolean);
-    const photos: FilPhoto[] = input.medias.map((m, i) => ({
+    const photos: FilPhoto[] = medias.map((m, i) => ({
       id: toFilPhotoId(crypto.randomUUID()),
       imageUrl: m.imageUrl,
       bucket: m.bucket,
@@ -1159,7 +1163,8 @@ export const demo = {
       createdAt: now,
       publishedAt: now,
       state: 'publie',
-      type: input.type ?? 'note',
+      // Album « coulisses » (photo) par défaut — jamais un type documentaire.
+      type: input.type ?? 'etape',
       title: input.title.trim(),
       visibleTo: input.shareWithClient ? SHARED_AUDIENCE : INTERNAL_AUDIENCE,
       photos,
@@ -2181,13 +2186,14 @@ export function clientNotifications(
   const seen = snap.seen['client'] ?? {};
   const out: AppNotification[] = [];
 
-  // 📷 Nouvelle publication partagée (Moment : photos + mot de l'équipe).
+  // 📷 Nouvelles photos partagées dans les coulisses (album = UN seul moment →
+  // UNE seule notification, jamais une par photo). Uniquement les albums photo.
   for (const m of snap.fil.moments[projectId] ?? [])
-    if (momentPartageClient(m) && m.createdAt > base && !seen[m.id])
+    if (estMomentCoulisses(m) && momentPartageClient(m) && m.createdAt > base && !seen[m.id])
       out.push({
         id: `moment-${m.id}`,
         icon: '📷',
-        text: `Nouvelle publication de votre équipe`,
+        text: `Nouvelles photos ajoutées dans les coulisses`,
         createdAt: m.createdAt,
         seenKeys: [m.id],
         projectId,

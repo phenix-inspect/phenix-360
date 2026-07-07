@@ -733,12 +733,15 @@ export function buildDemoSeed(): DemoSeed {
   const mMur = mkMoment(12, 'etape', 'Ouverture du mur porteur', 'Cuisine', {
     legendes: ['Cuisine ouverte sur le séjour'],
   });
-  const mVisite = mkMoment(15, 'visite', 'Visite de chantier avec Mme Martin', 'Chambre', {
+  // Moments PHOTO du chantier (coulisses) — pas de livrable rattaché : ils vivent
+  // dans l'album, pas au Suivi. (Les vraies missions « visite » créées par le
+  // conducteur génèrent un compte rendu et restent, elles, hors des coulisses.)
+  const mVisite = mkMoment(15, 'etape', 'Visite de chantier avec Mme Martin', 'Chambre', {
     observations:
       'Visite sur site : la cliente valide l’implantation des prises et l’emplacement du meuble vasque.',
     intervenants: ['Mickaël (conducteur)', 'Mme Martin'],
   });
-  const mPrepa = mkMoment(22, 'visite', 'Préparation du chantier', 'Chambre');
+  const mPrepa = mkMoment(22, 'etape', 'Préparation du chantier', 'Chambre');
   const mDemarrage = mkMoment(40, 'etape', 'Démarrage du chantier', 'Façade', {
     legendes: ['Installation et protections'],
   });

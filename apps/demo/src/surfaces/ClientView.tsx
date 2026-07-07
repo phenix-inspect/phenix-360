@@ -4,6 +4,7 @@ import { CalendarRange, ClipboardList, FileText, Lock, MessageCircle, Palette } 
 import {
   SELECTION_STATUS_LABEL,
   bibliothequeImages,
+  momentsCoulisses,
   buildClientDecisions,
   buildClientShareReadiness,
   buildDecisionContent,
@@ -76,7 +77,9 @@ export function ClientView({
   // Le Récit et la Bibliothèque sont deux vues d'une même section : le sommaire
   // pilote la vue affichée (Récit ↔ Bibliothèque) en plus du défilement.
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
-  const filMoments = filOf(snap, project.id).moments;
+  // « Dans les coulisses » côté client = albums photo partagés UNIQUEMENT (pas de
+  // comptes rendus / PV / documents : ceux-ci ont leurs propres sections).
+  const filMoments = momentsCoulisses(filOf(snap, project.id).moments);
   const hasRecit = filDuChantier(filMoments, { viewer: 'client' }).some((e) => e.kind === 'moment');
   const hasBiblio = bibliothequeImages(filMoments, { viewer: 'client' }).length > 0;
 

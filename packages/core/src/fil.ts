@@ -269,6 +269,40 @@ export function momentTypeOf(moment: Moment): MomentType {
 }
 
 /**
+ * Types de Moment « de travail » : ils GÉNÈRENT un livrable (compte rendu, PV de
+ * pré-réception / réception, bon de livraison, fiche SAV…) et vivent dans le Suivi,
+ * les Comptes rendus et les Documents — JAMAIS dans « Dans les coulisses ».
+ */
+export const MOMENT_TYPES_TRAVAIL: readonly MomentType[] = [
+  'reunion',
+  'visite',
+  'livraison',
+  'prereception',
+  'reception',
+  'sav',
+  'note',
+  'decision',
+];
+
+/**
+ * Un Moment appartient-il à « Dans les coulisses » ? Décision produit : cet espace
+ * est l'ALBUM PHOTO/VIDÉO du chantier (la brique plaisir), pas un historique. Un
+ * moment « coulisses » porte au moins une photo ET n'a AUCUNE vocation documentaire
+ * (les missions vivent ailleurs). C'est le SEUL contenu du Fil.
+ */
+export function estMomentCoulisses(moment: Moment): boolean {
+  return moment.photos.length > 0 && !MOMENT_TYPES_TRAVAIL.includes(momentTypeOf(moment));
+}
+
+/** Ne conserve que les moments « coulisses » (albums photo) — filtre du Fil. */
+export function momentsCoulisses(moments: Moment[]): Moment[] {
+  return moments.filter(estMomentCoulisses);
+}
+
+/** Nombre maximum de photos dans UN album (un seul moment) — cf. composer. */
+export const MAX_ALBUM_PHOTOS = 10;
+
+/**
  * Ce Moment est-il PARTAGÉ au client ? Règle unique : publié + audience client.
  * Le Fil client = l'ensemble des Moments pour lesquels ceci est vrai.
  */

@@ -1391,3 +1391,48 @@ imprimable suffit et reste 100 % local).
 devis / interne / pré-réception / réception / partagé client — fichier ET généré,
 client-safe, zéro console) ; `client-documents.test` recalé (le document sans fichier
 s'ouvre désormais). Gate vert (e2e 43/43). VISION Art. 7, 8, 9, 11.
+
+---
+
+## 07/07/2026 — « Dans les coulisses » recentré sur les photos (l'Instagram du chantier)
+
+**Décision produit :** « Dans les coulisses » N'EST PAS l'historique du chantier.
+C'est la brique PLAISIR — l'album photo/vidéo privé du chantier : le client l'ouvre
+pour voir l'avancement en images, les moments, les belles photos, aimer, commenter.
+Contenu AUTORISÉ : photos (vidéos à venir), texte d'accompagnement court, coups de
+cœur, commentaires. Contenu INTERDIT : documents, comptes rendus, PV de pré-réception /
+réception, réserves, devis, factures, historique technique — qui vivent au **Suivi**,
+dans **Documents** et **Comptes rendus**.
+
+**Filtre (aucun nouvel écran, on clarifie le rôle) :** un Moment appartient aux
+coulisses ssi il porte au moins une photo ET n'est PAS un moment « de travail »
+(`estMomentCoulisses` / `momentsCoulisses`). Les types documentaires
+(`MOMENT_TYPES_TRAVAIL` : réunion, visite, livraison, pré-réception, réception, SAV,
+note, décision) — ceux que « Nouvelle mission » génère avec un compte rendu / PV —
+sont écartés du Fil ET de la Bibliothèque, côté conducteur comme client. Un compte
+rendu généré ne s'affiche donc jamais dans les coulisses ; il reste consultable au
+Suivi (cf. décision « Tout document est consultable »).
+
+**Album (jusqu'à 10 photos) :** le composer « Créer un moment » devient un pur album
+photo — plus de sélecteur de type (les albums sont des moments PHOTO par défaut),
+**10 photos maximum** en une fois (`MAX_ALBUM_PHOTOS`, tronqué au dépôt et à la
+saisie). Un dépôt = **un seul moment/album** (badge « N photos », galerie immersive
+au clic, cœur rouge vif, commentaires sous l'album — UX déjà en place). Notification
+client **unique** par album : « Nouvelles photos ajoutées dans les coulisses »
+(jamais une par photo).
+
+**Seed :** les moments photo « Visite / Préparation » (sans livrable) sont reclassés
+en moments d'album (`etape`) pour rester dans les coulisses ; l'« Avant travaux » de
+PHÉNIX Start devient un album photo. La vraie « Réunion » interne reste un moment de
+travail (hors coulisses) — l'exemple du contenu écarté. **Alternatives rejetées :**
+un onglet « Album » séparé (nouvel écran) ; filtrer par présence de photos seulement
+(laisserait passer les missions photographiées).
+
+**Impact :** core `fil.ts` (`MOMENT_TYPES_TRAVAIL`, `estMomentCoulisses`,
+`momentsCoulisses`, `MAX_ALBUM_PHOTOS`) ; `FilView` / `ClientView` (filtre du Fil +
+Bibliothèque) ; `store` (`addMoment` type album par défaut + cap 10, notification
+album) ; `MomentComposer` (album pur, cap 10) ; `seed` / `PhenixStart`. Nouveau
+`coulisses-photos.test` (document/CR/pré-réception hors coulisses ; 1 photo → moment ;
+12 photos → 1 album limité à 10 ; notification unique ; cœur + commentaire ;
+client-safe) ; `notifications-bidirect` recalé (texte album). Gate vert (e2e 44/44).
+VISION Art. 9, 11.
