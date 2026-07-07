@@ -26,6 +26,7 @@ import { DocumentButton } from '../DocumentButton';
 import { DocumentLink } from '../DocumentLink';
 import { demo, useDemo } from '../../store';
 import { readDocumentAttachment, readPhotoAttachment, MAX_DOC_MB } from '../../lib/upload';
+import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../../lib/media';
 
 const FILE_CATEGORIES = PREP_DOC_CATEGORIES.filter((c) => c !== 'photo_avant');
 
@@ -215,7 +216,7 @@ export function PrepDocumentsSection({
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,application/pdf,image/*"
+            accept={ACCEPT_DOCUMENT}
             className="hidden"
             data-testid="prep-doc-file"
             onChange={(e) => {
@@ -341,7 +342,7 @@ export function PhotosAvantSection({
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept={ACCEPT_IMAGE}
               multiple
               className="hidden"
               data-testid="prep-photo-file"

@@ -23,6 +23,7 @@ import {
 import { FileText, Image as ImageIcon, Inbox, Upload, X } from 'lucide-react';
 import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment, readPhotoAttachment } from '../lib/upload';
+import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../lib/media';
 
 export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande' | 'repondre';
 
@@ -226,7 +227,7 @@ function CaptureForm({
           <input
             ref={photoInput}
             type="file"
-            accept="image/*"
+            accept={ACCEPT_IMAGE}
             multiple
             className="hidden"
             onChange={(e) => {
@@ -291,7 +292,7 @@ function CaptureForm({
           <input
             ref={docInput}
             type="file"
-            accept=".pdf,application/pdf,image/*"
+            accept={ACCEPT_DOCUMENT}
             className="hidden"
             onChange={(e) => {
               void onPickDoc(e.target.files);

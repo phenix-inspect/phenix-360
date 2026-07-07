@@ -1466,3 +1466,42 @@ depuis le sous-menu ET la mission) — ambigu, contraire à « une action = une 
 (publication via Nouvelle mission uniquement, sous-menu sans bouton, album visible en
 consultation) et `notifications-bidirect` recalés sur le nouveau parcours. Gate vert
 (e2e 44/44). VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — Acquisition des photos : capacités NATIVES du téléphone (partout)
+
+**Décision produit :** PHÉNIX est d'abord un outil de terrain sur smartphone. Partout
+où l'on ajoute une photo (coulisses, compte rendu, pré-réception, réception, réserves,
+documents avec photo…), on utilise le **sélecteur NATIF** du téléphone : prendre une
+photo à l'instant avec l'appareil, choisir dans la galerie, ou piocher un fichier
+(Drive · Fichiers · iCloud). On ne réinvente pas cette interface — l'OS la fournit. Le
+conducteur ne quitte jamais PHÉNIX pour photographier ; une photo prise à l'instant se
+publie immédiatement.
+
+**Mécanique (améliorer l'existant, aucun nouvel écran) :** en HTML, `accept="image/*"`
+SANS l'attribut `capture` déclenche déjà, sur iOS/Android, le sélecteur natif offrant
+les trois options (appareil photo, galerie, fichiers). Imposer `capture` forcerait
+l'appareil photo et masquerait galerie/fichiers — on ne le fait donc JAMAIS. On
+centralise ces valeurs en une **source unique** (`ACCEPT_IMAGE`, `ACCEPT_DOCUMENT`
+dans `lib/media.ts`, documentées) et on l'applique à TOUS les champs : coulisses
+(album, multiple), capture de mission (compte rendu / pré-réception / réception,
+multiple), réserve (preuve à la levée), décision client, documents (PDF **ou** photo),
+photos avant travaux. Sur ordinateur, le même attribut ouvre la sélection multi-fichiers
+(le glisser-déposer reste géré à l'onboarding) — comportement inchangé.
+
+**Album coulisses :** jusqu'à 10 photos en une fois → un seul album (cf. décision
+« coulisses »). La vidéo (« si supportée ») reste **à prévoir** : le MediaUploader de la
+démo ne traite que l'image (décodage canvas) — on ne l'active pas pour ne pas casser le
+rendu. `ACCEPT_IMAGE` est le point unique où l'étendre le jour venu.
+
+**Alternatives rejetées :** ajouter un bouton « appareil photo » dédié avec
+`capture="environment"` (réinvente l'interface et masque galerie/fichiers) ; une
+librairie de capture custom (inutile — le navigateur fait tout, 100 % natif).
+
+**Impact :** `lib/media.ts` (`ACCEPT_IMAGE`, `ACCEPT_DOCUMENT`) appliqués à
+`MomentComposer`, `MissionFlow`, `ReserveLeveeDialog`, `ClientDecisionComposer`,
+`ProposalWorkshop`, `Composer`, `PrepDocuments`. Nouveau `media-capture.test`
+(viewport iPhone : coulisses/mission/réserves/documents = champ natif `image/*` sans
+`capture`, albums `multiple`, ajout réel de photos ; desktop inchangé ; zéro console).
+Gate vert (e2e 45/45). VISION Art. 9, 11.

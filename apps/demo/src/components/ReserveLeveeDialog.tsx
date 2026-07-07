@@ -11,7 +11,7 @@ import {
 import type { EventActor, ReserveEvent, UploadedMedia } from '@phenix360/core';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import { demo } from '../store';
-import { mediaUploader } from '../lib/media';
+import { ACCEPT_IMAGE, mediaUploader } from '../lib/media';
 
 /**
  * Lever une réserve — clôture PROPRE et append-only. On n'efface ni ne modifie
@@ -92,7 +92,7 @@ export function ReserveLeveeDialog({
               <label className="block">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPT_IMAGE}
                   className="sr-only"
                   onChange={(e) => void onPick(e.target.files)}
                 />

@@ -17,7 +17,7 @@ import {
   type UploadedMedia,
 } from '@phenix360/core';
 import { demo } from '../../store';
-import { mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
 interface Pick {
   key: string;
@@ -197,7 +197,7 @@ export function MomentComposer({
             <label className="block">
               <input
                 type="file"
-                accept="image/*"
+                accept={ACCEPT_IMAGE}
                 multiple
                 className="sr-only"
                 onChange={(e) => void onPick(e.target.files)}

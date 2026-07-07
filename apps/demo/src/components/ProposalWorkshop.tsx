@@ -10,6 +10,7 @@ import {
 } from '@phenix360/core';
 import { warmGradient } from './gradient';
 import { fileToImageUrl } from '../lib/image';
+import { ACCEPT_IMAGE } from '../lib/media';
 
 const MAX_OPTIONS = 5;
 
@@ -162,7 +163,7 @@ export function ProposalWorkshop({
                               {o.imageUrl ? 'Remplacer' : 'Photo'}
                               <input
                                 type="file"
-                                accept="image/*"
+                                accept={ACCEPT_IMAGE}
                                 className="hidden"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];

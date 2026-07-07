@@ -9,6 +9,23 @@
  */
 import type { MediaUploader, UploadedMedia } from '@phenix360/core';
 
+/**
+ * Types acceptés par les sélecteurs de PHOTO — source unique, pour un comportement
+ * IDENTIQUE partout (coulisses, compte rendu, pré/réception, réserves, décisions…).
+ *
+ * Sur SMARTPHONE, `accept="image/*"` déclenche le sélecteur NATIF du téléphone :
+ * l'utilisateur peut prendre une photo à l'instant avec l'appareil, choisir dans sa
+ * galerie, ou piocher un fichier (Drive / Fichiers / iCloud). On n'impose JAMAIS
+ * l'attribut `capture` : il forcerait l'appareil photo et masquerait galerie et
+ * fichiers — or les trois options doivent rester offertes. Sur ORDINATEUR, le même
+ * attribut ouvre la sélection d'un ou plusieurs fichiers (le glisser-déposer reste
+ * géré là où il est proposé). On ne réinvente pas l'interface : on laisse l'OS faire.
+ */
+export const ACCEPT_IMAGE = 'image/*';
+
+/** Sélecteurs de DOCUMENT : un PDF, ou la PHOTO d'un document (prise sur mobile). */
+export const ACCEPT_DOCUMENT = '.pdf,application/pdf,image/*';
+
 const MAX = 1600;
 const QUALITY = 0.82;
 

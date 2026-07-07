@@ -18,7 +18,7 @@ import {
 } from '@phenix360/core';
 import { Camera, Check, Loader2, Mic, Plus, Send, Sparkles, Trash2, X } from 'lucide-react';
 import { demo } from '../../store';
-import { mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
 type Step = 'capture' | 'travaille' | 'comprend' | 'partager';
 
@@ -405,7 +405,7 @@ function CaptureStep({
         <label className="grid aspect-square cursor-pointer place-items-center rounded-xl border border-dashed border-border bg-paper-50 text-muted-foreground transition-colors hover:border-gold-300 hover:text-foreground">
           <input
             type="file"
-            accept="image/*"
+            accept={ACCEPT_IMAGE}
             multiple
             className="sr-only"
             onChange={(e) => onPick(e.target.files)}
