@@ -40,7 +40,7 @@ import {
   Plus,
   Reply,
 } from 'lucide-react';
-import { demo, dossierOf, nameOf, type DemoSnapshot } from '../store';
+import { demo, dossierOf, filOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
@@ -49,6 +49,7 @@ import { DocumentButton } from '../components/DocumentButton';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { FilView } from '../components/fil/FilView';
+import { MomentComposer } from '../components/fil/MomentComposer';
 import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
@@ -88,6 +89,8 @@ export function CompagnonView({
   const [missionPicker, setMissionPicker] = useState(false);
   const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
   const [decisionComposer, setDecisionComposer] = useState(false);
+  // Publier un album « coulisses » depuis Nouvelle mission (jamais le sous-menu).
+  const [albumComposer, setAlbumComposer] = useState(false);
   const [lever, setLever] = useState<ReserveEvent | null>(null);
   // À l'ouverture d'un chantier en préparation, on accueille par la note de
   // lancement (onglet Préparation) ; sinon, le suivi du jour — sauf onglet imposé.
@@ -254,6 +257,10 @@ export function CompagnonView({
             setMissionPicker(false);
             setDecisionComposer(true);
           }}
+          onPublishAlbum={() => {
+            setMissionPicker(false);
+            setAlbumComposer(true);
+          }}
           onClose={() => setMissionPicker(false)}
         />
       )}
@@ -262,6 +269,15 @@ export function CompagnonView({
         <ClientDecisionComposer
           onCreate={(input) => demo.createClientDecision(project, actor, input)}
           onClose={() => setDecisionComposer(false)}
+        />
+      )}
+
+      {albumComposer && (
+        <MomentComposer
+          project={project}
+          actor={actor}
+          zones={filOf(snap, project.id).zones}
+          onClose={() => setAlbumComposer(false)}
         />
       )}
 

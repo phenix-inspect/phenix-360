@@ -32,7 +32,17 @@ const notif = (re) => notifs().getByRole('button', { name: re });
 
 const openCoulisses = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-  await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
+  await page.getByRole('tab', { name: 'Dans les coulisses' }).first().click();
+};
+/** Ouvre le composer d'album via « Nouvelle mission → Publier dans les coulisses ». */
+const openAlbumComposer = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: /Publier dans les coulisses/ }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('heading', { name: 'Créer un moment' })
+    .waitFor({ state: 'visible', timeout: 6000 });
 };
 const openAujourdhui = async () => {
   await page.getByRole('tab', { name: /Aujourd/ }).click();
@@ -61,16 +71,9 @@ try {
   // ---------------------------------------------------------------------------
   // CONDUCTEUR → CLIENT (1) : publier une photo partagée.
   // ---------------------------------------------------------------------------
-  await assert('CONDUCTEUR publie une photo partagée (nouveau moment)', async () => {
-    await openCoulisses();
-    await page
-      .getByRole('button', { name: /Créer un moment/ })
-      .first()
-      .click();
+  await assert('CONDUCTEUR publie une photo partagée (via Nouvelle mission)', async () => {
+    await openAlbumComposer();
     const dialog = page.getByRole('dialog');
-    await dialog
-      .getByRole('heading', { name: 'Créer un moment' })
-      .waitFor({ state: 'visible', timeout: 6000 });
     await dialog.locator('input[type=file]').setInputFiles({
       name: 'chantier.png',
       mimeType: 'image/png',

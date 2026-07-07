@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, EmptyState, SegmentedControl } from '@phenix360/ui';
+import { EmptyState, SegmentedControl } from '@phenix360/ui';
 import {
   aMisCoupDeCoeur,
   bibliothequeImages,
@@ -11,7 +11,7 @@ import {
   type Moment,
   type Project,
 } from '@phenix360/core';
-import { ImagePlus, Images } from 'lucide-react';
+import { Images } from 'lucide-react';
 import {
   demo,
   filOf,
@@ -22,7 +22,6 @@ import {
 } from '../../store';
 import { FilMoment } from './FilMoment';
 import { BibliothequeView } from './BibliothequeView';
-import { MomentComposer } from './MomentComposer';
 import { MomentGallery } from './MomentGallery';
 
 /**
@@ -50,7 +49,6 @@ export function FilView({
   view?: 'fil' | 'bibliotheque';
   onViewChange?: (view: 'fil' | 'bibliotheque') => void;
 }): React.JSX.Element {
-  const [composing, setComposing] = useState(false);
   // Vue interne par défaut ; contrôlée si le parent fournit `view`/`onViewChange`.
   const [internalView, setInternalView] = useState<'fil' | 'bibliotheque'>('fil');
   const view = viewProp ?? internalView;
@@ -132,22 +130,17 @@ export function FilView({
               : 'Toutes vos photos, prêtes à être retrouvées.'}
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <SegmentedControl
-            value={view}
-            onValueChange={setView}
-            options={[
-              { value: 'fil', label: 'Dans les coulisses' },
-              { value: 'bibliotheque', label: 'Bibliothèque' },
-            ]}
-            aria-label="Changer de vue"
-          />
-          {canCompose && (
-            <Button onClick={() => setComposing(true)}>
-              <ImagePlus aria-hidden /> Créer un moment
-            </Button>
-          )}
-        </div>
+        {/* « Dans les coulisses » = espace de CONSULTATION. On publie via
+            « Nouvelle mission → Publier dans les coulisses », jamais ici. */}
+        <SegmentedControl
+          value={view}
+          onValueChange={setView}
+          options={[
+            { value: 'fil', label: 'Dans les coulisses' },
+            { value: 'bibliotheque', label: 'Bibliothèque' },
+          ]}
+          aria-label="Changer de vue"
+        />
       </div>
 
       {vide ? (
@@ -156,15 +149,8 @@ export function FilView({
           title="Les coulisses du chantier commencent bientôt"
           description={
             canCompose
-              ? 'Créez un premier moment : il ouvrira l’histoire du chantier.'
+              ? 'Publiez un premier album depuis « Nouvelle mission → Publier dans les coulisses ».'
               : 'Les premiers moments de votre chantier apparaîtront ici très bientôt.'
-          }
-          action={
-            canCompose ? (
-              <Button onClick={() => setComposing(true)}>
-                <ImagePlus aria-hidden /> Créer un moment
-              </Button>
-            ) : undefined
           }
         />
       ) : view === 'bibliotheque' ? (
@@ -210,15 +196,6 @@ export function FilView({
           )}
           <p className="pb-2 text-center text-xs text-muted-foreground">· Le début du chantier ·</p>
         </div>
-      )}
-
-      {composing && (
-        <MomentComposer
-          project={project}
-          actor={actor}
-          zones={zones}
-          onClose={() => setComposing(false)}
-        />
       )}
 
       {gallery && (

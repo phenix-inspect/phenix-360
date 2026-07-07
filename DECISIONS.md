@@ -1436,3 +1436,33 @@ album) ; `MomentComposer` (album pur, cap 10) ; `seed` / `PhenixStart`. Nouveau
 12 photos → 1 album limité à 10 ; notification unique ; cœur + commentaire ;
 client-safe) ; `notifications-bidirect` recalé (texte album). Gate vert (e2e 44/44).
 VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — « Nouvelle mission » = point d'entrée UNIQUE des actions (ACTION ≠ CONSULTATION)
+
+**Décision produit :** le conducteur ne navigue plus dans un sous-menu pour AGIR.
+Toute action part de **➕ Nouvelle mission** — y compris publier des photos. Principe
+clair : **Nouvelle mission = JE FAIS** ; **Dans les coulisses = JE REGARDE**. On
+sépare l'ACTION de la CONSULTATION.
+
+**Publier dans les coulisses depuis Nouvelle mission :** le sélecteur de mission gagne
+une action mise en avant « 📸 Publier dans les coulisses » qui ouvre DIRECTEMENT le
+composer d'album (jusqu'à 10 photos, description, couverture, partage). La publication
+crée l'album, la notification client et un moment visible immédiatement dans l'espace
+client — sans jamais ouvrir le sous-menu. Le sous-menu « Dans les coulisses » perd son
+bouton « Créer un moment » : il devient un **espace de consultation** pur (le conducteur
+y garde le partage / la suppression / la création de réserve depuis une photo, qui sont
+de la modération, pas de la publication).
+
+**Sans nouvel écran ni concept :** on réutilise le workflow « Nouvelle mission » et le
+composer d'album existants — on ajoute juste une entrée au sélecteur et on retire un
+bouton du sous-menu. **Alternatives rejetées :** garder deux points d'entrée (publier
+depuis le sous-menu ET la mission) — ambigu, contraire à « une action = une entrée ».
+
+**Impact :** `MissionPicker` (`onPublishAlbum` + action « Publier dans les coulisses ») ;
+`CompagnonView` (état + rendu du `MomentComposer` déclenché par le sélecteur) ;
+`FilView` (retrait du bouton/composer — consultation seule). Tests : `coulisses-photos`
+(publication via Nouvelle mission uniquement, sous-menu sans bouton, album visible en
+consultation) et `notifications-bidirect` recalés sur le nouveau parcours. Gate vert
+(e2e 44/44). VISION Art. 9, 11.

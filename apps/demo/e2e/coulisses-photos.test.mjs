@@ -42,6 +42,17 @@ const openClient = async () => {
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
   await page.waitForTimeout(400);
 };
+/** Ouvre le composer d'album via « Nouvelle mission → Publier dans les coulisses »
+ * (le sous-menu « Dans les coulisses » ne publie plus : consultation seule). */
+const openAlbumComposer = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: /Publier dans les coulisses/ }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('heading', { name: 'Créer un moment' })
+    .waitFor({ state: 'visible', timeout: 6000 });
+};
 
 /** Déroule une mission (capture → PHÉNIX comprend → valider → terminer). */
 const runMission = async (missionLabel, observation) => {
@@ -104,18 +115,17 @@ try {
       throw new Error('le PV de pré-réception apparaît dans les coulisses');
   });
 
-  // ---- Album : 1 photo → moment visible ----------------------------------
-  await assert('Ajout d’1 photo → un moment visible dans les coulisses', async () => {
-    await openCoulisses();
-    await page
-      .getByRole('button', { name: /Créer un moment/ })
-      .first()
-      .click();
+  // ---- Publication via Nouvelle mission UNIQUEMENT (jamais le sous-menu) --
+  await assert('Ajout d’1 photo via Nouvelle mission → moment visible en coulisses', async () => {
+    // On publie SANS ouvrir « Dans les coulisses » (le sous-menu ne publie plus).
+    await openAlbumComposer();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[type=file]').setInputFiles(photo(1));
     await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Une première photo');
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
+    // On OUVRE les coulisses seulement pour CONSULTER — et le moment y est.
+    await openCoulisses();
     await page
       .locator('article')
       .filter({ hasText: 'Une première photo' })
@@ -123,12 +133,15 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
+  await assert('« Dans les coulisses » ne publie pas (consultation seule)', async () => {
+    await openCoulisses();
+    if ((await page.getByRole('button', { name: /Créer un moment/ }).count()) > 0)
+      throw new Error('le bouton de publication subsiste dans le sous-menu coulisses');
+  });
+
   // ---- Album : 10 photos max → UN SEUL album, limite respectée -----------
   await assert('Ajout de 12 photos → un seul album, limité à 10 (partagé client)', async () => {
-    await page
-      .getByRole('button', { name: /Créer un moment/ })
-      .first()
-      .click();
+    await openAlbumComposer();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[type=file]').setInputFiles(TWELVE);
     // La limite est atteinte → « Album complet — 10 photos maximum ».
@@ -139,7 +152,8 @@ try {
     await dialog.getByRole('checkbox').check(); // Partager avec le client
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
-    // Un SEUL moment/album, avec le badge « 10 photos ».
+    // Un SEUL moment/album, avec le badge « 10 photos » (vu en consultation).
+    await openCoulisses();
     const album = page.locator('article').filter({ hasText: ALBUM_TITLE }).first();
     await album.waitFor({ state: 'visible', timeout: 6000 });
     await album.getByText('10 photos').first().waitFor({ state: 'visible', timeout: 5000 });
