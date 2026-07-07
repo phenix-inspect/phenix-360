@@ -25,11 +25,12 @@ interface Pick {
 }
 
 /**
- * Créer un MOMENT de chantier — l'ALBUM PHOTO des coulisses. Le conducteur ajoute
- * jusqu'à 10 photos (un seul moment), un titre et un mot court, et décide s'il le
- * partage au client. C'est la brique PLAISIR : pas de document, pas de compte
- * rendu — juste l'avancement en images. Interne par défaut : « privé → Partager →
- * Espace client ». Les livrables (CR, PV, réserves) passent par « Nouvelle mission ».
+ * Créer un MOMENT de chantier — l'ALBUM PHOTO des coulisses. Formulaire VOLONTAIREMENT
+ * minimal (publier en moins de 30 s) : photos (jusqu'à 10), titre, description, pièce
+ * (optionnelle). Pas de partage à cocher (une publication coulisses est TOUJOURS pour
+ * le client), pas d'intervenants (le client regarde des photos, pas une feuille de
+ * présence). C'est la brique PLAISIR — les livrables (CR, PV, réserves) passent par
+ * « Nouvelle mission ».
  */
 export function MomentComposer({
   project,
@@ -47,10 +48,7 @@ export function MomentComposer({
   const [busy, setBusy] = useState(false);
   const [title, setTitle] = useState('');
   const [observations, setObservations] = useState('');
-  const [intervenants, setIntervenants] = useState<string[]>([]);
-  const [intervenantDraft, setIntervenantDraft] = useState('');
   const [zone, setZone] = useState('');
-  const [share, setShare] = useState(false);
 
   const onPick = async (files: FileList | null): Promise<void> => {
     if (!files || files.length === 0) return;
@@ -85,13 +83,6 @@ export function MomentComposer({
     setCoverKey((c) => (c === key ? null : c));
   };
 
-  const addIntervenant = (): void => {
-    const v = intervenantDraft.trim();
-    if (!v) return;
-    setIntervenants((list) => (list.includes(v) ? list : [...list, v]));
-    setIntervenantDraft('');
-  };
-
   const create = (): void => {
     if (picks.length === 0 || !title.trim()) return;
     const coverIndex = Math.max(
@@ -104,10 +95,11 @@ export function MomentComposer({
       title,
       medias: picks.map((p) => p.media),
       coverIndex,
-      shareWithClient: share,
+      // Une publication « coulisses » est TOUJOURS destinée au client (brique
+      // plaisir) : le conducteur n'a pas à se poser la question du partage.
+      shareWithClient: true,
       ...(zone ? { zoneId: zones.find((z) => z.id === zone)?.id } : {}),
       ...(observations.trim() ? { observations } : {}),
-      ...(intervenants.length ? { intervenants } : {}),
     });
     onClose();
   };
@@ -122,7 +114,7 @@ export function MomentComposer({
           <DialogTitle>Créer un moment</DialogTitle>
           <DialogDescription>
             L’album photo de votre chantier : jusqu’à {MAX_ALBUM_PHOTOS} photos en une fois (un seul
-            moment). Ce moment reste interne tant que vous ne le partagez pas.
+            moment). Il est partagé avec le client dans « Dans les coulisses ».
           </DialogDescription>
         </DialogHeader>
 
@@ -242,51 +234,6 @@ export function MomentComposer({
             />
           </Field>
 
-          <Group label="Intervenants présents (optionnel)">
-            <div className="space-y-2">
-              {intervenants.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {intervenants.map((name) => (
-                    <span
-                      key={name}
-                      className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-foreground"
-                    >
-                      {name}
-                      <button
-                        type="button"
-                        onClick={() => setIntervenants((l) => l.filter((x) => x !== name))}
-                        aria-label={`Retirer ${name}`}
-                        className="text-muted-foreground hover:text-foreground [&_svg]:size-3"
-                      >
-                        <X aria-hidden />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  value={intervenantDraft}
-                  onChange={(e) => setIntervenantDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addIntervenant();
-                    }
-                  }}
-                  placeholder="Ex. Plombier, Électricien…"
-                />
-                <Button
-                  variant="ghost"
-                  onClick={addIntervenant}
-                  disabled={!intervenantDraft.trim()}
-                >
-                  Ajouter
-                </Button>
-              </div>
-            </div>
-          </Group>
-
           <Field label="Pièce (optionnel)">
             <select value={zone} onChange={(e) => setZone(e.target.value)} className={selectCls}>
               <option value="">Aucune</option>
@@ -297,24 +244,6 @@ export function MomentComposer({
               ))}
             </select>
           </Field>
-
-          {/* Partage — une ACTION, pas un objet : bascule l'audience du Moment. */}
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-paper-50 p-3">
-            <input
-              type="checkbox"
-              checked={share}
-              onChange={(e) => setShare(e.target.checked)}
-              className="mt-0.5 size-4 accent-gold-600"
-            />
-            <span className="text-sm leading-snug">
-              <span className="font-medium text-foreground">Partager avec le client</span>
-              <span className="block text-xs text-muted-foreground">
-                {share
-                  ? 'Ce moment apparaîtra dans l’espace client.'
-                  : 'Ce moment reste interne. Vous pourrez le partager plus tard.'}
-              </span>
-            </span>
-          </label>
 
           <div className="flex items-center justify-between gap-2 pt-1">
             <span className="text-xs text-muted-foreground">
@@ -349,25 +278,5 @@ function Field({
       <span className="text-muted-foreground">{label}</span>
       {children}
     </label>
-  );
-}
-
-/**
- * Comme Field mais SANS <label> : à utiliser dès que le groupe contient des
- * boutons (un <label> qui enveloppe des boutons casse leur nom accessible et
- * détourne le clic vers le champ associé).
- */
-function Group({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <div role="group" aria-label={label} className="flex flex-col gap-1.5 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      {children}
-    </div>
   );
 }

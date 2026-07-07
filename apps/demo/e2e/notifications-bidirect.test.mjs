@@ -80,7 +80,7 @@ try {
       buffer: Buffer.from(PNG, 'base64'),
     });
     await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Avancement du séjour');
-    await dialog.getByRole('checkbox').check(); // Partager avec le client
+    // Publication coulisses = toujours partagée au client (plus de case à cocher).
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
   });

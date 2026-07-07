@@ -149,7 +149,7 @@ try {
       .getByText(/Album complet — 10 photos maximum/)
       .waitFor({ state: 'visible', timeout: 8000 });
     await dialog.getByPlaceholder(/Avancement de la cuisine/).fill(ALBUM_TITLE);
-    await dialog.getByRole('checkbox').check(); // Partager avec le client
+    // Plus de case « Partager » : une publication coulisses est toujours pour le client.
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
     // Un SEUL moment/album, avec le badge « 10 photos » (vu en consultation).
@@ -161,15 +161,17 @@ try {
       throw new Error('l’album n’est pas un moment unique');
   });
 
-  // ---- Notification client UNIQUE pour l'album ---------------------------
-  await assert('Notification client UNIQUE pour l’album (pas une par photo)', async () => {
+  // ---- UNE notification PAR ALBUM (jamais une par photo) -----------------
+  await assert('Notification par album, pas par photo (2 albums publiés → 2)', async () => {
     await openClient();
     const notif = page
       .locator('section[aria-label="Notifications"]')
       .getByRole('button', { name: /Nouvelles photos ajoutées dans les coulisses/ });
     await notif.first().waitFor({ state: 'visible', timeout: 6000 });
-    if ((await notif.count()) !== 1)
-      throw new Error(`attendu 1 notification album, vu ${await notif.count()}`);
+    // Deux albums publiés dans la session (1 photo + 10 photos = 11 photos) → si la
+    // notification était PAR PHOTO on en aurait 11 ; par ALBUM, on en a exactement 2.
+    if ((await notif.count()) !== 2)
+      throw new Error(`attendu 2 notifications (une par album), vu ${await notif.count()}`);
   });
 
   // ---- Cœur + commentaire client sous l'album ----------------------------

@@ -1505,3 +1505,36 @@ librairie de capture custom (inutile — le navigateur fait tout, 100 % natif).
 (viewport iPhone : coulisses/mission/réserves/documents = champ natif `image/*` sans
 `capture`, albums `multiple`, ajout réel de photos ; desktop inchangé ; zéro console).
 Gate vert (e2e 45/45). VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — Formulaire « Dans les coulisses » simplifié (publier en < 30 s)
+
+**Décision produit (retour terrain) :** les coulisses sont un espace ÉMOTIONNEL
+(Instagram privé du chantier), pas un compte rendu. On retire du composer d'album les
+deux champs sans valeur pour le client :
+
+1. **« Partager avec le client » (case à cocher) → supprimée.** Une publication
+   coulisses est TOUJOURS destinée au client : le conducteur n'a pas à se poser la
+   question. Le partage devient **automatique** (`shareWithClient: true` en dur).
+2. **« Intervenants présents » → supprimé.** Le client regarde des photos, pas une
+   feuille de présence.
+
+Le formulaire se réduit à l'essentiel : **📸 photos, titre, description (observations),
+pièce (optionnelle), Créer le moment.** Tout ce qui n'apporte pas de valeur au client
+disparaît — objectif : publier un album en moins de 30 secondes.
+
+**Sans nouvel écran ni concept :** on retire deux champs d'un formulaire existant.
+Le partage automatique n'ajoute rien — il applique la règle « coulisses = toujours
+client » déjà posée (une publication apparaît immédiatement dans l'espace client et
+déclenche la notification album). **Alternatives rejetées :** garder le partage
+optionnel « pour les cas particuliers » (les coulisses n'en ont pas — le contenu
+technique passe par Nouvelle mission, hors coulisses).
+
+**Impact :** `MomentComposer` (retrait du state `share` / `intervenants`, du bloc
+« Partager » et du groupe « Intervenants », du helper `Group` devenu inutile ;
+`create()` publie toujours partagé). Nouveau `coulisses-formulaire.test` (ni case
+Partager ni champ Intervenants ; publication sans action de partage → visible côté
+client ; marquée « Partagé avec le client » côté conducteur) ; `coulisses-photos` et
+`notifications-bidirect` recalés (plus de case à cocher ; une notification PAR ALBUM).
+Gate vert (e2e 46/46). VISION Art. 9, 11.
