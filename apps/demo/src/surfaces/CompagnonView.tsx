@@ -38,6 +38,7 @@ import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { DocumentButton } from '../components/DocumentButton';
 import { DossierPanel } from '../components/DossierPanel';
+import { DocumentsTab } from '../components/DocumentsTab';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { FilView } from '../components/fil/FilView';
 import { MomentComposer } from '../components/fil/MomentComposer';
@@ -55,7 +56,7 @@ function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   return { userId: id, role: 'compagnon', displayName: nameOf(snap, id) };
 }
 
-export type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves';
+export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'reserves';
 
 export function CompagnonView({
   snap,
@@ -183,13 +184,11 @@ export function CompagnonView({
         onOpenPreparation={() => setTab('preparation')}
       />
 
-      <Tabs
-        value={tab}
-        onValueChange={(v) => setTab(v as 'suivi' | 'preparation' | 'fil' | 'reserves')}
-      >
+      <Tabs value={tab} onValueChange={(v) => setTab(v as CompagnonTab)}>
         <TabsList>
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           <TabsTrigger value="preparation">Préparation</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="fil">Dans les coulisses</TabsTrigger>
           <TabsTrigger value="reserves">
             <span className="flex items-center gap-1.5">
@@ -205,6 +204,9 @@ export function CompagnonView({
           ) : (
             <PrepEmpty project={project} />
           )}
+        </TabsContent>
+        <TabsContent value="documents">
+          <DocumentsTab project={project} dossier={dossier ?? null} actor={actor} events={events} />
         </TabsContent>
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />

@@ -38,9 +38,9 @@ const addDoc = async (libelle, typeLabel, visibilityLabel, file) => {
   await row(libelle).waitFor({ state: 'visible', timeout: 5000 });
 };
 
-const openPreparation = async () => {
+const openDocuments = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-  await page.getByRole('tab', { name: /Préparation/ }).click();
+  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
 };
 const openClientDocs = async () => {
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
@@ -63,7 +63,7 @@ const findEvent = (obj, libelle) => {
 try {
   await openDemo(page);
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-  await openPreparation();
+  await openDocuments();
 
   await assert('Ajout d’un document INTERNE (visibilité par défaut)', async () => {
     await addDoc('Partage-interne', 'Autre', 'Interne uniquement', INTERNE_PDF);
@@ -95,7 +95,7 @@ try {
   });
 
   await assert('Changer un INTERNE → VISIBLE CLIENT met à jour l’espace client', async () => {
-    await openPreparation();
+    await openDocuments();
     await row('Partage-interne')
       .getByRole('button', { name: /Rendre visible au client/ })
       .click();
@@ -104,7 +104,7 @@ try {
   });
 
   await assert('Changer un VISIBLE CLIENT → INTERNE le retire de l’espace client', async () => {
-    await openPreparation();
+    await openDocuments();
     await row('Partage-client')
       .getByRole('button', { name: /Rendre interne/ })
       .click();

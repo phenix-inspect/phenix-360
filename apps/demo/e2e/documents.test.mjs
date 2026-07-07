@@ -1,6 +1,6 @@
 /**
- * Consolidation 2 — Documents = une bibliothèque unique. Un document déposé en
- * Préparation devient un événement `document` du Journal (fini le silo) ; la
+ * Consolidation 2 — Documents = une bibliothèque unique. Un document déposé dans
+ * l'onglet DOCUMENTS devient un événement `document` du Journal (fini le silo) ; la
  * checklist pointe vers lui. Client-safe : un document interne ne fuit pas.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
@@ -19,9 +19,9 @@ const { assert, summary } = harness();
 try {
   await openDemo(page);
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-  await page.getByRole('tab', { name: 'Préparation' }).click();
+  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
 
-  await assert('Déposer un document en Préparation (fichier réel)', async () => {
+  await assert('Déposer un document dans l’onglet Documents (fichier réel)', async () => {
     await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
     await page.getByLabel('Libellé du document').fill(DOC);
     await page.setInputFiles('[data-testid="prep-doc-file"]', PDF);

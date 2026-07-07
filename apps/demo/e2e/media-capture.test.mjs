@@ -113,7 +113,7 @@ try {
   // ---- Documents avec photo : PDF OU photo (prise sur mobile) -------------
   await assert('DOCUMENTS — champ natif (PDF ou photo, sans capture)', async () => {
     await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: /Préparation/ }).click();
+    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
     const input = page.locator('[data-testid="prep-doc-file"]');
     await input.waitFor({ state: 'attached', timeout: 6000 });
     const a = await mediaAttrs(input);

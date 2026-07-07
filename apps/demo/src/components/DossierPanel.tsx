@@ -49,7 +49,7 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
-import { PhotosAvantSection, PrepDocumentsSection } from './prep/PrepDocuments';
+import { PhotosAvantSection } from './prep/PrepDocuments';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -224,25 +224,6 @@ export function DossierPanel({
     });
   };
 
-  const askDocument = async (docId: string, label: string) => {
-    patch({
-      documents: dossier.documents.map((d) =>
-        d.id === docId ? { ...d, status: 'demande_client' } : d,
-      ),
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'ouverte',
-      content: {
-        question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${label} ?`,
-        destinataire: 'client',
-      },
-    });
-  };
-
   const stepLabels = (ids?: string[]): string[] =>
     (ids ?? []).map((id) => dossier.roadmap.find((s) => s.id === id)?.label ?? id);
 
@@ -363,13 +344,6 @@ export function DossierPanel({
           />
         </Section>
       )}
-
-      <PrepDocumentsSection
-        project={project}
-        dossier={dossier}
-        patch={patch}
-        onAskDocument={(docId, label) => void askDocument(docId, label)}
-      />
 
       <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
 

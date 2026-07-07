@@ -52,3 +52,44 @@ export function openAttachment(attachment: EventAttachment): void {
 export function openHtmlDocument(html: string): void {
   openBlob(new Blob([html], { type: 'text/html;charset=utf-8' }));
 }
+
+/** Télécharge un Blob sous un nom de fichier donné (ancre `download`). 100 % local. */
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Nettoie un libellé pour en faire un nom de fichier sûr. */
+const safeName = (name: string): string =>
+  name
+    .replace(/[^\p{L}\p{N}\-_. ]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, '-') || 'document';
+
+/** Télécharge une pièce jointe RÉELLE (le fichier d'origine). Sans fichier → rien. */
+export function downloadAttachment(attachment: EventAttachment): void {
+  const dataUrl = attachment.dataUrl;
+  if (!dataUrl) return;
+  try {
+    const comma = dataUrl.indexOf(',');
+    const base64 = dataUrl.slice(comma + 1);
+    const mime = attachment.mimeType || 'application/octet-stream';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    downloadBlob(new Blob([bytes], { type: mime }), attachment.fileName ?? safeName('document'));
+  } catch {
+    /* silencieux : on n'a rien à télécharger */
+  }
+}
+
+/** Télécharge un document GÉNÉRÉ (HTML autonome) sous « <titre>.html ». */
+export function downloadHtmlDocument(html: string, title: string): void {
+  downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeName(title)}.html`);
+}

@@ -138,7 +138,9 @@ try {
       .getByText('Prêt à partager au client')
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
-    // Retrait du document « Devis signé » (aucun objet devis riche ici → bloquant).
+    // Retrait du document « Devis signé » — la gestion des documents vit désormais
+    // dans l'onglet DOCUMENTS (bibliothèque unique).
+    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
     await page.getByRole('button', { name: 'Retirer Devis signé' }).click();
     await openClient();
     await page

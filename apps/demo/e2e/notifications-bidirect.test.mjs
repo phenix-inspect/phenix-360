@@ -97,7 +97,7 @@ try {
   // ---------------------------------------------------------------------------
   await assert('CONDUCTEUR partage un document (Visible client)', async () => {
     await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: /Préparation/ }).click();
+    await page.getByRole('tab', { name: 'Documents', exact: true }).click();
     await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
     await page.getByLabel('Libellé du document').fill(DOC_LIBELLE);
     await page.getByLabel('Type de document').selectOption({ label: 'Plan' });

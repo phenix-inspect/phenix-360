@@ -81,8 +81,13 @@ import {
   type ZoneId,
 } from '@phenix360/core';
 import { buildDemoSeed } from './seed';
-import { openAttachment, openHtmlDocument } from './lib/document';
-import { buildDocumentHtml } from './lib/generatedDocument';
+import {
+  downloadAttachment,
+  downloadHtmlDocument,
+  openAttachment,
+  openHtmlDocument,
+} from './lib/document';
+import { buildDocumentHtml, generatedDocumentTitle } from './lib/generatedDocument';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
@@ -458,6 +463,35 @@ export const demo = {
         authorName: nameOf(snapshot, event.actor.userId),
       }),
     );
+  },
+
+  /**
+   * TÉLÉCHARGE n'importe quel document (règle unique, symétrique de `openDocument`) :
+   * un vrai fichier → le fichier d'origine ; un document généré → sa page HTML.
+   */
+  downloadDocument(event: Event): void {
+    if (event.type === 'document' && event.content.attachment.dataUrl) {
+      downloadAttachment(event.content.attachment);
+      return;
+    }
+    const project = snapshot.projects.find((p) => p.id === event.projectId);
+    downloadHtmlDocument(
+      buildDocumentHtml(event, {
+        projectName: project?.name ?? 'Chantier',
+        authorName: nameOf(snapshot, event.actor.userId),
+      }),
+      generatedDocumentTitle(event),
+    );
+  },
+
+  /**
+   * Change la VISIBILITÉ d'un document (interne ↔ visible client) directement sur
+   * son événement `document`. Le client le voit apparaître / disparaître aussitôt.
+   */
+  async setDocumentVisibility(eventId: string, visibility: EventVisibility): Promise<void> {
+    await backend.setEventVisibility(toEventId(eventId), visibility);
+    refresh();
+    broadcast();
   },
 
   /**

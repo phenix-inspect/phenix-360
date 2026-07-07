@@ -1603,3 +1603,48 @@ d'actions du `SuiviTab` → consultation seule). Nouveau `mission-entree-unique.
 composer s'ouvre ; parcours complet « ajouter un document » → au Journal ; compteur
 « Répondre ») ; `documents-acompte-facture` recalé (ajout de document via Nouvelle
 mission). Gate vert (e2e 47/47). VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — Un onglet = un univers : réorg. du Chantier + Documents dédié
+
+**Décision produit (retour terrain) :** trop de briques mélangées sur une même page.
+Règle unique : **un onglet = un univers = une seule question.** On ne crée aucun
+concept — on DÉPLACE les briques existantes dans le bon univers.
+
+- **SUIVI** = « que s'est-il passé ? » → le journal chronologique SEUL. Aucune
+  création, aucune bibliothèque de documents, aucune notification.
+- **PRÉPARATION** = « le chantier est-il piloté ? » → le cockpit (check-list de
+  lancement, devis/budget, planning, dates, commandes, décisions client, avenants).
+  Plus de bibliothèque de documents ici.
+- **DOCUMENTS** (nouvel onglet) = « où retrouver un document ? » → **tout** : la
+  préparation documentaire (dépôt, obtention, « Demander au client », partage) ET la
+  **bibliothèque du chantier** (devis, factures, plans, comptes rendus, PV de
+  pré-réception / réception… tout document ou PV généré). Chaque document est
+  **consultable, ouvrable, téléchargeable et partageable**. On ne cherche jamais
+  ailleurs.
+- **DANS LES COULISSES** = photos/albums (inchangé).
+- **AUJOURD'HUI** = le centre de notifications (déjà en place) : une notification vit
+  ICI, jamais QUE dans un chantier, et son clic ouvre directement l'élément concerné.
+
+**Mécanique (déplacement, pas de nouveau concept) :** `PrepDocumentsSection` quitte la
+Préparation pour le nouvel onglet `DocumentsTab`, qui ajoute une **bibliothèque**
+dérivée du journal (`document` + `compte_rendu` events NON gérés par la préparation →
+aucun doublon intra-onglet). Nouveaux ports : `demo.downloadDocument(event)`
+(fichier réel → le fichier ; document généré → sa page HTML) via `downloadAttachment`
+/ `downloadHtmlDocument` ; `demo.setDocumentVisibility(eventId, visibility)` (partage
+d'un fichier au client). Le Suivi ne crée plus rien (les actions ont déjà migré vers
+« Nouvelle mission »). `PhotosAvantSection` (état des lieux) reste en Préparation.
+
+**Espace client : NON touché** (conforme au brief — on valide d'abord le conducteur,
+puis on appliquera la même philosophie au client). **Alternatives rejetées :** garder
+les documents à la fois en Préparation et en Documents (le doublon qu'on supprime) ;
+une page unique immense (contraire à « un onglet = une question »).
+
+**Impact :** nouvel onglet `Documents` (`CompagnonView` + `DocumentsTab`), retrait de
+`PrepDocumentsSection` de `DossierPanel`, `lib/document` (download), `store`
+(`downloadDocument`, `setDocumentVisibility`). Nouveau `chantier-architecture.test`
+(chaque univers, aucun doublon, notifications dans Aujourd'hui, clic → bon écran) ;
+tests documentaires recalés (dépôt via l'onglet Documents) : `documents`,
+`documents-partage`, `documents-acompte-facture`, `client-partage`, `coulisses-photos`,
+`media-capture`, `notifications-bidirect`. Gate vert (e2e 48/48). VISION Art. 8, 9, 11.

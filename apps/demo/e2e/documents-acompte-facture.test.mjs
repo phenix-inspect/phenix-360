@@ -26,8 +26,9 @@ const FACTURE_SHARED_PDF = pdf('facture-partagee.pdf');
 
 const acompteRow = () => page.locator('li').filter({ hasText: 'Acompte payé' }).first();
 
-/** Dépose un document de préparation (libellé + catégorie + fichier réel). */
+/** Dépose un document (le dépôt vit dans l'onglet DOCUMENTS — bibliothèque unique). */
 const addPrepDoc = async (libelle, typeLabel, file) => {
+  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
   await page.getByRole('heading', { name: /^Documents/ }).scrollIntoViewIfNeeded();
   await page.getByLabel('Libellé du document').fill(libelle);
   await page.getByLabel('Type de document').selectOption({ label: typeLabel });
@@ -73,6 +74,8 @@ try {
   });
 
   await assert('La checklist « Acompte reçu » passe validée (via la catégorie)', async () => {
+    // La check-list de partage vit dans la Préparation (cockpit).
+    await page.getByRole('tab', { name: 'Préparation', exact: true }).click();
     await acompteRow()
       .getByRole('button', { name: 'Annuler' })
       .waitFor({ state: 'visible', timeout: 6000 });
@@ -89,6 +92,7 @@ try {
 
   await assert('Facture finale NON bloquante (toujours 3 éléments obligatoires)', async () => {
     // La facture n'entre jamais dans les bloquants de partage (devis/acompte/date).
+    await page.getByRole('tab', { name: 'Préparation', exact: true }).click();
     await page
       .getByText(/\/\s*3 éléments obligatoires validés/)
       .first()
@@ -137,10 +141,10 @@ try {
   });
 
   await assert(
-    'Non-régression : les deux documents restent dans les documents internes',
+    'Non-régression : les deux documents restent dans l’onglet Documents (internes)',
     async () => {
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-      await page.getByRole('tab', { name: /Préparation/ }).click();
+      await page.getByRole('tab', { name: 'Documents', exact: true }).click();
       await page
         .getByText('Preuve de versement 30%')
         .first()
