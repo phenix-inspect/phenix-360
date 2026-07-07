@@ -1,9 +1,9 @@
 /**
- * RC1 — Ouverture des documents côté client (bug de rendu/lien).
- * Un document AVEC fichier s'ouvre réellement (nouvel onglet, via blob) : titre
- * cliquable + bouton « Ouvrir le document ». Un document SANS fichier n'affiche
- * pas de faux lien (« Document disponible prochainement »). Client-safe strict :
- * un document interne n'apparaît jamais côté client.
+ * RC1 — Ouverture des documents côté client. Règle unique : tout document est
+ * CONSULTABLE d'un clic (jamais une simple ligne). Un document AVEC fichier ouvre
+ * le fichier ; un document SANS fichier ouvre un document GÉNÉRÉ par PHÉNIX — les
+ * deux via un nouvel onglet (blob). Client-safe strict : un document interne
+ * n'apparaît jamais côté client.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -31,14 +31,18 @@ try {
   });
 
   await assert(
-    'Document SANS fichier → pas de faux lien, mais « disponible prochainement »',
+    'Document SANS fichier → CONSULTABLE : PHÉNIX génère le document et l’ouvre',
     async () => {
       const card = cardWith(SANS_FICHIER);
-      await card
-        .getByText('Document disponible prochainement')
-        .waitFor({ state: 'visible', timeout: 5000 });
-      if ((await card.getByRole('button', { name: 'Ouvrir le document' }).count()) > 0)
-        throw new Error('un faux lien « Ouvrir » est affiché sur un document sans fichier');
+      // Plus de « disponible prochainement » : le document s'ouvre (document généré).
+      if ((await card.getByText('Document disponible prochainement').count()) > 0)
+        throw new Error('le document sans fichier reste une ligne inerte');
+      const pagePromise = ctx.waitForEvent('page', { timeout: 6000 });
+      await card.getByRole('button', { name: 'Ouvrir le document' }).click();
+      const tab = await pagePromise;
+      if (!tab.url().startsWith('blob:'))
+        throw new Error(`le document généré ne s'ouvre pas (url=${tab.url()})`);
+      await tab.close();
     },
   );
 

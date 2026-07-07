@@ -45,7 +45,7 @@ import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
-import { DocumentLink } from '../components/DocumentLink';
+import { DocumentButton } from '../components/DocumentButton';
 import { DossierPanel } from '../components/DossierPanel';
 import { AttentionPanel } from '../components/AttentionPanel';
 import { FilView } from '../components/fil/FilView';
@@ -399,12 +399,10 @@ function SuiviTab({
                 const filSrc =
                   e.type === 'demande' || e.type === 'reserve' ? e.content.source : undefined;
                 const canLever = e.type === 'reserve' && statut === 'ouverte';
-                const docAttachment =
-                  e.type === 'document' && e.content.attachment.dataUrl
-                    ? e.content.attachment
-                    : undefined;
-                const hasRow =
-                  badge != null || filSrc?.kind === 'fil' || canLever || docAttachment != null;
+                // Tout document / compte rendu est CONSULTABLE (fichier réel ou
+                // document généré par PHÉNIX) — jamais une simple ligne inerte.
+                const openableDoc = e.type === 'document' || e.type === 'compte_rendu';
+                const hasRow = badge != null || filSrc?.kind === 'fil' || canLever || openableDoc;
                 return (
                   <ActivityItem
                     key={e.id}
@@ -448,7 +446,7 @@ function SuiviTab({
                             <CircleCheck aria-hidden /> Lever la réserve
                           </button>
                         )}
-                        {docAttachment && <DocumentLink attachment={docAttachment} />}
+                        {openableDoc && <DocumentButton event={e} />}
                       </span>
                     )}
                   </ActivityItem>

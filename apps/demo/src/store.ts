@@ -79,6 +79,8 @@ import {
   type ZoneId,
 } from '@phenix360/core';
 import { buildDemoSeed } from './seed';
+import { openAttachment, openHtmlDocument } from './lib/document';
+import { buildDocumentHtml } from './lib/generatedDocument';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
@@ -432,6 +434,28 @@ export const demo = {
    */
   markMomentSeen(role: string, momentId: string): void {
     demo.markSeen(role, [momentId]);
+  },
+
+  /**
+   * Ouvre N'IMPORTE QUEL document pour consultation — règle unique : un document
+   * n'est JAMAIS une simple ligne. S'il porte un vrai fichier (PDF / image) →
+   * ouverture du fichier ; sinon (compte rendu, PV de réception, devis de
+   * référence…) → PHÉNIX GÉNÈRE le document et l'ouvre. Fonctionne pour les
+   * événements `document` et `compte_rendu`, côté conducteur comme côté client
+   * (le partage gouverne DÉJÀ où le document apparaît — ici on ne fait qu'ouvrir).
+   */
+  openDocument(event: Event): void {
+    if (event.type === 'document' && event.content.attachment.dataUrl) {
+      openAttachment(event.content.attachment);
+      return;
+    }
+    const project = snapshot.projects.find((p) => p.id === event.projectId);
+    openHtmlDocument(
+      buildDocumentHtml(event, {
+        projectName: project?.name ?? 'Chantier',
+        authorName: nameOf(snapshot, event.actor.userId),
+      }),
+    );
   },
 
   /**

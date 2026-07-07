@@ -22,6 +22,7 @@ import {
   X,
 } from 'lucide-react';
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
+import { DocumentButton } from '../DocumentButton';
 import { DocumentLink } from '../DocumentLink';
 import { demo, useDemo } from '../../store';
 import { readDocumentAttachment, readPhotoAttachment, MAX_DOC_MB } from '../../lib/upload';
@@ -124,8 +125,13 @@ export function PrepDocumentsSection({
                 </div>
                 <DocumentStatusBadge status={d.status} />
                 {(() => {
-                  const att = fileOf(d);
-                  return att ? <DocumentLink attachment={att} /> : null;
+                  // Document rattaché à la bibliothèque (événement) → toujours
+                  // consultable (fichier réel OU document généré par PHÉNIX).
+                  // Repli legacy : un attachment porté par le dossier (avant la
+                  // Consolidation Documents).
+                  const ev = documentEvent(d);
+                  if (ev) return <DocumentButton event={ev} />;
+                  return d.attachment?.dataUrl ? <DocumentLink attachment={d.attachment} /> : null;
                 })()}
                 {(() => {
                   // Bascule interne ↔ visible client (documents AVEC fichier).

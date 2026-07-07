@@ -1352,3 +1352,42 @@ ne voit QUE ce qui le concerne ; export/import inchangé.
 `ClientView`. Nouveau `notifications-bidirect.test` (photo/document → client ; ❤️/
 décision → conducteur ; clic ouvre + marque lu ; client-safe ; zéro console). Gate
 vert (e2e 42/42). VISION Art. 3, 9, 11.
+
+---
+
+## 07/07/2026 — Tout document est CONSULTABLE (un clic l'ouvre, toujours)
+
+**Décision produit (retour terrain) :** un document ne doit JAMAIS être une simple
+ligne dans une liste. Partout dans PHÉNIX, un document est cliquable et s'ouvre
+immédiatement. Deux cas, une seule règle pour l'utilisateur : **fichier réel**
+(PDF / image) → ouverture du fichier ; **document généré par PHÉNIX** (compte rendu,
+PV de réception, liste des points à reprendre, fiche de référence d'un devis / d'une
+facture / d'un acompte sans pièce jointe) → PHÉNIX **génère** le document (page HTML
+autonome, lisible et imprimable) et l'ouvre. Côté client comme côté conducteur.
+
+**Mécanique (enrichir l'existant, aucun nouvel écran) :** avant, seul un `document`
+event PORTANT un `dataUrl` était ouvrable (`DocumentLink`) ; les documents générés
+et les documents seedés sans fichier restaient inertes (« disponible prochainement »).
+Désormais un point d'entrée unique `demo.openDocument(event)` route : fichier réel →
+`openAttachment` (blob) ; sinon → `buildDocumentHtml(event, ctx)` + `openHtmlDocument`
+(blob `text/html`). Même mécanique d'ouverture par onglet que les fichiers — pour
+l'utilisateur, tout document se consulte pareil. Le rendu généré est **pure
+présentation** (titre = `docTitre` d'une mission quand présent : « PV de réception »…,
+métadonnées chantier / date / auteur / étape / présents, corps : texte + décisions +
+actions + questions + manquants pour un compte rendu ; fiche de référence pour un
+document sans pièce). Contenu métier **échappé** (HTML-safe).
+
+**Portée :** `MomentCard` (récit + documents + comptes rendus client), Journal
+conducteur (`CompagnonView`), Préparation (`PrepDocuments`) via un `DocumentButton`
+générique qui remplace `DocumentLink`. La visibilité GOUVERNE DÉJÀ où un document
+apparaît — ouvrir ne contourne rien : le client ne voit et n'ouvre que le partagé,
+l'interne reste au conducteur. **Alternatives rejetées :** un lecteur / écran dédié
+(nouveau concept) ; générer un vrai PDF (dépendance lourde hors-ligne — l'HTML
+imprimable suffit et reste 100 % local).
+
+**Impact :** `lib/document.ts` (`openBlob` extrait, `openHtmlDocument`), nouveau
+`lib/generatedDocument.ts` (`buildDocumentHtml`), `store.openDocument`, nouveau
+`components/DocumentButton`. Nouveau `documents-consultables.test` (compte rendu /
+devis / interne / pré-réception / réception / partagé client — fichier ET généré,
+client-safe, zéro console) ; `client-documents.test` recalé (le document sans fichier
+s'ouvre désormais). Gate vert (e2e 43/43). VISION Art. 7, 8, 9, 11.

@@ -1,12 +1,28 @@
 import type { EventAttachment } from '@phenix360/core';
 
 /**
- * Ouvre une pièce jointe (PDF / image) dans un NOUVEL ONGLET, pour aperçu.
+ * Ouvre un Blob dans un NOUVEL ONGLET (aperçu natif du navigateur).
  *
  * Les navigateurs bloquent la navigation directe vers une URL `data:` (anti-
- * hameçonnage) : on convertit donc le data URL en Blob puis en URL d'objet, qui
- * s'ouvre et se rend nativement. Sans fichier attaché, on ne fait RIEN (aucun
- * faux lien). 100 % local, aucun réseau.
+ * hameçonnage) : on passe donc par une URL d'objet, qui s'ouvre et se rend
+ * nativement. Ouverture par ancre `target="_blank"` : fiable (contrairement à
+ * `window.open(..., 'noopener')` qui renvoie toujours null). 100 % local.
+ */
+function openBlob(blob: Blob): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/**
+ * Ouvre une pièce jointe RÉELLE (PDF / image, data URL base64) dans un nouvel
+ * onglet. Sans fichier attaché, on ne fait RIEN (aucun faux lien). 100 % local.
  */
 export function openAttachment(attachment: EventAttachment): void {
   const dataUrl = attachment.dataUrl;
@@ -20,19 +36,19 @@ export function openAttachment(attachment: EventAttachment): void {
     const binary = atob(base64);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
-    // Ouverture par ancre `target="_blank"` : fiable pour ouvrir un nouvel onglet
-    // (contrairement à `window.open(..., 'noopener')` qui renvoie toujours null).
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    openBlob(new Blob([bytes], { type: mime }));
   } catch {
     // Dernier recours : tenter le data URL tel quel.
     window.open(dataUrl, '_blank', 'noopener,noreferrer');
   }
+}
+
+/**
+ * Ouvre un document GÉNÉRÉ par PHÉNIX (compte rendu, PV de réception, fiche de
+ * référence…) : une page HTML autonome, lisible et imprimable, rendue dans un
+ * nouvel onglet. Même mécanique d'ouverture que les fichiers réels — pour
+ * l'utilisateur, tout document se consulte de la même façon.
+ */
+export function openHtmlDocument(html: string): void {
+  openBlob(new Blob([html], { type: 'text/html;charset=utf-8' }));
 }

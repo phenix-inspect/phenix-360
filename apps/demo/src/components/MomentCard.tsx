@@ -2,8 +2,8 @@ import { FileText, Heart, MessageCircle, NotebookPen, Sparkles } from 'lucide-re
 import { ROLE_LABEL, type Event } from '@phenix360/core';
 import { Avatar } from './Avatar';
 import { PhotoTile } from './PhotoTile';
-import { DocumentLink } from './DocumentLink';
-import { openAttachment } from '../lib/document';
+import { DocumentButton } from './DocumentButton';
+import { demo } from '../store';
 import { eventDescription, eventTitle } from '../lib/eventText';
 import { fmtDate } from '../lib/format';
 
@@ -21,10 +21,9 @@ export function MomentCard({
 }): React.JSX.Element {
   const title = eventTitle(event);
   const description = eventDescription(event);
-  // Document RÉELLEMENT ouvrable = un fichier attaché (data URL). Sinon on n'offre
-  // aucun lien (ni titre cliquable) : « disponible prochainement ».
-  const openableDoc =
-    event.type === 'document' && event.content.attachment.dataUrl ? event.content.attachment : null;
+  // Règle unique : un document (ou un compte rendu) est TOUJOURS consultable — un
+  // vrai fichier s'ouvre, un document généré par PHÉNIX se génère à l'ouverture.
+  const openable = event.type === 'document' || event.type === 'compte_rendu';
 
   return (
     <article className="overflow-hidden rounded-2xl border border-border bg-surface shadow-sm">
@@ -60,10 +59,10 @@ export function MomentCard({
                     : 'Compte rendu'}
             </span>
           )}
-          {openableDoc ? (
+          {openable ? (
             <button
               type="button"
-              onClick={() => openAttachment(openableDoc)}
+              onClick={() => demo.openDocument(event)}
               className="block text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <h3 className="font-serif text-lg font-semibold tracking-tight text-foreground underline-offset-4 transition-colors hover:text-gold-700 hover:underline">
@@ -78,17 +77,11 @@ export function MomentCard({
           {description != null && (
             <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
           )}
-          {event.type === 'document' &&
-            (openableDoc ? (
-              <span className="mt-1 inline-flex">
-                <DocumentLink attachment={openableDoc} />
-              </span>
-            ) : (
-              <span className="mt-1 inline-flex items-center gap-2 rounded-lg border border-dashed border-border bg-muted px-3 py-2 text-sm text-muted-foreground [&_svg]:size-4">
-                <FileText aria-hidden />
-                Document disponible prochainement
-              </span>
-            ))}
+          {openable && (
+            <span className="mt-1 inline-flex">
+              <DocumentButton event={event} />
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-5 border-t border-border pt-3 text-muted-foreground">
