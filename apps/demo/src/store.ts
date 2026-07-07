@@ -2124,7 +2124,9 @@ export interface AppNotification {
   /** Conducteur : onglet du chantier à ouvrir (+ Moment à cibler le cas échéant). */
   tab?: string;
   momentId?: string;
-  /** Client : section de l'espace à faire défiler (+ éventuel basculement de vue). */
+  /** Client : onglet de l'espace à ouvrir (aujourdhui / projet / coulisses / documents). */
+  clientTab?: 'aujourdhui' | 'projet' | 'coulisses' | 'documents';
+  /** Client : section à faire défiler dans l'onglet (+ éventuel basculement de vue). */
   clientSection?: string;
   clientView?: 'fil' | 'bibliotheque';
 }
@@ -2231,6 +2233,7 @@ export function clientNotifications(
         createdAt: m.createdAt,
         seenKeys: [m.id],
         projectId,
+        clientTab: 'coulisses',
         clientSection: 'section-fil',
         clientView: 'fil',
       });
@@ -2238,7 +2241,7 @@ export function clientNotifications(
   for (const e of snap.events) {
     if (e.projectId !== projectId || e.visibility !== 'client' || e.state !== 'publie') continue;
     if (e.createdAt <= base || seen[e.id]) continue;
-    // 💬 Nouveau compte rendu de l'équipe.
+    // 💬 Nouveau compte rendu de l'équipe → il vit dans l'onglet DOCUMENTS.
     if (e.type === 'compte_rendu')
       out.push({
         id: `cr-${e.id}`,
@@ -2247,9 +2250,10 @@ export function clientNotifications(
         createdAt: e.createdAt,
         seenKeys: [e.id],
         projectId,
-        clientSection: 'section-fil',
+        clientTab: 'documents',
+        clientSection: 'section-documents',
       });
-    // 📄 Nouveau document partagé.
+    // 📄 Nouveau document partagé → onglet DOCUMENTS.
     else if (e.type === 'document')
       out.push({
         id: `doc-${e.id}`,
@@ -2258,6 +2262,7 @@ export function clientNotifications(
         createdAt: e.createdAt,
         seenKeys: [e.id],
         projectId,
+        clientTab: 'documents',
         clientSection: 'section-documents',
       });
   }

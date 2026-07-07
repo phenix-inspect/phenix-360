@@ -8,7 +8,7 @@
  *  • la facture finale n'est PAS bloquante au démarrage (toujours 3 obligatoires) ;
  *  • client-safe inchangé : interne → invisible côté client ; partagé → visible.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 import { phenixDevisPdf } from './pdf-fixtures.mjs';
 
 const browser = await launch();
@@ -127,7 +127,7 @@ try {
   });
 
   await assert('Client-safe : la facture PARTAGÉE est visible côté client', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Documents');
     await page
       .locator('#section-documents')
       .getByText('Facture finale partagee', { exact: false })

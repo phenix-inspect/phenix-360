@@ -48,6 +48,8 @@ try {
     await openClient();
     if ((await page.getByText('Espace client non prêt').count()) > 0)
       throw new Error('espace client bloqué alors que les 3 bloquants sont validés');
+    // Le planning vit dans l'onglet « Le projet ».
+    await page.getByRole('tab', { name: 'Le projet' }).click();
     await page
       .getByRole('heading', { name: 'Les grandes étapes du chantier' })
       .first()

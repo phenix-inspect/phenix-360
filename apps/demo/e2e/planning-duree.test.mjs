@@ -61,7 +61,9 @@ const setDureeEtDebut = async (duration, startIso) => {
 };
 
 const openClient = async () => {
+  // Le planning (grandes étapes) vit dans l'onglet « Le projet » de l'Espace client.
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  await page.getByRole('tab', { name: 'Le projet' }).click();
   await planning()
     .getByText('Réception', { exact: true })
     .first()

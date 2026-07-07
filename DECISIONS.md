@@ -1648,3 +1648,54 @@ une page unique immense (contraire à « un onglet = une question »).
 tests documentaires recalés (dépôt via l'onglet Documents) : `documents`,
 `documents-partage`, `documents-acompte-facture`, `client-partage`, `coulisses-photos`,
 `media-capture`, `notifications-bidirect`. Gate vert (e2e 48/48). VISION Art. 8, 9, 11.
+
+## 07/07/2026 — Un onglet = un univers : refonte complète de l'Espace client
+
+**Décision produit (retour terrain) :** on applique à l'Espace client la même règle que
+le Chantier — **un onglet = un univers = une seule question.** Le client ne doit jamais
+avoir l'impression d'un logiciel de chantier / ERP : il comprend tout en < 5 s, comme
+un réseau social premium qui rassure. On ne crée aucun concept — on DÉPLACE les briques
+existantes dans le bon univers. Quatre onglets, quatre questions :
+
+- **AUJOURD'HUI** = « PHÉNIX attend-il quelque chose de moi ? » → la boîte de réception :
+  décisions à prendre, questions PHÉNIX, réponses du conducteur, nouveaux documents,
+  nouvelles photos, ❤️/💬, rappels. Une notification traitée disparaît (accusé de
+  lecture), et son clic ouvre **directement le bon écran** (le bon onglet + la bonne
+  section). Aucun univers mélangé ici : juste ce qui appelle une action.
+- **LE PROJET** = « où en est mon chantier ? » → grandes étapes, avancement, dates,
+  planning simplifié, « Vos choix ». **Aucun document, aucune photo, aucun historique.**
+  Rassure, ne stresse pas.
+- **DANS LES COULISSES** = « que se passe-t-il ? » → l'Instagram privé du chantier :
+  albums photos/vidéos, ❤️ et 💬. **Aucun document / CR / PV / PDF.**
+- **DOCUMENTS** = « où retrouver mes documents ? » → devis, avenants, acompte, factures,
+  **comptes rendus**, visites, PV de pré-réception / réception, garanties, notices…
+  Chaque document **ouvrable et téléchargeable** d'un clic. On ne cherche jamais ailleurs.
+
+**Mécanique (déplacement, pas de nouveau concept) :** `ClientView` passe d'une page qui
+défile (sommaire + `#section-*`) à **4 sous-onglets** `Tabs` ; les `id` de section sont
+conservés À L'INTÉRIEUR des onglets pour que les notifications ciblent toujours le bon
+ancrage. `AppNotification` gagne un champ `clientTab` (`'aujourdhui' | 'projet' |
+'coulisses' | 'documents'`) : `clientNotifications` route photo/moment → coulisses,
+document/compte rendu → documents ; le clic bascule sur le bon onglet PUIS scrolle vers
+la section. Les **comptes rendus rejoignent la bibliothèque Documents** (un seul univers
+documentaire, plus de section « Comptes rendus » à part). Nouveau composant
+`ClientDocuments` (liste `li` : titre + « Ouvrir le document » + « Télécharger »,
+via `demo.openDocument` / `demo.downloadDocument`). « Dans les coulisses » n'affiche que
+les moments-photos (`momentsCoulisses`), en lecture (`canCompose=false`).
+
+**Collision de libellé résolue :** le sous-onglet client « Aujourd'hui » porte le même
+nom que le sélecteur de vue global « Aujourd'hui » (deux `role=tab`). L'en-tête étant
+premier dans le DOM, les tests ciblent l'en-tête via `.first()` ; le helper e2e
+`openClientTab` ouvre l'« Aujourd'hui » client via `.last()`.
+
+**Alternatives rejetées :** garder une longue page qui défile (contraire à « un onglet =
+une question ») ; laisser les comptes rendus dans un univers séparé (le client cherchait
+à deux endroits) ; mélanger photos et documents dans un même « fil » (l'ERP qu'on fuit).
+
+**Impact :** `ClientView` réécrit (4 onglets), nouveau `components/ClientDocuments`,
+`store` (`clientTab` dans `AppNotification` + `clientNotifications`), helper
+`openClientTab` (harness). Nouveau `client-architecture.test` (chaque fonctionnalité dans
+le bon onglet, aucun doublon, toutes les notifications dans Aujourd'hui ouvrant le bon
+écran, photos hors Documents, documents hors Coulisses, zéro fuite, zéro erreur console).
+~18 suites client recalées (navigation par sous-onglet). Gate vert (e2e 49/49). VISION
+Art. 3, 6, 8, 11.

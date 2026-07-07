@@ -5,7 +5,7 @@
  * bon endroit, et se retire quand le conducteur le marque « pris en compte ».
  * Client-safe : rien de ce radar ne fuit côté client.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2200 });
@@ -31,15 +31,20 @@ try {
   });
 
   await assert('CLIENT — le client valide une ambiance (cuisine)', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page); // Aujourd'hui = la décision à prendre
     await page.getByRole('button', { name: 'Voir la décision' }).click();
     await page.getByRole('radio', { name: new RegExp('beige sable', 'i') }).click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
+    // « Vos choix » (le récap) vit dans l'onglet « Le projet ».
+    await page.getByRole('tab', { name: 'Le projet' }).click();
     await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('CONDUCTEUR — le choix validé rejoint « À traiter »', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });
@@ -73,7 +78,10 @@ try {
   });
 
   await assert('« Pris en compte » retire le choix de « À traiter »', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });

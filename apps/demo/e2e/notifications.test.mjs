@@ -6,7 +6,7 @@
  * client ont chacun le leur). Plusieurs en attente → compteur juste, on ouvre la
  * plus récente. Client-safe strict.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2200 });
@@ -74,7 +74,10 @@ try {
   await assert(
     'Aujourd’hui : plus de signal « commentaire client » (consulté + répondu)',
     async () => {
-      await page.getByRole('tab', { name: /Aujourd/ }).click();
+      await page
+        .getByRole('tab', { name: /Aujourd/ })
+        .first()
+        .click();
       await page
         .getByRole('heading', { name: /Bonjour Mickaël/ })
         .waitFor({ state: 'visible', timeout: 5000 });
@@ -85,22 +88,23 @@ try {
   );
 
   await assert('CLIENT — deux messages d’équipe → compteur juste (2)', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    // Le signal « votre équipe vous a laissé N messages » vit dans Aujourd'hui.
+    await openClientTab(page);
     await page
       .getByText(/Votre équipe vous a laissé 2 messages/)
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
+    // Les Moments signalés se comptent dans « Dans les coulisses ».
+    await openClientTab(page, 'Dans les coulisses');
     const n = await badgeClient().count();
     if (n !== 2) throw new Error(`attendu 2 Moments signalés, vu ${n}`);
   });
 
   await assert('Clic notification client → ouvre la PLUS RÉCENTE + la marque lue', async () => {
+    await openClientTab(page); // Aujourd'hui
+    // Le clic bascule sur les coulisses et consulte le plus récent (le mur porteur).
     await page.getByRole('button', { name: /Votre équipe vous a laissé/ }).click();
-    // La plus récente (le mur porteur) est consultée → compteur retombe à 1.
-    await page
-      .getByText(/Votre équipe vous a laissé 1 message/)
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+    await page.waitForTimeout(400);
     const n = await badgeClient().count();
     if (n !== 1) throw new Error(`attendu 1 Moment encore signalé, vu ${n}`);
     // Celui qui reste est le plus ancien (la dalle), pas le mur.

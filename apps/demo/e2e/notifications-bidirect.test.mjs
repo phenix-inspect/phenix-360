@@ -11,7 +11,7 @@
  * elle disparaît. L'historique seedé ne notifie jamais (repère `notifBaseline`).
  * Client-safe strict. Zéro erreur console.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2600 });
@@ -45,7 +45,10 @@ const openAlbumComposer = async () => {
     .waitFor({ state: 'visible', timeout: 6000 });
 };
 const openAujourdhui = async () => {
-  await page.getByRole('tab', { name: /Aujourd/ }).click();
+  await page
+    .getByRole('tab', { name: /Aujourd/ })
+    .first()
+    .click();
   await page
     .getByRole('heading', { name: /Bonjour Mickaël/ })
     .waitFor({ state: 'visible', timeout: 6000 });
@@ -127,13 +130,15 @@ try {
       .first()
       .click();
     await page.waitForTimeout(400);
-    // La section documents est bien à l'écran (le document partagé y figure).
+    // Le clic bascule sur l'onglet Documents, où le document partagé figure.
     await page
       .locator('#section-documents')
       .getByText(DOC_LIBELLE)
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
-    // La notification consultée s'est éteinte (l'autre — la publication — demeure).
+    // De retour dans Aujourd'hui : la notif document a disparu (consultée), la notif
+    // photos demeure (non consultée).
+    await openClientTab(page);
     if ((await notif(new RegExp(`Nouveau document partagé : ${DOC_LIBELLE}`)).count()) > 0)
       throw new Error('la notification document persiste après consultation');
     await notif(/Nouvelles photos ajoutées dans les coulisses/)
@@ -145,6 +150,7 @@ try {
   // CLIENT → CONDUCTEUR (1) : coup de cœur (❤️).
   // ---------------------------------------------------------------------------
   await assert('CLIENT met un ❤️ sur une publication', async () => {
+    await openClientTab(page, 'Dans les coulisses');
     const heart = page.getByRole('button', { name: /coup de cœur/i }).first();
     await heart.waitFor({ state: 'visible', timeout: 6000 });
     await heart.click();
@@ -166,10 +172,12 @@ try {
   // CLIENT → CONDUCTEUR (2) : valider une décision.
   // ---------------------------------------------------------------------------
   await assert('CLIENT valide une décision (choix d’ambiance)', async () => {
-    await openClient();
+    await openClientTab(page); // Aujourd'hui = la décision à prendre
     await page.getByRole('button', { name: 'Voir la décision' }).click();
     await page.getByRole('radio').first().click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
+    // Le récap « Vos choix » vit dans « Le projet ».
+    await page.getByRole('tab', { name: 'Le projet' }).click();
     await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 

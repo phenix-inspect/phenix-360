@@ -108,6 +108,20 @@ export async function openDemo(page) {
     .waitFor({ state: 'visible', timeout: 15000 });
 }
 
+/**
+ * Ouvre l'Espace client sur l'un de ses 4 onglets (Aujourd'hui / Le projet / Dans
+ * les coulisses / Documents). L'onglet « Aujourd'hui » du client coexiste avec le
+ * sélecteur de vue « Aujourd'hui » de l'en-tête : on cible donc le DERNIER (celui
+ * de l'espace client, rendu après l'en-tête).
+ */
+export async function openClientTab(page, sub = 'Aujourd’hui') {
+  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  const isAujourdhui = /Aujourd/.test(sub);
+  const tab = page.getByRole('tab', { name: isAujourdhui ? /Aujourd/ : sub });
+  await (isAujourdhui ? tab.last() : tab.first()).click();
+  await page.waitForTimeout(200);
+}
+
 /** Carte de contact (bloc .rounded-xl qui porte le nom ET les actions). */
 export const contactCard = (page, name) =>
   page

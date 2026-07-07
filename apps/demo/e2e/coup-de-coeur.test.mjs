@@ -4,7 +4,7 @@
  * clic le vide. L'état « aimé » pilote réellement la couleur ET le remplissage.
  * Persiste après rechargement. Fonctionne côté conducteur ET côté client.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2200 });
@@ -63,7 +63,7 @@ try {
   });
 
   await assert('CLIENT — le coup de cœur marche aussi dans l’espace client', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Dans les coulisses');
     const btn = page.getByRole('button', { name: /coup de cœur/i }).first();
     await btn.waitFor({ state: 'visible', timeout: 6000 });
     const before = await pressed(btn);

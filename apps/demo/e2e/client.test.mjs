@@ -4,7 +4,7 @@
  * « modification », sections Documents / Comptes rendus, récit renommé,
  * client-safe.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser);
@@ -21,35 +21,34 @@ try {
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
+  await assert('Espace client : l’onglet « Dans les coulisses » ouvre sa section', async () => {
+    await openClientTab(page, 'Dans les coulisses');
+    await page
+      .getByRole('heading', { name: 'Dans les coulisses du chantier' })
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+    if ((await page.getByText('Le Fil', { exact: true }).count()) > 0)
+      throw new Error('« Le Fil » subsiste quelque part');
+  });
+
   await assert(
-    'Espace client : la section s’intitule « Dans les coulisses du chantier »',
+    'Documents : un seul univers (comptes rendus INCLUS, plus de section séparée)',
     async () => {
-      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      await openClientTab(page, 'Documents');
       await page
-        .getByRole('heading', { name: 'Dans les coulisses du chantier' })
+        .getByRole('heading', { name: 'Vos documents' })
         .first()
-        .waitFor({ state: 'visible', timeout: 6000 });
-      if ((await page.getByText('Le Fil', { exact: true }).count()) > 0)
-        throw new Error('« Le Fil » subsiste quelque part');
+        .waitFor({ state: 'visible', timeout: 5000 });
+      // Les comptes rendus ne sont plus une section À PART : ils vivent dans Documents.
+      if ((await page.getByRole('heading', { name: 'Comptes rendus', exact: true }).count()) > 0)
+        throw new Error('une section « Comptes rendus » séparée subsiste côté client');
     },
   );
-
-  await assert('Sections client claires : Documents ET Comptes rendus séparés', async () => {
-    await page
-      .getByRole('heading', { name: 'Documents', exact: true })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page
-      .getByRole('heading', { name: 'Comptes rendus', exact: true })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-    if ((await page.getByText('Comptes rendus & documents').count()) > 0)
-      throw new Error('l’ancienne section fusionnée subsiste');
-  });
 
   await assert(
     'Décision client : plus d’option « modification » (choisir / valider seulement)',
     async () => {
+      await openClientTab(page); // Aujourd'hui = la décision à prendre
       const voir = page.getByRole('button', { name: /Voir la décision/ });
       if ((await voir.count()) > 0) {
         await voir.first().click();
@@ -71,19 +70,20 @@ try {
       const sel = page.getByLabel('Choisir le chantier à prévisualiser');
       await sel.waitFor({ state: 'visible', timeout: 5000 });
       await sel.selectOption({ label: 'Maison Écully' });
+      // Le nom du chantier prévisualisé vit dans l'onglet « Le projet ».
+      await page.getByRole('tab', { name: 'Le projet' }).click();
       await page
         .getByRole('heading', { name: 'Maison Écully' })
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
-      // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon
-      // 6e. On vise le TITRE (le sélecteur de chantier liste aussi les noms).
+      // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon 6e.
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
       await page
         .getByRole('heading', { name: 'Appartement Lyon 6e' })
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
       // En rouvrant l'aperçu, il s'est réinitialisé sur le chantier actif (temporaire).
-      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      await openClientTab(page, 'Le projet');
       await page
         .getByRole('heading', { name: 'Appartement Lyon 6e' })
         .first()

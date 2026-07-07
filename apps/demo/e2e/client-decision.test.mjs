@@ -5,7 +5,7 @@
  * attend », choisit (ou délègue à PHÉNIX) ; le choix validé remonte au radar
  * Aujourd'hui et au Journal. Réutilise le modèle décision existant. Client-safe.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2200 });
@@ -97,11 +97,16 @@ try {
   await assert('CLIENT — valide un choix', async () => {
     await page.getByRole('radio', { name: new RegExp(OPT_A, 'i') }).click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
+    // Le récap « Vos choix » vit dans l'onglet « Le projet ».
+    await page.getByRole('tab', { name: 'Le projet' }).click();
     await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('CONDUCTEUR — Aujourd’hui affiche le choix validé, exact', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     const counter = page.getByRole('button', { name: /Filtrer.*à traiter/i });
     await counter.waitFor({ state: 'visible', timeout: 5000 });
     await counter.click();

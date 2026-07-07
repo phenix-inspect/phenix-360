@@ -3,7 +3,7 @@
  * information INTERNE conducteur. Côté client, on ne montre que le STATUT du
  * chantier ; le conducteur, lui, continue de voir le lot en cours.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2000 });
@@ -17,7 +17,7 @@ try {
   await openDemo(page);
 
   await assert('Espace client : le badge du LOT (« Gros œuvre ») est retiré', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Le projet'); // le héros/statut vit dans « Le projet »
     await page
       .getByRole('heading', { name: /Appartement Lyon 6e/ })
       .first()

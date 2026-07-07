@@ -7,7 +7,7 @@
  * ne fuient JAMAIS. On réutilise la visibilité d'événement existante ; aucun
  * nouveau module. Export/import conserve fichier + visibilité.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 import { readFileSync } from 'node:fs';
 
 const browser = await launch();
@@ -24,7 +24,8 @@ const CLIENT_PDF = pdf('doc-client.pdf');
 
 const row = (label) => page.locator('li').filter({ hasText: label }).first();
 const clientDocs = () => page.locator('#section-documents');
-const clientCard = (label) => clientDocs().locator('article').filter({ hasText: label }).first();
+// Côté client, les documents sont une LISTE (<li>) dans l'onglet Documents.
+const clientCard = (label) => clientDocs().locator('li').filter({ hasText: label }).first();
 
 /** Ajoute un document de préparation (libellé + type + visibilité + fichier). */
 const addDoc = async (libelle, typeLabel, visibilityLabel, file) => {
@@ -43,9 +44,9 @@ const openDocuments = async () => {
   await page.getByRole('tab', { name: 'Documents', exact: true }).click();
 };
 const openClientDocs = async () => {
-  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
-  await clientDocs()
-    .getByRole('heading', { name: 'Documents' })
+  await openClientTab(page, 'Documents');
+  await page
+    .getByRole('heading', { name: 'Vos documents' })
     .waitFor({ state: 'visible', timeout: 8000 });
 };
 

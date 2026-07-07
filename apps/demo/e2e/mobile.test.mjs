@@ -86,7 +86,10 @@ try {
     });
 
     await assert(`[${vp.name}] Dépôt de dossier (upload) atteignable`, async () => {
-      await page.getByRole('tab', { name: /Aujourd/ }).click();
+      await page
+        .getByRole('tab', { name: /Aujourd/ })
+        .first()
+        .click();
       await page.getByRole('button', { name: 'Gérer' }).click();
       await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
       await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });

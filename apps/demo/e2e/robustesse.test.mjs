@@ -158,7 +158,10 @@ try {
       .getByText(/Aucun chantier pour l.instant/)
       .first()
       .waitFor({ state: 'visible' });
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
   });
 
   await assert('Recharger la démonstration restaure des chantiers', async () => {

@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Badge, Card, CardContent } from '@phenix360/ui';
-import { CalendarRange, ClipboardList, FileText, Lock, MessageCircle, Palette } from 'lucide-react';
+import { Badge, Card, CardContent, Tabs, TabsContent, TabsList, TabsTrigger } from '@phenix360/ui';
+import { CalendarRange, FileText, Lock, MessageCircle, Palette } from 'lucide-react';
 import {
   SELECTION_STATUS_LABEL,
-  bibliothequeImages,
   momentsCoulisses,
   buildClientDecisions,
   buildClientShareReadiness,
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
-  filDuChantier,
   isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
@@ -35,7 +33,7 @@ import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
 import { StepProgress } from '../components/StepProgress';
 import { GrandesEtapes } from '../components/GrandesEtapes';
-import { MomentCard } from '../components/MomentCard';
+import { ClientDocuments } from '../components/ClientDocuments';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
 import { PhenixWidget } from '../components/PhenixWidget';
@@ -77,11 +75,15 @@ export function ClientView({
   // Le Récit et la Bibliothèque sont deux vues d'une même section : le sommaire
   // pilote la vue affichée (Récit ↔ Bibliothèque) en plus du défilement.
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
+  // Un onglet = un univers (même philosophie que le conducteur) : Aujourd'hui
+  // (boîte de réception), Le projet (où en est le chantier), Dans les coulisses
+  // (photos), Documents (tout PDF). Défaut : la boîte de réception.
+  const [clientTab, setClientTab] = useState<'aujourdhui' | 'projet' | 'coulisses' | 'documents'>(
+    'aujourdhui',
+  );
   // « Dans les coulisses » côté client = albums photo partagés UNIQUEMENT (pas de
   // comptes rendus / PV / documents : ceux-ci ont leurs propres sections).
   const filMoments = momentsCoulisses(filOf(snap, project.id).moments);
-  const hasRecit = filDuChantier(filMoments, { viewer: 'client' }).some((e) => e.kind === 'moment');
-  const hasBiblio = bibliothequeImages(filMoments, { viewer: 'client' }).length > 0;
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -130,49 +132,34 @@ export function ClientView({
       ? decisions.filter((d) => d.eventId !== action.decision.eventId)
       : decisions;
 
-  // Sommaire horizontal : un raccourci vers chaque section de la page. Aucun
-  // nouvel écran — juste un défilement fluide. Une puce n'apparaît que si sa
-  // section a du contenu (VISION Art. 11 : jamais d'entrée creuse).
-  const goTo = (id: string): void =>
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  const hasDecisions = clientDecision !== null || decisions.length > 0;
-  const sommaire: { label: string; onClick: () => void }[] = [
-    ...(hasDecisions ? [{ label: 'Décisions', onClick: () => goTo('section-decision') }] : []),
-    ...(dossier ? [{ label: 'Planning', onClick: () => goTo('section-etapes') }] : []),
-    ...(clientDocuments.length > 0
-      ? [{ label: 'Documents', onClick: () => goTo('section-documents') }]
-      : []),
-    ...(comptesRendus.length > 0
-      ? [{ label: 'Comptes rendus', onClick: () => goTo('section-comptes') }]
-      : []),
-    ...(hasRecit
-      ? [
-          {
-            label: 'Dans les coulisses',
-            onClick: () => {
-              setFilView('fil');
-              goTo('section-fil');
-            },
-          },
-        ]
-      : []),
-    ...(hasBiblio
-      ? [
-          {
-            label: 'Bibliothèque',
-            onClick: () => {
-              setFilView('bibliotheque');
-              goTo('section-fil');
-            },
-          },
-        ]
-      : []),
-  ];
+  // Boîte de réception : ce que l'équipe a publié (photos, comptes rendus, documents).
+  const clientNotificationsList = clientNotifications(snap, project.id);
+  // Ouvrir une notification : basculer sur le BON onglet, éteindre le signal, puis
+  // défiler jusqu'à l'élément concerné (après le rendu de l'onglet).
+  const openNotif = (n: (typeof clientNotificationsList)[number]): void => {
+    demo.markSeen('client', n.seenKeys);
+    if (n.clientTab) setClientTab(n.clientTab);
+    if (n.clientView) setFilView(n.clientView);
+    requestAnimationFrame(() =>
+      document
+        .getElementById(n.clientSection ?? '')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  };
 
-  // Navigation PHÉNIX : on ouvre l'écran ciblé (défilement + repère visuel).
+  // Navigation PHÉNIX (depuis Léon) : on ouvre le BON onglet + défilement/repère.
   const clientTarget = snap.clientTarget;
   useEffect(() => {
     if (!clientTarget) return;
+    const tab =
+      clientTarget.kind === 'document'
+        ? 'documents'
+        : clientTarget.kind === 'decision'
+          ? 'aujourdhui'
+          : clientTarget.kind === 'etapes'
+            ? 'projet'
+            : 'coulisses';
+    setClientTab(tab);
     const id =
       clientTarget.kind === 'document'
         ? `ev-${clientTarget.ref}`
@@ -181,8 +168,9 @@ export function ClientView({
           : clientTarget.kind === 'etapes'
             ? 'section-etapes'
             : 'section-fil';
-    const el = document.getElementById(id);
-    if (el) {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(id);
+      if (!el) return;
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       el.animate?.(
         [
@@ -192,7 +180,7 @@ export function ClientView({
         ],
         { duration: 1600, easing: 'ease-out' },
       );
-    }
+    });
     demo.clearClientTarget();
   }, [clientTarget]);
 
@@ -205,185 +193,164 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
-      {sommaire.length > 0 && (
-        <nav
-          aria-label="Sommaire de votre espace"
-          className="flex flex-wrap gap-2 border-b border-border pb-4"
-        >
-          {sommaire.map((s) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={s.onClick}
-              className="inline-flex items-center rounded-full border border-border bg-surface px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 hover:text-gold-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              {s.label}
-            </button>
-          ))}
-        </nav>
-      )}
+      <Tabs
+        value={clientTab}
+        onValueChange={(v) =>
+          setClientTab(v as 'aujourdhui' | 'projet' | 'coulisses' | 'documents')
+        }
+      >
+        <TabsList>
+          <TabsTrigger value="aujourdhui">Aujourd’hui</TabsTrigger>
+          <TabsTrigger value="projet">Le projet</TabsTrigger>
+          <TabsTrigger value="coulisses">Dans les coulisses</TabsTrigger>
+          <TabsTrigger value="documents">Documents</TabsTrigger>
+        </TabsList>
 
-      {teamMessages > 0 && (
-        <button
-          type="button"
-          onClick={() => {
-            // Clic = navigation directe vers le Moment concerné + marquage lu.
-            // On s'assure d'abord que le Récit est à l'écran, puis le Récit
-            // ouvre précisément le Moment (défilement + curseur de réponse).
-            document
-              .getElementById('section-fil')
-              ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            const target = mostRecentPendingTeamMoment(snap, project.id);
-            if (target) demo.focusMoment(target, actor.role);
-          }}
-          className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
-        >
-          <MessageCircle aria-hidden />
-          Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} — voir les
-          coulisses
-        </button>
-      )}
-
-      {/* Notifications client — ce que l'ÉQUIPE a publié (photos/publications,
-          documents partagés). Un clic ouvre la section et éteint le signal. */}
-      <NotificationsFeed
-        notifications={clientNotifications(snap, project.id)}
-        onOpen={(n) => {
-          demo.markSeen('client', n.seenKeys);
-          if (n.clientView) setFilView(n.clientView);
-          document
-            .getElementById(n.clientSection ?? '')
-            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }}
-      />
-
-      <div id="section-decision" className="scroll-mt-24 rounded-2xl">
-        {clientDecision ? (
-          <ClientDecisionBanner
-            decision={clientDecision}
-            onValidate={(optionId) => validateDecision(clientDecision, optionId)}
-          />
-        ) : (
-          <SmartBanner project={project} events={events} actor={actor} />
-        )}
-      </div>
-
-      <Card>
-        <CardContent className="space-y-5 p-6">
-          {/* Côté client : statut seulement, JAMAIS le lot en cours (« Gros œuvre »
-              …) — c'est une info interne conducteur. Le détail se lit dans les coulisses ou
-              se demande à Léon. */}
-          <ProjectHero
-            project={project}
-            clientName={nameOf(snap, project.clientId)}
-            showStep={false}
-          />
-          {!dossier && <StepProgress current={project.currentStep} />}
-        </CardContent>
-      </Card>
-
-      <div id="section-fil" className="scroll-mt-24 rounded-2xl">
-        <FilView
-          snap={snap}
-          project={project}
-          actor={actor}
-          canCompose={false}
-          view={filView}
-          onViewChange={setFilView}
-        />
-      </div>
-
-      {dossier && (
-        <section id="section-etapes" className="scroll-mt-24 space-y-3 rounded-2xl">
-          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-            <CalendarRange aria-hidden />
-            <h2 className="font-serif text-lg font-semibold tracking-tight">
-              Les grandes étapes du chantier
-            </h2>
-          </div>
-          <GrandesEtapes status={project.status} dossier={dossier} />
-        </section>
-      )}
-
-      {dossier && dossier.selections.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-            <Palette aria-hidden />
-            <h2 className="font-serif text-lg font-semibold tracking-tight">Vos choix</h2>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {dossier.selections.map((s) => (
-              <div
-                key={s.id}
-                className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
+        {/* AUJOURD'HUI — la boîte de réception : tout ce qui attend une réaction. */}
+        <TabsContent value="aujourdhui">
+          <div className="space-y-6">
+            {teamMessages > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Ouvre les coulisses au Moment concerné (défilement + curseur).
+                  setClientTab('coulisses');
+                  const target = mostRecentPendingTeamMoment(snap, project.id);
+                  if (target) demo.focusMoment(target, actor.role);
+                }}
+                className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
               >
-                <div className="min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wide text-gold-700">
-                    {s.categorie}
-                  </p>
-                  <p className="truncate text-sm text-foreground">{s.label}</p>
-                  {s.detail && <p className="truncate text-xs text-muted-foreground">{s.detail}</p>}
+                <MessageCircle aria-hidden />
+                Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} —
+                voir les coulisses
+              </button>
+            )}
+
+            {/* Notifications : ce que l'ÉQUIPE a publié. Un clic ouvre le bon onglet. */}
+            <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
+
+            <div id="section-decision" className="scroll-mt-24 rounded-2xl">
+              {clientDecision ? (
+                <ClientDecisionBanner
+                  decision={clientDecision}
+                  onValidate={(optionId) => validateDecision(clientDecision, optionId)}
+                />
+              ) : (
+                <SmartBanner project={project} events={events} actor={actor} />
+              )}
+            </div>
+
+            {otherDecisions.length > 0 && (
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">
+                  Autres décisions en attente ({otherDecisions.length})
+                </h3>
+                <ul className="space-y-2">
+                  {otherDecisions.map((d) => (
+                    <li key={d.eventId} className="rounded-xl border border-border bg-surface p-4">
+                      <p className="text-sm text-foreground">{d.question}</p>
+                      <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* LE PROJET — où en est mon chantier : étapes, planning, choix. Rassure. */}
+        <TabsContent value="projet">
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="space-y-5 p-6">
+                {/* Statut seulement, JAMAIS le lot en cours (info interne conducteur). */}
+                <ProjectHero
+                  project={project}
+                  clientName={nameOf(snap, project.clientId)}
+                  showStep={false}
+                />
+                {!dossier && <StepProgress current={project.currentStep} />}
+              </CardContent>
+            </Card>
+
+            {dossier && (
+              <section id="section-etapes" className="scroll-mt-24 space-y-3 rounded-2xl">
+                <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+                  <CalendarRange aria-hidden />
+                  <h2 className="font-serif text-lg font-semibold tracking-tight">
+                    Les grandes étapes du chantier
+                  </h2>
                 </div>
-                <Badge
-                  variant={
-                    s.statut === 'valide' ? 'success' : s.statut === 'propose' ? 'info' : 'neutral'
-                  }
-                >
-                  {SELECTION_STATUS_LABEL[s.statut]}
-                </Badge>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+                <GrandesEtapes status={project.status} dossier={dossier} />
+              </section>
+            )}
 
-      {otherDecisions.length > 0 && (
-        <section className="space-y-2">
-          <h3 className="text-sm font-medium text-foreground">
-            Autres décisions en attente ({otherDecisions.length})
-          </h3>
-          <ul className="space-y-2">
-            {otherDecisions.map((d) => (
-              <li key={d.eventId} className="rounded-xl border border-border bg-surface p-4">
-                <p className="text-sm text-foreground">{d.question}</p>
-                <DecisionResponder decision={d} actor={actor} className="mt-2" />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+            {dossier && dossier.selections.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+                  <Palette aria-hidden />
+                  <h2 className="font-serif text-lg font-semibold tracking-tight">Vos choix</h2>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {dossier.selections.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gold-700">
+                          {s.categorie}
+                        </p>
+                        <p className="truncate text-sm text-foreground">{s.label}</p>
+                        {s.detail && (
+                          <p className="truncate text-xs text-muted-foreground">{s.detail}</p>
+                        )}
+                      </div>
+                      <Badge
+                        variant={
+                          s.statut === 'valide'
+                            ? 'success'
+                            : s.statut === 'propose'
+                              ? 'info'
+                              : 'neutral'
+                        }
+                      >
+                        {SELECTION_STATUS_LABEL[s.statut]}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
+        </TabsContent>
 
-      {clientDocuments.length > 0 && (
-        <section id="section-documents" className="scroll-mt-24 space-y-4">
-          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-            <FileText aria-hidden />
-            <h2 className="font-serif text-lg font-semibold tracking-tight">Documents</h2>
+        {/* DANS LES COULISSES — l'Instagram du projet : photos, ❤️, 💬. */}
+        <TabsContent value="coulisses">
+          <div id="section-fil" className="scroll-mt-24 rounded-2xl">
+            <FilView
+              snap={snap}
+              project={project}
+              actor={actor}
+              canCompose={false}
+              view={filView}
+              onViewChange={setFilView}
+            />
           </div>
-          <div className="space-y-4">
-            {clientDocuments.map((e) => (
-              <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
-                <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+        </TabsContent>
 
-      {comptesRendus.length > 0 && (
-        <section id="section-comptes" className="scroll-mt-24 space-y-4">
-          <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-            <ClipboardList aria-hidden />
-            <h2 className="font-serif text-lg font-semibold tracking-tight">Comptes rendus</h2>
-          </div>
-          <div className="space-y-4">
-            {comptesRendus.map((e) => (
-              <div key={e.id} id={`ev-${e.id}`} className="rounded-2xl">
-                <MomentCard event={e} authorName={nameOf(snap, e.actor.userId)} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+        {/* DOCUMENTS — tout PDF (devis, factures, comptes rendus, PV…), ouvrable
+            et téléchargeable. On ne cherche jamais ailleurs. */}
+        <TabsContent value="documents">
+          <section id="section-documents" className="scroll-mt-24 space-y-4">
+            <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
+              <FileText aria-hidden />
+              <h2 className="font-serif text-lg font-semibold tracking-tight">Vos documents</h2>
+            </div>
+            <ClientDocuments events={[...clientDocuments, ...comptesRendus]} />
+          </section>
+        </TabsContent>
+      </Tabs>
 
       <PhenixWidget snap={snap} project={project} actor={actor} />
     </div>

@@ -10,7 +10,7 @@
  * « Observations » est renommé « Légende ». On vérifie chaque suppression + que la
  * publication marche avec photos seules, ou photos + légende (affichée côté client).
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2400 });
@@ -38,8 +38,7 @@ const openAlbumComposer = async () => {
     .waitFor({ state: 'visible', timeout: 6000 });
 };
 const openClientCoulisses = async () => {
-  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
-  await page.waitForTimeout(400);
+  await openClientTab(page, 'Dans les coulisses');
 };
 
 try {

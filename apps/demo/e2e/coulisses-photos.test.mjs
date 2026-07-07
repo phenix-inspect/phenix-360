@@ -94,8 +94,9 @@ try {
     await page.getByRole('button', { name: /photo-99/ }).waitFor({ timeout: 6000 });
     await page.getByRole('button', { name: /Ajouter le document/ }).click();
     await page.locator('li').filter({ hasText: DOC_LIBELLE }).first().waitFor({ state: 'visible' });
-    // Côté client : présent dans Documents, absent des coulisses.
+    // Côté client : présent dans l'onglet Documents, absent des coulisses.
     await openClient();
+    await page.getByRole('tab', { name: 'Documents' }).first().click();
     await page
       .locator('#section-documents')
       .getByText(DOC_LIBELLE)
@@ -176,6 +177,7 @@ try {
 
   // ---- Cœur + commentaire client sous l'album ----------------------------
   await assert('Le client aime l’album (cœur rouge vif)', async () => {
+    await page.getByRole('tab', { name: 'Dans les coulisses' }).first().click();
     const album = page.locator('#section-fil article').filter({ hasText: ALBUM_TITLE }).first();
     await album.waitFor({ state: 'visible', timeout: 6000 });
     const heart = album.getByRole('button', { name: /coup de cœur/i }).first();

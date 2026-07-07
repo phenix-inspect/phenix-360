@@ -5,7 +5,7 @@
  * l'interface (conducteur, client, chat de Léon) et que « Dans les coulisses »
  * le remplace partout, sans casser la navigation.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2600 });
@@ -41,13 +41,9 @@ try {
   });
 
   await assert(
-    'Client : sommaire + section « Dans les coulisses », plus aucun « Récit »',
+    'Client : onglet + section « Dans les coulisses », plus aucun « Récit »',
     async () => {
-      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
-      await page
-        .getByText('Dans les coulisses', { exact: true })
-        .first()
-        .waitFor({ state: 'visible', timeout: 6000 });
+      await openClientTab(page, 'Dans les coulisses');
       await page
         .getByRole('heading', { name: 'Dans les coulisses du chantier' })
         .first()

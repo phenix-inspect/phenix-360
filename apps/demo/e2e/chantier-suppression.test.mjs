@@ -78,7 +78,10 @@ try {
       // On bascule vers un autre chantier (plus « Chantier Jetable »).
       await page.waitForTimeout(400);
       if (await seen(/Chantier Jetable/)) throw new Error('le chantier actif supprimé est resté');
-      await page.getByRole('tab', { name: /Aujourd/ }).click();
+      await page
+        .getByRole('tab', { name: /Aujourd/ })
+        .first()
+        .click();
       await heading(/Mes chantiers \(2\)/).waitFor({ state: 'visible', timeout: 5000 });
     },
   );

@@ -6,7 +6,7 @@
  *  • Léon (concierge) continue de répondre aux questions détaillées.
  * Le statut est piloté côté conducteur (source de vérité) ; l'espace client suit.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 import { phenixDevisPdf } from './pdf-fixtures.mjs';
 
 const browser = await launch();
@@ -19,7 +19,7 @@ const setStatut = async (label) => {
 };
 const planning = () => page.locator('#section-etapes');
 const openClient = async () => {
-  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  await openClientTab(page, 'Le projet'); // le planning vit dans « Le projet »
   await page
     .getByRole('heading', { name: 'Les grandes étapes du chantier' })
     .first()

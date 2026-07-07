@@ -68,7 +68,10 @@ try {
   });
 
   await assert('Source de vérité unique : « Aujourd’hui » suit le changement', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });

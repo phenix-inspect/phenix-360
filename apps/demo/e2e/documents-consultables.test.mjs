@@ -9,7 +9,7 @@
  * Vérifié des DEUX côtés : documents partagés (client) et internes (conducteur).
  * Aucun nouvel écran — on enrichit le comportement des documents existants.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { ctx, page, consoleErrors } = await session(browser, { height: 2600 });
@@ -118,9 +118,9 @@ try {
 
   // ---- Document PARTAGÉ côté client (vrai fichier → ouverture du fichier) --
   await assert('Ouverture d’un DOCUMENT PARTAGÉ côté client → le fichier s’ouvre', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Documents');
     const card = page
-      .locator('#section-documents article')
+      .locator('#section-documents li')
       .filter({ hasText: 'Plan de la salle de bain' })
       .first();
     await card.waitFor({ state: 'visible', timeout: 6000 });
@@ -129,7 +129,7 @@ try {
 
   // ---- Client-safe : l'interne ne fuit jamais dans l'espace client --------
   await assert('Client-safe : les documents internes ne fuient pas', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Documents');
     await page.waitForTimeout(300);
     for (const secret of ['Contrat sous-traitant', 'PV de réception', 'points à reprendre'])
       if ((await page.getByText(secret, { exact: false }).count()) > 0)

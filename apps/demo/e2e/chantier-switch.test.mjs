@@ -5,7 +5,7 @@
  * courant est conservé (tous les chantiers seedés sont prêts pour le client, donc
  * dotés d'un dossier de préparation).
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 1800 });
@@ -69,14 +69,17 @@ try {
   });
 
   await assert('Non-régression Aujourd’hui', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('Non-régression Espace client (chantier actif = Croix-Rousse)', async () => {
-    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await openClientTab(page, 'Le projet'); // le nom du chantier vit dans « Le projet »
     await page
       .getByRole('heading', { name: /Duplex Croix-Rousse/ })
       .first()

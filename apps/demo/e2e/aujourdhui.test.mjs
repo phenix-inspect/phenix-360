@@ -80,7 +80,10 @@ try {
   });
 
   await assert('Retour « Aujourd’hui » : cliquer une décision ouvre l’onglet Suivi', async () => {
-    await page.getByRole('tab', { name: /Aujourd/ }).click();
+    await page
+      .getByRole('tab', { name: /Aujourd/ })
+      .first()
+      .click();
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });

@@ -5,7 +5,7 @@
  * deux via un nouvel onglet (blob). Client-safe strict : un document interne
  * n'apparaît jamais côté client.
  */
-import { launch, session, harness, openDemo } from './harness.mjs';
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
 const browser = await launch();
 const { ctx, page, consoleErrors } = await session(browser, { height: 2400 });
@@ -15,14 +15,16 @@ const OUVRABLE = 'Plan de la salle de bain'; // seed : document client AVEC data
 const SANS_FICHIER = 'Devis plomberie'; // seed : document client SANS dataUrl
 const INTERNE = 'Contrat sous-traitant'; // seed : document interne (jamais client)
 
+// Les documents client vivent désormais dans l'onglet DOCUMENTS de l'Espace client :
+// une ligne (`li`) par document, titre + « Ouvrir le document » + « Télécharger ».
 const docs = () => page.locator('#section-documents');
-const cardWith = (text) => docs().locator('article').filter({ hasText: text }).first();
+const cardWith = (text) => docs().locator('li').filter({ hasText: text }).first();
 
 try {
   await openDemo(page);
-  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  await openClientTab(page, 'Documents');
   await docs()
-    .getByRole('heading', { name: 'Documents' })
+    .getByRole('heading', { name: 'Vos documents' })
     .waitFor({ state: 'visible', timeout: 6000 });
 
   await assert('Les documents client sont visibles', async () => {
@@ -46,14 +48,13 @@ try {
     },
   );
 
-  await assert(
-    'Document AVEC fichier → titre cliquable + bouton « Ouvrir le document »',
-    async () => {
-      const card = cardWith(OUVRABLE);
-      await card.getByRole('button', { name: new RegExp(OUVRABLE) }).waitFor({ state: 'visible' });
-      await card.getByRole('button', { name: 'Ouvrir le document' }).waitFor({ state: 'visible' });
-    },
-  );
+  await assert('Document AVEC fichier → « Ouvrir le document » + « Télécharger »', async () => {
+    const card = cardWith(OUVRABLE);
+    await card.getByRole('button', { name: 'Ouvrir le document' }).waitFor({ state: 'visible' });
+    await card
+      .getByRole('button', { name: new RegExp(`Télécharger : ${OUVRABLE}`) })
+      .waitFor({ state: 'visible' });
+  });
 
   await assert('Le clic OUVRE réellement le fichier (nouvel onglet)', async () => {
     const card = cardWith(OUVRABLE);
@@ -62,15 +63,6 @@ try {
     const tab = await pagePromise;
     if (!tab.url().startsWith('blob:'))
       throw new Error(`le document ne s'ouvre pas en aperçu (url=${tab.url()})`);
-    await tab.close();
-  });
-
-  await assert('Le TITRE ouvre aussi le fichier', async () => {
-    const card = cardWith(OUVRABLE);
-    const pagePromise = ctx.waitForEvent('page', { timeout: 6000 });
-    await card.getByRole('button', { name: new RegExp(OUVRABLE) }).click();
-    const tab = await pagePromise;
-    if (!tab.url().startsWith('blob:')) throw new Error('le titre n’ouvre pas le fichier');
     await tab.close();
   });
 
