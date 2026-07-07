@@ -6,7 +6,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  Input,
 } from '@phenix360/ui';
 import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Star, X } from 'lucide-react';
 import {
@@ -26,11 +25,11 @@ interface Pick {
 
 /**
  * Créer un MOMENT de chantier — l'ALBUM PHOTO des coulisses. Formulaire VOLONTAIREMENT
- * minimal (publier en moins de 30 s) : photos (jusqu'à 10), titre, description, pièce
- * (optionnelle). Pas de partage à cocher (une publication coulisses est TOUJOURS pour
- * le client), pas d'intervenants (le client regarde des photos, pas une feuille de
- * présence). C'est la brique PLAISIR — les livrables (CR, PV, réserves) passent par
- * « Nouvelle mission ».
+ * minimal (publier en moins de 20 s) : photos (jusqu'à 10), légende LIBRE et
+ * optionnelle, pièce (optionnelle). Pas de titre à inventer, pas de partage à cocher
+ * (une publication coulisses est TOUJOURS pour le client), pas d'intervenants (le
+ * client regarde des photos, pas une feuille de présence). C'est la brique PLAISIR —
+ * les livrables (CR, PV, réserves) passent par « Nouvelle mission ».
  */
 export function MomentComposer({
   project,
@@ -46,8 +45,8 @@ export function MomentComposer({
   const [picks, setPicks] = useState<Pick[]>([]);
   const [coverKey, setCoverKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [title, setTitle] = useState('');
-  const [observations, setObservations] = useState('');
+  // Un seul champ texte, LIBRE et OPTIONNEL : la légende (ex-« observations »).
+  const [legende, setLegende] = useState('');
   const [zone, setZone] = useState('');
 
   const onPick = async (files: FileList | null): Promise<void> => {
@@ -84,7 +83,7 @@ export function MomentComposer({
   };
 
   const create = (): void => {
-    if (picks.length === 0 || !title.trim()) return;
+    if (picks.length === 0) return;
     const coverIndex = Math.max(
       0,
       picks.findIndex((p) => p.key === coverKey),
@@ -92,14 +91,16 @@ export function MomentComposer({
     demo.addMoment({
       projectId: project.id,
       actor,
-      title,
+      // Pas de titre à inventer : la légende (optionnelle) porte le récit. Le titre
+      // du Moment reste vide — l'album se lit par ses photos + sa légende.
+      title: '',
       medias: picks.map((p) => p.media),
       coverIndex,
       // Une publication « coulisses » est TOUJOURS destinée au client (brique
       // plaisir) : le conducteur n'a pas à se poser la question du partage.
       shareWithClient: true,
       ...(zone ? { zoneId: zones.find((z) => z.id === zone)?.id } : {}),
-      ...(observations.trim() ? { observations } : {}),
+      ...(legende.trim() ? { observations: legende } : {}),
     });
     onClose();
   };
@@ -215,22 +216,13 @@ export function MomentComposer({
             </label>
           )}
 
-          <Field label="Titre">
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex. Avancement de la cuisine"
-              autoFocus
-            />
-          </Field>
-
-          <Field label="Observations (optionnel)">
+          <Field label="Légende (optionnelle)">
             <textarea
-              value={observations}
-              onChange={(e) => setObservations(e.target.value)}
-              rows={3}
-              placeholder="Ce que vous avez constaté sur place…"
-              className="min-h-[4.5rem] resize-y rounded-lg border border-input bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+              value={legende}
+              onChange={(e) => setLegende(e.target.value)}
+              rows={2}
+              placeholder="Décrivez ce moment… (ex. La cuisine prend forme !)"
+              className="min-h-[3.5rem] resize-y rounded-lg border border-input bg-surface px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
             />
           </Field>
 
@@ -255,7 +247,7 @@ export function MomentComposer({
               <Button variant="ghost" onClick={onClose}>
                 Annuler
               </Button>
-              <Button onClick={create} disabled={picks.length === 0 || !title.trim()}>
+              <Button onClick={create} disabled={picks.length === 0}>
                 Créer le moment
               </Button>
             </div>

@@ -1538,3 +1538,38 @@ Partager ni champ Intervenants ; publication sans action de partage → visible 
 client ; marquée « Partagé avec le client » côté conducteur) ; `coulisses-photos` et
 `notifications-bidirect` recalés (plus de case à cocher ; une notification PAR ALBUM).
 Gate vert (e2e 46/46). VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — Coulisses : suppression du champ « Titre », « Observations » → « Légende »
+
+**Décision produit (retour terrain) :** le champ **Titre** n'apporte aucune valeur —
+les coulisses sont un espace type Instagram, pas un rapport de chantier, et le
+conducteur ne doit pas avoir à inventer un titre à chaque publication. On le
+**supprime**. Le champ texte restant (« Observations ») est **renommé « Légende
+(optionnelle) »** (placeholder « Décrivez ce moment… », ex. « La cuisine prend
+forme ! ») — libre, sans obligation de le remplir.
+
+Le formulaire se réduit à : **📸 photos · 📝 légende (optionnelle) · 🏠 pièce
+(optionnelle) · Créer.** Objectif : publier un album en **moins de 20 secondes**.
+Plus le formulaire est court, plus le conducteur publie souvent.
+
+**Mécanique (aucun nouvel écran) :** on retire le champ Titre et son état ; la
+légende est stockée dans `observations` (le Moment n'a plus de `title` — chaîne
+vide). Deux composants d'affichage s'adaptent : `FilMoment` n'affiche le `<h3>` que
+si un titre EXISTE (les albums coulisses n'en ont pas → juste la légende sous la
+photo, façon caption) ; `MomentGallery` retombe sur la légende puis un libellé
+générique (« Photos du chantier ») pour l'entête et le nom accessible. Les moments
+seedés (« Dalle coulée »…) gardent leur titre — aucune régression. La création
+n'exige plus qu'au moins une photo (la légende est optionnelle).
+
+**Alternatives rejetées :** rendre le titre optionnel mais le garder (encore un
+champ à ignorer — on veut le formulaire le plus court possible) ; stocker la légende
+comme titre prominent (une caption se lit sous la photo, pas en gros titre serif).
+
+**Impact :** `MomentComposer` (retrait du champ et de l'état `title`, `Observations` →
+`Légende`, création sans titre) ; `FilMoment` (titre conditionnel) ; `MomentGallery`
+(entête de repli). Nouveau périmètre de `coulisses-formulaire.test` (Titre absent ;
+Observations remplacé par Légende ; publication photos seules ; publication photos +
+légende ; légende affichée côté client) ; `coulisses-photos` / `notifications-bidirect`
+/ `media-capture` recalés (champ Légende). Gate vert (e2e 46/46). VISION Art. 9, 11.

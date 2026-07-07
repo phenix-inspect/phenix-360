@@ -113,6 +113,9 @@ export function MomentGallery({
     onSendPhotoMessage(current.id, t);
     setDraft('');
   };
+  // Les albums « coulisses » n'ont pas de titre : on retombe sur la légende, puis
+  // sur un libellé générique (pour l'entête et le nom accessible de la galerie).
+  const heading = moment.title.trim() || moment.observations?.trim() || 'Photos du chantier';
 
   return (
     <div
@@ -120,7 +123,7 @@ export function MomentGallery({
       style={{ backgroundColor: 'rgba(19,16,9,0.985)' }}
       role="dialog"
       aria-modal="true"
-      aria-label={moment.title}
+      aria-label={heading}
       onTouchStart={(e) => {
         if (editing) return;
         touchX.current = e.touches[0]?.clientX ?? null;
@@ -135,7 +138,7 @@ export function MomentGallery({
       {/* Barre haute : titre + compteur (+ repères) + actions */}
       <div className="flex items-center justify-between gap-3 p-4 text-paper-0">
         <div className="min-w-0">
-          <p className="truncate font-serif text-lg font-semibold tracking-tight">{moment.title}</p>
+          <p className="truncate font-serif text-lg font-semibold tracking-tight">{heading}</p>
           <p className="flex items-center gap-2 text-xs opacity-80">
             <span>
               {index + 1} / {total}

@@ -79,7 +79,7 @@ try {
       mimeType: 'image/png',
       buffer: Buffer.from(PNG, 'base64'),
     });
-    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Avancement du séjour');
+    await dialog.getByPlaceholder(/Décrivez ce moment/).fill('Avancement du séjour');
     // Publication coulisses = toujours partagée au client (plus de case à cocher).
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });

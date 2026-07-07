@@ -75,7 +75,7 @@ try {
       .getByText(/3 photos/)
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
-    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Album mobile');
+    await dialog.getByPlaceholder(/Décrivez ce moment/).fill('Album mobile');
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
   });

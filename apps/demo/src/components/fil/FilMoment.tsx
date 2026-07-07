@@ -130,19 +130,23 @@ export function FilMoment({
           )}
         </div>
 
-        {/* Titre + observations */}
-        <div className="space-y-1.5">
-          <h3 className="font-serif text-xl font-semibold tracking-tight text-foreground">
-            {moment.title}
-          </h3>
-          {moment.observations ? (
-            <p className="text-sm leading-relaxed text-muted-foreground">{moment.observations}</p>
-          ) : (
-            cover?.legende && (
-              <p className="text-sm leading-relaxed text-muted-foreground">{cover.legende}</p>
-            )
-          )}
-        </div>
+        {/* Titre (facultatif — les albums coulisses n'en ont pas) + légende. */}
+        {(moment.title.trim() || moment.observations || cover?.legende) && (
+          <div className="space-y-1.5">
+            {moment.title.trim() && (
+              <h3 className="font-serif text-xl font-semibold tracking-tight text-foreground">
+                {moment.title}
+              </h3>
+            )}
+            {moment.observations ? (
+              <p className="text-sm leading-relaxed text-muted-foreground">{moment.observations}</p>
+            ) : (
+              cover?.legende && (
+                <p className="text-sm leading-relaxed text-muted-foreground">{cover.legende}</p>
+              )
+            )}
+          </div>
+        )}
 
         {/* Intervenants présents */}
         {moment.intervenants && moment.intervenants.length > 0 && (

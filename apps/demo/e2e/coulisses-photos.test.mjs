@@ -121,7 +121,7 @@ try {
     await openAlbumComposer();
     const dialog = page.getByRole('dialog');
     await dialog.locator('input[type=file]').setInputFiles(photo(1));
-    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill('Une première photo');
+    await dialog.getByPlaceholder(/Décrivez ce moment/).fill('Une première photo');
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
     // On OUVRE les coulisses seulement pour CONSULTER — et le moment y est.
@@ -148,7 +148,7 @@ try {
     await dialog
       .getByText(/Album complet — 10 photos maximum/)
       .waitFor({ state: 'visible', timeout: 8000 });
-    await dialog.getByPlaceholder(/Avancement de la cuisine/).fill(ALBUM_TITLE);
+    await dialog.getByPlaceholder(/Décrivez ce moment/).fill(ALBUM_TITLE);
     // Plus de case « Partager » : une publication coulisses est toujours pour le client.
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
