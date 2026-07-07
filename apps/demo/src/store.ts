@@ -105,6 +105,10 @@ const SEEN_KEY = 'phenix-demo:seen:v1';
 // `decisionEventId → ISO`. Éteint la notification « choix à traiter » une fois
 // l'action engagée (commande, artisan, planning). Accusé, pas un fait métier.
 const CHOIX_TRAITES_KEY = 'phenix-demo:choix-traites:v1';
+// Repère « notifications » (device-local) : les faits ANTÉRIEURS à cette date ne
+// génèrent pas de notification (sinon la démo croulerait sous l'historique seedé).
+// Seules les actions POSTÉRIEURES (session en cours) notifient l'autre partie.
+const NOTIF_BASELINE_KEY = 'phenix-demo:notif-baseline:v1';
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -283,7 +287,19 @@ function migrateDossierChecklists(): void {
   if (changed) localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
 }
 
+/**
+ * Repère « notifications » : posé au tout premier chargement (ou à la migration
+ * d'un poste existant). Les faits antérieurs (historique seedé) ne notifient pas ;
+ * seules les actions de la session en cours le font.
+ */
+function ensureNotifBaseline(): void {
+  if (typeof localStorage === 'undefined') return;
+  if (localStorage.getItem(NOTIF_BASELINE_KEY) === null)
+    localStorage.setItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
+}
+
 migrateDossierChecklists();
+ensureNotifBaseline();
 let snapshot: DemoSnapshot = build();
 
 function build(): DemoSnapshot {
@@ -415,9 +431,20 @@ export const demo = {
    * notification correspondante sans exiger de réponse. « Consulter suffit ».
    */
   markMomentSeen(role: string, momentId: string): void {
+    demo.markSeen(role, [momentId]);
+  },
+
+  /**
+   * Accusé de lecture GÉNÉRIQUE : marque un ou plusieurs identifiants (Moment,
+   * événement, coup de cœur…) comme LUS par un rôle → éteint la/les notification(s)
+   * correspondante(s). Une notification consultée disparaît.
+   */
+  markSeen(role: string, ids: string[]): void {
+    if (ids.length === 0) return;
     const seen = readJson<SeenState>(SEEN_KEY, {});
     const forRole = seen[role] ?? {};
-    forRole[momentId] = new Date().toISOString();
+    const now = new Date().toISOString();
+    for (const id of ids) forRole[id] = now;
     seen[role] = forRole;
     localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
     refresh();
@@ -1747,6 +1774,9 @@ export const demo = {
     localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(fil.annotations));
     localStorage.removeItem(PHENIX_CONV_KEY);
     localStorage.removeItem(SHARES_KEY);
+    // Nouvelle démo = ardoise de notifications propre : l'historique seedé ne
+    // notifie pas ; seules les actions à venir le feront.
+    localStorage.setItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
     localStorage.setItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
@@ -2006,6 +2036,169 @@ export function mostRecentPendingTeamMoment(
   projectId: string | null | undefined,
 ): string | undefined {
   return mostRecentMoment(snap, projectId, pendingTeamMoments(snap, projectId));
+}
+
+/* -------------------------------------------------------------------------- *
+ * NOTIFICATIONS BIDIRECTIONNELLES — le chantier, espace privé conducteur ⇆ client
+ * -------------------------------------------------------------------------- *
+ * Toute action importante d'une partie notifie l'autre, DANS son écran d'accueil
+ * (« Aujourd'hui » côté conducteur, l'Espace client côté client) — jamais un
+ * nouvel écran. Une notification est DÉRIVÉE des faits (événements, moments,
+ * coups de cœur) : rien de nouveau n'est persisté. Elle s'éteint dès qu'on la
+ * consulte (accusé de lecture `seen[role]`), et l'historique antérieur au repère
+ * `notifBaseline` ne notifie jamais. Client-safe : chaque camp ne voit QUE ce qui
+ * le concerne.
+ */
+export interface AppNotification {
+  /** Identifiant stable (clé React + accusé de lecture). */
+  id: string;
+  icon: string;
+  text: string;
+  createdAt: string;
+  /** Faits à marquer LUS quand on ouvre la notification (souvent 1, photos → n). */
+  seenKeys: string[];
+  projectId: string;
+  /** Conducteur : onglet du chantier à ouvrir (+ Moment à cibler le cas échéant). */
+  tab?: string;
+  momentId?: string;
+  /** Client : section de l'espace à faire défiler (+ éventuel basculement de vue). */
+  clientSection?: string;
+  clientView?: 'fil' | 'bibliotheque';
+}
+
+function notifBaseline(): string {
+  return readJson<string | null>(NOTIF_BASELINE_KEY, null) ?? '';
+}
+
+const byDateDesc = (a: AppNotification, b: AppNotification): number =>
+  a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0;
+
+/**
+ * Notifications du CONDUCTEUR pour un chantier : ce que le CLIENT a fait
+ * (❤️ sur une publication, commentaire, réponse/validation d'une décision).
+ */
+export function conductorNotifications(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): AppNotification[] {
+  if (!projectId) return [];
+  const base = notifBaseline();
+  const seen = snap.seen['compagnon'] ?? {};
+  const clientId = snap.projects.find((p) => p.id === projectId)?.clientId;
+  const clientName = clientId ? nameOf(snap, clientId) : 'Votre client';
+  const out: AppNotification[] = [];
+
+  // ❤️ du client sur une publication.
+  for (const c of snap.fil.coups[projectId] ?? [])
+    if (c.userRole === 'client' && c.createdAt > base && !seen[c.id])
+      out.push({
+        id: `coup-${c.id}`,
+        icon: '❤️',
+        text: `${clientName} a aimé une publication`,
+        createdAt: c.createdAt,
+        seenKeys: [c.id],
+        projectId,
+        tab: 'fil',
+        momentId: c.momentId,
+      });
+
+  // 💬 Commentaire du client (dernier message d'un Moment = client, non consulté).
+  for (const id of pendingClientMoments(snap, projectId))
+    out.push({
+      id: `comment-${id}`,
+      icon: '💬',
+      text: `${clientName} a commenté une publication`,
+      createdAt: lastMessageAt(snap, projectId, id),
+      seenKeys: [id],
+      projectId,
+      tab: 'fil',
+      momentId: id,
+    });
+
+  // ✅ Décision validée / déléguée par le client.
+  for (const e of snap.events)
+    if (
+      e.projectId === projectId &&
+      e.type === 'decision' &&
+      (e.content.kind === 'validee' || e.content.kind === 'deleguee') &&
+      e.content.origin === 'client' &&
+      e.createdAt > base &&
+      !seen[e.id]
+    )
+      out.push({
+        id: `decision-${e.id}`,
+        icon: '✅',
+        text: `Décision validée par le client`,
+        createdAt: e.createdAt,
+        seenKeys: [e.id],
+        projectId,
+        tab: 'suivi',
+      });
+
+  return out.sort(byDateDesc);
+}
+
+/** Date du dernier message d'un Moment (pour dater la notification « commentaire »). */
+function lastMessageAt(snap: DemoSnapshot, projectId: string, momentId: string): string {
+  return lastMessagePerMoment(snap.fil.messages[projectId] ?? []).get(momentId)?.createdAt ?? '';
+}
+
+/**
+ * Notifications du CLIENT pour un chantier : ce que le CONDUCTEUR a publié
+ * (nouvelle publication / photos, nouveau document partagé). Uniquement du contenu
+ * VISIBLE client — jamais l'interne.
+ */
+export function clientNotifications(
+  snap: DemoSnapshot,
+  projectId: string | null | undefined,
+): AppNotification[] {
+  if (!projectId) return [];
+  const base = notifBaseline();
+  const seen = snap.seen['client'] ?? {};
+  const out: AppNotification[] = [];
+
+  // 📷 Nouvelle publication partagée (Moment : photos + mot de l'équipe).
+  for (const m of snap.fil.moments[projectId] ?? [])
+    if (momentPartageClient(m) && m.createdAt > base && !seen[m.id])
+      out.push({
+        id: `moment-${m.id}`,
+        icon: '📷',
+        text: `Nouvelle publication de votre équipe`,
+        createdAt: m.createdAt,
+        seenKeys: [m.id],
+        projectId,
+        clientSection: 'section-fil',
+        clientView: 'fil',
+      });
+
+  for (const e of snap.events) {
+    if (e.projectId !== projectId || e.visibility !== 'client' || e.state !== 'publie') continue;
+    if (e.createdAt <= base || seen[e.id]) continue;
+    // 💬 Nouveau compte rendu de l'équipe.
+    if (e.type === 'compte_rendu')
+      out.push({
+        id: `cr-${e.id}`,
+        icon: '💬',
+        text: `Nouveau compte rendu de votre équipe`,
+        createdAt: e.createdAt,
+        seenKeys: [e.id],
+        projectId,
+        clientSection: 'section-fil',
+      });
+    // 📄 Nouveau document partagé.
+    else if (e.type === 'document')
+      out.push({
+        id: `doc-${e.id}`,
+        icon: '📄',
+        text: `Nouveau document partagé : ${e.content.libelle}`,
+        createdAt: e.createdAt,
+        seenKeys: [e.id],
+        projectId,
+        clientSection: 'section-documents',
+      });
+  }
+
+  return out.sort(byDateDesc);
 }
 
 /**

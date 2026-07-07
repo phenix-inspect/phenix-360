@@ -1318,3 +1318,37 @@ page (mobile OK).
 - nouveau `coulisses.test` (« Récit » absent de l'UI côté conducteur, client et
   chat ; « Dans les coulisses » partout ; navigation intacte). Gate vert (e2e 41/41).
   VISION Art. 11.
+
+---
+
+## 07/07/2026 — Notifications BIDIRECTIONNELLES (chaque action importante prévient l'autre)
+
+**Décision produit :** toute action marquante d'un camp crée une notification pour
+l'AUTRE, dans son écran d'accueil — jamais un nouvel écran. **Conducteur → client**
+(dans l'Espace client) : nouvelle publication (photo/moment partagé), nouveau compte
+rendu, document partagé. **Client → conducteur** (dans « Aujourd'hui ») : coup de
+cœur (❤️), commentaire, décision validée/déléguée. Un clic **ouvre l'élément
+concerné** et **éteint** la notification (elle disparaît) ; l'historique seedé ne
+notifie jamais.
+
+**Mécanique (rien de nouveau persisté) :** les notifications sont **dérivées des
+faits** (`conductorNotifications` / `clientNotifications`) — moments partagés, coups
+de cœur, événements `compte_rendu`/`document` visibles client, décisions `validee`/
+`deleguee` d'origine `client`. Deux garde-fous d'extinction : (1) un **repère
+`notifBaseline`** posé à l'ouverture / au rechargement de la démo → le passé ne
+notifie pas ; (2) un **accusé de lecture par rôle** (`seen[role]`, `markSeen`) que
+le clic renseigne. Le commentaire réutilise le mécanisme existant
+(`pendingClientMoments`) — feed et badges restent cohérents.
+
+**Sans nouvel écran ni concept :** on réutilise Aujourd'hui et l'Espace client via
+un bloc `NotificationsFeed` compact (or, discret) qui s'efface quand il est vide.
+**Alternatives rejetées :** écran « Notifications » dédié ; drapeau lu/non-lu
+persisté par notification ; messagerie temps réel. Client-safe strict : chaque camp
+ne voit QUE ce qui le concerne ; export/import inchangé.
+
+**Impact :** store `AppNotification` + `conductorNotifications` / `clientNotifications`,
+`markSeen(role, ids)`, `ensureNotifBaseline` / reset dans `loadDemo` ; composant
+`NotificationsFeed` ; câblage `AujourdhuiView` (agrégé multi-chantiers) et
+`ClientView`. Nouveau `notifications-bidirect.test` (photo/document → client ; ❤️/
+décision → conducteur ; clic ouvre + marque lu ; client-safe ; zéro console). Gate
+vert (e2e 42/42). VISION Art. 3, 9, 11.

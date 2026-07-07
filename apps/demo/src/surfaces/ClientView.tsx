@@ -19,6 +19,7 @@ import {
   type Project,
 } from '@phenix360/core';
 import {
+  clientNotifications,
   demo,
   dossierOf,
   filOf,
@@ -27,6 +28,7 @@ import {
   pendingTeamMessageCount,
   type DemoSnapshot,
 } from '../store';
+import { NotificationsFeed } from '../components/NotificationsFeed';
 import { SmartBanner } from '../components/SmartBanner';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ProjectHero } from '../components/ProjectHero';
@@ -238,6 +240,19 @@ export function ClientView({
           coulisses
         </button>
       )}
+
+      {/* Notifications client — ce que l'ÉQUIPE a publié (photos/publications,
+          documents partagés). Un clic ouvre la section et éteint le signal. */}
+      <NotificationsFeed
+        notifications={clientNotifications(snap, project.id)}
+        onOpen={(n) => {
+          demo.markSeen('client', n.seenKeys);
+          if (n.clientView) setFilView(n.clientView);
+          document
+            .getElementById(n.clientSection ?? '')
+            ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }}
+      />
 
       <div id="section-decision" className="scroll-mt-24 rounded-2xl">
         {clientDecision ? (

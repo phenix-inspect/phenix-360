@@ -27,12 +27,14 @@ import {
 } from 'lucide-react';
 import {
   choixClientValidesATraiter,
+  conductorNotifications,
   demo,
   mostRecentPendingClientMoment,
   nameOf,
   pendingClientCommentCount,
   type DemoSnapshot,
 } from '../store';
+import { NotificationsFeed } from '../components/NotificationsFeed';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_SHORT } from '../lib/status';
 import { cityOf } from '../lib/ville';
 import type { CompagnonTab } from './CompagnonView';
@@ -278,6 +280,16 @@ export function AujourdhuiView({
         </h1>
         <p className="text-base text-muted-foreground">{phrase}</p>
       </div>
+
+      {/* Notifications — ce que le CLIENT a fait (❤️, commentaire, décision).
+          On réutilise Aujourd'hui : un clic ouvre l'élément et éteint le signal. */}
+      <NotificationsFeed
+        notifications={snap.projects.flatMap((p) => conductorNotifications(snap, p.id))}
+        onOpen={(n) => {
+          demo.markSeen('compagnon', n.seenKeys);
+          onOpenChantier(n.projectId, n.tab as CompagnonTab | undefined, n.momentId);
+        }}
+      />
 
       {/* Ce qui réclame votre attention — trois compteurs, lus en cinq secondes.
           « À traiter » regroupe tout ce qui est sur votre bureau (décisions,
