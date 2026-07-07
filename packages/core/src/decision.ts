@@ -21,6 +21,12 @@ export interface Decision {
   status: DecisionStatus;
   createdAt: IsoDateTime;
   resolution?: DemandeResolution;
+  /** `document` ⇒ le client répond en joignant un document (échange documentaire). */
+  attendu?: 'document';
+  /** Libellé du document attendu (nom à réception). */
+  docLibelle?: string;
+  /** Catégorie du document attendu (classement automatique). */
+  docCategorie?: string;
 }
 
 /** Projette une `demande` en `Decision` lisible côté client. */
@@ -34,6 +40,9 @@ export function toDecision(e: DemandeEvent): Decision {
     status,
     createdAt: e.createdAt,
     resolution: e.content.resolution,
+    ...(e.content.attendu ? { attendu: e.content.attendu } : {}),
+    ...(e.content.docLibelle ? { docLibelle: e.content.docLibelle } : {}),
+    ...(e.content.docCategorie ? { docCategorie: e.content.docCategorie } : {}),
   };
 }
 

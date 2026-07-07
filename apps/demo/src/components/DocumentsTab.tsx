@@ -52,6 +52,7 @@ export function DocumentsTab({
   };
   const askDocument = async (docId: string, label: string): Promise<void> => {
     if (!dossier) return;
+    const cat = dossier.documents.find((d) => d.id === docId)?.categorie;
     patch({
       documents: dossier.documents.map((d) =>
         d.id === docId ? { ...d, status: 'demande_client' } : d,
@@ -66,6 +67,10 @@ export function DocumentsTab({
       content: {
         question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${label} ?`,
         destinataire: 'client',
+        // Échange DOCUMENTAIRE : le client répond en joignant le document.
+        attendu: 'document',
+        docLibelle: label,
+        ...(cat ? { docCategorie: cat } : {}),
       },
     });
   };

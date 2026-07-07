@@ -468,6 +468,10 @@ export function buildDemoSeed(): DemoSeed {
       { id: 'd2', label: 'Plans', status: 'fourni' },
       { id: 'd3', label: 'DPE', status: 'a_fournir', recommande: true },
       { id: 'd4', label: "Attestation d'assurance", status: 'fourni' },
+      // Documents encore À FOURNIR par le client : on les lui demande depuis
+      // l'onglet Documents (« Demander au client » → échange documentaire).
+      { id: 'd6', label: 'Diagnostic amiante', status: 'a_fournir' },
+      { id: 'd7', label: 'Attestation décennale', status: 'a_fournir' },
     ],
     questions: [
       { id: 'q1', question: 'Confirmer la date de réception souhaitée ?', answered: false },

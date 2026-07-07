@@ -1738,3 +1738,45 @@ Nouvelle mission uniquement, filtres conducteur + client, filtrage non destructi
 d'ajout recalés vers Nouvelle mission : `documents`, `documents-partage`,
 `documents-acompte-facture`, `coulisses-photos`, `notifications-bidirect`, `media-capture`.
 Gate vert (e2e 50/50). VISION Art. 7, 8, 9, 11.
+
+## 07/07/2026 — Réponse à une demande de document (échange documentaire, pas une conversation)
+
+**Décision produit (retour terrain) :** une demande de document sert à RÉCUPÉRER un
+document — répondre par un simple message ne suffit pas. **Le document est l'élément
+principal ; le commentaire est facultatif.** Le client peut répondre de trois façons :
+commentaire seul, document seul, document + commentaire.
+
+- **Pièces jointes** : PDF / JPEG / PNG, via le sélecteur natif habituel de PHÉNIX
+  (`ACCEPT_DOCUMENT`, sans `capture`) — sur mobile : prendre une photo, galerie, Drive,
+  Fichiers. Cohérent avec tous les autres uploads.
+- **Enregistrement automatique** : le document envoyé devient un événement `document`
+  (visible client, publié), classé au projet. Il apparaît dans « Documents » des DEUX
+  côtés (conducteur ET client), consultable et téléchargeable. Le conducteur ne
+  retélécharge/réimporte jamais rien.
+- **Notification conducteur** dans « Aujourd'hui » : « 📎 … a envoyé : {document} » (ou
+  « a répondu à votre demande de document » pour un commentaire seul). Le clic ouvre
+  directement l'onglet Documents du chantier, sur le document reçu.
+
+**Mécanique (enrichissement d'une demande existante, aucun nouveau concept) :** la
+`DemandeContent` gagne `attendu: 'document'` + `docLibelle` / `docCategorie` (posés par
+« Demander au client ») ; la `DemandeResolution` gagne `docEventId` (lien vers le document
+créé). `toDecision` projette ces champs. Nouveau port `demo.resolveDocumentDemande` : crée
+l'événement `document` (acteur = client) puis résout la demande. `conductorNotifications`
+notifie sur la demande de document résolue ; `clientNotifications` ignore les documents que
+le client s'est lui-même envoyés (pas d'auto-notification). Le `DecisionResponder` gère la
+réponse documentaire (joindre + commentaire, l'un ou l'autre suffit). Côté `ClientView`, une
+demande de document n'est PLUS une « décision » : elle sort du bandeau « Une décision vous
+attend » (`SmartBanner`) pour vivre dans sa propre section « Documents demandés », toujours
+atteignable. Le seed Lyon 6e gagne deux documents « à fournir » (démo réaliste).
+
+**Alternatives rejetées :** garder la réponse en message seul (ne récupère pas le document) ;
+demander au conducteur de réimporter le fichier (double manipulation) ; traiter la demande de
+document comme une décision d'ambiance (mélange deux univers).
+
+**Impact :** `core/event` (+`attendu`/`docLibelle`/`docCategorie`/`docEventId`),
+`core/decision` (`toDecision`), `store` (`resolveDocumentDemande`, notifications),
+`DecisionResponder` (réponse documentaire), `DocumentsTab` (« Demander au client » marque la
+demande), `ClientView` (section « Documents demandés »), `seed`. Nouveau
+`demande-document.test` (trois modes de réponse, notification conducteur, document présent et
+consultable des deux côtés, commentaire seul ne crée aucun document). Gate vert (e2e 51/51).
+VISION Art. 6, 7, 8, 9, 11.

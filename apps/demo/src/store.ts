@@ -543,6 +543,51 @@ export const demo = {
     mutate(backend.resolveDemande(id, resolution)),
 
   /**
+   * Réponse du client à une demande de DOCUMENT. Le document est l'élément
+   * principal : s'il joint un fichier, on crée un événement `document` (visible
+   * client, publié) — enregistré au projet, présent dans « Documents » des DEUX
+   * côtés, sans jamais le retélécharger/réimporter. Le commentaire est facultatif.
+   * Trois cas : commentaire seul, document seul, document + commentaire.
+   */
+  async resolveDocumentDemande(
+    demandeId: EventId,
+    input: {
+      projectId: ProjectId;
+      actor: EventActor;
+      texte?: string;
+      attachment?: EventAttachment;
+      libelle?: string;
+      categorie?: string;
+    },
+  ): Promise<void> {
+    let docEventId: EventId | undefined;
+    if (input.attachment) {
+      const ev = await backend.appendEvent({
+        projectId: input.projectId,
+        actor: input.actor,
+        type: 'document',
+        // Visible client : le document apparaît dans « Documents » des deux côtés.
+        visibility: 'client',
+        state: 'publie',
+        content: {
+          attachment: input.attachment,
+          libelle: input.libelle?.trim() || input.attachment.fileName || 'Document',
+          ...(input.categorie ? { categorie: input.categorie } : {}),
+        },
+      });
+      docEventId = ev.id;
+    }
+    await backend.resolveDemande(demandeId, {
+      texte: input.texte?.trim() ?? '',
+      resolvedBy: input.actor.userId,
+      resolvedAt: new Date().toISOString(),
+      ...(docEventId ? { docEventId } : {}),
+    });
+    refresh();
+    broadcast();
+  },
+
+  /**
    * Crée le projet À PARTIR de la proposition validée par l'humain (PHÉNIX
    * Start). « PHÉNIX prépare, vous validez » : rien n'est créé avant cet appel.
    * Passe par les ports core (projet, membres, événements) ; le dossier préparé
@@ -2200,6 +2245,30 @@ export function conductorNotifications(
         tab: 'suivi',
       });
 
+  // 📎 Réponse du client à une demande de DOCUMENT (document joint et/ou message).
+  for (const e of snap.events) {
+    if (e.projectId !== projectId || e.type !== 'demande') continue;
+    const c = e.content;
+    if (c.destinataire !== 'client' || c.attendu !== 'document' || !c.resolution) continue;
+    if (c.resolution.resolvedAt <= base || seen[e.id]) continue;
+    const doc = c.resolution.docEventId
+      ? snap.events.find((x) => x.id === c.resolution?.docEventId && x.type === 'document')
+      : undefined;
+    const libelle = doc?.type === 'document' ? doc.content.libelle : undefined;
+    out.push({
+      id: `docreq-${e.id}`,
+      icon: '📎',
+      text: libelle
+        ? `${clientName} a envoyé : ${libelle}`
+        : `${clientName} a répondu à votre demande de document`,
+      createdAt: c.resolution.resolvedAt,
+      seenKeys: [e.id],
+      projectId,
+      // Le document reçu est classé dans « Documents » ; sinon, la demande au Suivi.
+      tab: doc ? 'documents' : 'suivi',
+    });
+  }
+
   return out.sort(byDateDesc);
 }
 
@@ -2253,8 +2322,9 @@ export function clientNotifications(
         clientTab: 'documents',
         clientSection: 'section-documents',
       });
-    // 📄 Nouveau document partagé → onglet DOCUMENTS.
-    else if (e.type === 'document')
+    // 📄 Nouveau document partagé PAR L'ÉQUIPE → onglet DOCUMENTS. On ignore les
+    // documents que le CLIENT a lui-même envoyés (il ne se notifie pas lui-même).
+    else if (e.type === 'document' && e.actor.role !== 'client')
       out.push({
         id: `doc-${e.id}`,
         icon: '📄',

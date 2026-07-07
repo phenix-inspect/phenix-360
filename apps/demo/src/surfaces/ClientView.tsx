@@ -125,12 +125,22 @@ export function ClientView({
   };
 
   const decisions = pendingClientDecisions(events);
-  const action = nextClientAction(project, events);
-  // La décision prioritaire est déjà portée par le bandeau : on liste le reste.
+  // Une demande de DOCUMENT n'est pas une « décision » : c'est un échange
+  // documentaire (le document est l'élément principal). On la sort du bandeau
+  // « Une décision vous attend » et on la place dans sa propre liste, toujours
+  // atteignable. Le bandeau ne raisonne donc que sur les vraies décisions.
+  const docRequests = decisions.filter((d) => d.attendu === 'document');
+  const decisionRequests = decisions.filter((d) => d.attendu !== 'document');
+  const docRequestIds = new Set(docRequests.map((d) => d.eventId));
+  const bannerEvents = events.filter((e) => !docRequestIds.has(e.id));
+  const action = nextClientAction(project, bannerEvents);
+  // La décision prioritaire est portée par le SmartBanner — mais seulement quand il
+  // s'affiche (pas de décision d'ambiance qui occupe déjà le bandeau). Sinon on la
+  // laisse dans la liste pour qu'aucune décision ne devienne inatteignable.
   const otherDecisions =
-    action.kind === 'decision_attendue'
-      ? decisions.filter((d) => d.eventId !== action.decision.eventId)
-      : decisions;
+    !clientDecision && action.kind === 'decision_attendue'
+      ? decisionRequests.filter((d) => d.eventId !== action.decision.eventId)
+      : decisionRequests;
 
   // Boîte de réception : ce que l'équipe a publié (photos, comptes rendus, documents).
   const clientNotificationsList = clientNotifications(snap, project.id);
@@ -236,9 +246,31 @@ export function ClientView({
                   onValidate={(optionId) => validateDecision(clientDecision, optionId)}
                 />
               ) : (
-                <SmartBanner project={project} events={events} actor={actor} />
+                <SmartBanner project={project} events={bannerEvents} actor={actor} />
               )}
             </div>
+
+            {docRequests.length > 0 && (
+              <section id="section-documents-demandes" className="space-y-2">
+                <h3 className="text-sm font-medium text-foreground">
+                  Documents demandés ({docRequests.length})
+                </h3>
+                <ul className="space-y-2">
+                  {docRequests.map((d) => (
+                    <li
+                      key={d.eventId}
+                      className="rounded-xl border border-gold-200 bg-gold-50 p-4"
+                    >
+                      <p className="flex items-center gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+                        <FileText aria-hidden />
+                        {d.question}
+                      </p>
+                      <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {otherDecisions.length > 0 && (
               <section className="space-y-2">

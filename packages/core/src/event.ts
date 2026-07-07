@@ -166,6 +166,12 @@ export interface DemandeResolution {
   texte: string;
   resolvedBy: UserId;
   resolvedAt: IsoDateTime;
+  /**
+   * Réponse à une demande de DOCUMENT : id de l'événement `document` créé par le
+   * client (le document est enregistré au projet, jamais un simple message). Le
+   * commentaire (`texte`) reste facultatif — le document est l'élément principal.
+   */
+  docEventId?: EventId;
 }
 
 /**
@@ -188,6 +194,15 @@ export interface DemandeContent {
   resolution?: DemandeResolution;
   /** Origine (le cas échéant) : photo annotée du Fil. */
   source?: FilSource;
+  /**
+   * Nature attendue de la réponse. `document` ⇒ échange DOCUMENTAIRE : le client
+   * répond en JOIGNANT un document (PDF / image), commentaire facultatif.
+   */
+  attendu?: 'document';
+  /** Libellé du document attendu (classement + nom à réception). */
+  docLibelle?: string;
+  /** Catégorie du document attendu (classement automatique à réception). */
+  docCategorie?: string;
 }
 
 /* -------------------------------------------------------------------------- *
