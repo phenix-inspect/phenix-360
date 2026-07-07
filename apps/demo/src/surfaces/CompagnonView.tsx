@@ -30,16 +30,7 @@ import {
   type ProjectStatus,
   type ReserveEvent,
 } from '@phenix360/core';
-import {
-  CalendarClock,
-  CircleCheck,
-  FileText,
-  HardHat,
-  HelpCircle,
-  Image as ImageIcon,
-  Plus,
-  Reply,
-} from 'lucide-react';
+import { CalendarClock, CircleCheck, HardHat, Image as ImageIcon, Plus } from 'lucide-react';
 import { demo, dossierOf, filOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
@@ -62,12 +53,6 @@ function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'compagnon');
   const id = member?.userId ?? userId('compagnon-demo');
   return { userId: id, role: 'compagnon', displayName: nameOf(snap, id) };
-}
-
-interface ActionDef {
-  kind: ComposerKind;
-  label: string;
-  icon: React.ReactNode;
 }
 
 export type CompagnonTab = 'suivi' | 'preparation' | 'fil' | 'reserves';
@@ -146,7 +131,6 @@ export function CompagnonView({
       project={project}
       actor={actor}
       events={events}
-      onCompose={setComposer}
       onNewMission={() => setMissionPicker(true)}
       onOpenFilPhoto={openFilPhoto}
       onLeverReserve={setLever}
@@ -261,6 +245,11 @@ export function CompagnonView({
             setMissionPicker(false);
             setAlbumComposer(true);
           }}
+          onCompose={(kind) => {
+            setMissionPicker(false);
+            setComposer(kind);
+          }}
+          pendingReplies={questionsEnAttente(events).length}
           onClose={() => setMissionPicker(false)}
         />
       )}
@@ -315,7 +304,6 @@ function SuiviTab({
   project,
   actor,
   events,
-  onCompose,
   onNewMission,
   onOpenFilPhoto,
   onLeverReserve,
@@ -324,53 +312,21 @@ function SuiviTab({
   project: Project;
   actor: EventActor;
   events: Event[];
-  onCompose: (kind: ComposerKind) => void;
   onNewMission: () => void;
   onOpenFilPhoto: (momentId: string, photoId?: string) => void;
   onLeverReserve: (reserve: ReserveEvent) => void;
 }): React.JSX.Element {
   const drafts = events.filter((e) => e.state === 'brouillon');
-  const pendingReplies = questionsEnAttente(events).length;
-  // Le Suivi répond à « que faire sur CE chantier ? », pas à « que s'est-il
-  // passé ? » (c'est le Récit). Le journal complet est une ARCHIVE : on n'en
-  // montre que la dernière activité, dépliable à la demande (100 % conservé).
+  // Le Suivi ne CRÉE plus rien : toute création passe par « Nouvelle mission »
+  // (entrée UNIQUE). Il ne sert qu'à CONSULTER — dernière activité + à publier les
+  // brouillons. Le journal complet est une ARCHIVE : on n'en montre que la dernière
+  // activité, dépliable à la demande (100 % conservé).
   const [showAllJournal, setShowAllJournal] = useState(false);
   const RECENT_JOURNAL = 4;
   const journalEvents = showAllJournal ? events : events.slice(0, RECENT_JOURNAL);
 
-  // « Nouvelle mission » est l'ENTRÉE UNIQUE pour photographier et rédiger un
-  // compte rendu (cf. MissionFlow → createMission). On ne duplique donc plus
-  // « Nouveau compte rendu » ni « Ajouter des photos » ici : une action = un seul
-  // point d'entrée. Restent les actions SANS équivalent mission.
-  const actions: ActionDef[] = [
-    { kind: 'document', label: 'Ajouter un document', icon: <FileText aria-hidden /> },
-    { kind: 'demande', label: 'Demander au client', icon: <HelpCircle aria-hidden /> },
-    { kind: 'repondre', label: 'Répondre au client', icon: <Reply aria-hidden /> },
-  ];
-
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {actions.map((a) => (
-          <button
-            key={a.kind}
-            type="button"
-            onClick={() => onCompose(a.kind)}
-            className="group relative flex flex-col items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left shadow-sm transition-colors duration-base ease-out hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            <span className="flex size-10 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-5">
-              {a.icon}
-            </span>
-            <span className="text-sm font-medium leading-snug text-foreground">{a.label}</span>
-            {a.kind === 'repondre' && pendingReplies > 0 && (
-              <span className="absolute right-3 top-3">
-                <Badge variant="gold">{pendingReplies}</Badge>
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-
       {drafts.length > 0 && (
         <section className="space-y-2">
           <h3 className="text-sm font-medium text-foreground">À publier ({drafts.length})</h3>

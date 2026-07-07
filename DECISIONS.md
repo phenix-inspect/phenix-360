@@ -1573,3 +1573,33 @@ comme titre prominent (une caption se lit sous la photo, pas en gros titre serif
 Observations remplacé par Légende ; publication photos seules ; publication photos +
 légende ; légende affichée côté client) ; `coulisses-photos` / `notifications-bidirect`
 / `media-capture` recalés (champ Légende). Gate vert (e2e 46/46). VISION Art. 9, 11.
+
+---
+
+## 07/07/2026 — « Nouvelle mission » : point d'entrée UNIQUE des créations
+
+**Décision produit (retour terrain) :** le conducteur hésitait entre les cartes du
+Suivi et le bouton « + Nouvelle mission ». Règle unique désormais : **« je veux faire
+quelque chose → Nouvelle mission ».** Les trois dernières actions de CRÉATION du Suivi
+— **Ajouter un document · Demander au client · Répondre au client** — rejoignent le
+sélecteur « Nouvelle mission ». Le Suivi ne CRÉE plus rien : il ne sert qu'à
+CONSULTER (radar d'attention — déjà hors du Suivi —, dernière activité, publication
+des brouillons).
+
+Le bouton « + Nouvelle mission » devient l'entrée unique de toutes les créations :
+compte rendu, pré-réception, réception, réserve (via mission), document, demande au
+client, réponse au client, publication « Dans les coulisses », décision client.
+
+**Sans nouvel écran ni concept :** on DÉPLACE trois points d'entrée. Les composers
+(`document` / `demande` / `repondre`) sont inchangés ; seul l'endroit d'où on les
+ouvre change. Le compteur de questions en attente (badge) suit « Répondre au client »
+dans le sélecteur. **Alternatives rejetées :** garder les cartes dans le Suivi « au
+cas où » (c'est justement l'hésitation qu'on supprime — un seul endroit pour créer).
+
+**Impact :** `MissionPicker` (nouveau `onCompose` + `pendingReplies`, grille des trois
+actions administratives) ; `CompagnonView` (câblage du sélecteur, retrait de la grille
+d'actions du `SuiviTab` → consultation seule). Nouveau `mission-entree-unique.test`
+(cartes absentes du Suivi ; trois actions présentes dans Nouvelle mission ; chaque
+composer s'ouvre ; parcours complet « ajouter un document » → au Journal ; compteur
+« Répondre ») ; `documents-acompte-facture` recalé (ajout de document via Nouvelle
+mission). Gate vert (e2e 47/47). VISION Art. 9, 11.

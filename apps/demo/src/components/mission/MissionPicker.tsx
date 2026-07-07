@@ -1,17 +1,28 @@
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@phenix360/ui';
+import {
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@phenix360/ui';
 import { MISSIONS, type MissionKind } from '@phenix360/core';
 import {
   ClipboardList,
   Eye,
+  FileText,
+  HelpCircle,
   Images,
   KeyRound,
   MessageSquareQuote,
   PenLine,
+  Reply,
   Truck,
   Users,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
+import type { ComposerKind } from '../Composer';
 
 const ICONS: Record<MissionKind, LucideIcon> = {
   visite: Eye,
@@ -24,6 +35,37 @@ const ICONS: Record<MissionKind, LucideIcon> = {
 };
 
 /**
+ * Actions administratives DÉPLACÉES du Suivi vers ce point d'entrée unique : le
+ * conducteur ne se demande plus « où cliquer » — pour CRÉER, c'est toujours ici.
+ * Le Suivi ne sert plus qu'à CONSULTER (radar, dernière activité).
+ */
+const COMPOSE_ACTIONS: {
+  kind: ComposerKind;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}[] = [
+  {
+    kind: 'document',
+    label: 'Ajouter un document',
+    description: 'Devis, plan, facture…',
+    icon: FileText,
+  },
+  {
+    kind: 'demande',
+    label: 'Demander au client',
+    description: 'Poser une question, soumettre un choix',
+    icon: HelpCircle,
+  },
+  {
+    kind: 'repondre',
+    label: 'Répondre au client',
+    description: 'Les questions en attente de réponse',
+    icon: Reply,
+  },
+];
+
+/**
  * « Pourquoi êtes-vous là ? » — le seul choix du conducteur, en un tap. Ce n'est
  * pas « quel document créer ? » : c'est la raison de sa présence. La mission
  * oriente ensuite tout ce que PHÉNIX prépare, sans jamais l'enfermer.
@@ -32,6 +74,8 @@ export function MissionPicker({
   onSelect,
   onClientDecision,
   onPublishAlbum,
+  onCompose,
+  pendingReplies = 0,
   onClose,
 }: {
   onSelect: (kind: MissionKind) => void;
@@ -39,6 +83,10 @@ export function MissionPicker({
   onClientDecision: () => void;
   /** Publier un album photo dans « Dans les coulisses » (la brique plaisir). */
   onPublishAlbum: () => void;
+  /** Actions administratives (document, demande, réponse) — déplacées du Suivi. */
+  onCompose: (kind: ComposerKind) => void;
+  /** Nombre de questions client en attente (badge sur « Répondre au client »). */
+  pendingReplies?: number;
   onClose: () => void;
 }): React.JSX.Element {
   return (
@@ -88,6 +136,35 @@ export function MissionPicker({
                   <span className="block text-sm font-medium text-foreground">{m.label}</span>
                   <span className="block text-xs text-muted-foreground">{m.description}</span>
                 </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Actions administratives (document / demande / réponse), déplacées du
+            Suivi : créer, c'est TOUJOURS ici. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {COMPOSE_ACTIONS.map((a) => {
+            const Icon = a.icon;
+            return (
+              <button
+                key={a.kind}
+                type="button"
+                onClick={() => onCompose(a.kind)}
+                className="group relative flex items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left shadow-sm transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-5">
+                  <Icon aria-hidden />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-foreground">{a.label}</span>
+                  <span className="block text-xs text-muted-foreground">{a.description}</span>
+                </span>
+                {a.kind === 'repondre' && pendingReplies > 0 && (
+                  <span className="absolute right-3 top-3">
+                    <Badge variant="gold">{pendingReplies}</Badge>
+                  </span>
+                )}
               </button>
             );
           })}

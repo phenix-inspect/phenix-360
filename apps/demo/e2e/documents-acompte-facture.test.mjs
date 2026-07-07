@@ -108,10 +108,11 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  // Partager UN document au client (chemin existant : composer « Ajouter un document »).
+  // Partager UN document au client (« Ajouter un document » vit désormais dans
+  // « Nouvelle mission » — point d'entrée unique des créations).
   await assert('Publier une facture PARTAGÉE au client', async () => {
-    await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
-    await page.getByRole('button', { name: 'Ajouter un document' }).click();
+    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+    await page.getByRole('button', { name: /Ajouter un document/ }).click();
     const dlg = page.getByRole('dialog');
     await dlg.getByLabel('Libellé du document').fill('Facture finale partagee');
     await dlg.locator('input[type=file]').setInputFiles(FACTURE_SHARED_PDF);
