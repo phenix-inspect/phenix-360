@@ -17,7 +17,6 @@ import {
   EVENT_TYPE_LABEL,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABEL,
-  buildChantierAttention,
   questionsEnAttente,
   reserveStatut,
   reservesOuvertes,
@@ -39,7 +38,6 @@ import { PhotoTile } from '../components/PhotoTile';
 import { DocumentButton } from '../components/DocumentButton';
 import { DossierPanel } from '../components/DossierPanel';
 import { DocumentsTab } from '../components/DocumentsTab';
-import { AttentionPanel } from '../components/AttentionPanel';
 import { FilView } from '../components/fil/FilView';
 import { MomentComposer } from '../components/fil/MomentComposer';
 import { ReservesView } from '../components/ReservesView';
@@ -95,35 +93,7 @@ export function CompagnonView({
     if (tab === 'preparation' && !dossier) setTab('suivi');
   }, [project.id, tab, dossier]);
 
-  const attention = buildChantierAttention(dossier, events);
   const nbReservesOuvertes = reservesOuvertes(events).length;
-
-  const askDocument = async (docId: string) => {
-    if (!dossier) return;
-    const doc = dossier.documents.find((d) => d.id === docId);
-    if (!doc) return;
-    demo.saveDossier(project.id, {
-      ...dossier,
-      documents: dossier.documents.map((d) =>
-        d.id === docId ? { ...d, status: 'demande_client' } : d,
-      ),
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'ouverte',
-      content: {
-        question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${doc.label} ?`,
-        destinataire: 'client',
-        // Échange DOCUMENTAIRE : le client répond en joignant le document.
-        attendu: 'document',
-        docLibelle: doc.label,
-        ...(doc.categorie ? { docCategorie: doc.categorie } : {}),
-      },
-    });
-  };
 
   const openFilPhoto = (momentId: string, photoId?: string): void => {
     demo.openFilPhoto(momentId, photoId);
@@ -181,12 +151,6 @@ export function CompagnonView({
           <DeleteChantierButton projectId={project.id} name={project.name} className="ml-auto" />
         </div>
       </div>
-
-      <AttentionPanel
-        items={attention}
-        onAskDocument={(docId) => void askDocument(docId)}
-        onOpenPreparation={() => setTab('preparation')}
-      />
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as CompagnonTab)}>
         <TabsList>

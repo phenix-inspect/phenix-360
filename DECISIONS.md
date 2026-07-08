@@ -1826,3 +1826,31 @@ types + formulaire document), `MissionPicker` (retrait « Décision client »), 
 (entrée Nouvelle mission, 3 modes, statut Reçu/Répondu, notification, ouvert/téléchargé des deux
 côtés, client-safe) ; `mission-entree-unique` et `client-decision` recalés. Gate vert (e2e
 51/51). VISION Art. 6, 7, 8, 9, 11.
+
+## 07/07/2026 — Suppression du bandeau « PHÉNIX surveille votre chantier » (fin du 2ᵉ tableau de bord)
+
+**Décision produit (retour terrain) :** depuis la refonte, le bandeau radar en tête du
+chantier (« PHÉNIX surveille votre chantier ») est un DOUBLON — ses informations vivent déjà
+dans leur univers : les alertes/actions dans « Aujourd'hui », le pilotage dans « Préparation »,
+l'historique au « Suivi », les documents dans « Documents », les photos dans « Dans les
+coulisses ». On le **supprime entièrement, sans le remplacer** : le conducteur arrive
+directement sur les onglets du chantier (Suivi / Préparation / Documents / Dans les coulisses /
+Réserves). Le chantier ne possède plus de second tableau de bord ; **les alertes ne vivent que
+dans « Aujourd'hui »**.
+
+**Peut-on supprimer sans perte fonctionnelle ? Oui** — toutes les informations existent déjà
+ailleurs. Le raccourci contextuel « Demander » du radar disparaît lui aussi : demander un
+document passe désormais par « Nouvelle mission → Demander au client → Document ».
+
+**Mécanique :** retrait de `<AttentionPanel>` de `CompagnonView` (+ suppression du calcul
+`buildChantierAttention` et de la fonction `askDocument` devenue inutile) ; le composant
+`components/AttentionPanel.tsx` est supprimé. Le sélecteur core `buildChantierAttention` reste
+disponible (pur, sans UI) mais n'est plus consommé — aucune modification du modèle.
+
+**Alternatives rejetées :** remplacer le bandeau par un autre encart de synthèse (on recréerait
+le doublon) ; garder un radar allégé (deux endroits où lire les alertes).
+
+**Impact :** `CompagnonView` (retrait du panneau), suppression de `AttentionPanel.tsx`. Nouveau
+`chantier-sans-radar.test` (le bandeau n'existe plus, on arrive directement sur les onglets,
+chaque onglet s'ouvre, les alertes vivent dans « Aujourd'hui », zéro erreur console). Gate vert
+(e2e 52/52). VISION Art. 3, 7, 10, 11.
