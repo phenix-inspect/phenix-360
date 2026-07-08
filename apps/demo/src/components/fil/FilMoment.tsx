@@ -62,8 +62,12 @@ export function FilMoment({
   onDelete: () => void;
   onShare: () => void;
 }): React.JSX.Element {
+  const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
   const cover = momentCover(moment);
   const count = moment.photos.length;
+  // Aperçu multi-photos : la couverture d'abord, puis les suivantes dans l'ordre
+  // (jusqu'à 3 tuiles ; au-delà, un « +N » sur la dernière).
+  const apercu = (cover ? [cover, ...photos.filter((p) => p.id !== cover.id)] : photos).slice(0, 3);
   const shared = momentPartageClient(moment);
   // La carte du Fil reste sobre : seuls les messages du Moment (niveau 1).
   const messagesMoment = messagesDuMoment(moment.id, messages);
@@ -76,14 +80,42 @@ export function FilMoment({
       {/* Grande photo (couverture) — cadre plus DENSE pour parcourir le récit
           comme un fil social (≈ 33 % plus court que l'ancien 4/5), sans écraser
           l'image (object-cover recadre). Coins arrondis via l'article. Le clic
-          ouvre toujours le plein écran. */}
+          ouvre toujours le plein écran. Un album (≥ 2 photos) montre une MOSAÏQUE
+          d'aperçu — on voit d'un coup qu'il y en a plusieurs. */}
       <button
         type="button"
         onClick={onOpenGallery}
         aria-label={count > 1 ? `Ouvrir l’album (${count} photos)` : 'Agrandir la photo'}
         className="relative block aspect-[6/5] w-full bg-paper-100"
       >
-        {cover && <FilImage photo={cover} />}
+        {count > 1 ? (
+          <span
+            className={`grid size-full gap-1 bg-border ${
+              count === 2 ? 'grid-cols-2' : 'grid-cols-3 grid-rows-2'
+            }`}
+          >
+            {apercu.map((p, i) => (
+              <span
+                key={p.id}
+                className={`relative block overflow-hidden bg-paper-100 ${
+                  count >= 3 && i === 0 ? 'col-span-2 row-span-2' : ''
+                }`}
+              >
+                <FilImage photo={p} />
+                {count > 3 && i === apercu.length - 1 && (
+                  <span
+                    className="absolute inset-0 flex items-center justify-center text-lg font-semibold text-paper-0"
+                    style={{ backgroundColor: 'rgba(19,16,9,0.55)' }}
+                  >
+                    +{count - 3}
+                  </span>
+                )}
+              </span>
+            ))}
+          </span>
+        ) : (
+          cover && <FilImage photo={cover} />
+        )}
         <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-paper-0/90 px-2.5 py-1 text-xs font-medium text-ink-800 shadow-sm">
           {MOMENT_TYPE_SHORT[momentTypeOf(moment)]}
         </span>

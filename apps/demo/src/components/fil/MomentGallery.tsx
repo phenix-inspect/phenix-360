@@ -9,6 +9,8 @@ import {
   PenLine,
   Send,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import {
   ROLE_LABEL,
@@ -75,22 +77,37 @@ export function MomentGallery({
   const [resp, setResp] = useState('');
   const [ech, setEch] = useState('');
   const touchX = useRef<number | null>(null);
+  // Zoom : la photo est montrée ENTIÈRE (jamais recadrée) ; le zoom permet de
+  // regarder un détail. Déplacement au doigt/souris une fois zoomé.
+  const [zoom, setZoom] = useState(false);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const drag = useRef<{ x: number; y: number } | null>(null);
 
   const total = photos.length;
   const go = (dir: -1 | 1): void => setIndex((i) => Math.min(total - 1, Math.max(0, i + dir)));
+  const toggleZoom = (): void =>
+    setZoom((z) => {
+      if (z) setPan({ x: 0, y: 0 });
+      return !z;
+    });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
+      if (zoom) return; // zoomé : les flèches ne changent pas de photo.
       if (e.key === 'ArrowLeft') go(-1);
       if (e.key === 'ArrowRight') go(1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, zoom]);
 
-  // On efface le brouillon quand on change de photo (un message = une photo).
-  useEffect(() => setDraft(''), [index]);
+  // On change de photo : brouillon effacé (un message = une photo) et zoom remis à zéro.
+  useEffect(() => {
+    setDraft('');
+    setZoom(false);
+    setPan({ x: 0, y: 0 });
+  }, [index]);
 
   const counts = comptesMessagesParPhoto(messages);
   const current = photos[index];
@@ -125,11 +142,11 @@ export function MomentGallery({
       aria-modal="true"
       aria-label={heading}
       onTouchStart={(e) => {
-        if (editing) return;
+        if (editing || zoom) return;
         touchX.current = e.touches[0]?.clientX ?? null;
       }}
       onTouchEnd={(e) => {
-        if (editing || touchX.current == null) return;
+        if (editing || zoom || touchX.current == null) return;
         const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
         if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
         touchX.current = null;
@@ -158,6 +175,17 @@ export function MomentGallery({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {!editing && current.imageUrl && (
+            <button
+              type="button"
+              onClick={toggleZoom}
+              aria-label={zoom ? 'Dézoomer' : 'Zoomer'}
+              aria-pressed={zoom}
+              className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+            >
+              {zoom ? <ZoomOut aria-hidden /> : <ZoomIn aria-hidden />}
+            </button>
+          )}
           {photoAnnotations.length > 0 && !editing && (
             <button
               type="button"
@@ -174,6 +202,8 @@ export function MomentGallery({
             onClick={() => {
               setEditing((v) => !v);
               setShowAnnotations(true);
+              setZoom(false);
+              setPan({ x: 0, y: 0 });
             }}
             aria-label={editing ? 'Terminer l’annotation' : 'Annoter la photo'}
             aria-pressed={editing}
@@ -195,23 +225,60 @@ export function MomentGallery({
         </div>
       </div>
 
-      {/* Image */}
-      <div className="relative flex flex-1 items-center justify-center overflow-hidden px-2">
-        <div className="relative max-h-full w-full max-w-3xl">
-          <div className="relative mx-auto aspect-[4/5] max-h-[58vh] w-full overflow-hidden rounded-xl">
-            <FilImage photo={current} />
-            <PhotoAnnotator
-              key={current.id}
-              photo={current}
-              annotations={photoAnnotations}
-              show={showAnnotations}
-              editing={editing}
-              onAdd={onAddAnnotation}
+      {/* Image — montrée ENTIÈRE (object-contain, jamais recadrée). Le conteneur
+          épouse la photo (inline-block) : le calque d'annotations, en inset-0,
+          reste donc aligné au pixel près, letterbox compris. Zoomé, on déplace la
+          photo au doigt / à la souris. */}
+      <div
+        className={`relative flex flex-1 items-center justify-center overflow-hidden px-2 ${
+          zoom ? 'cursor-grab touch-none active:cursor-grabbing' : ''
+        }`}
+        onPointerDown={(e) => {
+          if (!zoom) return;
+          drag.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerMove={(e) => {
+          if (!zoom || !drag.current) return;
+          // /2 : on annule le facteur d'échelle pour un déplacement 1:1 au doigt.
+          const dx = (e.clientX - drag.current.x) / 2;
+          const dy = (e.clientY - drag.current.y) / 2;
+          drag.current = { x: e.clientX, y: e.clientY };
+          setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
+        }}
+        onPointerUp={() => {
+          drag.current = null;
+        }}
+      >
+        <div
+          className="relative inline-block max-h-full transition-transform duration-base"
+          style={zoom ? { transform: `scale(2) translate(${pan.x}px, ${pan.y}px)` } : undefined}
+        >
+          {current.imageUrl ? (
+            <img
+              src={current.imageUrl}
+              alt={current.legende ?? 'Photo du chantier'}
+              onDoubleClick={() => {
+                if (!editing) toggleZoom();
+              }}
+              draggable={false}
+              className="block max-h-[72vh] max-w-full select-none rounded-xl object-contain"
             />
-          </div>
+          ) : (
+            <div className="aspect-[4/5] max-h-[72vh] w-[min(88vw,40rem)] overflow-hidden rounded-xl">
+              <FilImage photo={current} />
+            </div>
+          )}
+          <PhotoAnnotator
+            key={current.id}
+            photo={current}
+            annotations={photoAnnotations}
+            show={showAnnotations}
+            editing={editing}
+            onAdd={onAddAnnotation}
+          />
         </div>
 
-        {index > 0 && (
+        {index > 0 && !zoom && (
           <button
             type="button"
             onClick={() => go(-1)}
@@ -221,7 +288,7 @@ export function MomentGallery({
             <ChevronLeft aria-hidden />
           </button>
         )}
-        {index < total - 1 && (
+        {index < total - 1 && !zoom && (
           <button
             type="button"
             onClick={() => go(1)}
@@ -238,8 +305,10 @@ export function MomentGallery({
         {current.legende && (
           <p className="mx-auto max-w-2xl text-center text-sm opacity-90">{current.legende}</p>
         )}
+        {/* Pellicule de miniatures : on parcourt l'album d'un coup d'œil et on
+            saute à une photo. Pastille or = la photo porte un mot. */}
         {total > 1 && (
-          <div className="flex items-center justify-center gap-1.5">
+          <div className="mx-auto flex max-w-2xl snap-x gap-2 overflow-x-auto pb-1">
             {photos.map((p, i) => {
               const hasMsg = (counts.get(p.id) ?? 0) > 0;
               return (
@@ -248,10 +317,18 @@ export function MomentGallery({
                   type="button"
                   onClick={() => setIndex(i)}
                   aria-label={`Aller à la photo ${i + 1}`}
-                  className={`size-1.5 rounded-full transition-colors duration-base ${
-                    i === index ? 'bg-paper-0' : hasMsg ? 'bg-gold-400' : 'bg-paper-0/35'
+                  aria-current={i === index}
+                  className={`relative size-14 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition-all duration-base ${
+                    i === index
+                      ? 'border-paper-0'
+                      : 'border-transparent opacity-55 hover:opacity-90'
                   }`}
-                />
+                >
+                  <FilImage photo={p} />
+                  {hasMsg && (
+                    <span className="absolute right-1 top-1 size-2 rounded-full bg-gold-400 ring-1 ring-ink-900/40" />
+                  )}
+                </button>
               );
             })}
           </div>

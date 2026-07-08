@@ -21,10 +21,13 @@ export function BibliothequeView({
   images,
   zones,
   momentsAimes,
+  onOpenPhoto,
 }: {
   images: BibliothequeImage[];
   zones: ProjectZone[];
   momentsAimes: ReadonlySet<string>;
+  /** Ouvre la galerie immersive sur cette photo (le parent porte la galerie). */
+  onOpenPhoto?: (image: BibliothequeImage) => void;
 }): React.JSX.Element {
   const [filters, setFilters] = useState<BibliothequeFilters>({});
 
@@ -110,11 +113,17 @@ export function BibliothequeView({
           {resultats.map((img) => {
             const zone = zoneLabel(img.zoneId);
             return (
-              <div
+              <button
                 key={img.photo.id}
-                className="relative aspect-square overflow-hidden rounded-lg border border-border bg-paper-100"
+                type="button"
+                onClick={() => onOpenPhoto?.(img)}
+                aria-label={`Ouvrir la photo${img.title ? ` : ${img.title}` : ''}`}
+                className="group relative block aspect-square overflow-hidden rounded-lg border border-border bg-paper-100 text-left transition-transform duration-base hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
               >
-                <FilImage photo={img.photo} />
+                <FilImage
+                  photo={img.photo}
+                  className="transition-transform duration-base group-hover:scale-105"
+                />
                 <div
                   className="pointer-events-none absolute inset-x-0 bottom-0 p-2 text-paper-0"
                   style={{
@@ -124,7 +133,7 @@ export function BibliothequeView({
                   <p className="truncate text-xs font-medium">{img.title}</p>
                   {zone && <p className="truncate text-[0.625rem] opacity-90">{zone}</p>}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

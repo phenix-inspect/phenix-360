@@ -1885,3 +1885,43 @@ zoom / impression / téléchargement).
 conducteur ET client ouvre au clic du titre — PDF, image, document généré —, aucun document
 mort, téléchargement des deux côtés, zéro erreur console). Gate vert (e2e 53/53). VISION
 Art. 7, 8, 9, 11.
+
+## 08/07/2026 — « Dans les coulisses » : album & viewer photo dignes d'un album premium
+
+**Décision produit (retour terrain) :** les coulisses sont la brique PLAISIR (l'album du
+chantier que le client regarde). Quatre défauts nuisaient à cette promesse — on les corrige
+d'un bloc, sans nouveau concept ni logique métier (présentation seule) :
+
+1. **La photo était RECADRÉE.** Le viewer plein écran forçait chaque image dans un cadre 4:5
+   (`object-cover`) : les bords étaient rognés. On montre désormais la **photo entière**
+   (`object-contain`, letterbox) — on ne coupe plus rien. **Subtilité technique déterminante :**
+   le calque d'annotations (`PhotoAnnotator`) se positionne en `inset-0` avec des coordonnées
+   normalisées 0..1 ; un `object-contain` naïf aurait désaligné toutes les annotations sur les
+   bandes de letterbox. Le conteneur **épouse donc la photo** (`inline-block`, l'image porte
+   `max-h`/`max-w`), si bien que l'overlay reste calé au pixel près.
+2. **On ne pouvait pas regarder un détail.** Ajout d'un **zoom** (bouton + double-clic), avec
+   **déplacement au doigt/souris** une fois zoomé ; flèches et swipe désactivés pendant le zoom
+   pour ne pas se télescoper ; zoom réinitialisé au changement de photo et à l'entrée en
+   annotation. Le zoom n'apparaît que sur une **vraie image** (pas les tuiles dégradées).
+3. **Navigation pauvre dans un album.** Les simples points de pagination deviennent une
+   **pellicule de miniatures** défilante : on parcourt l'album d'un coup d'œil et on saute à
+   une photo ; pastille or = la photo porte un mot.
+4. **La carte d'un album ne montrait qu'UNE photo.** Un album (≥ 2 photos) affiche maintenant une
+   **mosaïque d'aperçu** (couverture + suivantes, « +N » au-delà de 3) — on voit immédiatement
+   qu'il y en a plusieurs. La mosaïque reste **dans le cadre dense 6/5** (contrat `recit-densite`).
+5. **Bonus cohérence :** dans la **Bibliothèque**, les vignettes étaient des `<div>` morts —
+   cliquer n'ouvrait rien. Elles deviennent cliquables et **ouvrent le viewer** sur la bonne
+   photo (même règle que « tout est consultable d'un clic », 07/07).
+
+**Alternatives rejetées :** garder `object-cover` et « juste » agrandir le cadre (on continue de
+rogner) ; recalculer la position des annotations en fonction du letterbox (fragile, deux sources
+de vérité géométriques) ; un carrousel de vignettes distinct de la galerie (deux façons de
+naviguer). Le pinch natif multi-touch est laissé à plus tard : le zoom bouton + glisser couvre le
+besoin sur mobile sans dépendance.
+
+**Mécanique :** `MomentGallery` (photo entière + zoom/pan + pellicule), `FilMoment` (mosaïque
+d'aperçu), `BibliothequeView` (vignettes → bouton `onOpenPhoto`), `FilView` (câblage vignette →
+galerie ciblée). Aucun changement de modèle ni de sélecteur core ; client-safe et append-only
+intacts. Nouveau `coulisses-viewer.test` (mosaïque ≥ 2 images, photo `object-contain`, pellicule +
+compteur, zoom masquant les flèches, vignette Bibliothèque ouvrant le viewer, zéro erreur console),
+`recit-densite` toujours vert (cadre 6/5 conservé). Gate vert (e2e 54/54). VISION Art. 1, 8, 9, 11.

@@ -158,6 +158,10 @@ export function FilView({
           images={images}
           zones={zones}
           momentsAimes={new Set(coups.map((c) => c.momentId))}
+          onOpenPhoto={(image) => {
+            const m = moments.find((x) => x.id === image.momentId);
+            if (m) setGallery({ moment: m, photoId: image.photo.id });
+          }}
         />
       ) : (
         <div className="mx-auto max-w-xl space-y-6">
