@@ -1,13 +1,13 @@
 /**
- * RC1 — Réponse à une demande de DOCUMENT (échange documentaire, pas une conversation).
+ * RC1 — Demander un document au client depuis « Nouvelle mission ».
  * ===========================================================================
- * Quand le conducteur demande un document au client, le client répond de TROIS
- * façons : un commentaire seul, un document seul, un document + commentaire. Le
- * document est l'élément principal : il s'enregistre automatiquement au projet et
- * apparaît dans « Documents » des DEUX côtés (consultable, téléchargeable), sans
- * jamais le retélécharger/réimporter. Le conducteur reçoit une notification dans
- * « Aujourd'hui » qui ouvre la demande concernée. Aucun nouveau concept : on enrichit
- * la réponse à une demande existante.
+ * Tout ce que le conducteur demande au client passe par « Nouvelle mission →
+ * Demander au client », où il choisit le TYPE : décision, document ou question.
+ * Pour un DOCUMENT : libellé + type + message optionnel + échéance optionnelle,
+ * visible client automatiquement. Le client répond de trois façons (commentaire
+ * seul / fichier seul / fichier + commentaire). Le document reçu est enregistré au
+ * projet et apparaît dans « Documents » des DEUX côtés (ouvrable, téléchargeable) ;
+ * la demande passe en « Reçu » et le conducteur est notifié dans « Aujourd'hui ».
  */
 import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
@@ -17,17 +17,13 @@ const { assert, summary } = harness();
 
 const PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-const PDF = {
-  name: 'diagnostic.pdf',
-  mimeType: 'application/pdf',
-  buffer: Buffer.from('%PDF-1.4 d'),
-};
-const IMG = { name: 'attestation.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') };
+const PDF = { name: 'diag.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 d') };
+const IMG = { name: 'rib.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') };
 
-// Trois documents « à fournir » du chantier seedé (Lyon 6e, espace client ouvert).
-const DPE = 'DPE';
-const DIAG = 'Diagnostic amiante';
-const ASSU = 'Attestation décennale';
+const L_COMMENT = 'Justificatif de virement'; // réponse : commentaire seul
+const L_DOC = 'Diagnostic plomb'; // réponse : fichier seul
+const L_BOTH = 'RIB du client'; // réponse : fichier + commentaire
+const INTERNE = 'Contrat sous-traitant'; // document interne seedé (jamais client)
 
 const notifs = () => page.locator('section[aria-label="Notifications"]');
 const demandeCard = (label) =>
@@ -35,17 +31,20 @@ const demandeCard = (label) =>
     .locator('li')
     .filter({ hasText: `transmettre : ${label}` })
     .first();
+const demandesSection = () =>
+  page.locator('div').filter({ hasText: 'Documents demandés au client' }).last();
 
-/** Le conducteur demande un document (checklist Documents → « Demander au client »). */
-const askDoc = async (label) => {
+/** « Nouvelle mission → Demander au client → Demander un document ». */
+const askDoc = async (libelle, typeLabel) => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
-  await page
-    .locator('li')
-    .filter({ hasText: label })
-    .first()
-    .getByRole('button', { name: 'Demander au client' })
-    .click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('button', { name: /Demander au client/ }).click();
+  const dlg = page.getByRole('dialog');
+  await dlg.getByRole('button', { name: /Demander un document/ }).click();
+  await dlg.getByLabel('Document demandé').fill(libelle);
+  await dlg.getByLabel('Type de document').selectOption({ label: typeLabel });
+  await dlg.getByRole('button', { name: /Envoyer la demande de document/ }).click();
+  await dlg.waitFor({ state: 'hidden', timeout: 6000 });
 };
 
 const openConducteurAujourdhui = async () => {
@@ -58,72 +57,105 @@ const openConducteurAujourdhui = async () => {
     .waitFor({ state: 'visible', timeout: 6000 });
 };
 
+const openConducteurDocuments = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('tab', { name: 'Documents', exact: true }).click();
+};
+
 try {
   await openDemo(page);
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
 
-  await assert('CONDUCTEUR — trois demandes de document créées', async () => {
-    await askDoc(DPE);
-    await askDoc(DIAG);
-    await askDoc(ASSU);
-    // Chaque demande apparaît côté client (Aujourd'hui), dans « Documents demandés ».
+  await assert('« Demander au client » existe dans « Nouvelle mission »', async () => {
+    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+    const dlg = page.getByRole('dialog');
+    await dlg.getByRole('button', { name: /Demander au client/ }).click();
+    // Les trois types sont proposés (décision / document / question).
+    await dlg.getByRole('button', { name: /Demander une décision/ }).waitFor({ state: 'visible' });
+    await dlg.getByRole('button', { name: /Demander un document/ }).waitFor({ state: 'visible' });
+    await dlg
+      .getByRole('button', { name: /Poser une question simple/ })
+      .waitFor({ state: 'visible' });
+    await page.keyboard.press('Escape');
+    await dlg.waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  });
+
+  await assert('On crée trois demandes de document (via Nouvelle mission)', async () => {
+    await askDoc(L_COMMENT, 'Justificatif d’acompte');
+    await askDoc(L_DOC, 'Diagnostic');
+    await askDoc(L_BOTH, 'RIB');
+    // Le conducteur les suit dans « Documents demandés au client » (En attente).
+    await openConducteurDocuments();
+    const sec = demandesSection();
+    for (const l of [L_COMMENT, L_DOC, L_BOTH]) {
+      await sec
+        .locator('li')
+        .filter({ hasText: l })
+        .first()
+        .getByText('En attente')
+        .waitFor({ state: 'visible', timeout: 6000 });
+    }
+  });
+
+  await assert('CLIENT — les trois demandes apparaissent dans « Aujourd’hui »', async () => {
     await openClientTab(page);
-    await demandeCard(DPE).waitFor({ state: 'visible', timeout: 6000 });
-    await demandeCard(DIAG).waitFor({ state: 'visible', timeout: 6000 });
-    await demandeCard(ASSU).waitFor({ state: 'visible', timeout: 6000 });
+    await demandeCard(L_COMMENT).waitFor({ state: 'visible', timeout: 6000 });
+    await demandeCard(L_DOC).waitFor({ state: 'visible', timeout: 6000 });
+    await demandeCard(L_BOTH).waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  // --- (1) commentaire SEUL --------------------------------------------------
   await assert('CLIENT — répond avec un COMMENTAIRE SEUL', async () => {
-    const card = demandeCard(DPE);
+    const card = demandeCard(L_COMMENT);
     await card.getByRole('button', { name: /joindre un document/i }).click();
-    await card.getByPlaceholder(/Ajouter un commentaire/).fill('Je vous l’envoie par courrier.');
+    await card.getByPlaceholder(/Ajouter un commentaire/).fill('Virement effectué ce matin.');
     await card.getByRole('button', { name: 'Envoyer' }).click();
-    // La demande traitée disparaît de la boîte de réception.
-    await demandeCard(DPE).waitFor({ state: 'detached', timeout: 6000 });
+    await demandeCard(L_COMMENT).waitFor({ state: 'detached', timeout: 6000 });
   });
 
-  // --- (2) document SEUL -----------------------------------------------------
-  await assert('CLIENT — répond avec un DOCUMENT SEUL', async () => {
-    const card = demandeCard(DIAG);
+  await assert('CLIENT — répond avec un FICHIER SEUL', async () => {
+    const card = demandeCard(L_DOC);
     await card.getByRole('button', { name: /joindre un document/i }).click();
     await card.locator('[data-testid="client-doc-file"]').setInputFiles(PDF);
     await card.getByRole('button', { name: new RegExp(PDF.name) }).waitFor({ timeout: 6000 });
     await card.getByRole('button', { name: 'Envoyer' }).click();
-    await demandeCard(DIAG).waitFor({ state: 'detached', timeout: 6000 });
+    await demandeCard(L_DOC).waitFor({ state: 'detached', timeout: 6000 });
   });
 
-  // --- (3) document + commentaire -------------------------------------------
-  await assert('CLIENT — répond avec un DOCUMENT + COMMENTAIRE', async () => {
-    const card = demandeCard(ASSU);
+  await assert('CLIENT — répond avec un FICHIER + COMMENTAIRE', async () => {
+    const card = demandeCard(L_BOTH);
     await card.getByRole('button', { name: /joindre un document/i }).click();
     await card.locator('[data-testid="client-doc-file"]').setInputFiles(IMG);
     await card.getByRole('button', { name: new RegExp(IMG.name) }).waitFor({ timeout: 6000 });
-    await card.getByPlaceholder(/Ajouter un commentaire/).fill('Assurance à jour jusqu’en 2027.');
+    await card.getByPlaceholder(/Ajouter un commentaire/).fill('Voici mon RIB.');
     await card.getByRole('button', { name: 'Envoyer' }).click();
-    await demandeCard(ASSU).waitFor({ state: 'detached', timeout: 6000 });
+    await demandeCard(L_BOTH).waitFor({ state: 'detached', timeout: 6000 });
   });
 
-  // --- CÔTÉ CLIENT : les documents envoyés sont dans « Documents » -----------
-  await assert('CLIENT — retrouve ses documents envoyés (ouvrir + télécharger)', async () => {
-    await openClientTab(page, 'Documents');
-    for (const label of [DIAG, ASSU]) {
-      const rowDoc = page.locator('#section-documents li').filter({ hasText: label }).first();
-      await rowDoc.waitFor({ state: 'visible', timeout: 6000 });
-      await rowDoc
-        .getByRole('button', { name: 'Ouvrir le document' })
-        .waitFor({ state: 'visible' });
-      await rowDoc
-        .getByRole('button', { name: new RegExp(`Télécharger : ${label}`) })
-        .waitFor({ state: 'visible' });
-    }
-    // Le commentaire SEUL n'a créé AUCUN document (échange documentaire only).
-    if ((await page.locator('#section-documents li').filter({ hasText: DPE }).count()) > 0)
-      throw new Error('un document a été créé pour une réponse « commentaire seul »');
-  });
+  await assert(
+    'CLIENT — retrouve ses documents dans « Documents » (ouvrir + télécharger)',
+    async () => {
+      await openClientTab(page, 'Documents');
+      for (const label of [L_DOC, L_BOTH]) {
+        const rowDoc = page.locator('#section-documents li').filter({ hasText: label }).first();
+        await rowDoc.waitFor({ state: 'visible', timeout: 6000 });
+        await rowDoc
+          .getByRole('button', { name: 'Ouvrir le document' })
+          .waitFor({ state: 'visible' });
+        await rowDoc
+          .getByRole('button', { name: new RegExp(`Télécharger : ${label}`) })
+          .waitFor({ state: 'visible' });
+      }
+      // Le commentaire SEUL n'a créé AUCUN document.
+      if ((await page.locator('#section-documents li').filter({ hasText: L_COMMENT }).count()) > 0)
+        throw new Error('un document a été créé pour une réponse « commentaire seul »');
+      // Client-safe : le document interne seedé ne fuit jamais.
+      if ((await page.getByText(INTERNE, { exact: false }).count()) > 0)
+        throw new Error('un document interne fuit dans l’espace client');
+    },
+  );
 
   await assert('CLIENT — un document envoyé s’OUVRE réellement (blob)', async () => {
-    const rowDoc = page.locator('#section-documents li').filter({ hasText: DIAG }).first();
+    const rowDoc = page.locator('#section-documents li').filter({ hasText: L_DOC }).first();
     const pagePromise = ctx.waitForEvent('page', { timeout: 6000 });
     await rowDoc.getByRole('button', { name: 'Ouvrir le document' }).click();
     const tab = await pagePromise;
@@ -131,16 +163,14 @@ try {
     await tab.close();
   });
 
-  // --- CÔTÉ CONDUCTEUR : notifications dans « Aujourd'hui » ------------------
   await assert('CONDUCTEUR — notifications de réponse dans « Aujourd’hui »', async () => {
     await openConducteurAujourdhui();
-    // Document envoyé → « a envoyé : … » ; commentaire seul → « a répondu … ».
     await notifs()
-      .getByRole('button', { name: new RegExp(`a envoyé : ${DIAG}`) })
+      .getByRole('button', { name: new RegExp(`a envoyé : ${L_DOC}`) })
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
     await notifs()
-      .getByRole('button', { name: new RegExp(`a envoyé : ${ASSU}`) })
+      .getByRole('button', { name: new RegExp(`a envoyé : ${L_BOTH}`) })
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
     await notifs()
@@ -149,33 +179,39 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert(
-    'CONDUCTEUR — la notification ouvre « Documents » sur le document reçu',
-    async () => {
-      await notifs()
-        .getByRole('button', { name: new RegExp(`a envoyé : ${DIAG}`) })
-        .first()
-        .click();
-      // On atterrit sur l'onglet Documents du chantier concerné, document présent.
-      await page
-        .getByRole('tab', { name: 'Documents', selected: true })
-        .waitFor({ state: 'visible', timeout: 6000 });
-      await page.getByText(DIAG).first().waitFor({ state: 'visible', timeout: 6000 });
-    },
-  );
-
-  await assert('CONDUCTEUR — le document reçu est consultable dans « Documents »', async () => {
-    // La bibliothèque porte le document reçu (la ligne de checklist, elle, n'a pas
-    // de bouton d'ouverture) : on cible la ligne QUI a « Ouvrir le document ».
-    const rowDoc = page
+  await assert('CONDUCTEUR — la demande passe en « Reçu » + document consultable', async () => {
+    await openConducteurDocuments();
+    const sec = demandesSection();
+    // Fichier fourni → « Reçu » ; commentaire seul → « Répondu ».
+    await sec
       .locator('li')
-      .filter({ hasText: DIAG })
-      .filter({ has: page.getByRole('button', { name: 'Ouvrir le document' }) })
-      .first();
-    await rowDoc.getByRole('button', { name: 'Ouvrir le document' }).waitFor({ state: 'visible' });
-    await rowDoc
-      .getByRole('button', { name: new RegExp(`Télécharger : ${DIAG}`) })
+      .filter({ hasText: L_DOC })
+      .first()
+      .getByText('Reçu')
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await sec
+      .locator('li')
+      .filter({ hasText: L_COMMENT })
+      .first()
+      .getByText('Répondu')
+      .waitFor({ state: 'visible', timeout: 6000 });
+    // Le document reçu est ouvrable + téléchargeable côté conducteur.
+    const row = sec.locator('li').filter({ hasText: L_DOC }).first();
+    await row.getByRole('button', { name: 'Ouvrir le document' }).waitFor({ state: 'visible' });
+    await row
+      .getByRole('button', { name: new RegExp(`Télécharger : ${L_DOC}`) })
       .waitFor({ state: 'visible' });
+  });
+
+  await assert('CONDUCTEUR — le clic notification ouvre « Documents »', async () => {
+    await openConducteurAujourdhui();
+    await notifs()
+      .getByRole('button', { name: new RegExp(`a envoyé : ${L_DOC}`) })
+      .first()
+      .click();
+    await page
+      .getByRole('tab', { name: 'Documents', selected: true })
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Zéro erreur console', async () => {

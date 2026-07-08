@@ -24,16 +24,20 @@ const dialog = () => page.getByRole('dialog');
 try {
   await openDemo(page);
 
-  await assert('Nouvelle mission propose « Décision client »', async () => {
-    // On travaille sur un chantier vierge de décision (Écully) via le sélecteur.
-    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await selector().selectOption({ label: 'Maison Écully' });
-    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-    await page.getByRole('button', { name: /Décision client/ }).click();
-    await page
-      .getByRole('heading', { name: 'Demander une décision au client' })
-      .waitFor({ state: 'visible', timeout: 6000 });
-  });
+  await assert(
+    'Nouvelle mission → « Demander au client » → « Demander une décision »',
+    async () => {
+      // On travaille sur un chantier vierge de décision (Écully) via le sélecteur.
+      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+      await selector().selectOption({ label: 'Maison Écully' });
+      await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+      await page.getByRole('button', { name: /Demander au client/ }).click();
+      await page.getByRole('button', { name: /Demander une décision/ }).click();
+      await page
+        .getByRole('heading', { name: 'Demander une décision au client' })
+        .waitFor({ state: 'visible', timeout: 6000 });
+    },
+  );
 
   await assert('Saisir titre + contexte + une photo', async () => {
     await dialog()

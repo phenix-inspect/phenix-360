@@ -1780,3 +1780,49 @@ demande), `ClientView` (section « Documents demandés »), `seed`. Nouveau
 `demande-document.test` (trois modes de réponse, notification conducteur, document présent et
 consultable des deux côtés, commentaire seul ne crée aucun document). Gate vert (e2e 51/51).
 VISION Art. 6, 7, 8, 9, 11.
+
+## 07/07/2026 — Demander au client = point d'entrée unique typé (décision / document / question)
+
+**Décision produit (retour terrain) :** « je ne trouve pas comment demander un document ».
+Règle simple : **tout ce que le conducteur demande au client passe par « + Nouvelle mission
+→ Demander au client »**, où il choisit le TYPE :
+
+1. **Demander une décision** → ouvre le composer de décision structuré (existant).
+2. **Demander un document** → libellé + type de document (Justificatif d'acompte, Attestation
+   assurance, RIB, Diagnostic, DPE, Plan, Autorisation copropriété, Pièce d'identité, Autre) +
+   message facultatif + échéance facultative ; **visible client automatiquement**.
+3. **Poser une question simple** → une question ouverte.
+
+Le client reçoit la demande dans « Aujourd'hui » (section « Documents demandés » pour un
+document) et répond en trois façons (commentaire seul / fichier seul / fichier + commentaire ;
+PDF/JPEG/PNG via le sélecteur natif). À réception d'un fichier : la demande passe en **« Reçu »**
+(sinon « Répondu » pour un commentaire seul), le conducteur est notifié dans « Aujourd'hui », et
+le document est **ajouté automatiquement à l'onglet Documents** (des deux côtés), ouvrable et
+téléchargeable — jamais de réimport.
+
+**Créer une demande de document ne se fait PLUS depuis l'onglet Documents** : ce dernier ne fait
+que consulter (bibliothèque + suivi « Documents demandés au client » avec statut En attente /
+Reçu / Répondu). Créer = Nouvelle mission ; consulter = Documents.
+
+**Mécanique (enrichissement de l'action existante, aucun nouvel écran) :** le composer
+« Demander au client » (kind `demande`) présente un menu 3 choix ; « Décision » remonte au
+composer structuré via `onEscalateDecision`, « Document » et « Question » restent en ligne. La
+`DemandeContent` gagne `echeance?` (les champs `attendu`/`docLibelle`/`docCategorie` existaient
+déjà) ; `toDecision` la projette. Le bouton « Demander au client » par document quitte la
+check-list de préparation ; `DocumentsTab` gagne la section de suivi « Documents demandés au
+client » et ne crée plus rien (retrait de `askDocument`/`onAskDocument`, `actor`). Le raccourci
+contextuel « Demander » du radar (AttentionPanel) crée désormais une vraie demande de document
+(`attendu: 'document'`). Le bouton autonome « Décision client » de « Nouvelle mission » est
+absorbé par « Demander au client → Décision ».
+
+**Alternatives rejetées :** garder la demande de document cachée dans l'onglet Documents (le
+conducteur ne la trouvait pas) ; multiplier les points d'entrée (Documents + radar + mission) ;
+deux boutons « décision » distincts dans Nouvelle mission (doublon).
+
+**Impact :** `core/event` (+`echeance`), `core/decision` (`toDecision`), `Composer` (menu 3
+types + formulaire document), `MissionPicker` (retrait « Décision client »), `CompagnonView`
+(escalade décision, demande de document contextuelle), `prep/PrepDocuments` (retrait du bouton),
+`DocumentsTab` (suivi « Documents demandés », plus de création). `demande-document.test` réécrit
+(entrée Nouvelle mission, 3 modes, statut Reçu/Répondu, notification, ouvert/téléchargé des deux
+côtés, client-safe) ; `mission-entree-unique` et `client-decision` recalés. Gate vert (e2e
+51/51). VISION Art. 6, 7, 8, 9, 11.

@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { Badge, Button, Card, CardContent } from '@phenix360/ui';
-import { Download, Eye, EyeOff, FileText, Library } from 'lucide-react';
-import {
-  sortByDate,
-  type Event,
-  type EventActor,
-  type Project,
-  type ProjectDossier,
-} from '@phenix360/core';
+import { Download, Eye, EyeOff, FileText, Library, MailQuestion } from 'lucide-react';
+import { sortByDate, type Event, type Project, type ProjectDossier } from '@phenix360/core';
 import { demo } from '../store';
 import { DocumentButton } from './DocumentButton';
 import { DocumentFilterBar } from './DocumentFilterBar';
@@ -18,21 +12,19 @@ import { fmtDate } from '../lib/format';
 
 /**
  * Onglet DOCUMENTS — répond à « où retrouver un document ? ». Il REGROUPE tout :
- * les documents de préparation (suivi d'obtention, dépôt, partage) ET la
- * bibliothèque de tous les documents/PV générés du chantier (devis, factures,
- * comptes rendus, pré-réception, réception…). Chaque document est consultable,
- * ouvrable, téléchargeable et — pour un fichier — partageable au client. On ne
- * cherche JAMAIS un document ailleurs. Aucune logique métier : lecture du journal.
+ * le suivi des documents DEMANDÉS au client (avec leur statut « Reçu »), les
+ * documents de préparation, ET la bibliothèque de tous les documents/PV générés du
+ * chantier. Chaque document est consultable, ouvrable, téléchargeable et — pour un
+ * fichier — partageable. CONSULTATION uniquement : on ne CRÉE rien ici (créer une
+ * demande passe par « Nouvelle mission → Demander au client »).
  */
 export function DocumentsTab({
   project,
   dossier,
-  actor,
   events,
 }: {
   project: Project;
   dossier: ProjectDossier | null;
-  actor: EventActor;
   events: Event[];
 }): React.JSX.Element {
   // La bibliothèque = tous les documents + comptes rendus du journal, SAUF ceux
@@ -47,44 +39,77 @@ export function DocumentsTab({
   const [filter, setFilter] = useState<DocFilter>('tous');
   const shown = filterDocuments(library, filter);
 
+  // Suivi des documents DEMANDÉS au client (créés via « Nouvelle mission »). Le
+  // clic n'agit pas : c'est un tableau de bord de consultation (En attente / Reçu).
+  const docRequests = sortByDate(
+    events.filter(
+      (e): e is Extract<Event, { type: 'demande' }> =>
+        e.type === 'demande' &&
+        e.content.destinataire === 'client' &&
+        e.content.attendu === 'document',
+    ),
+    'desc',
+  );
+
   const patch = (next: Partial<ProjectDossier>): void => {
     if (dossier) demo.saveDossier(project.id, { ...dossier, ...next });
-  };
-  const askDocument = async (docId: string, label: string): Promise<void> => {
-    if (!dossier) return;
-    const cat = dossier.documents.find((d) => d.id === docId)?.categorie;
-    patch({
-      documents: dossier.documents.map((d) =>
-        d.id === docId ? { ...d, status: 'demande_client' } : d,
-      ),
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'demande',
-      visibility: 'client',
-      state: 'ouverte',
-      content: {
-        question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${label} ?`,
-        destinataire: 'client',
-        // Échange DOCUMENTAIRE : le client répond en joignant le document.
-        attendu: 'document',
-        docLibelle: label,
-        ...(cat ? { docCategorie: cat } : {}),
-      },
-    });
   };
 
   return (
     <div className="space-y-6">
-      {dossier && (
-        <PrepDocumentsSection
-          project={project}
-          dossier={dossier}
-          patch={patch}
-          onAskDocument={(docId, label) => void askDocument(docId, label)}
-        />
+      {docRequests.length > 0 && (
+        <Card>
+          <CardContent className="space-y-4 p-5">
+            <h3 className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+              <MailQuestion aria-hidden />
+              Documents demandés au client
+              <span className="text-muted-foreground">({docRequests.length})</span>
+            </h3>
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+              {docRequests.map((r) => {
+                const docId = r.content.resolution?.docEventId;
+                const docEv = docId
+                  ? events.find((e) => e.id === docId && e.type === 'document')
+                  : undefined;
+                // « Reçu » = un document a été fourni ; « Répondu » = réponse sans
+                // document (commentaire seul) ; sinon « En attente ».
+                const status = docEv ? 'Reçu' : r.state === 'traitee' ? 'Répondu' : 'En attente';
+                const variant = docEv ? 'success' : r.state === 'traitee' ? 'neutral' : 'warning';
+                return (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-surface px-3 py-2.5"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-foreground">
+                        {r.content.docLibelle ?? r.content.question}
+                      </p>
+                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                        {r.content.docCategorie ?? 'Document'}
+                        {r.content.echeance ? ` · avant le ${fmtDate(r.content.echeance)}` : ''}
+                      </p>
+                    </div>
+                    <Badge variant={variant}>{status}</Badge>
+                    {docEv && <DocumentButton event={docEv} />}
+                    {docEv && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-label={`Télécharger : ${generatedDocumentTitle(docEv)}`}
+                        onClick={() => demo.downloadDocument(docEv)}
+                      >
+                        <Download aria-hidden /> Télécharger
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
       )}
+
+      {dossier && <PrepDocumentsSection project={project} dossier={dossier} patch={patch} />}
 
       <Card>
         <CardContent className="space-y-4 p-5">

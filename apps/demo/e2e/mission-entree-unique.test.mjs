@@ -48,7 +48,7 @@ const closeDialog = async () => {
 
 const MOVED = [
   { name: /Ajouter un document/, dialog: 'Ajouter un document' },
-  { name: /Demander au client/, dialog: 'Demander une décision au client' },
+  { name: /Demander au client/, dialog: 'Demander au client' },
   { name: /Répondre au client/, dialog: 'Répondre au client' },
 ];
 

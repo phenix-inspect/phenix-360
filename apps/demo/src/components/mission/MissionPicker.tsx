@@ -14,7 +14,6 @@ import {
   HelpCircle,
   Images,
   KeyRound,
-  MessageSquareQuote,
   PenLine,
   Reply,
   Truck,
@@ -54,7 +53,7 @@ const COMPOSE_ACTIONS: {
   {
     kind: 'demande',
     label: 'Demander au client',
-    description: 'Poser une question, soumettre un choix',
+    description: 'Une décision, un document ou une question',
     icon: HelpCircle,
   },
   {
@@ -72,15 +71,12 @@ const COMPOSE_ACTIONS: {
  */
 export function MissionPicker({
   onSelect,
-  onClientDecision,
   onPublishAlbum,
   onCompose,
   pendingReplies = 0,
   onClose,
 }: {
   onSelect: (kind: MissionKind) => void;
-  /** Cas particulier : préparer une décision à faire valider par le client. */
-  onClientDecision: () => void;
   /** Publier un album photo dans « Dans les coulisses » (la brique plaisir). */
   onPublishAlbum: () => void;
   /** Actions administratives (document, demande, réponse) — déplacées du Suivi. */
@@ -169,24 +165,6 @@ export function MissionPicker({
             );
           })}
         </div>
-
-        {/* Cas particulier : demander une décision au client (pas une capture,
-            mais une demande de choix). Mis en avant, hors grille des missions. */}
-        <button
-          type="button"
-          onClick={onClientDecision}
-          className="group mt-1 flex w-full items-start gap-3 rounded-xl border border-gold-200 bg-gold-50 p-4 text-left shadow-sm transition-colors duration-base hover:border-gold-300 hover:bg-gold-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-        >
-          <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-5">
-            <MessageSquareQuote aria-hidden />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-medium text-foreground">Décision client</span>
-            <span className="block text-xs text-muted-foreground">
-              Demander un choix au client (carrelage, couleur, option…)
-            </span>
-          </span>
-        </button>
       </DialogContent>
     </Dialog>
   );

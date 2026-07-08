@@ -203,6 +203,8 @@ export interface DemandeContent {
   docLibelle?: string;
   /** Catégorie du document attendu (classement automatique à réception). */
   docCategorie?: string;
+  /** Échéance FACULTATIVE souhaitée pour la réponse (AAAA-MM-JJ). */
+  echeance?: string;
 }
 
 /* -------------------------------------------------------------------------- *

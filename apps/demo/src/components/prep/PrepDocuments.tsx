@@ -27,12 +27,10 @@ export function PrepDocumentsSection({
   project,
   dossier,
   patch,
-  onAskDocument,
 }: {
   project: Project;
   dossier: ProjectDossier;
   patch: (next: Partial<ProjectDossier>) => void;
-  onAskDocument: (docId: string, label: string) => void;
 }): React.JSX.Element {
   const snap = useDemo();
   const docs = dossier.documents.filter((d) => d.categorie !== 'photo_avant');
@@ -41,11 +39,6 @@ export function PrepDocumentsSection({
   // résout via `eventId`. Repli sur `attachment` pour d'anciennes données.
   const documentEvent = (d: ProjectDocument) =>
     d.eventId ? snap.events.find((e) => e.id === d.eventId && e.type === 'document') : undefined;
-  const fileOf = (d: ProjectDocument): EventAttachment | undefined => {
-    const ev = documentEvent(d);
-    if (ev) return ev.type === 'document' ? ev.content.attachment : undefined;
-    return d.attachment;
-  };
   // Visibilité courante d'un document PARTAGEABLE (avec fichier au Journal) ; null
   // s'il n'a pas de fichier (rien à montrer au client).
   const visibilityOf = (d: ProjectDocument): EventVisibility | null =>
@@ -118,11 +111,6 @@ export function PrepDocumentsSection({
                     </Button>
                   );
                 })()}
-                {(d.status === 'manquant' || d.status === 'a_fournir') && !fileOf(d) && (
-                  <Button size="sm" variant="outline" onClick={() => onAskDocument(d.id, d.label)}>
-                    Demander au client
-                  </Button>
-                )}
                 <button
                   type="button"
                   aria-label={`Retirer ${d.label}`}

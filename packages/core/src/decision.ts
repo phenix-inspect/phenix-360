@@ -27,6 +27,8 @@ export interface Decision {
   docLibelle?: string;
   /** Catégorie du document attendu (classement automatique). */
   docCategorie?: string;
+  /** Échéance facultative souhaitée (AAAA-MM-JJ). */
+  echeance?: string;
 }
 
 /** Projette une `demande` en `Decision` lisible côté client. */
@@ -43,6 +45,7 @@ export function toDecision(e: DemandeEvent): Decision {
     ...(e.content.attendu ? { attendu: e.content.attendu } : {}),
     ...(e.content.docLibelle ? { docLibelle: e.content.docLibelle } : {}),
     ...(e.content.docCategorie ? { docCategorie: e.content.docCategorie } : {}),
+    ...(e.content.echeance ? { echeance: e.content.echeance } : {}),
   };
 }
 

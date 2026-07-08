@@ -117,6 +117,10 @@ export function CompagnonView({
       content: {
         question: `Pour préparer votre chantier, pouvez-vous nous transmettre : ${doc.label} ?`,
         destinataire: 'client',
+        // Échange DOCUMENTAIRE : le client répond en joignant le document.
+        attendu: 'document',
+        docLibelle: doc.label,
+        ...(doc.categorie ? { docCategorie: doc.categorie } : {}),
       },
     });
   };
@@ -206,7 +210,7 @@ export function CompagnonView({
           )}
         </TabsContent>
         <TabsContent value="documents">
-          <DocumentsTab project={project} dossier={dossier ?? null} actor={actor} events={events} />
+          <DocumentsTab project={project} dossier={dossier ?? null} events={events} />
         </TabsContent>
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />
@@ -229,6 +233,11 @@ export function CompagnonView({
         actor={actor}
         events={events}
         onClose={() => setComposer(null)}
+        onEscalateDecision={() => {
+          // « Demander au client → Décision » : bascule vers le composer structuré.
+          setComposer(null);
+          setDecisionComposer(true);
+        }}
       />
 
       {lever && <ReserveLeveeDialog reserve={lever} actor={actor} onClose={() => setLever(null)} />}
@@ -238,10 +247,6 @@ export function CompagnonView({
           onSelect={(kind) => {
             setMissionKind(kind);
             setMissionPicker(false);
-          }}
-          onClientDecision={() => {
-            setMissionPicker(false);
-            setDecisionComposer(true);
           }}
           onPublishAlbum={() => {
             setMissionPicker(false);

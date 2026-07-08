@@ -20,12 +20,37 @@ import {
   type Project,
   type ProjectStep,
 } from '@phenix360/core';
-import { FileText, Image as ImageIcon, Inbox, Upload, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  FileText,
+  HelpCircle,
+  Image as ImageIcon,
+  Inbox,
+  MessageSquareQuote,
+  Upload,
+  X,
+} from 'lucide-react';
 import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment, readPhotoAttachment } from '../lib/upload';
 import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../lib/media';
 
 export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande' | 'repondre';
+
+/**
+ * Types de documents demandables au client (« Demander au client → Document »).
+ * La CATÉGORIE choisie classe automatiquement le document reçu.
+ */
+const DOC_TYPES = [
+  'Justificatif d’acompte',
+  'Attestation assurance',
+  'RIB',
+  'Diagnostic',
+  'DPE',
+  'Plan',
+  'Autorisation copropriété',
+  'Pièce d’identité',
+  'Autre',
+] as const;
 
 const TITLES: Record<ComposerKind, { title: string; description: string }> = {
   compte_rendu: {
@@ -35,8 +60,8 @@ const TITLES: Record<ComposerKind, { title: string; description: string }> = {
   photo: { title: 'Ajouter des photos', description: 'Partagez l’avancement en images.' },
   document: { title: 'Ajouter un document', description: 'Devis, plan, facture…' },
   demande: {
-    title: 'Demander une décision au client',
-    description: 'Posez une question ou soumettez un choix à votre client.',
+    title: 'Demander au client',
+    description: 'Une décision, un document ou une question — au bon endroit, en un geste.',
   },
   repondre: {
     title: 'Répondre au client',
@@ -51,12 +76,15 @@ export function Composer({
   actor,
   events,
   onClose,
+  onEscalateDecision,
 }: {
   kind: ComposerKind | null;
   project: Project;
   actor: EventActor;
   events: Event[];
   onClose: () => void;
+  /** « Demander au client → Décision » ouvre le composer de décision structuré. */
+  onEscalateDecision?: () => void;
 }): React.JSX.Element | null {
   if (kind === null) return null;
   const meta = TITLES[kind];
@@ -70,7 +98,13 @@ export function Composer({
         {kind === 'repondre' ? (
           <ReplyList project={project} actor={actor} events={events} onDone={onClose} />
         ) : (
-          <CaptureForm kind={kind} project={project} actor={actor} onDone={onClose} />
+          <CaptureForm
+            kind={kind}
+            project={project}
+            actor={actor}
+            onDone={onClose}
+            onEscalateDecision={onEscalateDecision}
+          />
         )}
       </DialogContent>
     </Dialog>
@@ -82,11 +116,13 @@ function CaptureForm({
   project,
   actor,
   onDone,
+  onEscalateDecision,
 }: {
   kind: Exclude<ComposerKind, 'repondre'>;
   project: Project;
   actor: EventActor;
   onDone: () => void;
+  onEscalateDecision?: () => void;
 }): React.JSX.Element {
   const [texte, setTexte] = useState('');
   const [etape, setEtape] = useState<ProjectStep>(project.currentStep ?? 'gros_oeuvre');
@@ -94,6 +130,11 @@ function CaptureForm({
   const [piece, setPiece] = useState('');
   const [libelle, setLibelle] = useState('');
   const [question, setQuestion] = useState('');
+  // « Demander au client » : choix du type (décision / document / question).
+  const [demandeMode, setDemandeMode] = useState<'menu' | 'document' | 'question'>('menu');
+  const [docLibelle, setDocLibelle] = useState('');
+  const [docType, setDocType] = useState<(typeof DOC_TYPES)[number]>(DOC_TYPES[0]);
+  const [echeance, setEcheance] = useState('');
   const [visibility, setVisibility] = useState<'client' | 'interne'>('client');
   // Vrais fichiers (Lot 3) : aperçu local base64.
   const [photos, setPhotos] = useState<EventAttachment[]>([]);
@@ -146,7 +187,44 @@ function CaptureForm({
         ? photos.length > 0
         : kind === 'document'
           ? doc !== null && libelle.trim().length > 0
-          : question.trim().length > 0;
+          : // kind === 'demande'
+            demandeMode === 'document'
+            ? docLibelle.trim().length > 0
+            : demandeMode === 'question'
+              ? question.trim().length > 0
+              : false;
+
+  const submitDemande = async () => {
+    if (!canSubmit || busy) return;
+    if (demandeMode === 'document') {
+      // Demande de DOCUMENT : visible client automatiquement (échange documentaire).
+      await demo.appendEvent({
+        projectId: project.id,
+        actor,
+        visibility: 'client',
+        type: 'demande',
+        state: 'ouverte',
+        content: {
+          question: question.trim() || `Pouvez-vous nous transmettre : ${docLibelle.trim()} ?`,
+          destinataire: 'client',
+          attendu: 'document',
+          docLibelle: docLibelle.trim(),
+          docCategorie: docType,
+          ...(echeance ? { echeance } : {}),
+        },
+      });
+    } else {
+      await demo.appendEvent({
+        projectId: project.id,
+        actor,
+        visibility: 'client',
+        type: 'demande',
+        state: 'ouverte',
+        content: { question: question.trim(), destinataire: 'client' },
+      });
+    }
+    onDone();
+  };
 
   const submit = async (publish: boolean) => {
     if (!canSubmit || busy) return;
@@ -344,14 +422,79 @@ function CaptureForm({
         </p>
       )}
 
-      {kind === 'demande' && (
-        <Textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ex. Quel carrelage pour la salle de bain ?"
-          rows={2}
-          autoFocus
-        />
+      {kind === 'demande' && demandeMode === 'menu' && (
+        <div className="space-y-2">
+          <DemandeChoice
+            icon={<MessageSquareQuote aria-hidden />}
+            title="Demander une décision"
+            description="Un choix à valider (carrelage, coloris, option…)"
+            onClick={() => onEscalateDecision?.()}
+          />
+          <DemandeChoice
+            icon={<FileText aria-hidden />}
+            title="Demander un document"
+            description="Acompte, assurance, RIB, diagnostic, DPE, plan…"
+            onClick={() => setDemandeMode('document')}
+          />
+          <DemandeChoice
+            icon={<HelpCircle aria-hidden />}
+            title="Poser une question simple"
+            description="Une question ouverte à votre client"
+            onClick={() => setDemandeMode('question')}
+          />
+        </div>
+      )}
+
+      {kind === 'demande' && demandeMode === 'question' && (
+        <>
+          <BackToMenu onClick={() => setDemandeMode('menu')} />
+          <Textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ex. Confirmez-vous la date de livraison ?"
+            rows={2}
+            autoFocus
+          />
+        </>
+      )}
+
+      {kind === 'demande' && demandeMode === 'document' && (
+        <>
+          <BackToMenu onClick={() => setDemandeMode('menu')} />
+          <Field label="Document demandé">
+            <Input
+              value={docLibelle}
+              onChange={(e) => setDocLibelle(e.target.value)}
+              placeholder="Ex. Attestation d’assurance décennale"
+              autoFocus
+            />
+          </Field>
+          <Field label="Type de document">
+            <select
+              value={docType}
+              onChange={(e) => setDocType(e.target.value as (typeof DOC_TYPES)[number])}
+              className={selectCls}
+            >
+              {DOC_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Message au client (facultatif)">
+            <Textarea
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="Ex. Merci de nous transmettre ce document dès que possible."
+              rows={2}
+            />
+          </Field>
+          <Field label="Échéance souhaitée (facultatif)">
+            <Input type="date" value={echeance} onChange={(e) => setEcheance(e.target.value)} />
+          </Field>
+          <p className="text-xs text-muted-foreground">Visible par le client automatiquement.</p>
+        </>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
@@ -377,11 +520,61 @@ function CaptureForm({
             Brouillon
           </Button>
         )}
-        <Button onClick={() => void submit(true)} disabled={!canSubmit || busy}>
-          {kind === 'demande' ? 'Envoyer la demande' : 'Publier'}
-        </Button>
+        {kind === 'demande' && demandeMode !== 'menu' && (
+          <Button onClick={() => void submitDemande()} disabled={!canSubmit || busy}>
+            {demandeMode === 'document' ? 'Envoyer la demande de document' : 'Envoyer la demande'}
+          </Button>
+        )}
+        {kind !== 'demande' && (
+          <Button onClick={() => void submit(true)} disabled={!canSubmit || busy}>
+            Publier
+          </Button>
+        )}
       </div>
     </div>
+  );
+}
+
+/** Un choix du menu « Demander au client » (décision / document / question). */
+function DemandeChoice({
+  icon,
+  title,
+  description,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  onClick: () => void;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group flex w-full items-start gap-3 rounded-xl border border-border bg-surface p-4 text-left transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-5"
+    >
+      <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-full bg-gold-100 text-gold-700">
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-medium text-foreground">{title}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+/** Retour au menu de type de demande. */
+function BackToMenu({ onClick }: { onClick: () => void }): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground [&_svg]:size-4"
+    >
+      <ChevronLeft aria-hidden />
+      Changer de type de demande
+    </button>
   );
 }
 
