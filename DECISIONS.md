@@ -1969,3 +1969,43 @@ chrome compact) ; token `z-viewer` (`packages/ui`). `coulisses-viewer.test` éte
 écran, photo `object-contain` contenue dans la fenêtre, body verrouillé + libéré à la fermeture,
 **header occulté**, **Léon occulté** côté client via `elementFromPoint`, desktop + mobile). Aucun
 changement de modèle ni de logique. Gate vert (e2e 54/54, zéro erreur console). VISION Art. 8, 9, 11.
+
+## 08/07/2026 — Viewer photo : expérience immersive type Photos iPhone / Instagram (RC2)
+
+**Décision produit :** le RC1 était un vrai plein écran ; le RC2 en fait une **expérience**. Quand
+on ouvre un album, on doit **oublier PHÉNIX** : la photo est le sujet, l'interface s'efface.
+**On ne touche pas à l'architecture RC1** (portal, `z-viewer`, verrou body, `ResizeObserver`,
+annotations alignées) — on ajoute la couche immersive par-dessus.
+
+- **Chrome minimal + auto-effacement.** Deux niveaux : le **niveau 1** (compteur `1/n`, fermer,
+  flèches) reste au repos ; le **niveau 2** (titre, zoom, annoter, bouton commentaires, pellicule,
+  légende) **apparaît au mouvement** et **s'efface après 4 s d'inactivité**. Transitions en
+  opacity, aucun flash.
+- **Tap pour l'immersion totale.** Un tap sur la photo masque **tout** le chrome ; un mouvement (ou
+  un nouveau tap) le ramène. Repères `data-chrome` pour un test déterministe de l'opacité.
+- **Commentaires en Bottom Sheet.** Ils ne volent plus de hauteur : un bouton **« Commentaires
+  (N) »** ouvre une feuille (commentaires + annotations + saisie) ; **la photo reste visible
+  derrière** ; fermeture au clic (croix / fond) ou **glissé vers le bas**.
+- **Pellicule** réduite (miniatures `size-10`), intégrée au niveau 2 (donc auto-effacée).
+- **Navigation** : flèches desktop + clavier ←/→, **swipe horizontal** mobile ; changement de photo
+  **instantané** grâce au **préchargement** systématique des voisines (précédente + suivante).
+- **Fermeture** multi-voies : **Échap** (referme d'abord la feuille si ouverte), **croix**, **clic
+  sur le fond noir** (hors photo), **glissé vers le bas** (mobile).
+- **Orientation** : à la rotation, on **conserve** la photo affichée et le zoom ; seul le viewport
+  est recalculé (le `ResizeObserver` redimensionne le cadre, l'index et le zoom sont préservés).
+- **Accessibilité** : **focus piégé** dans le viewer (cycle Tab), et **rendu à l'élément ouvrant**
+  à la fermeture.
+- **Animations** : ouverture opacity + léger `scale`, fermeture inverse (démontage différé ~200 ms),
+  transitions de navigation fluides.
+
+**Alternatives rejetées :** garder les commentaires en flux (revole la hauteur, contredit
+l'immersion) ; masquer le chrome via `display:none` (casse les transitions et le piège à focus) ;
+inertie de swipe « physique » (surcoût sans bénéfice réel en V1 — un seuil + transition suffit) ;
+pincer-zoomer multi-touch natif (reporté ; zoom bouton + double-tap + glisser couvre le besoin).
+
+**Mécanique :** `MomentGallery` (niveaux de chrome `immersive`/`controls` + minuterie d'inactivité,
+Bottom Sheet, préchargement, piège à focus + restitution, animations d'ouverture/fermeture, tap /
+clic-fond / glissé). Aucun changement de modèle, de sélecteur core, ni de l'architecture RC1.
+`coulisses-viewer.test` étendu (tap masque puis mouvement révèle via `data-chrome`, Bottom Sheet
+ouvre/ferme avec photo derrière, fermeture Échap + clic-fond, focus rendu à l'ouvrant) ; les acquis
+RC1 restent couverts. Gate vert (e2e 54/54, zéro erreur console). VISION Art. 8, 9, 11.

@@ -33,23 +33,30 @@ const ACTION_LABEL: Record<'decision' | 'reserve' | 'sav', string> = {
   sav: 'SAV',
 };
 
+/** Délai d'inactivité avant que les contrôles secondaires s'effacent (ms). */
+const IDLE_MS = 4000;
+
 /** Ratio largeur/hauteur d'une photo, si ses dimensions sont connues. */
 const ratioDePhoto = (p?: FilPhoto): number | null =>
   p && p.width && p.height ? p.width / p.height : null;
 
 /**
- * Viewer photo plein écran — un VRAI mode de consultation (type Photos iPhone /
- * Instagram), pas un overlay bavard posé sur la page :
- *   • rendu via portal sur `document.body` + `z-viewer` (au-dessus du header et du
- *     concierge Léon), fond noir opaque, scroll du body verrouillé ;
- *   • la photo tient TOUJOURS dans la fenêtre, centrée, entière (jamais de scroll) :
- *     on mesure le stage (ResizeObserver) et le ratio réel de la photo, puis on
- *     dimensionne un cadre qui épouse exactement l'image — le calque d'annotations
- *     (inset-0) reste donc aligné au pixel près ;
- *   • navigation flèches (desktop) + swipe (mobile) + clavier, compteur clair,
- *     pellicule de miniatures compacte, zoom + déplacement.
- * Le client peut laisser un message ATTACHÉ à la photo (niveau 2) ; le conducteur
- * peut annoter et créer une réserve depuis une annotation.
+ * Viewer photo plein écran — une EXPÉRIENCE immersive type Photos iPhone /
+ * Instagram, pas un composant métier. Pendant qu'il est ouvert, on oublie PHÉNIX :
+ * la photo est le sujet, l'interface s'efface.
+ *
+ * Architecture (verrouillée — RC1) : portal sur `document.body`, `z-viewer`
+ * (au-dessus du header et du concierge Léon), fond noir opaque, scroll du body
+ * verrouillé, focus piégé + rendu à l'ouvrant à la fermeture. La photo est
+ * dimensionnée « au pixel » (zone mesurée × ratio réel) : entière, centrée, sans
+ * scroll, et le calque d'annotations reste aligné.
+ *
+ * Chrome (RC2) : au repos on ne voit que le compteur, le bouton fermer et les
+ * flèches ; les contrôles secondaires (titre, zoom, annoter, miniatures, bouton
+ * commentaires, légende) apparaissent au mouvement et s'effacent après inactivité.
+ * Un tap sur la photo bascule le mode immersif (tout disparaît / réapparaît). Les
+ * commentaires et annotations vivent dans un Bottom Sheet qui ne vole plus de
+ * hauteur. Fermeture : Échap, croix, clic sur le fond, glissé vers le bas.
  */
 export function MomentGallery({
   moment,
@@ -90,19 +97,71 @@ export function MomentGallery({
   const [reserveFor, setReserveFor] = useState<string | null>(null);
   const [resp, setResp] = useState('');
   const [ech, setEch] = useState('');
-  const touchX = useRef<number | null>(null);
-  // Zoom : la photo est montrée ENTIÈRE (jamais recadrée) ; le zoom permet de
-  // regarder un détail. Déplacement au doigt/souris une fois zoomé.
+  // Zoom : la photo reste ENTIÈRE ; le zoom regarde un détail (glisser pour déplacer).
   const [zoom, setZoom] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const drag = useRef<{ x: number; y: number } | null>(null);
-  // Dimensionnement « au pixel » : on mesure la zone photo et le ratio réel de
-  // l'image pour lui donner exactement le plus grand cadre qui tient dedans.
+  // Chrome immersif : `immersive` = tout masqué (tap) ; `controls` = contrôles
+  // secondaires visibles (apparaissent au mouvement, s'effacent après inactivité).
+  const [immersive, setImmersive] = useState(false);
+  const [controls, setControls] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  // Animation d'ouverture / fermeture (opacity + léger scale).
+  const [entered, setEntered] = useState(false);
+
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<Element | null>(null);
+  const drag = useRef<{ x: number; y: number } | null>(null);
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+  const sheetStartY = useRef<number | null>(null);
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [ratio, setRatio] = useState<number | null>(ratioDePhoto(photos[start]));
 
-  // Un viewer plein écran ne laisse jamais le body défiler derrière lui.
+  // Refs miroir : lues dans les timers/écouteurs sans les recréer.
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
+  const sheetRef = useRef(sheet);
+  sheetRef.current = sheet;
+
+  const total = photos.length;
+  const current = photos[index];
+
+  const clearIdle = (): void => {
+    if (idle.current) clearTimeout(idle.current);
+    idle.current = null;
+  };
+  const scheduleHide = (): void => {
+    clearIdle();
+    idle.current = setTimeout(() => {
+      // On garde les contrôles tant qu'on annote ou que la feuille est ouverte.
+      if (!editingRef.current && !sheetRef.current) setControls(false);
+    }, IDLE_MS);
+  };
+  /** Tout réveiller : sortir de l'immersif, montrer les contrôles, réarmer l'inactivité. */
+  const wake = (): void => {
+    setImmersive(false);
+    setControls(true);
+    scheduleHide();
+  };
+
+  const go = (dir: -1 | 1): void => {
+    setIndex((i) => Math.min(total - 1, Math.max(0, i + dir)));
+    wake();
+  };
+  const toggleZoom = (): void =>
+    setZoom((z) => {
+      if (z) setPan({ x: 0, y: 0 });
+      return !z;
+    });
+
+  // Fermeture animée : on rejoue l'anim inverse, puis on démonte.
+  const requestClose = (): void => {
+    setEntered(false);
+    setTimeout(onClose, 200);
+  };
+
+  // Verrou du scroll de la page (un vrai plein écran).
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -111,7 +170,23 @@ export function MomentGallery({
     };
   }, []);
 
-  // On suit la taille de la zone photo (rotation, redimensionnement, clavier mobile).
+  // Focus : piégé dans le viewer, rendu à l'élément ouvrant à la fermeture.
+  useEffect(() => {
+    openerRef.current = document.activeElement;
+    const id = requestAnimationFrame(() => {
+      setEntered(true);
+      dialogRef.current?.focus();
+    });
+    scheduleHide();
+    return () => {
+      cancelAnimationFrame(id);
+      clearIdle();
+      (openerRef.current as HTMLElement | null)?.focus?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Suivi de la taille de la zone photo (redimensionnement, rotation mobile).
   useLayoutEffect(() => {
     const el = stageRef.current;
     if (!el) return;
@@ -122,27 +197,18 @@ export function MomentGallery({
     return () => ro.disconnect();
   }, []);
 
-  const total = photos.length;
-  const go = (dir: -1 | 1): void => setIndex((i) => Math.min(total - 1, Math.max(0, i + dir)));
-  const toggleZoom = (): void =>
-    setZoom((z) => {
-      if (z) setPan({ x: 0, y: 0 });
-      return !z;
-    });
-
+  // Préchargement des voisines → changement de photo instantané.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose();
-      if (zoom) return; // zoomé : les flèches ne changent pas de photo.
-      if (e.key === 'ArrowLeft') go(-1);
-      if (e.key === 'ArrowRight') go(1);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, zoom]);
+    for (const p of [photos[index - 1], photos[index + 1]]) {
+      if (p?.imageUrl) {
+        const im = new Image();
+        im.src = p.imageUrl;
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
 
-  // On change de photo : brouillon effacé (un message = une photo), zoom remis à
-  // zéro, ratio réamorcé sur les dimensions connues (affiné à la charge de l'image).
+  // Changement de photo : brouillon effacé, zoom réinitialisé, ratio réamorcé.
   useEffect(() => {
     setDraft('');
     setZoom(false);
@@ -151,8 +217,49 @@ export function MomentGallery({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
+  // Clavier : Échap (feuille puis viewer), flèches, piège à focus (Tab).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Tab') {
+        const root = dialogRef.current;
+        if (!root) return;
+        const items = Array.from(
+          root.querySelectorAll<HTMLElement>(
+            'button, [href], input, textarea, select, [tabindex]:not([tabindex="-1"])',
+          ),
+        ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+        if (items.length === 0) {
+          e.preventDefault();
+          root.focus();
+          return;
+        }
+        const first = items[0]!;
+        const last = items[items.length - 1]!;
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        if (sheetRef.current) setSheet(false);
+        else requestClose();
+        return;
+      }
+      wake();
+      if (zoom) return;
+      if (e.key === 'ArrowLeft') go(-1);
+      if (e.key === 'ArrowRight') go(1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, total]);
+
   const counts = comptesMessagesParPhoto(messages);
-  const current = photos[index];
   if (!current) return <></>;
 
   const photoMessages = messagesDePhoto(current.id, messages);
@@ -173,12 +280,11 @@ export function MomentGallery({
     setDraft('');
   };
   // Les albums « coulisses » n'ont pas de titre : on retombe sur la légende, puis
-  // sur un libellé générique (pour l'entête et le nom accessible de la galerie).
+  // sur un libellé générique (entête + nom accessible du viewer).
   const heading = moment.title.trim() || moment.observations?.trim() || 'Photos du chantier';
+  const commentCount = photoMessages.length;
 
-  // Le plus grand cadre au ratio de la photo qui tient dans la zone mesurée :
-  // borné par la hauteur si la zone est « plus large » que la photo, sinon par
-  // la largeur. Résultat = photo entière, centrée, sans recadrage ni scroll.
+  // Le plus grand cadre au ratio de la photo qui tient dans la zone mesurée.
   const R = ratio ?? 0.8; // 4/5 par défaut, le temps de connaître le vrai ratio
   const box =
     stageSize.w > 0 && stageSize.h > 0
@@ -186,127 +292,82 @@ export function MomentGallery({
         ? { width: stageSize.h * R, height: stageSize.h }
         : { width: stageSize.w, height: stageSize.w / R }
       : null;
+  const scaleIn = entered ? 1 : 0.96;
   const wrapperStyle: React.CSSProperties = {
     ...(box
       ? { width: `${box.width}px`, height: `${box.height}px` }
       : { maxWidth: '100%', maxHeight: '100%' }),
-    ...(zoom ? { transform: `scale(2) translate(${pan.x}px, ${pan.y}px)` } : null),
+    transform: zoom ? `scale(2) translate(${pan.x}px, ${pan.y}px)` : `scale(${scaleIn})`,
   };
+
+  // Visibilité du chrome : niveau 1 (compteur, fermer, flèches) tant qu'on n'est
+  // pas en immersif ; niveau 2 (contrôles secondaires) seulement au mouvement.
+  const tier1 = !immersive;
+  const tier2 = !immersive && controls;
+  const fade = (visible: boolean): string =>
+    `transition-opacity duration-base ${visible ? 'opacity-100' : 'pointer-events-none opacity-0'}`;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-viewer flex flex-col overflow-hidden overscroll-contain"
-      style={{ backgroundColor: '#000' }}
+      ref={dialogRef}
+      tabIndex={-1}
+      className="fixed inset-0 z-viewer overflow-hidden overscroll-contain outline-none"
+      style={{
+        backgroundColor: '#000',
+        opacity: entered ? 1 : 0,
+        transition: 'opacity 200ms ease',
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={heading}
-      onTouchStart={(e) => {
-        if (editing || zoom) return;
-        touchX.current = e.touches[0]?.clientX ?? null;
-      }}
-      onTouchEnd={(e) => {
-        if (editing || zoom || touchX.current == null) return;
-        const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current;
-        if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
-        touchX.current = null;
-      }}
+      onMouseMove={wake}
     >
-      {/* Barre haute : titre + compteur (+ repères) + actions */}
-      <div className="flex shrink-0 items-center justify-between gap-3 p-4 text-paper-0">
-        <div className="min-w-0">
-          <p className="truncate font-serif text-lg font-semibold tracking-tight">{heading}</p>
-          <p className="flex items-center gap-2 text-xs opacity-80">
-            <span>
-              {index + 1} / {total}
-            </span>
-            {photoMessages.length > 0 && (
-              <span className="inline-flex items-center gap-1 [&_svg]:size-3.5">
-                <MessageCircle aria-hidden />
-                {photoMessages.length}
-              </span>
-            )}
-            {photoAnnotations.length > 0 && (
-              <span className="inline-flex items-center gap-1 [&_svg]:size-3.5">
-                <PenLine aria-hidden />
-                {photoAnnotations.length}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          {!editing && current.imageUrl && (
-            <button
-              type="button"
-              onClick={toggleZoom}
-              aria-label={zoom ? 'Dézoomer' : 'Zoomer'}
-              aria-pressed={zoom}
-              className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-            >
-              {zoom ? <ZoomOut aria-hidden /> : <ZoomIn aria-hidden />}
-            </button>
-          )}
-          {photoAnnotations.length > 0 && !editing && (
-            <button
-              type="button"
-              onClick={() => setShowAnnotations((v) => !v)}
-              aria-label={showAnnotations ? 'Masquer les annotations' : 'Afficher les annotations'}
-              aria-pressed={showAnnotations}
-              className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-            >
-              {showAnnotations ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              setEditing((v) => !v);
-              setShowAnnotations(true);
-              setZoom(false);
-              setPan({ x: 0, y: 0 });
-            }}
-            aria-label={editing ? 'Terminer l’annotation' : 'Annoter la photo'}
-            aria-pressed={editing}
-            className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm transition-colors duration-base [&_svg]:size-4 ${
-              editing ? 'bg-gold-500 text-primary-foreground' : 'text-paper-0 hover:bg-paper-0/10'
-            }`}
-          >
-            <PenLine aria-hidden />
-            {editing ? 'Terminer' : 'Annoter'}
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Fermer"
-            className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-          >
-            <X aria-hidden />
-          </button>
-        </div>
-      </div>
-
-      {/* Zone photo : occupe TOUT l'espace disponible entre les deux barres. La
-          photo est centrée et dimensionnée pour tenir entière (cadre = ratio réel
-          × zone mesurée) — jamais de recadrage, jamais de scroll. Le calque
-          d'annotations épouse ce cadre au pixel près. Zoomé, on déplace au doigt. */}
+      {/* Zone photo — plein écran. Tap = bascule immersif ; clic sur le fond noir
+          (hors photo) = fermeture ; glissé horizontal = navigation ; glissé bas =
+          fermeture. Zoomé : glisser déplace la photo. */}
       <div
         ref={stageRef}
-        className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
+        className={`absolute inset-0 flex items-center justify-center overflow-hidden ${
           zoom ? 'cursor-grab touch-none active:cursor-grabbing' : ''
         }`}
         onPointerDown={(e) => {
-          if (!zoom) return;
-          drag.current = { x: e.clientX, y: e.clientY };
+          pointerStart.current = { x: e.clientX, y: e.clientY };
+          if (zoom) drag.current = { x: e.clientX, y: e.clientY };
         }}
         onPointerMove={(e) => {
           if (!zoom || !drag.current) return;
-          // /2 : on annule le facteur d'échelle pour un déplacement 1:1 au doigt.
+          // /2 : on annule l'échelle pour un déplacement 1:1 au doigt.
           const dx = (e.clientX - drag.current.x) / 2;
           const dy = (e.clientY - drag.current.y) / 2;
           drag.current = { x: e.clientX, y: e.clientY };
           setPan((p) => ({ x: p.x + dx, y: p.y + dy }));
         }}
-        onPointerUp={() => {
-          drag.current = null;
+        onPointerUp={(e) => {
+          const s = pointerStart.current;
+          pointerStart.current = null;
+          if (editing) return;
+          if (zoom) {
+            drag.current = null;
+            return;
+          }
+          if (!s) return;
+          const dx = e.clientX - s.x;
+          const dy = e.clientY - s.y;
+          const adx = Math.abs(dx);
+          const ady = Math.abs(dy);
+          if (adx > 40 && adx > ady) {
+            go(dx < 0 ? 1 : -1);
+            return;
+          }
+          if (dy > 80 && ady > adx) {
+            requestClose();
+            return;
+          }
+          if (adx < 10 && ady < 10) {
+            // Tap : sur le fond noir → fermer ; sur la photo → bascule immersif.
+            if (e.target === stageRef.current) requestClose();
+            else setImmersive((v) => !v);
+          }
         }}
       >
         <div className="relative transition-transform duration-base" style={wrapperStyle}>
@@ -337,38 +398,126 @@ export function MomentGallery({
             onAdd={onAddAnnotation}
           />
         </div>
-
-        {index > 0 && !zoom && (
-          <button
-            type="button"
-            onClick={() => go(-1)}
-            aria-label="Photo précédente"
-            className="absolute left-3 inline-flex size-11 items-center justify-center rounded-full bg-paper-0/10 text-paper-0 transition-colors duration-base hover:bg-paper-0/20 [&_svg]:size-6"
-          >
-            <ChevronLeft aria-hidden />
-          </button>
-        )}
-        {index < total - 1 && !zoom && (
-          <button
-            type="button"
-            onClick={() => go(1)}
-            aria-label="Photo suivante"
-            className="absolute right-3 inline-flex size-11 items-center justify-center rounded-full bg-paper-0/10 text-paper-0 transition-colors duration-base hover:bg-paper-0/20 [&_svg]:size-6"
-          >
-            <ChevronRight aria-hidden />
-          </button>
-        )}
       </div>
 
-      {/* Barre basse COMPACTE : légende + pellicule + (messages / annotations) +
-          saisie. La zone messages/annotations est plafonnée et défile en interne —
-          elle ne pousse jamais la photo hors écran ni ne fait défiler la page. */}
-      <div className="shrink-0 space-y-2.5 p-3 text-paper-0">
+      {/* Barre haute. Niveau 1 : compteur + fermer. Niveau 2 : titre + zoom /
+          annoter / afficher-masquer (apparaissent au mouvement). */}
+      <div
+        data-chrome="top"
+        className={`absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 text-paper-0 ${fade(
+          tier1,
+        )}`}
+        style={{ backgroundImage: 'linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0))' }}
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium tabular-nums" aria-label="Position dans l’album">
+            {index + 1} / {total}
+          </p>
+          <p className={`truncate font-serif text-lg font-semibold tracking-tight ${fade(tier2)}`}>
+            {heading}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <div className={`flex items-center gap-1 ${fade(tier2)}`}>
+            {current.imageUrl && !editing && (
+              <button
+                type="button"
+                onClick={toggleZoom}
+                aria-label={zoom ? 'Dézoomer' : 'Zoomer'}
+                aria-pressed={zoom}
+                className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+              >
+                {zoom ? <ZoomOut aria-hidden /> : <ZoomIn aria-hidden />}
+              </button>
+            )}
+            {photoAnnotations.length > 0 && !editing && (
+              <button
+                type="button"
+                onClick={() => setShowAnnotations((v) => !v)}
+                aria-label={
+                  showAnnotations ? 'Masquer les annotations' : 'Afficher les annotations'
+                }
+                aria-pressed={showAnnotations}
+                className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+              >
+                {showAnnotations ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setEditing((v) => !v);
+                setShowAnnotations(true);
+                setZoom(false);
+                setPan({ x: 0, y: 0 });
+                wake();
+              }}
+              aria-label={editing ? 'Terminer l’annotation' : 'Annoter la photo'}
+              aria-pressed={editing}
+              className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm transition-colors duration-base [&_svg]:size-4 ${
+                editing ? 'bg-gold-500 text-primary-foreground' : 'text-paper-0 hover:bg-paper-0/10'
+              }`}
+            >
+              <PenLine aria-hidden />
+              {editing ? 'Terminer' : 'Annoter'}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Fermer"
+            className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
+          >
+            <X aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      {/* Flèches (niveau 1, hors zoom). */}
+      {tier1 && !zoom && index > 0 && (
+        <button
+          type="button"
+          onClick={() => go(-1)}
+          aria-label="Photo précédente"
+          className="absolute left-3 top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-paper-0/10 text-paper-0 transition-colors duration-base hover:bg-paper-0/20 [&_svg]:size-6"
+        >
+          <ChevronLeft aria-hidden />
+        </button>
+      )}
+      {tier1 && !zoom && index < total - 1 && (
+        <button
+          type="button"
+          onClick={() => go(1)}
+          aria-label="Photo suivante"
+          className="absolute right-3 top-1/2 inline-flex size-11 -translate-y-1/2 items-center justify-center rounded-full bg-paper-0/10 text-paper-0 transition-colors duration-base hover:bg-paper-0/20 [&_svg]:size-6"
+        >
+          <ChevronRight aria-hidden />
+        </button>
+      )}
+
+      {/* Barre basse (niveau 2) : légende + bouton commentaires + pellicule. */}
+      <div
+        data-chrome="bottom"
+        className={`absolute inset-x-0 bottom-0 space-y-2 p-3 text-paper-0 ${fade(tier2)}`}
+        style={{ backgroundImage: 'linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0))' }}
+      >
         {current.legende && (
           <p className="mx-auto max-w-2xl text-center text-sm opacity-90">{current.legende}</p>
         )}
-        {/* Pellicule de miniatures COMPACTE : parcours d'un coup d'œil, saut direct.
-            Pastille or = la photo porte un mot. */}
+        <div className="flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              setSheet(true);
+              setControls(true);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-paper-0/10 px-3.5 py-1.5 text-sm text-paper-0 transition-colors duration-base hover:bg-paper-0/20 [&_svg]:size-4"
+          >
+            <MessageCircle aria-hidden />
+            Commentaires ({commentCount})
+          </button>
+        </div>
+        {/* Pellicule COMPACTE. */}
         {total > 1 && (
           <div className="mx-auto flex max-w-2xl snap-x justify-center gap-1.5 overflow-x-auto">
             {photos.map((p, i) => {
@@ -377,10 +526,13 @@ export function MomentGallery({
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => setIndex(i)}
+                  onClick={() => {
+                    setIndex(i);
+                    wake();
+                  }}
                   aria-label={`Aller à la photo ${i + 1}`}
                   aria-current={i === index}
-                  className={`relative size-12 shrink-0 snap-start overflow-hidden rounded-md border-2 transition-all duration-base ${
+                  className={`relative size-10 shrink-0 snap-start overflow-hidden rounded-md border-2 transition-all duration-base ${
                     i === index
                       ? 'border-paper-0'
                       : 'border-transparent opacity-55 hover:opacity-90'
@@ -395,10 +547,51 @@ export function MomentGallery({
             })}
           </div>
         )}
+      </div>
 
-        <div className="mx-auto w-full max-w-2xl space-y-2">
-          {(photoMessages.length > 0 || (canCreateAction && photoAnnotations.length > 0)) && (
-            <div className="max-h-[28vh] space-y-2 overflow-y-auto">
+      {/* BOTTOM SHEET commentaires / annotations — la photo reste visible derrière.
+          Fermable au clic (croix / fond) ou au glissé vers le bas. */}
+      {sheet && (
+        <>
+          <button
+            type="button"
+            aria-label="Fermer les commentaires"
+            onClick={() => setSheet(false)}
+            className="absolute inset-0 cursor-default bg-transparent"
+          />
+          <section
+            role="dialog"
+            aria-label="Commentaires de la photo"
+            className="absolute inset-x-0 bottom-0 flex max-h-[70%] flex-col rounded-t-2xl bg-ink-900 text-paper-0 shadow-2xl"
+            onTouchStart={(e) => {
+              sheetStartY.current = e.touches[0]?.clientY ?? null;
+            }}
+            onTouchEnd={(e) => {
+              if (sheetStartY.current == null) return;
+              const dy =
+                (e.changedTouches[0]?.clientY ?? sheetStartY.current) - sheetStartY.current;
+              if (dy > 60) setSheet(false);
+              sheetStartY.current = null;
+            }}
+          >
+            <div className="flex items-center justify-between px-4 pb-2 pt-3">
+              <span className="mx-auto h-1 w-10 rounded-full bg-paper-0/25" aria-hidden />
+              <button
+                type="button"
+                onClick={() => setSheet(false)}
+                aria-label="Réduire les commentaires"
+                className="absolute right-3 inline-flex size-9 items-center justify-center rounded-full text-paper-0 hover:bg-paper-0/10 [&_svg]:size-5"
+              >
+                <X aria-hidden />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
+              {photoMessages.length === 0 && !(canCreateAction && photoAnnotations.length > 0) && (
+                <p className="py-6 text-center text-sm opacity-70">
+                  Aucun commentaire pour l’instant.
+                </p>
+              )}
               {photoMessages.length > 0 && (
                 <ul className="space-y-1.5">
                   {photoMessages.map((m) => (
@@ -413,7 +606,7 @@ export function MomentGallery({
                 </ul>
               )}
 
-              {/* PONT conducteur : créer une Demande ou une Réserve depuis une annotation. */}
+              {/* PONT conducteur : créer une réserve depuis une annotation. */}
               {canCreateAction && photoAnnotations.length > 0 && (
                 <ul className="space-y-2 border-t border-paper-0/15 pt-2">
                   {photoAnnotations.map((a) => (
@@ -484,30 +677,30 @@ export function MomentGallery({
                 </ul>
               )}
             </div>
-          )}
 
-          <div className="flex gap-2">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') send();
-              }}
-              placeholder="Écrire un petit mot sur cette photo…"
-              className="h-10 flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
-            />
-            <button
-              type="button"
-              onClick={send}
-              disabled={!draft.trim()}
-              aria-label="Envoyer"
-              className="inline-flex size-10 items-center justify-center rounded-lg border border-paper-0/20 text-paper-0 transition-colors duration-base hover:bg-paper-0/10 disabled:opacity-40 [&_svg]:size-4"
-            >
-              <Send aria-hidden />
-            </button>
-          </div>
-        </div>
-      </div>
+            <div className="flex gap-2 border-t border-paper-0/15 p-3">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') send();
+                }}
+                placeholder="Écrire un petit mot sur cette photo…"
+                className="h-10 flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={!draft.trim()}
+                aria-label="Envoyer"
+                className="inline-flex size-10 items-center justify-center rounded-lg border border-paper-0/20 text-paper-0 transition-colors duration-base hover:bg-paper-0/10 disabled:opacity-40 [&_svg]:size-4"
+              >
+                <Send aria-hidden />
+              </button>
+            </div>
+          </section>
+        </>
+      )}
     </div>,
     document.body,
   );
