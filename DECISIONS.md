@@ -1854,3 +1854,34 @@ le doublon) ; garder un radar allégé (deux endroits où lire les alertes).
 `chantier-sans-radar.test` (le bandeau n'existe plus, on arrive directement sur les onglets,
 chaque onglet s'ouvre, les alertes vivent dans « Aujourd'hui », zéro erreur console). Gate vert
 (e2e 52/52). VISION Art. 3, 7, 10, 11.
+
+## 07/07/2026 — Aucun document « mort » : le TITRE ouvre le document (partout)
+
+**Décision produit (retour terrain) :** dans « Documents », les documents s'affichaient mais on
+ne savait pas où cliquer — seul un petit bouton « Ouvrir le document » agissait, pas le document
+lui-même. Règle : **si un document apparaît dans une liste, un clic sur son titre l'ouvre
+immédiatement.** Il ne doit jamais exister un document visible mais inaccessible.
+
+- Le **titre** (icône + libellé + méta) devient un bouton cliquable qui ouvre le document, dans
+  la bibliothèque du chantier ET le suivi « Documents demandés au client » (conducteur) et dans
+  l'espace client. Les boutons « Ouvrir le document » et « Télécharger » restent (redondance
+  assumée : deux affordances, jamais de ligne morte).
+- L'ouverture reste la règle unique : fichier PDF/image → aperçu natif du navigateur (zoom
+  natif) ; document GÉNÉRÉ par PHÉNIX (compte rendu, PV de visite / pré-réception / réception,
+  avenant, facture…) → page HTML autonome relisible à tout moment. Le téléchargement et le
+  partage (visibilité) restent inchangés.
+
+**Constat technique :** le port `demo.openDocument` ouvrait déjà TOUJOURS quelque chose (fichier
+réel si `dataUrl`, sinon document généré) — aucun bug d'ouverture. Le vrai défaut était UX : la
+zone cliquable se limitait à un bouton discret. On rend donc la ligne interactive, sans nouveau
+concept ni logique métier.
+
+**Alternatives rejetées :** retirer les boutons au profit du seul clic-titre (casse les tests et
+réduit la lisibilité) ; ouvrir dans un panneau maison (l'aperçu natif du navigateur offre déjà
+zoom / impression / téléchargement).
+
+**Impact :** `DocumentsTab` (titre cliquable dans la bibliothèque + « Documents demandés »),
+`ClientDocuments` (titre cliquable). Nouveau `documents-cliquables.test` (chaque ligne
+conducteur ET client ouvre au clic du titre — PDF, image, document généré —, aucun document
+mort, téléchargement des deux côtés, zéro erreur console). Gate vert (e2e 53/53). VISION
+Art. 7, 8, 9, 11.

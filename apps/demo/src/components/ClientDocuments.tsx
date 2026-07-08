@@ -49,16 +49,26 @@ export function ClientDocuments({ events }: { events: Event[] }): React.JSX.Elem
               id={`ev-${e.id}`}
               className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-surface px-4 py-3"
             >
-              <FileText aria-hidden className="size-5 shrink-0 text-gold-600" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">
-                  {generatedDocumentTitle(e)}
-                </p>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {e.type === 'document' ? (e.content.categorie ?? 'Document') : 'Compte rendu'} ·{' '}
-                  {fmtDate(e.createdAt)}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => demo.openDocument(e)}
+                aria-label={`Ouvrir : ${generatedDocumentTitle(e)}`}
+                className="group flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <FileText
+                  aria-hidden
+                  className="size-5 shrink-0 text-gold-600 group-hover:text-gold-700"
+                />
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-foreground group-hover:text-gold-700 group-hover:underline">
+                    {generatedDocumentTitle(e)}
+                  </span>
+                  <span className="block text-xs uppercase tracking-wide text-muted-foreground">
+                    {e.type === 'document' ? (e.content.categorie ?? 'Document') : 'Compte rendu'} ·{' '}
+                    {fmtDate(e.createdAt)}
+                  </span>
+                </span>
+              </button>
               <DocumentButton event={e} />
               <Button
                 size="sm"

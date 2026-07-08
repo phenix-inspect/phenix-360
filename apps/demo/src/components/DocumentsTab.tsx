@@ -80,15 +80,32 @@ export function DocumentsTab({
                     key={r.id}
                     className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-surface px-3 py-2.5"
                   >
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-foreground">
-                        {r.content.docLibelle ?? r.content.question}
-                      </p>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        {r.content.docCategorie ?? 'Document'}
-                        {r.content.echeance ? ` · avant le ${fmtDate(r.content.echeance)}` : ''}
-                      </p>
-                    </div>
+                    {docEv ? (
+                      <button
+                        type="button"
+                        onClick={() => demo.openDocument(docEv)}
+                        aria-label={`Ouvrir : ${generatedDocumentTitle(docEv)}`}
+                        className="group flex min-w-0 flex-1 flex-col rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="truncate text-sm text-foreground group-hover:text-gold-700 group-hover:underline">
+                          {r.content.docLibelle ?? r.content.question}
+                        </span>
+                        <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {r.content.docCategorie ?? 'Document'}
+                          {r.content.echeance ? ` · avant le ${fmtDate(r.content.echeance)}` : ''}
+                        </span>
+                      </button>
+                    ) : (
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm text-foreground">
+                          {r.content.docLibelle ?? r.content.question}
+                        </p>
+                        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                          {r.content.docCategorie ?? 'Document'}
+                          {r.content.echeance ? ` · avant le ${fmtDate(r.content.echeance)}` : ''}
+                        </p>
+                      </div>
+                    )}
                     <Badge variant={variant}>{status}</Badge>
                     {docEv && <DocumentButton event={docEv} />}
                     {docEv && (
@@ -137,14 +154,28 @@ export function DocumentsTab({
                   key={e.id}
                   className="flex flex-wrap items-center gap-x-3 gap-y-1.5 bg-surface px-3 py-2.5"
                 >
-                  <FileText aria-hidden className="size-4 shrink-0 text-gold-600" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">{generatedDocumentTitle(e)}</p>
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {e.type === 'document' ? (e.content.categorie ?? 'Document') : 'Compte rendu'}{' '}
-                      · {fmtDate(e.createdAt)}
-                    </p>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => demo.openDocument(e)}
+                    aria-label={`Ouvrir : ${generatedDocumentTitle(e)}`}
+                    className="group flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition-colors hover:text-gold-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <FileText
+                      aria-hidden
+                      className="size-4 shrink-0 text-gold-600 group-hover:text-gold-700"
+                    />
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm text-foreground group-hover:underline">
+                        {generatedDocumentTitle(e)}
+                      </span>
+                      <span className="block text-xs uppercase tracking-wide text-muted-foreground">
+                        {e.type === 'document'
+                          ? (e.content.categorie ?? 'Document')
+                          : 'Compte rendu'}{' '}
+                        · {fmtDate(e.createdAt)}
+                      </span>
+                    </span>
+                  </button>
                   <Badge variant={e.visibility === 'client' ? 'success' : 'neutral'}>
                     {e.visibility === 'client' ? 'Visible client' : 'Interne'}
                   </Badge>
