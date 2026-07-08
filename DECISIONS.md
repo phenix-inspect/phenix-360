@@ -1925,3 +1925,47 @@ galerie ciblée). Aucun changement de modèle ni de sélecteur core ; client-saf
 intacts. Nouveau `coulisses-viewer.test` (mosaïque ≥ 2 images, photo `object-contain`, pellicule +
 compteur, zoom masquant les flèches, vignette Bibliothèque ouvrant le viewer, zéro erreur console),
 `recit-densite` toujours vert (cadre 6/5 conservé). Gate vert (e2e 54/54). VISION Art. 1, 8, 9, 11.
+
+## 08/07/2026 — Viewer photo : un VRAI plein écran, pas un overlay sur la page (RC1)
+
+**Décision produit (retour terrain, test réel) :** l'album progressait, mais **ouvrir une photo
+donnait une impression cassée** : énorme bande noire, photo mal centrée, on voyait encore la page
+derrière, il fallait parfois scroller, et le **header** comme le **concierge Léon** restaient
+au-dessus. Ce n'était pas une galerie. Objectif : un **vrai mode de consultation photo** (type
+Photos iPhone / Instagram).
+
+**Cause racine (deux défauts distincts) :**
+
+1. **Ce n'était pas au-dessus de la page.** Le viewer était rendu _dans l'arbre_ de `FilView`
+   avec `z-modal` (1400) et un fond **semi-transparent** (`rgba(19,16,9,0.985)`). Or Léon est
+   **porté sur `body`** avec le **même** `z-modal` → il passait devant ; le header (`z-sticky`)
+   et la page transparaissaient.
+2. **La photo ne tenait pas dans la fenêtre.** L'image était plafonnée à `max-h-72vh` **et** un
+   gros panneau bas (légende + messages + annotations + saisie) mangeait la hauteur → la somme
+   dépassait l'écran (scroll), la photo était petite, cernée de noir.
+
+**Correctif :**
+
+- **Portal sur `document.body`** + **nouveau token `z-viewer` (1500)** — au-dessus des modales
+  et de Léon (`z-modal` 1400), sous les toasts (1600). Ajout du token à `packages/ui`
+  (`tokens.ts` + preset). **Fond noir OPAQUE** (`#000`) plein écran.
+- **Scroll du body verrouillé** tant que le viewer est ouvert (rétabli à la fermeture).
+- **La photo tient TOUJOURS dans la fenêtre, centrée, entière.** On mesure la zone photo
+  (`ResizeObserver`) et le **ratio réel** de l'image (`width/height`, affiné à `onLoad`), puis on
+  donne au cadre exactement le plus grand rectangle au bon ratio qui rentre — `object-contain`, ni
+  recadrage ni scroll. Le cadre épousant l'image, **le calque d'annotations reste aligné** (le
+  problème géométrique du letterbox disparaît).
+- **Chrome compact** : barre haute (titre, compteur `1 / n`, zoom, annoter, fermer) ; barre basse
+  (pellicule de miniatures **compacte** + messages/annotations **plafonnés et défilant en
+  interne**, jamais un scroll de page). Flèches desktop, swipe mobile, clavier — inchangés.
+
+**Alternatives rejetées :** monter le `z-index` sans portal (un ancêtre de `FilView` peut créer un
+contexte d'empilement qui piège le `fixed`) ; réutiliser `z-toast` (sémantiquement faux, passerait
+devant les toasts) ; garder le panneau bas en flux (revole la hauteur) ; recomposer la position des
+annotations d'après le letterbox (fragile).
+
+**Mécanique :** `MomentGallery` réécrit (portal, fond noir, verrou body, dimensionnement mesuré,
+chrome compact) ; token `z-viewer` (`packages/ui`). `coulisses-viewer.test` étendu (fond noir plein
+écran, photo `object-contain` contenue dans la fenêtre, body verrouillé + libéré à la fermeture,
+**header occulté**, **Léon occulté** côté client via `elementFromPoint`, desktop + mobile). Aucun
+changement de modèle ni de logique. Gate vert (e2e 54/54, zéro erreur console). VISION Art. 8, 9, 11.

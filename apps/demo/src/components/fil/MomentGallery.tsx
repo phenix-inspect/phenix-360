@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,6 +19,7 @@ import {
   comptesMessagesParPhoto,
   messagesDePhoto,
   type Annotation,
+  type FilPhoto,
   type Message,
   type Moment,
 } from '@phenix360/core';
@@ -31,11 +33,23 @@ const ACTION_LABEL: Record<'decision' | 'reserve' | 'sav', string> = {
   sav: 'SAV',
 };
 
+/** Ratio largeur/hauteur d'une photo, si ses dimensions sont connues. */
+const ratioDePhoto = (p?: FilPhoto): number | null =>
+  p && p.width && p.height ? p.width / p.height : null;
+
 /**
- * Galerie immersive d'un album : plein écran, navigation fluide (flèches,
- * clavier, swipe), compteur et légende par photo. Le client peut laisser un
- * message ATTACHÉ à la photo affichée (niveau 2) — un commentaire contextualisé,
- * pas une discussion sociale. Repère discret du nombre de messages par photo.
+ * Viewer photo plein écran — un VRAI mode de consultation (type Photos iPhone /
+ * Instagram), pas un overlay bavard posé sur la page :
+ *   • rendu via portal sur `document.body` + `z-viewer` (au-dessus du header et du
+ *     concierge Léon), fond noir opaque, scroll du body verrouillé ;
+ *   • la photo tient TOUJOURS dans la fenêtre, centrée, entière (jamais de scroll) :
+ *     on mesure le stage (ResizeObserver) et le ratio réel de la photo, puis on
+ *     dimensionne un cadre qui épouse exactement l'image — le calque d'annotations
+ *     (inset-0) reste donc aligné au pixel près ;
+ *   • navigation flèches (desktop) + swipe (mobile) + clavier, compteur clair,
+ *     pellicule de miniatures compacte, zoom + déplacement.
+ * Le client peut laisser un message ATTACHÉ à la photo (niveau 2) ; le conducteur
+ * peut annoter et créer une réserve depuis une annotation.
  */
 export function MomentGallery({
   moment,
@@ -82,6 +96,31 @@ export function MomentGallery({
   const [zoom, setZoom] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number } | null>(null);
+  // Dimensionnement « au pixel » : on mesure la zone photo et le ratio réel de
+  // l'image pour lui donner exactement le plus grand cadre qui tient dedans.
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
+  const [ratio, setRatio] = useState<number | null>(ratioDePhoto(photos[start]));
+
+  // Un viewer plein écran ne laisse jamais le body défiler derrière lui.
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, []);
+
+  // On suit la taille de la zone photo (rotation, redimensionnement, clavier mobile).
+  useLayoutEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const measure = (): void => setStageSize({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const total = photos.length;
   const go = (dir: -1 | 1): void => setIndex((i) => Math.min(total - 1, Math.max(0, i + dir)));
@@ -102,11 +141,14 @@ export function MomentGallery({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, zoom]);
 
-  // On change de photo : brouillon effacé (un message = une photo) et zoom remis à zéro.
+  // On change de photo : brouillon effacé (un message = une photo), zoom remis à
+  // zéro, ratio réamorcé sur les dimensions connues (affiné à la charge de l'image).
   useEffect(() => {
     setDraft('');
     setZoom(false);
     setPan({ x: 0, y: 0 });
+    setRatio(ratioDePhoto(photos[index]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
   const counts = comptesMessagesParPhoto(messages);
@@ -134,10 +176,27 @@ export function MomentGallery({
   // sur un libellé générique (pour l'entête et le nom accessible de la galerie).
   const heading = moment.title.trim() || moment.observations?.trim() || 'Photos du chantier';
 
-  return (
+  // Le plus grand cadre au ratio de la photo qui tient dans la zone mesurée :
+  // borné par la hauteur si la zone est « plus large » que la photo, sinon par
+  // la largeur. Résultat = photo entière, centrée, sans recadrage ni scroll.
+  const R = ratio ?? 0.8; // 4/5 par défaut, le temps de connaître le vrai ratio
+  const box =
+    stageSize.w > 0 && stageSize.h > 0
+      ? stageSize.w / stageSize.h > R
+        ? { width: stageSize.h * R, height: stageSize.h }
+        : { width: stageSize.w, height: stageSize.w / R }
+      : null;
+  const wrapperStyle: React.CSSProperties = {
+    ...(box
+      ? { width: `${box.width}px`, height: `${box.height}px` }
+      : { maxWidth: '100%', maxHeight: '100%' }),
+    ...(zoom ? { transform: `scale(2) translate(${pan.x}px, ${pan.y}px)` } : null),
+  };
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-modal flex flex-col"
-      style={{ backgroundColor: 'rgba(19,16,9,0.985)' }}
+      className="fixed inset-0 z-viewer flex flex-col overflow-hidden overscroll-contain"
+      style={{ backgroundColor: '#000' }}
       role="dialog"
       aria-modal="true"
       aria-label={heading}
@@ -153,7 +212,7 @@ export function MomentGallery({
       }}
     >
       {/* Barre haute : titre + compteur (+ repères) + actions */}
-      <div className="flex items-center justify-between gap-3 p-4 text-paper-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 p-4 text-paper-0">
         <div className="min-w-0">
           <p className="truncate font-serif text-lg font-semibold tracking-tight">{heading}</p>
           <p className="flex items-center gap-2 text-xs opacity-80">
@@ -225,12 +284,13 @@ export function MomentGallery({
         </div>
       </div>
 
-      {/* Image — montrée ENTIÈRE (object-contain, jamais recadrée). Le conteneur
-          épouse la photo (inline-block) : le calque d'annotations, en inset-0,
-          reste donc aligné au pixel près, letterbox compris. Zoomé, on déplace la
-          photo au doigt / à la souris. */}
+      {/* Zone photo : occupe TOUT l'espace disponible entre les deux barres. La
+          photo est centrée et dimensionnée pour tenir entière (cadre = ratio réel
+          × zone mesurée) — jamais de recadrage, jamais de scroll. Le calque
+          d'annotations épouse ce cadre au pixel près. Zoomé, on déplace au doigt. */}
       <div
-        className={`relative flex flex-1 items-center justify-center overflow-hidden px-2 ${
+        ref={stageRef}
+        className={`relative flex min-h-0 flex-1 items-center justify-center overflow-hidden ${
           zoom ? 'cursor-grab touch-none active:cursor-grabbing' : ''
         }`}
         onPointerDown={(e) => {
@@ -249,24 +309,24 @@ export function MomentGallery({
           drag.current = null;
         }}
       >
-        <div
-          className="relative inline-block max-h-full transition-transform duration-base"
-          style={zoom ? { transform: `scale(2) translate(${pan.x}px, ${pan.y}px)` } : undefined}
-        >
+        <div className="relative transition-transform duration-base" style={wrapperStyle}>
           {current.imageUrl ? (
             <img
               src={current.imageUrl}
               alt={current.legende ?? 'Photo du chantier'}
+              onLoad={(e) => {
+                const el = e.currentTarget;
+                if (el.naturalWidth && el.naturalHeight)
+                  setRatio(el.naturalWidth / el.naturalHeight);
+              }}
               onDoubleClick={() => {
                 if (!editing) toggleZoom();
               }}
               draggable={false}
-              className="block max-h-[72vh] max-w-full select-none rounded-xl object-contain"
+              className="absolute inset-0 block size-full select-none object-contain"
             />
           ) : (
-            <div className="aspect-[4/5] max-h-[72vh] w-[min(88vw,40rem)] overflow-hidden rounded-xl">
-              <FilImage photo={current} />
-            </div>
+            <FilImage photo={current} className="absolute inset-0 size-full" />
           )}
           <PhotoAnnotator
             key={current.id}
@@ -300,15 +360,17 @@ export function MomentGallery({
         )}
       </div>
 
-      {/* Légende + pastilles (repère messages) + messages de la photo */}
-      <div className="space-y-3 p-4 text-paper-0">
+      {/* Barre basse COMPACTE : légende + pellicule + (messages / annotations) +
+          saisie. La zone messages/annotations est plafonnée et défile en interne —
+          elle ne pousse jamais la photo hors écran ni ne fait défiler la page. */}
+      <div className="shrink-0 space-y-2.5 p-3 text-paper-0">
         {current.legende && (
           <p className="mx-auto max-w-2xl text-center text-sm opacity-90">{current.legende}</p>
         )}
-        {/* Pellicule de miniatures : on parcourt l'album d'un coup d'œil et on
-            saute à une photo. Pastille or = la photo porte un mot. */}
+        {/* Pellicule de miniatures COMPACTE : parcours d'un coup d'œil, saut direct.
+            Pastille or = la photo porte un mot. */}
         {total > 1 && (
-          <div className="mx-auto flex max-w-2xl snap-x gap-2 overflow-x-auto pb-1">
+          <div className="mx-auto flex max-w-2xl snap-x justify-center gap-1.5 overflow-x-auto">
             {photos.map((p, i) => {
               const hasMsg = (counts.get(p.id) ?? 0) > 0;
               return (
@@ -318,7 +380,7 @@ export function MomentGallery({
                   onClick={() => setIndex(i)}
                   aria-label={`Aller à la photo ${i + 1}`}
                   aria-current={i === index}
-                  className={`relative size-14 shrink-0 snap-start overflow-hidden rounded-lg border-2 transition-all duration-base ${
+                  className={`relative size-12 shrink-0 snap-start overflow-hidden rounded-md border-2 transition-all duration-base ${
                     i === index
                       ? 'border-paper-0'
                       : 'border-transparent opacity-55 hover:opacity-90'
@@ -326,7 +388,7 @@ export function MomentGallery({
                 >
                   <FilImage photo={p} />
                   {hasMsg && (
-                    <span className="absolute right-1 top-1 size-2 rounded-full bg-gold-400 ring-1 ring-ink-900/40" />
+                    <span className="absolute right-0.5 top-0.5 size-2 rounded-full bg-gold-400 ring-1 ring-ink-900/40" />
                   )}
                 </button>
               );
@@ -335,89 +397,93 @@ export function MomentGallery({
         )}
 
         <div className="mx-auto w-full max-w-2xl space-y-2">
-          {photoMessages.length > 0 && (
-            <ul className="max-h-28 space-y-1.5 overflow-y-auto">
-              {photoMessages.map((m) => (
-                <li key={m.id} className="text-sm">
-                  <span className="font-medium">{nameOf(m.authorId)}</span>{' '}
-                  <span className="text-xs opacity-70">
-                    {ROLE_LABEL[m.authorRole]} · {fmtDateTime(m.createdAt)}
-                  </span>
-                  <p className="opacity-90">{m.texte}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* PONT conducteur : créer une Demande ou une Réserve depuis une annotation. */}
-          {canCreateAction && photoAnnotations.length > 0 && (
-            <ul className="space-y-2 border-t border-paper-0/15 pt-2">
-              {photoAnnotations.map((a) => (
-                <li key={a.id} className="space-y-1.5 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
-                      <PenLine aria-hidden className="opacity-70" />
-                      <span className="truncate">{annotationLabel(a)}</span>
-                    </span>
-                    {a.action ? (
-                      <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
-                        {ACTION_LABEL[a.action.kind]} créée
+          {(photoMessages.length > 0 || (canCreateAction && photoAnnotations.length > 0)) && (
+            <div className="max-h-[28vh] space-y-2 overflow-y-auto">
+              {photoMessages.length > 0 && (
+                <ul className="space-y-1.5">
+                  {photoMessages.map((m) => (
+                    <li key={m.id} className="text-sm">
+                      <span className="font-medium">{nameOf(m.authorId)}</span>{' '}
+                      <span className="text-xs opacity-70">
+                        {ROLE_LABEL[m.authorRole]} · {fmtDateTime(m.createdAt)}
                       </span>
-                    ) : reserveFor === a.id ? null : (
-                      <span className="flex shrink-0 gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReserveFor(a.id);
-                            setResp('');
-                            setEch('');
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
-                        >
-                          <Flag aria-hidden />
-                          Créer une réserve
-                        </button>
-                      </span>
-                    )}
-                  </div>
+                      <p className="opacity-90">{m.texte}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-                  {reserveFor === a.id && !a.action && (
-                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-paper-0/15 bg-paper-0/5 p-2">
-                      <input
-                        value={resp}
-                        onChange={(e) => setResp(e.target.value)}
-                        placeholder="Responsable (ex. Peintre)"
-                        className="h-9 min-w-[8rem] flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                      />
-                      <input
-                        type="date"
-                        value={ech}
-                        onChange={(e) => setEch(e.target.value)}
-                        aria-label="Échéance"
-                        className="h-9 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onCreateReserve(a.id, { responsable: resp, echeance: ech });
-                          setReserveFor(null);
-                        }}
-                        className="h-9 rounded-lg bg-gold-500 px-3 text-sm font-medium text-primary-foreground"
-                      >
-                        Créer la réserve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setReserveFor(null)}
-                        className="h-9 rounded-lg px-2 text-sm hover:bg-paper-0/10"
-                      >
-                        Annuler
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
+              {/* PONT conducteur : créer une Demande ou une Réserve depuis une annotation. */}
+              {canCreateAction && photoAnnotations.length > 0 && (
+                <ul className="space-y-2 border-t border-paper-0/15 pt-2">
+                  {photoAnnotations.map((a) => (
+                    <li key={a.id} className="space-y-1.5 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
+                          <PenLine aria-hidden className="opacity-70" />
+                          <span className="truncate">{annotationLabel(a)}</span>
+                        </span>
+                        {a.action ? (
+                          <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
+                            {ACTION_LABEL[a.action.kind]} créée
+                          </span>
+                        ) : reserveFor === a.id ? null : (
+                          <span className="flex shrink-0 gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReserveFor(a.id);
+                                setResp('');
+                                setEch('');
+                              }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
+                            >
+                              <Flag aria-hidden />
+                              Créer une réserve
+                            </button>
+                          </span>
+                        )}
+                      </div>
+
+                      {reserveFor === a.id && !a.action && (
+                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-paper-0/15 bg-paper-0/5 p-2">
+                          <input
+                            value={resp}
+                            onChange={(e) => setResp(e.target.value)}
+                            placeholder="Responsable (ex. Peintre)"
+                            className="h-9 min-w-[8rem] flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                          />
+                          <input
+                            type="date"
+                            value={ech}
+                            onChange={(e) => setEch(e.target.value)}
+                            aria-label="Échéance"
+                            className="h-9 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 focus:outline-none focus:ring-2 focus:ring-gold-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onCreateReserve(a.id, { responsable: resp, echeance: ech });
+                              setReserveFor(null);
+                            }}
+                            className="h-9 rounded-lg bg-gold-500 px-3 text-sm font-medium text-primary-foreground"
+                          >
+                            Créer la réserve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setReserveFor(null)}
+                            className="h-9 rounded-lg px-2 text-sm hover:bg-paper-0/10"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           <div className="flex gap-2">
@@ -442,6 +508,7 @@ export function MomentGallery({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
