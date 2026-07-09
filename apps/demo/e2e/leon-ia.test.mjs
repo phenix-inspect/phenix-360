@@ -96,7 +96,9 @@ try {
         .first()
         .waitFor({ state: 'visible', timeout: 6000 });
       // Léon ne doit PAS répondre une commande (« Cuisine équipée ») à côté.
-      const lastBubble = await leon().getByText(/adresse de votre chantier/i).innerText();
+      const lastBubble = await leon()
+        .getByText(/adresse de votre chantier/i)
+        .innerText();
       if (/cuisine|commande/i.test(lastBubble))
         throw new Error('Léon confond adresse du chantier et commande');
       if ((await demandeCount()) !== before)
@@ -122,7 +124,11 @@ try {
         .first()
         .waitFor({ state: 'visible', timeout: 6000 });
       // À ce stade de la conversation, aucune date de réception ne doit apparaître.
-      if ((await leon().getByText(/réception.*autour du/i).count()) > 0)
+      if (
+        (await leon()
+          .getByText(/réception.*autour du/i)
+          .count()) > 0
+      )
         throw new Error('Léon répond une date de réception à « qu’il me reste à faire »');
     },
   );
@@ -136,7 +142,7 @@ try {
         .count();
       await ask('azerty qsdfgh wxcvbn');
       await leon()
-        .getByText(/ne trouve pas|transmettre votre demande/i)
+        .getByText(/pas trouvé|ne trouve pas|transmet/i)
         .last()
         .waitFor({ state: 'visible', timeout: 6000 });
       // Il ne propose SURTOUT pas d’ouvrir un NOUVEAU document au hasard.

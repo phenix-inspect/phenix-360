@@ -1,23 +1,42 @@
 /**
- * PHÉNIX — le cerveau (B2 : connaissance projet, ancrée & client-safe)
+ * PHÉNIX — le cerveau de Léon (V3 : assistant de suivi de chantier premium)
  * ===========================================================================
- * PHÉNIX n'est pas un chat : c'est un chef de projet numérique côté client.
- * Règle fondatrice — il ne répond QUE lorsqu'il dispose d'une information fiable
- * du dossier (aucune invention). Sinon, il transmet à l'équipe (escalade).
+ * Léon n'est PAS un chatbot. C'est un chef de projet numérique côté client, qui
+ * donne l'impression de connaître le chantier ET PHÉNIX par cœur. Il ne répond
+ * jamais au hasard : il RAISONNE avant de parler.
  *
- * B2 : PHÉNIX connaît tout le dossier — devis / avenants, planning / étapes,
- * commandes / livraisons, documents, décisions, réserves (traduites), photos,
- * pièces / matériaux / dates. Chaque réponse cite sa source (« Réponse basée
- * sur… »). Règles non négociables :
+ * Pipeline OBLIGATOIRE (jamais l'inverse) :
+ *
+ *   question
+ *     → compréhension de l'intention        (classifyIntent)
+ *     → classification vers UNE catégorie     (PhenixIntent)
+ *     → recherche dans la BONNE source        (base de connaissances + journal)
+ *     → évaluation du niveau de confiance      (haute / moyenne / faible)
+ *     → réponse (empathique, avec action)      (reply / nav)
+ *     → escalade conducteur UNIQUEMENT si nécessaire (escalate / proposeTransmit)
+ *
+ * Règles non négociables :
+ *   • une ABSENCE de réponse (« je ne trouve pas ») est toujours préférable à une
+ *     MAUVAISE réponse — jamais d'invention, jamais d'à-peu-près, jamais d'hallucination ;
  *   • jamais de MONTANT ni de CALCUL (les questions de prix escaladent) ;
  *   • jamais d'information interne (réserve n°, responsable, statut technique) ;
- *   • au moindre doute → escalade.
- * La formulation reste déterministe (remplaçable par un LLM sans toucher
- * l'ancrage). Aucune logique dispersée : tout vit ici.
+ *   • ton humain et rassurant (« Je viens de retrouver votre devis. »), jamais robotique.
+ *
+ * La base de connaissances (fiche PHÉNIX + fiche chantier) donne à Léon ce qu'il
+ * « sait » sans fouiller les documents. La formulation reste déterministe
+ * (remplaçable par un LLM sans toucher l'ancrage). Tout vit ici — aucune logique
+ * dispersée.
  */
 import type { Event } from './event.js';
 import { isDocument, isVisibleToClient } from './event.js';
-import { currentStep, leveeDeReserve, pendingClientDecisions, reserveEvents } from './views.js';
+import {
+  currentStep,
+  demandeRepondue,
+  demandesPourPhenix,
+  leveeDeReserve,
+  pendingClientDecisions,
+  reserveEvents,
+} from './views.js';
 import { PROJECT_STEP_LABEL } from './project.js';
 import type { ClientSelection, Order, ProjectDossier } from './prepare.js';
 import type { Moment, ProjectZone } from './fil.js';
@@ -70,11 +89,15 @@ export interface PhenixInput {
   /** Historique de l'échange (mémoire simple : intention + zone du tour précédent). */
   history?: { role: 'client' | 'phenix'; texte: string }[];
   /**
-   * L'adresse du CHANTIER (le bien en travaux) — donnée du dossier, distincte de
-   * l'adresse de l'entreprise PHÉNIX (`PHENIX_ADDRESS`). Léon doit savoir répondre
-   * « l'adresse du chantier » ≠ « votre adresse » sans jamais confondre les deux.
+   * Fiche CHANTIER — ce que Léon « connaît » du bien sans chercher : l'adresse du
+   * chantier (≠ adresse PHÉNIX), le nom du chantier, le client, l'état, les
+   * artisans. Alimenté par le store (projet + annuaire).
    */
   chantierAddress?: string | null;
+  chantierName?: string | null;
+  clientName?: string | null;
+  statutLabel?: string | null;
+  artisans?: { nom: string; trade?: string }[];
   /**
    * Le client a joint des photos à son message. PHÉNIX ne « voit » pas les
    * images : dès qu'une photo accompagne la demande, l'œil humain du conducteur
@@ -84,12 +107,27 @@ export interface PhenixInput {
 }
 
 /* -------------------------------------------------------------------------- *
- * Utilitaires de langue (déterministes, tolérants)
+ * Base de connaissances PHÉNIX — la « donnée PHÉNIX » que Léon connaît par cœur
+ * (source unique, configurable ici). Léon répond directement, sans jamais
+ * escalader une simple demande de coordonnées.
+ * -------------------------------------------------------------------------- */
+export const PHENIX_NAME = 'PHÉNIX 360';
+export const PHENIX_PHONE = '01 84 80 00 00';
+export const PHENIX_EMAIL = 'contact@phenix360.fr';
+export const PHENIX_ADDRESS = '24 rue de la République, 69002 Lyon';
+export const PHENIX_SITE = 'www.phenix360.fr';
+export const PHENIX_HORAIRES = 'du lundi au vendredi, de 8h30 à 18h30';
+
+/* -------------------------------------------------------------------------- *
+ * Utilitaires de langue (déterministes, tolérants aux fautes / synonymes)
  * -------------------------------------------------------------------------- */
 const strip = (s: string): string =>
   s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // Apostrophes typographiques (\u2019 ` \u00b4) ramen\u00e9es \u00e0 l'apostrophe droite : le
+    // client tape indiff\u00e9remment \u00ab s'appelle \u00bb ou \u00ab s\u2019appelle \u00bb.
+    .replace(/[\u2019\u2018`\u00b4]/g, "'")
     .toLowerCase();
 
 const STOP = new Set([
@@ -172,15 +210,6 @@ const PRICE_RX =
   /(combien|cout|coute|prix|montant|tarif|budget|euro|paiement|payer|reste a payer|facturation)/;
 
 /**
- * Coordonnées PHÉNIX communiquées au client — la « donnée PHÉNIX » que Léon
- * connaît (source unique, configurable ici). Léon répond directement, sans
- * jamais escalader une simple demande de contact.
- */
-export const PHENIX_PHONE = '01 84 80 00 00';
-export const PHENIX_EMAIL = 'contact@phenix360.fr';
-export const PHENIX_ADDRESS = '24 rue de la République, 69002 Lyon';
-
-/**
  * Types de documents que Léon sait reconnaître et retrouver (par mot-clé). L'ordre
  * compte : les libellés les plus spécifiques d'abord (« facture finale » avant
  * « facture », « pré-réception » avant « réception »).
@@ -202,7 +231,7 @@ const DOC_TYPES: { rx: RegExp; label: string }[] = [
 
 /** Le client demande explicitement de transmettre au conducteur → escalade directe. */
 const TRANSMIT_RX =
-  /(transmet|transmettre|prevenir le conducteur|prévenir le conducteur|demande[rz]? (au|à|a) (mon )?conducteur|contacte[rz]? (le|mon) conducteur|passe[rz]? au conducteur|remonte[rz]? au conducteur)/;
+  /(transmet|transmettre|prevenir le conducteur|prévenir le conducteur|demande[rz]? (au|à|a) (mon )?conducteur|contacte[rz]? (le|mon) conducteur|passe[rz]? au conducteur|remonte[rz]? au conducteur|parler (a|à) (quelqu'un|un humain|une personne|un conseiller)|joindre (quelqu'un|un humain))/;
 
 /**
  * Une DEMANDE D'ACTION / de permission / de changement (« peut-on décaler… »,
@@ -214,7 +243,7 @@ const TRANSMIT_RX =
 const REQUEST_RX =
   /(peut-?on|pourrait-?on|pourriez-vous|pouvez-vous|serait-il possible|est-il possible|est-ce possible|possible de|j'aimerais|je voudrais|je souhaite|puis-je|puis je)/;
 const INFO_VERB_RX =
-  /(voir|montre|montrer|montrez|afficher|affiche|ouvrir|ouvre|savoir|connaitre|connaître|consulter|retrouver|ou est|où est|\bquand\b|\bquel|\bquels|\bquelle|combien|c'est quoi)/;
+  /(voir|montre|montrer|montrez|afficher|affiche|ouvrir|ouvre|savoir|connaitre|connaître|consulter|retrouver|ou est|où est|\bquand\b|\bquel(le|les|s)?\b|combien|c'est quoi|joindre|contacter|coordonnees|coordonnées)/;
 
 /**
  * SIGNALEMENT D'UN PROBLÈME (fissure, fuite, malfaçon…) → l'œil humain du
@@ -223,10 +252,22 @@ const INFO_VERB_RX =
 const PROBLEM_RX =
   /(fissure|felure|fêlure|infiltration|fuite|degat|dégât|malfacon|malfaçon|cassé|cassee|cassée|abime|abîme|moisissure|inondation|ne (marche|fonctionne) (pas|plus)|mal fini|mal fait|signale.*(probleme|problème|souci|defaut|défaut|malfacon|malfaçon))/;
 
+/**
+ * BESOIN LOGISTIQUE / ADMINISTRATIF qui requiert une action humaine (clés
+ * perdues, rendez-vous, sinistre, résiliation…). Léon n'a pas la donnée et ne
+ * peut pas agir seul → il transmet au conducteur (jamais une réponse à côté).
+ */
+const ADMIN_RX =
+  /(plus (les |de |mes )?cle|perdu (les |mes )?cle|egare.*cle|égaré.*cle|prendre (un )?rendez-vous|prendre (un )?rdv|\brdv\b|resilier|résilier|resiliation|résiliation|sinistre|cambriol)/;
+
 /** Le client veut nous joindre (téléphone / e-mail / coordonnées PHÉNIX). */
 const CONTACT_PHONE_RX =
   /(numero|numéro|telephone|téléphone|\btel\b|coordonnees|coordonnées|comment (vous |t.)?(joindre|contacter|appeler)|(vous|t.) (joindre|contacter|appeler))/;
 const CONTACT_MAIL_RX = /(mail|email|e-mail|courriel)/;
+
+/** Horaires / site internet / nom de l'entreprise PHÉNIX. */
+const PHENIX_INFO_RX =
+  /(horaire|ouvert|ouvre|fermé|ferme(z|é)?|quand (vous |êtes-vous |etes-vous )?(ouvert|joignable|disponible)|site (internet|web|de phenix)|site phenix|adresse (internet|web)|votre site|sur internet)/;
 
 /**
  * Une question d'ADRESSE POSTALE. Léon distingue deux adresses bien réelles et
@@ -234,9 +275,10 @@ const CONTACT_MAIL_RX = /(mail|email|e-mail|courriel)/;
  * dossier) et celle de l'ENTREPRISE PHÉNIX. « l'adresse du chantier » ≠ « votre
  * adresse ». On exclut l'adresse e-mail (traitée par le contact).
  */
-const ADDRESS_RX = /(adresse|ou se trouve|où se trouve|ou est le|où est le|localisation)/;
+const ADDRESS_RX =
+  /(adres|ou se trouve|où se trouve|ou se situe|où se situe|ou est le|où est le|ou est mon|où est mon|ou sont vos|où sont vos|ou intervenez|où intervenez|localisation)/;
 const CHANTIER_RX =
-  /(chantier|travaux|appartement|logement|le bien|du bien|mon appart|maison|mon logement|ma maison)/;
+  /(chantier|travaux|appartement|logement|le bien|du bien|mon appart|maison|mon logement|ma maison|intervenez)/;
 const PHENIX_REF_RX =
   /(phenix|phénix|entreprise|societe|société|bureau|siege|siège|agence|vos bureaux|chez vous)/;
 
@@ -267,6 +309,7 @@ export function clientTodos(events: Event[]): PhenixTodo[] {
 
 /* -------------------------------------------------------------------------- *
  * projectKnowledge — index client-safe de faits vérifiés du dossier
+ * (recherche de DERNIER RECOURS, quand aucune intention précise n'a été comprise)
  * -------------------------------------------------------------------------- */
 interface KnowledgeFact {
   keys: string[];
@@ -277,7 +320,7 @@ interface KnowledgeFact {
 function commandeAnswer(o: Order): string {
   const liv = o.dateLivraisonReelle ?? o.dateLivraisonEstimee;
   if (o.statut === 'livree' || o.statut === 'posee' || o.statut === 'terminee')
-    return `Votre commande « ${o.label} » a bien été livrée${
+    return `Bonne nouvelle : votre commande « ${o.label} » a bien été livrée${
       o.dateLivraisonReelle ? ` le ${fmtDate(o.dateLivraisonReelle)}` : ''
     }.`;
   if (o.statut === 'commandee' || o.statut === 'en_preparation' || o.statut === 'expediee')
@@ -403,16 +446,22 @@ function searchKnowledge(q: string, facts: KnowledgeFact[]): KnowledgeFact | nul
 }
 
 /* -------------------------------------------------------------------------- *
- * Reconnaissance d'intention (déterministe, remplaçable par un LLM)
+ * Étape 1-2 du pipeline — compréhension + classification de l'intention
+ * (déterministe, tolérante aux synonymes / fautes ; remplaçable par un LLM)
  * -------------------------------------------------------------------------- */
 type PhenixIntent =
   | 'salutation'
+  | 'remerciement'
   | 'contact'
+  | 'phenix_infos'
   | 'adresse'
   | 'conducteur'
+  | 'artisans'
   | 'todo'
+  | 'choix_restants'
   | 'choix_valides'
   | 'documents_manquants'
+  | 'demande_status'
   | 'avancement'
   | 'planning'
   | 'reception'
@@ -423,7 +472,11 @@ type PhenixIntent =
   | 'none';
 
 function detectIntent(q: string): PhenixIntent {
-  if (/^(bonjour|salut|hello|coucou|bonsoir|hey)\b/.test(q) && q.length < 24) return 'salutation';
+  if (/^(bonjour|salut|hello|coucou|bonsoir|hey|yo)\b/.test(q) && q.length < 24)
+    return 'salutation';
+  if (/^(merci|super merci|merci beaucoup|nickel|parfait merci|top merci|c'est parfait)\b/.test(q))
+    return 'remerciement';
+
   // Coordonnées PHÉNIX : téléphone / e-mail / « comment vous joindre » (jamais un
   // document, jamais une escalade — Léon connaît ses propres coordonnées).
   if (
@@ -431,19 +484,36 @@ function detectIntent(q: string): PhenixIntent {
     (CONTACT_MAIL_RX.test(q) && /(phenix|phénix|vous|vos|votre|equipe|équipe|conducteur)/.test(q))
   )
     return 'contact';
+
+  // Horaires / site internet PHÉNIX.
+  if (PHENIX_INFO_RX.test(q)) return 'phenix_infos';
+
   // Adresse postale : chantier ou entreprise PHÉNIX (jamais l'e-mail, déjà traité).
   // On ne déclenche que sur une vraie question d'adresse — « où est le devis ? »
   // (mot « où est » suivi d'un document) reste une question de document.
   if (ADDRESS_RX.test(q) && !CONTACT_MAIL_RX.test(q)) {
-    if (/adresse/.test(q) || CHANTIER_RX.test(q) || PHENIX_REF_RX.test(q)) return 'adresse';
+    if (/adres/.test(q) || CHANTIER_RX.test(q) || PHENIX_REF_RX.test(q)) return 'adresse';
   }
+
   // Le nom / l'identité de mon conducteur : information que Léon ne détient pas —
   // il ne l'invente pas, il propose de transmettre (jamais un numéro à la place).
   if (
-    /(conducteur|chef de chantier|mon interlocuteur|mon responsable)/.test(q) &&
-    /(nom|s'appelle|sappelle|qui est|qui suit|prenom|prénom|c'est qui|joindre directement)/.test(q)
+    /(conducteur|chef de chantier|mon interlocuteur|mon responsable|referent|référent)/.test(q) &&
+    /(nom|s'appelle|sappelle|qui est|qui suit|prenom|prénom|c'est qui|joindre directement|coordonnees|coordonnées)/.test(
+      q,
+    )
   )
     return 'conducteur';
+
+  // Les artisans / l'équipe sur le chantier (identité, pas timing → planning).
+  if (
+    !/(quand|date|prevu|prévu)/.test(q) &&
+    /(qui (est|sont|va|s'occupe|travaille|intervient|fait|gere|gère)|les artisans|mon artisan|quel (artisan|plombier|electricien|électricien|peintre|carreleur|menuisier|chauffagiste|macon|maçon)|l'equipe|l'équipe|equipe qui|qui c'est)/.test(
+      q,
+    )
+  )
+    return 'artisans';
+
   // Documents demandés au client (« que dois-je envoyer ? », « quels documents manquent ? »).
   if (
     /(document.*manque|manque.*document|documents? (a|à) (envoyer|fournir|transmettre)|documents? demand|que dois-?je (envoyer|fournir|transmettre)|quels? (documents?|papiers?|pieces?|pièces?) (manque|envoyer|fournir|transmettre))/.test(
@@ -451,18 +521,40 @@ function detectIntent(q: string): PhenixIntent {
     )
   )
     return 'documents_manquants';
+
+  // Où en est MA DEMANDE (le ticket que le client a envoyé) — jamais « mon chantier ».
+  if (
+    /(demande|requete|requête|question)/.test(q) &&
+    /(ou en est|où en est|statut|des nouvelles|une reponse|une réponse|repondu|répondu|avancement de|traitee|traitée|suivi de ma)/.test(
+      q,
+    ) &&
+    !/chantier/.test(q)
+  )
+    return 'demande_status';
+
+  // Qu'est-ce qu'il me reste à CHOISIR (choix client en attente).
+  if (
+    /(chois|choix|selection|sélection|option|ambiance)/.test(q) &&
+    /(reste|restant|(a|à) faire|(a|à) valider|(a|à) choisir|dois-?je|en attente|manque)/.test(q)
+  )
+    return 'choix_restants';
+
+  // Ai-je quelque chose à faire (décisions client en attente) ?
   if (
     /(dois-?je|je dois|dois faire|faire quelque chose|quelque chose (a|à) (faire|valider)|une action|que dois|rien (a|à) faire|(a|à) valider|action attendue|besoin de moi|reste (a|à) faire|me reste|reste-t-il (a|à) faire|quoi faire|que faire|qu'ai-je (a|à) faire|en attente de moi)/.test(
       q,
     )
   )
     return 'todo';
+
+  // Mes choix DÉJÀ validés.
   if (
     /(ai-je (deja )?(choisi|valide)|mes choix|que j'ai (choisi|valide)|choix.*valide|deja valide|deja choisi)/.test(
       q,
     )
   )
     return 'choix_valides';
+
   // « Réception » comme QUESTION DE DATE (quand / prévue…), sinon c'est un
   // document (PV de réception) → traité par l'intention 'document'.
   if (
@@ -470,14 +562,20 @@ function detectIntent(q: string): PhenixIntent {
     /(\bquand\b|date|prevu|prévu|prochaine|c'est quand|ce sera quand|prevoir|prévoir)/.test(q)
   )
     return 'reception';
+
+  // Timing d'une étape / d'un intervenant (« quand commence… », « quand intervient le plombier »).
   if (
-    /(prochaine etape|prochaine phase|etape suivante|quand commence|quand debute|quand demarre|quand attaque)/.test(
+    /(prochaine etape|prochaine phase|etape suivante|quand commence|quand debute|quand démarre|quand demarre|quand attaque|quand intervient|quand passe|quand vient|quand arrive.*(plombier|electricien|électricien|peintre|carreleur|artisan))/.test(
       q,
     )
   )
     return 'planning';
-  if (/(command|livr|arrive|arrivee|expedi|colis|recu|fournisseur|delai)/.test(q))
+
+  if (
+    /(command|livr|arrive|arrivee|expedi|colis|\brecu\b|\breçu\b|fournisseur|delai|délai)/.test(q)
+  )
     return 'commande';
+
   // Un TYPE de document reconnu (devis, facture, DPE, plan, PV, avenant…) ou un
   // mot documentaire → intention 'document'. Vient AVANT 'photo' pour que
   // « montre-moi le DPE » ne soit pas confondu avec une demande de photos.
@@ -486,14 +584,17 @@ function detectIntent(q: string): PhenixIntent {
     /(document|papier|contrat|signer|signature|retrouve|ou est|où est)/.test(q)
   )
     return 'document';
+
   if (/(reserve|réserve|reprise|malfacon|defaut|corrige|finition)/.test(q)) return 'reserve';
   if (/(photo|image|montre|voir la|voir les|revoir|regarder)/.test(q)) return 'photo';
+
   if (
-    /(ou en est|avanc|etape|planning|calendrier|frise|ca avance|bientot|termine avant|fini avant|c'est ou)/.test(
+    /(ou en est|où en est|avanc|etape|planning|calendrier|frise|ca avance|ça avance|bientot|bientôt|termine avant|fini avant|c'est ou|c'est où|point sur)/.test(
       q,
     )
   )
     return 'avancement';
+
   if (/\bquand\b/.test(q)) return 'commande';
   return 'none';
 }
@@ -515,7 +616,7 @@ function matchOrder(q: string, orders: Order[]): Order | undefined {
 }
 
 /* -------------------------------------------------------------------------- *
- * Le cœur de PHÉNIX
+ * Le cœur de PHÉNIX — le pipeline
  * -------------------------------------------------------------------------- */
 export function askPhenix(input: PhenixInput): PhenixReply {
   const q = strip(input.question);
@@ -524,14 +625,13 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   const todos = clientTodos(events);
   const nextTodo = todos[0];
 
-  // Mémoire simple : intention + zone reportées du tour précédent. On ne reporte
-  // l'INTENTION que pour une VRAIE relance de continuité (« et la cuisine ? »,
+  // --- Étape mémoire : intention + zone reportées du tour précédent. On ne
+  // reporte l'INTENTION que pour une VRAIE relance de continuité (« et la cuisine ? »,
   // « et le salon ? ») : soit le message commence par un connecteur de suite, soit
   // il ne fait que désigner une pièce. Toute autre saisie (même courte, même du
   // charabia) porte son propre sujet — hériter d'une intention passée ferait
-  // répondre à côté (une réponse assurée hors-sujet = une invention, précisément le
-  // travers à bannir). La zone, elle, se reporte toujours (elle ne fait que
-  // préciser une réponse, jamais changer de sujet).
+  // répondre à côté (une réponse assurée hors-sujet = une invention, le travers à
+  // bannir). La zone, elle, se reporte toujours (elle précise, ne change pas de sujet).
   let intent = detectIntent(q);
   let zone = zoneOf(input.question);
   const isFollowUp =
@@ -542,7 +642,7 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       if (!h || h.role !== 'client') continue;
       if (intent === 'none' && isFollowUp) {
         const past = detectIntent(strip(h.texte));
-        if (past !== 'none' && past !== 'salutation') intent = past;
+        if (past !== 'none' && past !== 'salutation' && past !== 'remerciement') intent = past;
       }
       if (!zone) zone = zoneOf(h.texte);
       if (intent !== 'none' && zone) break;
@@ -585,33 +685,42 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     escaladeQuestion: input.question.trim(),
   });
   /**
-   * Léon ne SAIT PAS répondre — mieux vaut le dire honnêtement que servir une
-   * réponse à côté (« une mauvaise réponse est pire qu'un je-ne-trouve-pas »). Il
-   * n'invente rien : il annonce qu'il n'a pas l'information puis propose (sans
-   * l'imposer) de transmettre au conducteur. Le chat reste ouvert et clair.
+   * Confiance FAIBLE — Léon ne SAIT PAS répondre. Mieux vaut le dire honnêtement
+   * que servir une réponse à côté (« une absence de réponse est préférable à une
+   * mauvaise réponse »). Il n'invente rien : il l'admet avec un ton humain, puis
+   * PROPOSE (sans l'imposer) de transmettre au conducteur. Le chat reste ouvert.
    */
   const cannotFind = (quoi = 'cette information'): PhenixReply =>
     reply(
-      `Je ne trouve pas ${quoi} dans votre espace pour le moment. ` +
+      `Je n’ai malheureusement pas trouvé ${quoi} dans votre espace pour le moment. ` +
         'Voulez-vous que je transmette votre demande à votre conducteur ?',
       undefined,
       false,
     );
 
+  // ---- Garde-fous prioritaires (avant toute recherche) : ces cas sortent du
+  // pipeline immédiatement, car aucune donnée du dossier ne doit être « cherchée ».
+
   // Une photo jointe = un point à REGARDER : PHÉNIX ne voit pas les images, donc
   // toute demande avec photo passe directement au conducteur (jamais à l'aveugle).
   if (input.hasPhotos) return escalate();
-
-  // Le client demande EXPLICITEMENT une transmission au conducteur → on transmet.
+  // Le client demande EXPLICITEMENT une transmission (ou à parler à un humain).
   if (TRANSMIT_RX.test(q)) return escalate();
-
   // Signalement d'un problème (fissure, fuite, malfaçon…) → conducteur.
   if (PROBLEM_RX.test(q)) return escalate();
-
+  // Besoin logistique / administratif (clés, RDV, sinistre…) → conducteur.
+  if (ADMIN_RX.test(q)) return escalate();
   // Demande d'ACTION / de changement / de permission (hors info & navigation) →
   // décision humaine → conducteur. « je voudrais VOIR le devis » reste traité seul.
-  if (REQUEST_RX.test(q) && !INFO_VERB_RX.test(q)) return escalate();
-
+  // Les intentions d'INFORMATION DIRECTE (coordonnées, adresse, artisans…) ne sont
+  // jamais escaladées, même formulées en requête (« puis-je avoir votre numéro ? »).
+  const DIRECT_INFO =
+    intent === 'contact' ||
+    intent === 'phenix_infos' ||
+    intent === 'adresse' ||
+    intent === 'conducteur' ||
+    intent === 'artisans';
+  if (!DIRECT_INFO && REQUEST_RX.test(q) && !INFO_VERB_RX.test(q)) return escalate();
   // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
   if (PRICE_RX.test(q)) return escalate();
 
@@ -631,6 +740,8 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     );
   }
 
+  // ---- Étapes 3-6 du pipeline : recherche dans la bonne source selon l'intention,
+  // évaluation de la confiance, réponse (ou « je ne trouve pas » + proposition).
   switch (intent) {
     case 'salutation':
       return nextTodo
@@ -644,6 +755,13 @@ export function askPhenix(input: PhenixInput): PhenixReply {
             'votre suivi de chantier',
             false,
           );
+
+    case 'remerciement':
+      return reply(
+        'Avec plaisir 🙂 Je reste à votre disposition pour votre chantier — n’hésitez pas.',
+        undefined,
+        false,
+      );
 
     case 'contact': {
       const wantsMail =
@@ -661,11 +779,26 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       );
     }
 
+    case 'phenix_infos': {
+      const wantsSite = /(site|internet|web)/.test(q);
+      if (wantsSite)
+        return reply(
+          `Vous retrouvez ${PHENIX_NAME} en ligne sur ${PHENIX_SITE}. Pour toute question, je reste disponible ici.`,
+          'les coordonnées PHÉNIX',
+          false,
+        );
+      return reply(
+        `${PHENIX_NAME} est joignable ${PHENIX_HORAIRES}, au ${PHENIX_PHONE}. Et vous pouvez m'écrire ici à tout moment.`,
+        'les coordonnées PHÉNIX',
+        false,
+      );
+    }
+
     case 'adresse': {
       // Deux adresses distinctes, jamais confondues. Le CHANTIER l'emporte dès que
       // la question le désigne (« l'adresse du chantier », « où est le chantier »).
       const wantsChantier = CHANTIER_RX.test(q);
-      const wantsPhenix = PHENIX_REF_RX.test(q) || /(votre|vos)\s+adresse/.test(q);
+      const wantsPhenix = PHENIX_REF_RX.test(q) || /(votre|vos)\s+adres/.test(q);
       if (wantsChantier && !wantsPhenix) {
         if (input.chantierAddress)
           return reply(
@@ -694,6 +827,26 @@ export function askPhenix(input: PhenixInput): PhenixReply {
         false,
       );
 
+    case 'artisans': {
+      const artisans = input.artisans ?? [];
+      if (artisans.length === 0)
+        return reply(
+          'Les artisans qui interviennent sur votre chantier sont coordonnés par votre conducteur PHÉNIX. ' +
+            'Dites-moi ce que vous souhaitez savoir : je transmets si besoin.',
+          'votre suivi de chantier',
+          false,
+        );
+      const liste = artisans
+        .map((a) => (a.trade ? `${a.nom} (${a.trade})` : a.nom))
+        .slice(0, 6)
+        .join(', ');
+      return reply(
+        `Sur votre chantier interviennent : ${liste}. Ils sont coordonnés par votre conducteur PHÉNIX.`,
+        'votre chantier',
+        false,
+      );
+    }
+
     case 'documents_manquants': {
       const reqs = pendingClientDecisions(events).filter((d) => d.attendu === 'document');
       if (reqs.length === 0)
@@ -714,6 +867,52 @@ export function askPhenix(input: PhenixInput): PhenixReply {
         `Il reste ${reqs.length} élément${reqs.length > 1 ? 's' : ''} à transmettre : ${list}. Vous pouvez l'envoyer depuis « Aujourd'hui ».`,
         'vos documents demandés',
         false,
+      );
+    }
+
+    case 'demande_status': {
+      const demandes = demandesPourPhenix(events);
+      if (demandes.length === 0)
+        return reply(
+          "Vous n'avez aucune demande en cours pour le moment. Dès que vous m'en adressez une, je la suis pour vous.",
+          'vos demandes',
+          false,
+        );
+      const derniere = demandes[0]!;
+      if (demandeRepondue(derniere))
+        return nav(
+          'Votre dernière demande a reçu une réponse de votre conducteur. Vous la retrouvez dans « Vos demandes ».',
+          'vos demandes',
+          { kind: 'fil', label: 'Voir mes demandes' },
+          false,
+        );
+      const enAttente = demandes.filter((d) => !demandeRepondue(d)).length;
+      return reply(
+        `Votre demande est bien transmise à votre conducteur (${enAttente} en attente de réponse). ` +
+          'Vous serez notifié dès qu’une réponse sera disponible.',
+        'vos demandes',
+        false,
+      );
+    }
+
+    case 'choix_restants': {
+      const restants = (dossier?.selections ?? []).filter((s) => s.statut !== 'valide');
+      if (restants.length === 0)
+        return reply(
+          'Tous vos choix sont validés — il ne vous reste rien à choisir pour le moment. Bravo !',
+          'vos décisions',
+          false,
+        );
+      const liste = restants
+        .map((s) => s.categorie)
+        .slice(0, 6)
+        .join(', ');
+      const pendingDecision = pendingClientDecisions(events).length > 0;
+      return nav(
+        `Il vous reste ${restants.length} choix à faire : ${liste}. Je peux vous ouvrir la première décision.`,
+        'vos décisions en attente',
+        { kind: 'decision', label: 'Voir mes choix' },
+        pendingDecision && isCommand,
       );
     }
 
@@ -760,9 +959,16 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const step = currentStep(events);
       if (!step) return escalate();
       const suffix = zone ? ` (${zone})` : '';
+      const artisanNote =
+        input.artisans && input.artisans.length > 0
+          ? ` Votre équipe (${input.artisans
+              .map((a) => a.trade ?? a.nom)
+              .slice(0, 3)
+              .join(', ')}) est à l'œuvre.`
+          : '';
       return nav(
         empathie +
-          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement — les dernières photos sont dans les coulisses.`,
+          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement — les dernières photos sont dans les coulisses.${artisanNote}`,
         'votre suivi de chantier',
         { kind: 'fil', label: 'Voir les coulisses' },
         isCommand,
@@ -773,9 +979,17 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const tasks = dossier?.planning ?? [];
       if (tasks.length === 0) return escalate();
       const today = new Date().toISOString().slice(0, 10);
-      const qTokens = new Set(tokenize(q));
-      // « quand commence X » : tâche dont le libellé recoupe la question.
-      const ciblee = tasks.find((t) => tokenize(t.label).some((k) => qTokens.has(k)));
+      const qTokens = [...new Set(tokenize(q))];
+      // « quand commence X » / « quand intervient le plombier » : tâche dont le
+      // libellé recoupe la question — avec tolérance de radical (« plombier » ↔
+      // « plomberie », « peintre » ↔ « peinture ») pour parler comme le client.
+      const sharesRoot = (a: string, b: string): boolean => {
+        const n = Math.min(5, a.length, b.length);
+        return n >= 4 && a.slice(0, n) === b.slice(0, n);
+      };
+      const ciblee = tasks.find((t) =>
+        tokenize(t.label).some((k) => qTokens.some((qt) => k === qt || sharesRoot(k, qt))),
+      );
       if (ciblee)
         return reply(
           `L'étape « ${ciblee.label} » est prévue autour du ${fmtDate(ciblee.start)}.`,
@@ -853,7 +1067,7 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       // Un BOUTON, jamais une ouverture à l'aveugle : le client garde la main.
       const openDoc = (d: Doc): PhenixReply =>
         nav(
-          `J'ai retrouvé votre « ${d.libelle} ». Je peux vous l'ouvrir.`,
+          `Je viens de retrouver votre « ${d.libelle} ». Je peux vous l'ouvrir.`,
           'vos documents',
           { kind: 'document', ref: d.id, label: `Ouvrir « ${d.libelle} »` },
           false,
@@ -967,8 +1181,9 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     }
 
     default: {
-      // B2 : recherche ancrée dans la connaissance projet (matériaux, pièces,
-      // éléments précis…). Si rien de sûr → escalade (jamais d'approximation).
+      // Dernier recours : recherche ancrée dans la connaissance projet (matériaux,
+      // pièces, éléments précis…). Confiance suffisante SEULEMENT sur un mot
+      // spécifique — sinon on ne répond pas au hasard.
       const fact = searchKnowledge(q, projectKnowledge(input));
       if (fact) return reply(fact.answer, fact.clientLabel);
 
@@ -986,10 +1201,9 @@ export function askPhenix(input: PhenixInput): PhenixReply {
           sources: [{ clientLabel: 'votre planning' }],
         };
       }
-      // Rien de sûr à répondre : plutôt qu'une réponse à côté (« pire qu'un
-      // je-ne-trouve-pas »), Léon l'admet et propose de transmettre. Il n'ouvre
-      // jamais une demande dans le dos du client sur une question qu'il n'a pas
-      // comprise — c'est le client qui choisit de transmettre.
+      // Confiance faible : Léon l'admet et propose de transmettre. Il n'ouvre
+      // jamais une demande dans le dos du client sur une question incomprise —
+      // c'est le client qui choisit de transmettre.
       return cannotFind();
     }
   }

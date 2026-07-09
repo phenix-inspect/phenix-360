@@ -2491,3 +2491,55 @@ suite Playwright complète (58 suites : navigation, onglets, formulaires, modale
 PDF/visionneuse, documents, notifications, responsive, robustesse) sert de filet de non-régression et
 **assert zéro erreur console** sur chaque surface. Gate verte (typecheck, lint, prettier, build, e2e
 complet). VISION Art. 2, 8, 9, 11.
+
+## 09/07/2026 — Léon V3 : le cerveau devient un vrai assistant (pipeline + base de connaissances)
+
+**Décision produit validée :** Léon n'est plus « un chatbot qui répond » mais un assistant qui
+**raisonne avant de répondre**. On ne touche **pas** à l'interface (design définitivement validé) :
+tout le travail est dans le cerveau (`packages/core/phenix.ts`) + le câblage de données
+(`store.askPhenix`). Objectif : que le client se dise « on dirait qu'il connaît mon chantier par cœur ».
+
+**Pipeline obligatoire (jamais l'inverse) :** question → **compréhension de l'intention** →
+**classification** vers UNE catégorie → **recherche dans la bonne source** → **évaluation de la
+confiance** → **réponse** (empathique, avec action) → **escalade conducteur uniquement si nécessaire**.
+
+**Base de connaissances.** Léon « sait » sans fouiller les documents :
+
+- **Fiche PHÉNIX** (constantes, source unique) : nom, adresse, téléphone, e-mail, **site**, **horaires**.
+- **Fiche CHANTIER** (câblée depuis le projet + l'annuaire) : **adresse du chantier** (≠ adresse PHÉNIX),
+  nom, client, **état**, **artisans** (contacts liés), planning, documents, décisions, demandes, choix.
+
+**Intentions couvertes** (une question ne part jamais vers la mauvaise catégorie) : coordonnées PHÉNIX,
+horaires/site, adresse chantier, adresse PHÉNIX, conducteur (nom), artisans, documents (devis, avenants,
+factures, plans, assurance, DPE, comptes rendus, réception, pré-réception, SAV), planning, réception,
+choix restants, choix validés, documents demandés, **statut d'une demande client**, à-faire du jour,
+avancement, commandes/livraisons, photos, problème technique, modification, **administratif/logistique**
+(clés, RDV…), question générale.
+
+**Recherche par INTENTION, plus par mot au hasard.** « adresse du chantier » → fiche chantier ; jamais
+« → documents → devis → réponse au hasard ». Fin des replis faibles : aucun document « premier de la
+liste », la recherche libre exige un mot **spécifique**.
+
+**Logique de CONFIANCE.** Confiance haute → réponse directe ; faible → **« Je n'ai malheureusement pas
+trouvé cette information »** puis proposition de transmettre. Règle d'or : **une absence de réponse est
+toujours préférable à une mauvaise réponse** — jamais d'invention, jamais d'hallucination.
+
+**Ton humain + actions.** Formulations chaleureuses (« Je viens de retrouver votre devis. », « Bonne
+nouvelle : … », « Avec plaisir 🙂 »), jamais « Erreur / Impossible ». Chaque réponse propose d'**agir**
+(bouton Ouvrir le devis / Voir le choix / Voir les coulisses / Voir mes demandes). **Mémoire** de
+conversation conservée (relance de continuité « et l'avenant ? »).
+
+**Robustesse de langage** : normalisation des apostrophes typographiques (’ → '), tolérance aux fautes
+(« adrese »), aux radicaux (« plombier » ↔ « Plomberie »), aux synonymes ; garde-fous prioritaires
+(photo jointe, transmission explicite, problème, administratif, requête d'action, prix) évalués **avant**
+toute recherche.
+
+**Interdits respectés :** aucun changement de design / widget / écran ; interface strictement
+identique. Seuls le cerveau et le câblage de données évoluent.
+
+**Tests :** nouvelle **batterie d'intentions** `leon-intentions` (58/58, pur Node : bundle du core à la
+volée) couvrant des dizaines de formulations naturelles — synonymes, tournures, fautes de frappe,
+adresse chantier ≠ PHÉNIX, documents trouvés / absents, planning, commandes, choix, demandes, artisans,
+escalades ciblées, charabia → « je ne trouve pas ». `leon-ia` (12/12), `phenix-widget` (14/14),
+`client-concierge` (5/5) conservés. Gate verte (typecheck, lint, prettier, build, e2e complet, zéro
+erreur console). VISION Art. 2, 8, 9, 11.

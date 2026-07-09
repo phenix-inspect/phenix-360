@@ -18,6 +18,7 @@ import {
   InMemoryBackend,
   PROJECT_STEPS,
   PROJECT_STEP_LABEL,
+  PROJECT_STATUS_LABEL,
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
   buildDecisionContent,
@@ -1839,9 +1840,19 @@ export const demo = {
 
     const events = snapshot.events.filter((e) => e.projectId === projectId);
     const dossier = snapshot.dossiers[projectId] ?? null;
-    // L'adresse du CHANTIER (donnée du projet) — distincte de l'adresse PHÉNIX.
-    // Léon doit pouvoir répondre « l'adresse du chantier » sans jamais la confondre.
-    const chantierAddress = snapshot.projects.find((p) => p.id === projectId)?.address ?? null;
+    // Fiche CHANTIER que Léon « connaît » : adresse du bien (≠ adresse PHÉNIX),
+    // nom du chantier, client, état, artisans (annuaire). Il répond directement,
+    // sans confondre les sources ni escalader une simple question de contexte.
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    const chantierAddress = project?.address ?? null;
+    const chantierName = project?.name ?? null;
+    const statutLabel = project ? PROJECT_STATUS_LABEL[project.status] : null;
+    const clientName =
+      snapshot.contacts.find((c) => c.role === 'client' && c.projectIds.includes(projectId))?.nom ??
+      null;
+    const artisans = snapshot.contacts
+      .filter((c) => c.role === 'artisan' && c.projectIds.includes(projectId))
+      .map((c) => ({ nom: c.nom, ...(c.trade ? { trade: c.trade } : {}) }));
     // PHÉNIX est le concierge du CLIENT : il ne connaît que les Moments partagés
     // (jamais l'interne). Le Fil client est une projection — la règle est unique.
     const moments = (snapshot.fil.moments[projectId] ?? []).filter(momentPartageClient);
@@ -1857,6 +1868,10 @@ export const demo = {
       zones,
       history,
       chantierAddress,
+      chantierName,
+      clientName,
+      statutLabel,
+      artisans,
       hasPhotos: photos.length > 0,
     });
 
