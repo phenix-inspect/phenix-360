@@ -2198,3 +2198,39 @@ la réponse (`clientNotifications`) ; composants `PhotoPicker` (0–3 photos), `
   texte seul, escalade texte+photos, remontée Aujourd'hui, réponse texte / texte+photos, disparition
   d'Aujourd'hui, trace Suivi, notification + réponse reprise dans Léon). Gate verte (typecheck, lint,
   prettier, build, e2e, zéro erreur console). VISION Art. 2, 8, 9, 10, 11.
+
+## 09/07/2026 — Correctif critique : demande à Léon avec photo figeait le chat (quota localStorage)
+
+**Bug observé (production) :** après avoir beaucoup testé l'app (photos accumulées), envoyer une
+demande à Léon **avec une photo** figeait tout — rien ne s'affichait dans la conversation, le chat
+devenait inutilisable (envoi et ajout de photo impossibles), et **aucune demande n'était créée** côté
+conducteur.
+
+**Vraie cause (reproduite déterministiquement) :** `askPhenix` écrivait D'ABORD le fil de
+conversation **avec les photos recopiées** (data URL base64) dans `localStorage`. Sur un stockage
+quasi plein, `localStorage.setItem('…phenix-conv:v1', …)` levait `QuotaExceededError`. Cette exception
+n'était pas rattrapée : la promesse `askPhenix` était rejetée, donc dans `PhenixWidget.send` le
+`setBusy(false)` n'était jamais atteint → **chat figé sur `busy`** ; et l'écriture ayant échoué
+_avant_ la création de la demande, **la demande n'existait pas**. Le `InMemoryBackend` de la démo est
+« read-through » (localStorage = source de vérité), donc un `setItem` qui échoue = donnée perdue.
+
+**Correctif (la vraie cause, sans masquer) :**
+
+1. **Les photos quittent le blob de conversation.** Elles vivent désormais **uniquement dans
+   l'événement demande** (source unique) ; le fil ne garde que le texte + une référence
+   (`demandeRef`), et la bulle client réaffiche les photos **depuis la demande**. Fini la duplication
+   d'un gros payload base64 dans un blob éphémère — l'écriture du fil redevient minuscule.
+2. **`safeSetItem` :** toute écriture localStorage est best-effort — sur quota, on **journalise
+   (console.warn) et on continue** au lieu de laisser l'exception casser le flux. La session reste
+   fonctionnelle (vérité en mémoire vive) ; seule la survie au rechargement dégrade.
+3. **`PhenixWidget.send` en `try/finally` :** `busy` est **toujours** relâché, quoi qu'il arrive — le
+   chat ne peut plus rester figé.
+4. **Ordre :** la demande conducteur est créée **avant** l'écriture du fil, pour que les messages la
+   référencent et que la demande existe même si le fil ne persiste pas.
+
+**Vérifié :** reproduction déterministe (localStorage rempli à ~4,3 Mo) — avant : `QuotaExceededError`
+sur `phenix-conv:v1`, chat figé, 0 demande ; après : confirmation affichée, chat utilisable, demande
+créée et visible côté conducteur, 0 exception. Nouveau `demande-client-quota.test` (pas de gel, pas
+d'exception quota non rattrapée, confirmation visible sous pression mémoire). `demande-client.test`
+enrichi (11/11 : chat utilisable juste après l'envoi). Gate verte (typecheck, lint, prettier, build,
+e2e complet, zéro erreur console). VISION Art. 8, 9, 11.

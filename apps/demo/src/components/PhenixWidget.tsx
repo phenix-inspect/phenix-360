@@ -54,6 +54,16 @@ export function PhenixWidget({
     return null;
   };
 
+  // Photos jointes par le client : source UNIQUE = la demande liée (jamais
+  // recopiées dans le fil, pour ne pas saturer localStorage). Repli sur l'ancien
+  // champ `photos` pour d'éventuelles conversations déjà persistées.
+  const clientPhotosOf = (m: PhenixMessage): { imageUrl?: string }[] => {
+    if (m.photos && m.photos.length > 0) return m.photos;
+    if (!m.demandeRef) return [];
+    const e = events.find((x) => x.id === m.demandeRef);
+    return e && isDemande(e) ? (e.content.photos ?? []) : [];
+  };
+
   useEffect(() => {
     if (open && threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [open, messages.length]);
@@ -87,15 +97,24 @@ export function PhenixWidget({
     setBusy(true);
     setDraft('');
     setPhotos([]);
-    const msg = await demo.askPhenix(
-      project.id,
-      actor,
-      t,
-      attach.map((p) => ({ imageUrl: p.imageUrl, bucket: p.bucket, storagePath: p.storagePath })),
-    );
-    setBusy(false);
-    // Commande explicite (« ouvre… ») → on exécute l'ouverture directement.
-    if (msg?.autoOpen && msg.action) navigate(msg.action);
+    // `finally` GARANTIT le déblocage : quoi qu'il arrive (même un échec de
+    // persistance), le chat reste utilisable — jamais figé sur `busy`.
+    try {
+      const msg = await demo.askPhenix(
+        project.id,
+        actor,
+        t,
+        attach.map((p) => ({
+          imageUrl: p.imageUrl,
+          bucket: p.bucket,
+          storagePath: p.storagePath,
+        })),
+      );
+      // Commande explicite (« ouvre… ») → on exécute l'ouverture directement.
+      if (msg?.autoOpen && msg.action) navigate(msg.action);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const addPhotos = async (files: FileList | null): Promise<void> => {
@@ -171,6 +190,7 @@ export function PhenixWidget({
               <MessageRow
                 key={m.id}
                 m={m}
+                photos={clientPhotosOf(m)}
                 reponse={reponseFor(m.demandeRef)}
                 onNavigate={navigate}
               />
@@ -262,15 +282,17 @@ export function PhenixWidget({
 
 function MessageRow({
   m,
+  photos: photosInput,
   reponse,
   onNavigate,
 }: {
   m: PhenixMessage;
+  photos: { imageUrl?: string }[];
   reponse: string | null;
   onNavigate: (action: PhenixAction) => void;
 }): React.JSX.Element {
   if (m.role === 'client') {
-    const photos = (m.photos ?? []).filter((p) => p.imageUrl);
+    const photos = photosInput.filter((p) => p.imageUrl);
     return (
       <div className="flex flex-col items-end gap-1.5">
         {m.texte && (

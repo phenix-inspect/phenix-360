@@ -171,13 +171,36 @@ export interface MomentFocus {
 
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
+/**
+ * Écriture localStorage BEST-EFFORT. Le Mode Démo garde sa vérité en mémoire ;
+ * localStorage n'est qu'un cache de confort (survie au rechargement). Quand le
+ * quota est atteint (utilisateur qui a beaucoup testé, photos accumulées),
+ * `setItem` lève `QuotaExceededError` : on ne laisse JAMAIS cette exception
+ * remonter — elle casserait le flux en cours (chat figé, demande perdue). On
+ * journalise et on continue : la session reste fonctionnelle, seule la
+ * persistance dégrade. Ne masque rien (avertissement console explicite).
+ */
+function safeSetItem(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (e) {
+    console.warn(
+      `[phenix-demo] Persistance impossible pour « ${key} » (quota localStorage ?). ` +
+        `La session continue en mémoire ; la donnée peut ne pas survivre au rechargement.`,
+      e,
+    );
+    return false;
+  }
+}
+
 class LocalStorageKeyValueStore implements KeyValueStore {
   load(): BackendState | null {
     const raw = localStorage.getItem(STATE_KEY);
     return raw ? (JSON.parse(raw) as BackendState) : null;
   }
   save(state: BackendState): void {
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    safeSetItem(STATE_KEY, JSON.stringify(state));
   }
 }
 
@@ -1779,14 +1802,6 @@ export const demo = {
     const conv = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
     const list = conv[projectId] ?? [];
 
-    const clientMsg: PhenixMessage = {
-      id: crypto.randomUUID(),
-      role: 'client',
-      texte,
-      at: now,
-      ...(photos.length ? { photos } : {}),
-    };
-
     const events = snapshot.events.filter((e) => e.projectId === projectId);
     const dossier = snapshot.dossiers[projectId] ?? null;
     // PHÉNIX est le concierge du CLIENT : il ne connaît que les Moments partagés
@@ -1806,23 +1821,12 @@ export const demo = {
       hasPhotos: photos.length > 0,
     });
 
-    const phenixMsg: PhenixMessage = {
-      id: crypto.randomUUID(),
-      role: 'phenix',
-      texte: reply.message,
-      at: now,
-      kind: reply.kind,
-      ...(reply.sources.length ? { sources: reply.sources } : {}),
-      ...(reply.avancer ? { avancer: reply.avancer } : {}),
-      ...(reply.action ? { action: reply.action } : {}),
-    };
-
-    conv[projectId] = [...list, clientMsg, phenixMsg];
-    localStorage.setItem(PHENIX_CONV_KEY, JSON.stringify(conv));
-
-    // Escalade : Léon crée AUTOMATIQUEMENT une demande conducteur (texte du client
-    // + photos + date + auteur, statut « À traiter ») et la relie au message pour
-    // reprendre le fil dès la réponse. Le client, lui, ne crée jamais de ticket.
+    // Escalade : Léon crée D'ABORD la demande conducteur (texte du client + photos
+    // + date + auteur, statut « À traiter ») — source UNIQUE des photos. Le client
+    // ne crée jamais de ticket. On crée l'événement AVANT d'écrire le fil pour que
+    // les messages puissent le référencer (`demandeRef`) et afficher les photos
+    // depuis lui, sans dupliquer un gros payload base64 dans la conversation.
+    let demandeRef: string | undefined;
     if (reply.kind === 'escalade') {
       const event = await backend.appendEvent({
         projectId,
@@ -1836,12 +1840,35 @@ export const demo = {
           ...(photos.length ? { photos } : {}),
         },
       });
-      const map = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
-      map[projectId] = (map[projectId] ?? []).map((m) =>
-        m.id === phenixMsg.id ? { ...m, demandeRef: event.id } : m,
-      );
-      localStorage.setItem(PHENIX_CONV_KEY, JSON.stringify(map));
+      demandeRef = event.id;
     }
+
+    // Le fil de conversation est LÉGER (texte + réf) : les photos vivent dans la
+    // demande, jamais recopiées ici — sinon le blob de conversation gonfle et peut
+    // saturer le quota localStorage (chat figé, demande perdue). `safeSetItem`
+    // rend l'écriture best-effort : la session ne casse jamais sur un quota plein.
+    const clientMsg: PhenixMessage = {
+      id: crypto.randomUUID(),
+      role: 'client',
+      texte,
+      at: now,
+      ...(demandeRef ? { demandeRef } : {}),
+    };
+    const phenixMsg: PhenixMessage = {
+      id: crypto.randomUUID(),
+      role: 'phenix',
+      texte: reply.message,
+      at: now,
+      kind: reply.kind,
+      ...(reply.sources.length ? { sources: reply.sources } : {}),
+      ...(reply.avancer ? { avancer: reply.avancer } : {}),
+      ...(reply.action ? { action: reply.action } : {}),
+      ...(demandeRef ? { demandeRef } : {}),
+    };
+
+    conv[projectId] = [...list, clientMsg, phenixMsg];
+    safeSetItem(PHENIX_CONV_KEY, JSON.stringify(conv));
+
     refresh();
     broadcast();
     // On renvoie le message (avec `autoOpen` TRANSITOIRE — jamais persisté) pour

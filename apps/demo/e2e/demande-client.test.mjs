@@ -100,6 +100,20 @@ try {
       throw new Error('le « à traiter » interne fuite côté client');
   });
 
+  await assert('Client : le chat reste UTILISABLE juste après l’envoi (jamais figé)', async () => {
+    await openLeon();
+    // On peut retaper un message → « Envoyer » se réactive (busy libéré).
+    await leon().getByPlaceholder('Écrivez à PHÉNIX').fill('Un autre point rapide');
+    await page.waitForTimeout(150);
+    if (await leon().getByRole('button', { name: 'Envoyer' }).isDisabled())
+      throw new Error('chat figé : « Envoyer » reste désactivé malgré un nouveau message');
+    // On peut aussi rouvrir le sélecteur de photos (bouton d’ajout actif).
+    if (await leon().getByRole('button', { name: /Ajouter une photo/ }).isDisabled())
+      throw new Error('chat figé : l’ajout de photo est bloqué');
+    await leon().getByPlaceholder('Écrivez à PHÉNIX').fill('');
+    await closeLeon();
+  });
+
   await assert('Client : Léon accepte texte + photos → escalade avec photos', async () => {
     await parleAleon(D2, 2);
     await leon().getByText(TRANSMIS).last().waitFor({ state: 'visible', timeout: 6000 });
