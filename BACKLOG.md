@@ -164,7 +164,13 @@ utiles absents du Fil).
 toujours sur quel chantier on travaille ou quel espace on prévisualise (remplace et
 simplifie le ruban de perspective). Titres de journal « Type · contexte métier »,
 libellés d'état lisibles, dates épurées.
-**Manque** : historique client propre, notifications client, préférences. VISION Art. 8, 9.
+**Demande client via Léon (09/07)** : **Léon = point d'entrée UNIQUE** du client (plus de bouton
+« Faire une demande »). Le client écrit à Léon (texte et/ou 0 à 3 photos) ; Léon répond s'il sait,
+sinon il **crée automatiquement une demande conducteur** (escalade forcée dès qu'une photo est
+jointe). Modèle **1 demande = 1 réponse** ; statut À traiter / Répondu (client-safe « En attente »),
+remontée dans « Aujourd'hui » conducteur, trace Suivi (mémoire officielle), notification client à la
+réponse (reprise aussi dans le fil de Léon). `demande-client.test`.
+**Manque** : historique client propre, préférences. VISION Art. 2, 8, 9, 10.
 
 ### EPIC 13 — Administration · 🔴 À développer
 

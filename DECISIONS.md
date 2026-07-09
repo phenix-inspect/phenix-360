@@ -2150,3 +2150,51 @@ indépendant (dérivé des commandes/alertes) — inchangé.
 **Tests :** garde négative ajoutée à `compte-rendu.test` (le picker ne propose plus « Livraison de
 matériel »). Aucun test ne sélectionnait cette mission. Gate verte (typecheck, lint, prettier,
 build, e2e, zéro erreur console). VISION Art. 4, 11.
+
+## 09/07/2026 — Léon, point d'entrée UNIQUE du client → demande conducteur (1 demande = 1 réponse)
+
+**Décision produit validée :** le client n'a **PAS** de bouton « Faire une demande ». **Léon devient
+l'unique porte d'entrée** de toutes les interactions client — il ne se demande jamais « est-ce que je
+pose ma question ici ? est-ce que je fais une demande ? est-ce que je contacte PHÉNIX ? ». Il parle
+uniquement à Léon. Cette simplicité est un principe fondamental de PHÉNIX 360.
+
+**Fonctionnement :** dans la conversation avec Léon, le client écrit librement et peut **joindre 0 à
+3 photos** (texte et/ou photos). C'est **Léon qui décide** : (1) s'il connaît la réponse (info du
+chantier) → il répond **immédiatement**, aucun ticket, aucune intervention conducteur ; (2) s'il ne
+sait pas — ou dès qu'une **photo** est jointe (Léon ne voit pas les images, l'œil humain est requis)
+— il répond « **Je vais transmettre votre demande à votre conducteur de travaux PHÉNIX. Vous serez
+notifié dès qu'une réponse sera disponible.** » et **crée AUTOMATIQUEMENT une demande conducteur**.
+Le client ne crée jamais un ticket lui-même.
+
+**La demande créée** contient : texte du client + 0 à 3 photos + date + auteur. Statut **À traiter**.
+
+**Côté conducteur :** la demande **remonte automatiquement dans « Aujourd'hui »** (« Question
+client · … », `questionsEnAttente`) tant qu'elle n'est pas traitée. Le conducteur l'ouvre au Suivi
+et **répond une fois** — texte libre + 0 à 3 photos. Une seule réponse autorisée.
+
+**Après réponse :** statut **Répondu**, la demande **quitte Aujourd'hui** (état `traitee`), une
+**notification part au client**. La réponse est visible côté client (dans « Vos demandes » ET reprise
+dans le fil de Léon). Côté client, un statut client-safe **« En attente »** (jamais le « à traiter »
+interne du conducteur, qui ne doit pas fuiter).
+
+**Trace Suivi (mémoire officielle) :** chaque demande trace le Suivi avec la demande + ses photos,
+la réponse + ses photos, le statut et les dates (demande, réponse). Le Suivi devient la mémoire
+officielle de tous les échanges.
+
+**Mécanique (réutilise le modèle existant) :** le type d'événement `demande` `destinataire:'phenix'`
+portait déjà « question du client → réponse conducteur » (`resolveDemande` → `resolution`), et Léon
+(`askPhenix`) escaladait déjà en créant cette demande. Ajouts : `photos?` sur `DemandeContent` et
+`DemandeResolution` (`MAX_DEMANDE_PHOTOS = 3`) ; sélecteurs `demandesPourPhenix` / `demandeRepondue` ;
+`hasPhotos` sur l'entrée core de Léon → **escalade forcée** dès qu'une photo est jointe, et message
+d'escalade unifié « je transmets à votre conducteur ». App : `askPhenix(projectId, actor, question,
+photos)` attache les photos à la demande et au message client ; le widget **Léon** gagne une **icône
+d'ajout de photos** (0–3) et affiche les photos jointes dans la bulle client ; notification client à
+la réponse (`clientNotifications`) ; composants `PhotoPicker` (0–3 photos), `DemandeThread` (question
+
+- photos + réponse + photos + statut + dates, réponse inline conducteur), câblés dans « Vos demandes »
+  (client, lecture seule) et le Suivi conducteur. **Retiré :** le bouton « Faire une demande » et le
+  composant `ClientDemandeComposer` (Léon est le seul point d'entrée). Aucune messagerie, aucune
+  conversation infinie. `demande-client.test` (10/10 : Léon = point d'entrée / pas de bouton, escalade
+  texte seul, escalade texte+photos, remontée Aujourd'hui, réponse texte / texte+photos, disparition
+  d'Aujourd'hui, trace Suivi, notification + réponse reprise dans Léon). Gate verte (typecheck, lint,
+  prettier, build, e2e, zéro erreur console). VISION Art. 2, 8, 9, 10, 11.

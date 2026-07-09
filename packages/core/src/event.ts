@@ -244,6 +244,9 @@ export interface DocumentContent {
  */
 export type DemandeAudience = 'client' | 'phenix' | 'conducteur';
 
+/** Nombre maximum de photos jointes à une demande / une réponse. */
+export const MAX_DEMANDE_PHOTOS = 3;
+
 /** Réponse PORTÉE par la demande (pas un événement séparé, pas un fil). */
 export interface DemandeResolution {
   texte: string;
@@ -255,6 +258,8 @@ export interface DemandeResolution {
    * commentaire (`texte`) reste facultatif — le document est l'élément principal.
    */
   docEventId?: EventId;
+  /** Photos jointes à la réponse du conducteur (0 à 3). */
+  photos?: CompteRenduPhoto[];
 }
 
 /**
@@ -286,6 +291,8 @@ export interface DemandeContent {
   docCategorie?: string;
   /** Échéance FACULTATIVE souhaitée pour la réponse (AAAA-MM-JJ). */
   echeance?: string;
+  /** Photos jointes par le client à sa demande (0 à 3). */
+  photos?: CompteRenduPhoto[];
 }
 
 /* -------------------------------------------------------------------------- *

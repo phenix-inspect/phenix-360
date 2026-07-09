@@ -74,6 +74,23 @@ export function questionsEnAttente(events: Event[]): DemandeEvent[] {
 }
 
 /**
+ * Toutes les demandes ADRESSÉES à PHÉNIX (question du client), les plus récentes
+ * d'abord — répondues ou non. Base du modèle « 1 demande = 1 réponse » : la
+ * mémoire du Suivi et la section « Vos demandes » côté client la lisent.
+ */
+export function demandesPourPhenix(events: Event[]): DemandeEvent[] {
+  return sortByDate(
+    events.filter(isDemande).filter((e) => e.content.destinataire === 'phenix'),
+    'desc',
+  );
+}
+
+/** Une demande a-t-elle reçu sa réponse (conducteur) ? */
+export function demandeRepondue(e: DemandeEvent): boolean {
+  return e.content.resolution != null;
+}
+
+/**
  * Signalements des ARTISANS en attente de validation du conducteur (« j'ai
  * terminé, à valider »). Canal distinct des questions client — lecture filtrée
  * du journal (Mode Artisan). Toujours interne : jamais exposé au client.

@@ -45,6 +45,7 @@ import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { DocumentButton } from '../components/DocumentButton';
 import { CompteRenduPoints } from '../components/CompteRenduPoints';
+import { DemandeThread } from '../components/DemandeThread';
 import { DossierPanel } from '../components/DossierPanel';
 import { DocumentsTab } from '../components/DocumentsTab';
 import { FilView } from '../components/fil/FilView';
@@ -360,6 +361,10 @@ function SuiviTab({
                 const openableDoc = e.type === 'document' || e.type === 'compte_rendu';
                 const crPoints = e.type === 'compte_rendu' ? e.content.points : undefined;
                 const isCrPoints = (crPoints?.length ?? 0) > 0;
+                // Demande du client (question → réponse) : la mémoire officielle,
+                // avec la réponse conducteur (texte + photos) directement au Suivi.
+                const demandeClient =
+                  e.type === 'demande' && e.content.destinataire === 'phenix' ? e : null;
                 const hasRow = badge != null || filSrc?.kind === 'fil' || canLever || openableDoc;
                 return (
                   <ActivityItem
@@ -426,6 +431,16 @@ function SuiviTab({
                       </span>
                     )}
                     {isCrPoints && <CompteRenduPoints points={crPoints} audience="conducteur" />}
+                    {demandeClient && (
+                      <div className="mt-3">
+                        <DemandeThread
+                          demande={demandeClient}
+                          actor={actor}
+                          nameOf={(u) => nameOf(snap, u)}
+                          canReply
+                        />
+                      </div>
+                    )}
                   </ActivityItem>
                 );
               })}

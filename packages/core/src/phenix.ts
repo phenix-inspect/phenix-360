@@ -69,6 +69,12 @@ export interface PhenixInput {
   zones?: ProjectZone[];
   /** Historique de l'échange (mémoire simple : intention + zone du tour précédent). */
   history?: { role: 'client' | 'phenix'; texte: string }[];
+  /**
+   * Le client a joint des photos à son message. PHÉNIX ne « voit » pas les
+   * images : dès qu'une photo accompagne la demande, l'œil humain du conducteur
+   * est nécessaire → escalade automatique (jamais de réponse à l'aveugle).
+   */
+  hasPhotos?: boolean;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -437,10 +443,15 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   const escalate = (): PhenixReply => ({
     kind: 'escalade',
     message:
-      "Je n'ai pas encore cette information dans votre dossier. Je me renseigne auprès de l'équipe PHÉNIX et je reviens vers vous.",
+      'Je vais transmettre votre demande à votre conducteur de travaux PHÉNIX. ' +
+      'Vous serez notifié dès qu’une réponse sera disponible.',
     sources: [],
     escaladeQuestion: input.question.trim(),
   });
+
+  // Une photo jointe = un point à REGARDER : PHÉNIX ne voit pas les images, donc
+  // toute demande avec photo passe directement au conducteur (jamais à l'aveugle).
+  if (input.hasPhotos) return escalate();
 
   // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
   if (PRICE_RX.test(q)) return escalate();

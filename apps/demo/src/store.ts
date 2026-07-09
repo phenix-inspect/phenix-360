@@ -42,6 +42,7 @@ import {
   type CommCanal,
   type Contact,
   type ClientSelection,
+  type CompteRenduPhoto,
   type CompteRenduPoint,
   type CoupDeCoeur,
   type CrAudience,
@@ -141,6 +142,8 @@ export interface PhenixMessage {
   autoOpen?: boolean;
   /** Si escaladée : l'événement `demande` créé au Journal (pour la reprise). */
   demandeRef?: string;
+  /** Photos jointes par le client à SON message (0 à 3). */
+  photos?: CompteRenduPhoto[];
 }
 
 /** Cible de navigation posée par PHÉNIX (consommée par l'Espace client). */
@@ -586,6 +589,35 @@ export const demo = {
       resolvedBy: input.actor.userId,
       resolvedAt: new Date().toISOString(),
       ...(docEventId ? { docEventId } : {}),
+    });
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Le conducteur RÉPOND à une demande du client (texte obligatoire + 0 à 3
+   * photos). 1 demande = 1 réponse : `resolveDemande` porte la réponse et passe la
+   * demande à « traitee » — elle quitte « Aujourd'hui », reste tracée au Suivi, et
+   * une notification part au client.
+   */
+  async repondreDemandeClient(
+    demandeId: EventId,
+    actor: EventActor,
+    input: {
+      texte: string;
+      photos?: { imageUrl?: string; bucket?: string; storagePath?: string }[];
+    },
+  ): Promise<void> {
+    const photos: CompteRenduPhoto[] = (input.photos ?? []).map((ph) => ({
+      ...(ph.imageUrl ? { imageUrl: ph.imageUrl } : {}),
+      ...(ph.bucket ? { bucket: ph.bucket } : {}),
+      ...(ph.storagePath ? { storagePath: ph.storagePath } : {}),
+    }));
+    await backend.resolveDemande(demandeId, {
+      texte: input.texte.trim(),
+      resolvedBy: actor.userId,
+      resolvedAt: new Date().toISOString(),
+      ...(photos.length ? { photos } : {}),
     });
     refresh();
     broadcast();
@@ -1733,9 +1765,16 @@ export const demo = {
     projectId: ProjectId,
     actor: EventActor,
     question: string,
+    photosInput: { imageUrl?: string; bucket?: string; storagePath?: string }[] = [],
   ): Promise<PhenixMessage | null> {
     const texte = question.trim();
-    if (!texte) return null;
+    const photos: CompteRenduPhoto[] = photosInput.map((ph) => ({
+      ...(ph.imageUrl ? { imageUrl: ph.imageUrl } : {}),
+      ...(ph.bucket ? { bucket: ph.bucket } : {}),
+      ...(ph.storagePath ? { storagePath: ph.storagePath } : {}),
+    }));
+    // Léon accepte un message texte ET/OU des photos : au moins l'un des deux.
+    if (!texte && photos.length === 0) return null;
     const now = new Date().toISOString();
     const conv = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
     const list = conv[projectId] ?? [];
@@ -1745,6 +1784,7 @@ export const demo = {
       role: 'client',
       texte,
       at: now,
+      ...(photos.length ? { photos } : {}),
     };
 
     const events = snapshot.events.filter((e) => e.projectId === projectId);
@@ -1754,7 +1794,17 @@ export const demo = {
     const moments = (snapshot.fil.moments[projectId] ?? []).filter(momentPartageClient);
     const zones = snapshot.fil.zones[projectId] ?? [];
     const history = list.map((m) => ({ role: m.role, texte: m.texte }));
-    const reply = corePhenix({ question: texte, events, dossier, moments, zones, history });
+    // Une photo jointe force l'escalade (Léon ne voit pas les images) : c'est le
+    // conducteur qui regarde. `hasPhotos` porte cette décision côté core.
+    const reply = corePhenix({
+      question: texte,
+      events,
+      dossier,
+      moments,
+      zones,
+      history,
+      hasPhotos: photos.length > 0,
+    });
 
     const phenixMsg: PhenixMessage = {
       id: crypto.randomUUID(),
@@ -1770,15 +1820,21 @@ export const demo = {
     conv[projectId] = [...list, clientMsg, phenixMsg];
     localStorage.setItem(PHENIX_CONV_KEY, JSON.stringify(conv));
 
-    // Escalade : on ouvre une demande au Journal et on la relie au message.
-    if (reply.kind === 'escalade' && reply.escaladeQuestion) {
+    // Escalade : Léon crée AUTOMATIQUEMENT une demande conducteur (texte du client
+    // + photos + date + auteur, statut « À traiter ») et la relie au message pour
+    // reprendre le fil dès la réponse. Le client, lui, ne crée jamais de ticket.
+    if (reply.kind === 'escalade') {
       const event = await backend.appendEvent({
         projectId,
         actor,
         type: 'demande',
         visibility: 'client',
         state: 'ouverte',
-        content: { question: reply.escaladeQuestion, destinataire: 'phenix' },
+        content: {
+          question: reply.escaladeQuestion || 'Photos transmises',
+          destinataire: 'phenix',
+          ...(photos.length ? { photos } : {}),
+        },
       });
       const map = readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {});
       map[projectId] = (map[projectId] ?? []).map((m) =>
@@ -2260,6 +2316,26 @@ export function clientNotifications(
         clientTab: 'documents',
         clientSection: 'section-documents',
       });
+  }
+
+  // 💬 Le conducteur a RÉPONDU à une demande du client (question → réponse). La
+  // demande est passée à `traitee` (hors de la boucle « publie » ci-dessus) → on
+  // la traite à part. La réponse vit dans « Vos demandes » (onglet Aujourd'hui).
+  for (const e of snap.events) {
+    if (e.projectId !== projectId || e.type !== 'demande') continue;
+    const c = e.content;
+    if (c.destinataire !== 'phenix' || !c.resolution) continue;
+    if (c.resolution.resolvedAt <= base || seen[e.id]) continue;
+    out.push({
+      id: `demande-reponse-${e.id}`,
+      icon: '💬',
+      text: `PHÉNIX a répondu à votre demande`,
+      createdAt: c.resolution.resolvedAt,
+      seenKeys: [e.id],
+      projectId,
+      clientTab: 'aujourdhui',
+      clientSection: 'section-demandes-client',
+    });
   }
 
   return out.sort(byDateDesc);

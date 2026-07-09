@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@phenix360/ui';
-import { isDemande, type EventActor, type Project } from '@phenix360/core';
+import { isDemande, type EventActor, type Project, type UploadedMedia } from '@phenix360/core';
 import type { PhenixAction } from '@phenix360/core';
-import { ArrowRight, Send, X } from 'lucide-react';
+import { ArrowRight, ImagePlus, Send, X } from 'lucide-react';
 import { conversationOf, demo, type DemoSnapshot, type PhenixMessage } from '../store';
+import { ACCEPT_IMAGE, mediaUploader } from '../lib/media';
 import { LeonAvatar } from './LeonAvatar';
+
+const MAX_PHOTOS = 3;
 
 const SUGGESTIONS = [
   'Est-ce que je dois faire quelque chose ?',
@@ -32,8 +35,11 @@ export function PhenixWidget({
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
+  const [photos, setPhotos] = useState<UploadedMedia[]>([]);
+  const [attaching, setAttaching] = useState(false);
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const messages = conversationOf(snap, project.id);
   const events = snap.events.filter((e) => e.projectId === project.id);
@@ -72,15 +78,39 @@ export function PhenixWidget({
     setOpen(false);
   };
 
-  const send = async (text: string): Promise<void> => {
+  // Le client parle librement à Léon et peut JOINDRE 0 à 3 photos dans la
+  // conversation (texte et/ou photos). Léon répond s'il sait ; sinon il crée
+  // automatiquement une demande au conducteur — le client ne crée aucun ticket.
+  const send = async (text: string, attach: UploadedMedia[] = []): Promise<void> => {
     const t = text.trim();
-    if (!t || busy) return;
+    if ((!t && attach.length === 0) || busy) return;
     setBusy(true);
     setDraft('');
-    const msg = await demo.askPhenix(project.id, actor, t);
+    setPhotos([]);
+    const msg = await demo.askPhenix(
+      project.id,
+      actor,
+      t,
+      attach.map((p) => ({ imageUrl: p.imageUrl, bucket: p.bucket, storagePath: p.storagePath })),
+    );
     setBusy(false);
     // Commande explicite (« ouvre… ») → on exécute l'ouverture directement.
     if (msg?.autoOpen && msg.action) navigate(msg.action);
+  };
+
+  const addPhotos = async (files: FileList | null): Promise<void> => {
+    if (!files || files.length === 0) return;
+    const room = MAX_PHOTOS - photos.length;
+    if (room <= 0) return;
+    setAttaching(true);
+    try {
+      const chosen = Array.from(files).slice(0, room);
+      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
+      setPhotos((prev) => [...prev, ...uploaded].slice(0, MAX_PHOTOS));
+    } finally {
+      setAttaching(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   // Rendu via un PORTAL sur <body> : le widget doit rester ancré au VIEWPORT
@@ -163,14 +193,50 @@ export function PhenixWidget({
                 ))}
               </div>
             )}
+            {/* Photos jointes au message en cours (0 à 3), retirables avant l'envoi. */}
+            {photos.length > 0 && (
+              <div className="mb-2.5 flex flex-wrap gap-2">
+                {photos.map((ph, i) => (
+                  <div key={i} className="relative size-16 overflow-hidden rounded-lg">
+                    <img src={ph.imageUrl} alt="" className="size-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setPhotos(photos.filter((_, idx) => idx !== i))}
+                      aria-label={`Retirer la photo ${i + 1}`}
+                      className="absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-ink-900/70 text-paper-0 [&_svg]:size-3"
+                    >
+                      <X aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept={ACCEPT_IMAGE}
+                multiple
+                className="sr-only"
+                onChange={(e) => void addPhotos(e.target.files)}
+              />
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={photos.length >= MAX_PHOTOS || attaching || busy}
+                aria-label={`Ajouter une photo (jusqu’à ${MAX_PHOTOS})`}
+                title="Ajouter une photo"
+                className="grid size-11 shrink-0 place-items-center rounded-xl border border-input bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 [&_svg]:size-5"
+              >
+                <ImagePlus aria-hidden />
+              </button>
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    void send(draft);
+                    void send(draft, photos);
                   }
                 }}
                 rows={1}
@@ -180,8 +246,8 @@ export function PhenixWidget({
               <Button
                 size="icon"
                 aria-label="Envoyer"
-                disabled={!draft.trim() || busy}
-                onClick={() => void send(draft)}
+                disabled={(!draft.trim() && photos.length === 0) || busy}
+                onClick={() => void send(draft, photos)}
               >
                 <Send aria-hidden />
               </Button>
@@ -204,11 +270,26 @@ function MessageRow({
   onNavigate: (action: PhenixAction) => void;
 }): React.JSX.Element {
   if (m.role === 'client') {
+    const photos = (m.photos ?? []).filter((p) => p.imageUrl);
     return (
-      <div className="flex justify-end">
-        <p className="max-w-[85%] rounded-2xl rounded-br-md bg-ink-900 px-4 py-2.5 text-sm text-paper-0">
-          {m.texte}
-        </p>
+      <div className="flex flex-col items-end gap-1.5">
+        {m.texte && (
+          <p className="max-w-[85%] rounded-2xl rounded-br-md bg-ink-900 px-4 py-2.5 text-sm text-paper-0">
+            {m.texte}
+          </p>
+        )}
+        {photos.length > 0 && (
+          <div className="flex max-w-[85%] flex-wrap justify-end gap-1.5">
+            {photos.map((p, i) => (
+              <img
+                key={i}
+                src={p.imageUrl}
+                alt=""
+                className="size-20 rounded-xl border border-border object-cover"
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }

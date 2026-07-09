@@ -9,6 +9,7 @@ import {
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
+  demandesPourPhenix,
   isPhenixDelegate,
   nextClientAction,
   pendingClientDecisions,
@@ -36,6 +37,7 @@ import { GrandesEtapes } from '../components/GrandesEtapes';
 import { ClientDocuments } from '../components/ClientDocuments';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
+import { DemandeThread } from '../components/DemandeThread';
 import { PhenixWidget } from '../components/PhenixWidget';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -69,6 +71,8 @@ export function ClientView({
   // documents d'un côté, les comptes rendus de l'autre.
   const clientDocuments = updates.filter((e) => e.type === 'document');
   const comptesRendus = updates.filter((e) => e.type === 'compte_rendu');
+  // Les demandes faites par le client à PHÉNIX (question → réponse, sa mémoire).
+  const clientDemandes = demandesPourPhenix(events).filter((e) => e.actor.role === 'client');
   // Notification client : l'équipe a laissé un mot sur le récit (symétrique du
   // signal conducteur). Un clic emmène le client vers le récit.
   const teamMessages = pendingTeamMessageCount(snap, project.id);
@@ -238,6 +242,24 @@ export function ClientView({
 
             {/* Notifications : ce que l'ÉQUIPE a publié. Un clic ouvre le bon onglet. */}
             <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
+
+            {/* Suivi de mes demandes. Le client ne crée aucun ticket : il parle
+                simplement à Léon (widget flottant), qui répond ou transmet au
+                conducteur. Les demandes transmises se retrouvent ici (mémoire). */}
+            {clientDemandes.length > 0 && (
+              <section id="section-demandes-client" className="scroll-mt-24 space-y-2">
+                <h3 className="text-sm font-medium text-foreground">
+                  Vos demandes ({clientDemandes.length})
+                </h3>
+                <ul className="space-y-2">
+                  {clientDemandes.map((d) => (
+                    <li key={d.id}>
+                      <DemandeThread demande={d} actor={actor} nameOf={(u) => nameOf(snap, u)} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <div id="section-decision" className="scroll-mt-24 rounded-2xl">
               {clientDecision ? (
