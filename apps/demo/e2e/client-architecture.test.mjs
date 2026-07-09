@@ -23,10 +23,17 @@ const download = () => page.getByRole('button', { name: /Télécharger/ });
 try {
   await openDemo(page);
 
-  await assert('Les 5 onglets client existent', async () => {
+  await assert('Les 6 onglets client existent', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     const bar = page.locator('main').getByRole('tablist').first();
-    for (const t of ['Aujourd’hui', 'Vos demandes', 'Vos choix', 'Documents', 'Dans les coulisses'])
+    for (const t of [
+      'Aujourd’hui',
+      'Vos demandes',
+      'Vos choix',
+      'Documents',
+      'Dans les coulisses',
+      'Mon espace',
+    ])
       await bar.getByRole('tab', { name: t }).waitFor({ state: 'visible', timeout: 5000 });
     // Plus d'onglet « Le projet ».
     if ((await bar.getByRole('tab', { name: 'Le projet' }).count()) > 0)

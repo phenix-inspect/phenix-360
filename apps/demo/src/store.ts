@@ -119,6 +119,12 @@ const CHOIX_TRAITES_KEY = 'phenix-demo:choix-traites:v1';
 // génèrent pas de notification (sinon la démo croulerait sous l'historique seedé).
 // Seules les actions POSTÉRIEURES (session en cours) notifient l'autre partie.
 const NOTIF_BASELINE_KEY = 'phenix-demo:notif-baseline:v1';
+// « Mon espace » côté client (par chantier) : code d'accès, personnes invitées,
+// préférences de notification. Réglages du client, distincts du dossier métier.
+const CLIENT_SETTINGS_KEY = 'phenix-demo:client-settings:v1';
+// Consentement cookies (device-local, global) : une fois accepté, le bandeau ne
+// réapparaît plus. V1 : cookies nécessaires uniquement, pas de CMP.
+const COOKIE_CONSENT_KEY = 'phenix-demo:cookie-consent:v1';
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -151,6 +157,54 @@ export interface PhenixMessage {
 export interface ClientTarget {
   kind: 'document' | 'decision' | 'etapes' | 'fil';
   ref?: string;
+}
+
+/** Une personne invitée par le client à suivre son chantier (« Mon espace »). */
+export interface ClientInvitee {
+  id: string;
+  prenom: string;
+  nom: string;
+  email: string;
+  role: string;
+  statut: 'invite' | 'actif';
+  createdAt: string;
+}
+
+/** Les cinq préférences de notification simples (« Mon espace »). */
+export interface ClientNotifPrefs {
+  photos: boolean;
+  documents: boolean;
+  reponse: boolean;
+  decision: boolean;
+  rappelReception: boolean;
+}
+export type ClientNotifPrefKey = keyof ClientNotifPrefs;
+
+/**
+ * Réglages « Mon espace » du client, par chantier : son code d'accès, les
+ * personnes qu'il a invitées, ses préférences de notification. Réglages du
+ * client (device-local en démo), distincts du dossier métier du conducteur.
+ */
+export interface ClientSettings {
+  accessCode: string;
+  invitees: ClientInvitee[];
+  notifPrefs: ClientNotifPrefs;
+}
+
+/** Code d'accès par défaut d'un chantier (masqué, modifiable par le client). */
+const DEFAULT_ACCESS_CODE = 'phenix2026';
+function defaultClientSettings(): ClientSettings {
+  return {
+    accessCode: DEFAULT_ACCESS_CODE,
+    invitees: [],
+    notifPrefs: {
+      photos: true,
+      documents: true,
+      reponse: true,
+      decision: true,
+      rappelReception: true,
+    },
+  };
 }
 
 /**
@@ -309,6 +363,10 @@ export interface DemoSnapshot extends BackendState {
   seen: SeenState;
   /** Choix client validés « pris en compte » : `decisionEventId → ISO`. */
   choixTraites: Record<string, string>;
+  /** Réglages « Mon espace » du client, par chantier (code, invités, notifs). */
+  clientSettings: Record<string, ClientSettings>;
+  /** Consentement cookies (device-local) : le bandeau ne réapparaît plus après. */
+  cookieConsent: boolean;
   /**
    * L'espace de travail est-il initialisé ? `false` au tout premier lancement :
    * on propose alors un CHOIX (découvrir la démo / démarrer à vide) plutôt que
@@ -386,6 +444,11 @@ function build(): DemoSnapshot {
     clientTarget,
     seen: readJson<SeenState>(SEEN_KEY, {}),
     choixTraites: readJson<Record<string, string>>(CHOIX_TRAITES_KEY, {}),
+    clientSettings: readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {}),
+    cookieConsent:
+      typeof localStorage !== 'undefined'
+        ? localStorage.getItem(COOKIE_CONSENT_KEY) !== null
+        : false,
     seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
   };
 }
@@ -410,6 +473,7 @@ const WORKSPACE_KEYS = [
   CONTACTS_KEY,
   SEEN_KEY,
   CHOIX_TRAITES_KEY,
+  CLIENT_SETTINGS_KEY,
 ] as const;
 
 /** Marqueur du format de sauvegarde (pour reconnaître un fichier valide). */
@@ -597,6 +661,62 @@ export const demo = {
   clearClientTarget(): void {
     clientTarget = null;
     refresh();
+  },
+
+  // ---- « Mon espace » client : accès, invités, préférences, cookies ----------
+  /** Écrit (ou fusionne) les réglages « Mon espace » d'un chantier. */
+  _writeClientSettings(projectId: ProjectId, patch: Partial<ClientSettings>): void {
+    const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
+    const current = all[projectId] ?? defaultClientSettings();
+    all[projectId] = { ...current, ...patch };
+    safeSetItem(CLIENT_SETTINGS_KEY, JSON.stringify(all));
+    refresh();
+    broadcast();
+  },
+  /** Le client change son code d'accès (min. 6 caractères, obligatoire). */
+  setClientAccessCode(projectId: ProjectId, code: string): void {
+    demo._writeClientSettings(projectId, { accessCode: code });
+  },
+  /** Le client invite une personne de confiance à suivre son chantier. */
+  inviteClientPerson(
+    projectId: ProjectId,
+    input: { prenom: string; nom: string; email: string; role: string },
+  ): void {
+    const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
+    const current = all[projectId] ?? defaultClientSettings();
+    const invitee: ClientInvitee = {
+      id: crypto.randomUUID(),
+      prenom: input.prenom.trim(),
+      nom: input.nom.trim(),
+      email: input.email.trim(),
+      role: input.role.trim(),
+      statut: 'invite',
+      createdAt: new Date().toISOString(),
+    };
+    demo._writeClientSettings(projectId, { invitees: [...current.invitees, invitee] });
+  },
+  /** Le client retire l'accès d'une personne invitée. */
+  removeClientInvitee(projectId: ProjectId, inviteeId: string): void {
+    const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
+    const current = all[projectId] ?? defaultClientSettings();
+    demo._writeClientSettings(projectId, {
+      invitees: current.invitees.filter((i) => i.id !== inviteeId),
+    });
+  },
+  /** Le client bascule une préférence de notification. */
+  setClientNotifPref(projectId: ProjectId, key: ClientNotifPrefKey, value: boolean): void {
+    const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
+    const current = all[projectId] ?? defaultClientSettings();
+    demo._writeClientSettings(projectId, {
+      notifPrefs: { ...current.notifPrefs, [key]: value },
+    });
+  },
+  /** Le client accepte les cookies nécessaires — le bandeau ne réapparaît plus. */
+  acceptCookies(): void {
+    if (typeof localStorage !== 'undefined')
+      localStorage.setItem(COOKIE_CONSENT_KEY, new Date().toISOString());
+    refresh();
+    broadcast();
   },
 
   // Ports core (le produit passe par là).
@@ -2057,6 +2177,11 @@ export function dossierOf(
 ): ProjectDossier | null {
   if (!projectId) return null;
   return snap.dossiers[projectId] ?? null;
+}
+
+/** Réglages « Mon espace » d'un chantier (valeurs par défaut si jamais réglé). */
+export function clientSettingsOf(snap: DemoSnapshot, projectId: string): ClientSettings {
+  return snap.clientSettings[projectId] ?? defaultClientSettings();
 }
 
 /** Le fil de conversation PHÉNIX d'un projet (côté client). */

@@ -97,7 +97,12 @@ export function harness() {
 /** Ouvre la démo seedée et attend l'écran conducteur (« Bonjour Mickaël »). */
 export async function openDemo(page) {
   await page.goto(URL, { waitUntil: 'networkidle' });
-  await page.evaluate(() => localStorage.clear());
+  // Consentement cookies pré-accepté par défaut : le bandeau « première connexion »
+  // ne doit pas gêner les suites existantes (la suite dédiée le teste à part).
+  await page.evaluate(() => {
+    localStorage.clear();
+    localStorage.setItem('phenix-demo:cookie-consent:v1', new Date().toISOString());
+  });
   await page.reload({ waitUntil: 'networkidle' });
   await page
     .getByRole('button', { name: /Découvrir la démo/ })

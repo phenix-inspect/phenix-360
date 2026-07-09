@@ -28,11 +28,12 @@ import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
 import { ClientDocuments } from '../components/ClientDocuments';
 import { ClientDemandesTab } from '../components/ClientDemandesTab';
 import { ClientChoixTab } from '../components/ClientChoixTab';
+import { ClientMonEspaceTab, CookieConsentBanner } from '../components/ClientMonEspaceTab';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
 import { PhenixWidget } from '../components/PhenixWidget';
 
-type ClientTab = 'aujourdhui' | 'demandes' | 'choix' | 'documents' | 'coulisses';
+type ClientTab = 'aujourdhui' | 'demandes' | 'choix' | 'documents' | 'coulisses' | 'monespace';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'client');
@@ -181,6 +182,7 @@ export function ClientView({
           <TabsTrigger value="choix">Vos choix</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="coulisses">Dans les coulisses</TabsTrigger>
+          <TabsTrigger value="monespace">Mon espace</TabsTrigger>
         </TabsList>
 
         {/* AUJOURD'HUI — un tableau d'ACTIONS : notifications d'abord, puis ce qui
@@ -307,9 +309,19 @@ export function ClientView({
             />
           </div>
         </TabsContent>
+
+        {/* MON ESPACE — le client gère son accès, ses invités et ses préférences. */}
+        <TabsContent value="monespace">
+          <div id="section-monespace" className="scroll-mt-24">
+            <ClientMonEspaceTab snap={snap} project={project} />
+          </div>
+        </TabsContent>
       </Tabs>
 
       <PhenixWidget snap={snap} project={project} actor={actor} />
+
+      {/* Première connexion : bandeau cookies (consentement stocké localement). */}
+      {!snap.cookieConsent && <CookieConsentBanner />}
     </div>
   );
 }

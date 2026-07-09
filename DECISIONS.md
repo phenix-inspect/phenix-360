@@ -2543,3 +2543,47 @@ adresse chantier ≠ PHÉNIX, documents trouvés / absents, planning, commandes,
 escalades ciblées, charabia → « je ne trouve pas ». `leon-ia` (12/12), `phenix-widget` (14/14),
 `client-concierge` (5/5) conservés. Gate verte (typecheck, lint, prettier, build, e2e complet, zéro
 erreur console). VISION Art. 2, 8, 9, 11.
+
+## 09/07/2026 — Espace client : « Mon espace » (accès, invités, préférences, cookies)
+
+**Décision produit validée :** un vrai espace de gestion client, **sans usine à gaz**. Un 6ᵉ onglet
+**« Mon espace »** (nommé ainsi — plus client, plus premium que « Paramètres ») s'ajoute à l'Espace
+client **sans toucher au design global** ni casser les onglets existants (Aujourd'hui, Vos demandes,
+Vos choix, Documents, Dans les coulisses, Léon). Navigation cible : ces 6 onglets.
+
+**Contenu de « Mon espace » (5 encarts sobres) :**
+
+1. **Accès au chantier** : nom + adresse du chantier, **code d'accès masqué** (œil pour révéler),
+   bouton « Modifier mon code d'accès » → modale (double saisie de confirmation, **min. 6 caractères**,
+   messages d'erreur clairs) + **message de succès** à l'enregistrement.
+2. **Personnes invitées** : le client invite une personne de confiance (prénom/nom, e-mail, **rôle
+   libre** avec suggestions : conjoint, parent, investisseur, associé, locataire, architecte,
+   décorateur). La personne apparaît avec un **statut** (Invité / Actif) et un bouton **« Retirer
+   l'accès »**. Microcopy : « Invitez une personne de confiance à suivre l'avancement de votre
+   chantier. » — levier de découverte / recommandation PHÉNIX.
+3. **Préférences de notification** : 5 toggles simples (nouvelles photos, nouveaux documents, réponse
+   PHÉNIX, décision attendue, rappel avant réception), stockés en local (store démo).
+4. **Cookies et confidentialité** : état « Cookies nécessaires acceptés. »
+5. **Sécurité** : « Votre espace est privé. Seules les personnes disposant d'un accès peuvent consulter
+   les informations du chantier. »
+
+**Bandeau cookies (première connexion).** V1 sans CMP : à la première connexion client, un bandeau
+sobre « PHÉNIX 360 utilise des cookies nécessaires… » avec **Accepter** / **En savoir plus** ; le
+consentement est **stocké localement** et le bandeau **ne réapparaît plus** après acceptation (ni au
+reload). Les suites e2e existantes pré-acceptent le consentement dans `openDemo` pour ne pas être
+gênées ; la suite dédiée le teste à part.
+
+**Store (démo, remplaçable par un backend sans toucher l'écran) :** nouveau slice `clientSettings`
+par chantier (code d'accès, invités, préférences) + drapeau `cookieConsent` (device-local). Mutations
+`setClientAccessCode`, `inviteClientPerson`, `removeClientInvitee`, `setClientNotifPref`,
+`acceptCookies` ; sélecteur `clientSettingsOf`. `CLIENT_SETTINGS_KEY` rejoint les clés d'espace de
+travail (réinitialisables) ; le consentement cookies reste device-local.
+
+**Interdits respectés :** pas de page technique lourde, pas de menu complexe, design global intact,
+aucun des onglets existants cassé.
+
+**Tests :** nouvelle suite `mon-espace` (14/14) — bandeau cookies (visible, « En savoir plus »,
+Accepter, non-retour au reload, état dans « Mon espace »), code masqué + refus (< 6 car., non
+concordants) + succès, invitation (apparition + statut) + retrait, toggles sans crash, mention
+sécurité. `client-architecture` mis à jour (6 onglets). Gate verte (typecheck, lint, prettier, build,
+e2e complet, zéro erreur console). VISION Art. 6, 8, 9, 11.
