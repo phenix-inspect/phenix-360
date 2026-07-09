@@ -187,6 +187,12 @@ Léon. **Vos choix** (`ClientChoixTab`, filtres Tous / En attente / Répondu / A
 planning reste un outil conducteur ; l'avancement client se vit « Dans les coulisses ». `client-*`,
 `decisions`, `notifications-bidirect`, `demande-client` mis à jour ; `client-planning` /
 `planning-duree` supprimés (planning client retiré).
+**Léon IA premium (09/07)** : le cerveau (`packages/core/phenix.ts`) cherche AVANT de transmettre —
+coordonnées PHÉNIX (`PHENIX_PHONE`/`EMAIL`), recherche documentaire par type/mot-clé (`DOC_TYPES` :
+devis, facture, DPE, plan, PV…) avec bouton « Ouvrir » ou « je ne trouve pas + je transmets ? »,
+réception/planning depuis les dates, actions/décisions en attente. Escalade en dernier recours
+(problème signalé, changement/permission, prix, photo, transmission explicite). Aucun changement d'UI.
+`leon-ia.test` (8/8).
 **Manque** : préférences client. VISION Art. 2, 8, 9, 10, 11.
 
 ### EPIC 13 — Administration · 🔴 À développer

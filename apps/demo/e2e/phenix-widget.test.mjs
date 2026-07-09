@@ -131,9 +131,9 @@ try {
   });
 
   await assert(
-    'Navigation intelligente : « Voir les étapes » ouvre le récit du chantier',
+    'Navigation intelligente : « Voir les coulisses » ouvre le récit du chantier',
     async () => {
-      const nav = page.getByRole('button', { name: /Voir le planning|Voir les étapes/ });
+      const nav = page.getByRole('button', { name: /Voir les coulisses/ });
       await nav.first().waitFor({ state: 'visible', timeout: 5000 });
       await nav.first().click();
       // Sans rupture : le widget se ferme et on arrive à l'écran d'avancement.

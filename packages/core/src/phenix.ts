@@ -163,7 +163,63 @@ function fmtDate(iso: string): string {
 
 /** Détection « question de prix » → jamais de montant/calcul (escalade). */
 const PRICE_RX =
-  /(combien|cout|coute|prix|montant|tarif|budget|euro|paiement|payer|acompte|reste a payer|facturation)/;
+  /(combien|cout|coute|prix|montant|tarif|budget|euro|paiement|payer|reste a payer|facturation)/;
+
+/**
+ * Coordonnées PHÉNIX communiquées au client — la « donnée PHÉNIX » que Léon
+ * connaît (source unique, configurable ici). Léon répond directement, sans
+ * jamais escalader une simple demande de contact.
+ */
+export const PHENIX_PHONE = '01 84 80 00 00';
+export const PHENIX_EMAIL = 'contact@phenix360.fr';
+
+/**
+ * Types de documents que Léon sait reconnaître et retrouver (par mot-clé). L'ordre
+ * compte : les libellés les plus spécifiques d'abord (« facture finale » avant
+ * « facture », « pré-réception » avant « réception »).
+ */
+const DOC_TYPES: { rx: RegExp; label: string }[] = [
+  { rx: /avenant/, label: 'avenant' },
+  { rx: /facture finale|facture de solde|solde/, label: 'facture finale' },
+  { rx: /acompte/, label: 'acompte' },
+  { rx: /facture/, label: 'facture' },
+  { rx: /devis/, label: 'devis' },
+  { rx: /assurance|attestation|decennale|décennale/, label: 'assurance' },
+  { rx: /\bdpe\b|diagnostic|performance energetique|performance énergétique/, label: 'DPE' },
+  { rx: /\bplans?\b/, label: 'plan' },
+  { rx: /pre-?reception|pré-?réception/, label: 'pré-réception' },
+  { rx: /\bpv\b|proces-?verbal|procès-?verbal|compte-?rendu|compte rendu/, label: 'compte rendu' },
+  { rx: /reception|réception/, label: 'réception' },
+  { rx: /\bsav\b|apres-?vente|après-?vente/, label: 'SAV' },
+];
+
+/** Le client demande explicitement de transmettre au conducteur → escalade directe. */
+const TRANSMIT_RX =
+  /(transmet|transmettre|prevenir le conducteur|prévenir le conducteur|demande[rz]? (au|à|a) (mon )?conducteur|contacte[rz]? (le|mon) conducteur|passe[rz]? au conducteur|remonte[rz]? au conducteur)/;
+
+/**
+ * Une DEMANDE D'ACTION / de permission / de changement (« peut-on décaler… »,
+ * « je voudrais récupérer les clés… ») relève d'une décision humaine → conducteur.
+ * On la distingue d'une simple demande d'INFORMATION ou de NAVIGATION (« je
+ * voudrais voir le devis », « peut-on me montrer les photos ») que Léon sait
+ * traiter seul.
+ */
+const REQUEST_RX =
+  /(peut-?on|pourrait-?on|pourriez-vous|pouvez-vous|serait-il possible|est-il possible|est-ce possible|possible de|j'aimerais|je voudrais|je souhaite|puis-je|puis je)/;
+const INFO_VERB_RX =
+  /(voir|montre|montrer|montrez|afficher|affiche|ouvrir|ouvre|savoir|connaitre|connaître|consulter|retrouver|ou est|où est|\bquand\b|\bquel|\bquels|\bquelle|combien|c'est quoi)/;
+
+/**
+ * SIGNALEMENT D'UN PROBLÈME (fissure, fuite, malfaçon…) → l'œil humain du
+ * conducteur est requis, on transmet immédiatement (jamais de réponse à côté).
+ */
+const PROBLEM_RX =
+  /(fissure|felure|fêlure|infiltration|fuite|degat|dégât|malfacon|malfaçon|cassé|cassee|cassée|abime|abîme|moisissure|inondation|ne (marche|fonctionne) (pas|plus)|mal fini|mal fait|signale.*(probleme|problème|souci|defaut|défaut|malfacon|malfaçon))/;
+
+/** Le client veut nous joindre (téléphone / e-mail / coordonnées PHÉNIX). */
+const CONTACT_PHONE_RX =
+  /(numero|numéro|telephone|téléphone|\btel\b|coordonnees|coordonnées|comment (vous |t.)?(joindre|contacter|appeler)|(vous|t.) (joindre|contacter|appeler))/;
+const CONTACT_MAIL_RX = /(adresse )?(mail|email|e-mail|courriel)/;
 
 const ZONES: { key: string; rx: RegExp }[] = [
   { key: 'la salle de bain', rx: /(salle de bain|sdb|douche|baignoire|lavabo)/ },
@@ -314,8 +370,10 @@ function searchKnowledge(q: string, facts: KnowledgeFact[]): KnowledgeFact | nul
  * -------------------------------------------------------------------------- */
 type PhenixIntent =
   | 'salutation'
+  | 'contact'
   | 'todo'
   | 'choix_valides'
+  | 'documents_manquants'
   | 'avancement'
   | 'planning'
   | 'reception'
@@ -327,6 +385,20 @@ type PhenixIntent =
 
 function detectIntent(q: string): PhenixIntent {
   if (/^(bonjour|salut|hello|coucou|bonsoir|hey)\b/.test(q) && q.length < 24) return 'salutation';
+  // Coordonnées PHÉNIX : téléphone / e-mail / « comment vous joindre » (jamais un
+  // document, jamais une escalade — Léon connaît ses propres coordonnées).
+  if (
+    CONTACT_PHONE_RX.test(q) ||
+    (CONTACT_MAIL_RX.test(q) && /(phenix|phénix|vous|equipe|équipe|conducteur)/.test(q))
+  )
+    return 'contact';
+  // Documents demandés au client (« que dois-je envoyer ? », « quels documents manquent ? »).
+  if (
+    /(document.*manque|manque.*document|documents? (a|à) (envoyer|fournir|transmettre)|documents? demand|que dois-?je (envoyer|fournir|transmettre)|quels? (documents?|papiers?|pieces?|pièces?) (manque|envoyer|fournir|transmettre))/.test(
+      q,
+    )
+  )
+    return 'documents_manquants';
   if (
     /(dois-?je|je dois|dois faire|faire quelque chose|quelque chose (a|à) (faire|valider)|une action|que dois|rien (a|à) faire|(a|à) valider|action attendue|besoin de moi)/.test(
       q,
@@ -339,7 +411,13 @@ function detectIntent(q: string): PhenixIntent {
     )
   )
     return 'choix_valides';
-  if (/(reception|réception)/.test(q)) return 'reception';
+  // « Réception » comme QUESTION DE DATE (quand / prévue…), sinon c'est un
+  // document (PV de réception) → traité par l'intention 'document'.
+  if (
+    /(reception|réception)/.test(q) &&
+    /(\bquand\b|date|prevu|prévu|prochaine|c'est quand|ce sera quand|prevoir|prévoir)/.test(q)
+  )
+    return 'reception';
   if (
     /(prochaine etape|prochaine phase|etape suivante|quand commence|quand debute|quand demarre|quand attaque)/.test(
       q,
@@ -348,10 +426,12 @@ function detectIntent(q: string): PhenixIntent {
     return 'planning';
   if (/(command|livr|arrive|arrivee|expedi|colis|recu|fournisseur|delai)/.test(q))
     return 'commande';
+  // Un TYPE de document reconnu (devis, facture, DPE, plan, PV, avenant…) ou un
+  // mot documentaire → intention 'document'. Vient AVANT 'photo' pour que
+  // « montre-moi le DPE » ne soit pas confondu avec une demande de photos.
   if (
-    /(devis|facture|document|papier|contrat|attestation|assurance|\bplan\b|signer|signature|retrouve|ou est|avenant)/.test(
-      q,
-    )
+    DOC_TYPES.some((t) => t.rx.test(q)) ||
+    /(document|papier|contrat|signer|signature|retrouve|ou est|où est)/.test(q)
   )
     return 'document';
   if (/(reserve|réserve|reprise|malfacon|defaut|corrige|finition)/.test(q)) return 'reserve';
@@ -453,6 +533,16 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   // toute demande avec photo passe directement au conducteur (jamais à l'aveugle).
   if (input.hasPhotos) return escalate();
 
+  // Le client demande EXPLICITEMENT une transmission au conducteur → on transmet.
+  if (TRANSMIT_RX.test(q)) return escalate();
+
+  // Signalement d'un problème (fissure, fuite, malfaçon…) → conducteur.
+  if (PROBLEM_RX.test(q)) return escalate();
+
+  // Demande d'ACTION / de changement / de permission (hors info & navigation) →
+  // décision humaine → conducteur. « je voudrais VOIR le devis » reste traité seul.
+  if (REQUEST_RX.test(q) && !INFO_VERB_RX.test(q)) return escalate();
+
   // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
   if (PRICE_RX.test(q)) return escalate();
 
@@ -485,6 +575,45 @@ export function askPhenix(input: PhenixInput): PhenixReply {
             'votre suivi de chantier',
             false,
           );
+
+    case 'contact': {
+      const wantsMail =
+        CONTACT_MAIL_RX.test(q) && !/(numero|numéro|telephone|téléphone|\btel\b|appeler)/.test(q);
+      if (wantsMail)
+        return reply(
+          `Vous pouvez joindre PHÉNIX par e-mail à ${PHENIX_EMAIL}. Et vous pouvez toujours m'écrire ici : je transmets à votre conducteur si nécessaire.`,
+          'les coordonnées PHÉNIX',
+          false,
+        );
+      return reply(
+        `Vous pouvez joindre PHÉNIX au ${PHENIX_PHONE} (e-mail : ${PHENIX_EMAIL}). Et vous pouvez toujours m'écrire ici : je transmets à votre conducteur si nécessaire.`,
+        'les coordonnées PHÉNIX',
+        false,
+      );
+    }
+
+    case 'documents_manquants': {
+      const reqs = pendingClientDecisions(events).filter((d) => d.attendu === 'document');
+      if (reqs.length === 0)
+        return reply(
+          'Aucun document ne vous est demandé pour le moment : tout est à jour de votre côté.',
+          'vos documents',
+          false,
+        );
+      const list = reqs
+        .map((d) =>
+          d.question
+            .replace(/\s+/g, ' ')
+            .replace(/[.?…\s]+$/, '')
+            .trim(),
+        )
+        .join(' ; ');
+      return reply(
+        `Il reste ${reqs.length} élément${reqs.length > 1 ? 's' : ''} à transmettre : ${list}. Vous pouvez l'envoyer depuis « Aujourd'hui ».`,
+        'vos documents demandés',
+        false,
+      );
+    }
 
     case 'todo':
       if (todos.length === 0)
@@ -529,14 +658,11 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const step = currentStep(events);
       if (!step) return escalate();
       const suffix = zone ? ` (${zone})` : '';
-      const message = isCommand
-        ? 'Je vous ouvre l’avancement de votre chantier.'
-        : empathie +
-          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement.`;
       return nav(
-        message,
-        'les derniers comptes rendus',
-        { kind: 'etapes', label: 'Voir les étapes' },
+        empathie +
+          `Votre chantier${suffix} en est à l'étape « ${PROJECT_STEP_LABEL[step]} ». Tout avance normalement — les dernières photos sont dans les coulisses.`,
+        'votre suivi de chantier',
+        { kind: 'fil', label: 'Voir les coulisses' },
         isCommand,
       );
     }
@@ -545,34 +671,52 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       const tasks = dossier?.planning ?? [];
       if (tasks.length === 0) return escalate();
       const today = new Date().toISOString().slice(0, 10);
-      // « quand commence X » : tâche dont le libellé recoupe la question.
       const qTokens = new Set(tokenize(q));
-      const etapesAction: PhenixAction = { kind: 'etapes', label: 'Voir le planning' };
+      // « quand commence X » : tâche dont le libellé recoupe la question.
       const ciblee = tasks.find((t) => tokenize(t.label).some((k) => qTokens.has(k)));
       if (ciblee)
-        return nav(
+        return reply(
           `L'étape « ${ciblee.label} » est prévue autour du ${fmtDate(ciblee.start)}.`,
           'votre planning',
-          etapesAction,
-          isCommand,
+          false,
         );
       // « prochaine étape » : première tâche qui démarre après aujourd'hui.
       const next = [...tasks]
         .sort((a, b) => a.start.localeCompare(b.start))
         .find((t) => t.start > today);
       if (next)
-        return nav(
+        return reply(
           `La prochaine étape est « ${next.label} », prévue autour du ${fmtDate(next.start)}.`,
           'votre planning',
-          etapesAction,
-          isCommand,
+          false,
         );
       return escalate();
     }
 
-    case 'reception':
-      // La date de réception n'est pas figée de façon certaine → on transmet.
+    case 'reception': {
+      // On répond depuis les dates du planning quand elles existent (jamais une
+      // date figée qu'on n'aurait pas) ; sinon seulement, on transmet.
+      const tasks = dossier?.planning ?? [];
+      const recep = tasks.find((t) =>
+        /reception|réception|remise des cle|remise des clé|livraison finale|fin de chantier/.test(
+          strip(t.label),
+        ),
+      );
+      if (recep)
+        return reply(
+          `Votre réception est prévue autour du ${fmtDate(recep.start)}. La date exacte vous sera confirmée par votre conducteur.`,
+          'votre planning',
+          false,
+        );
+      const last = [...tasks].sort((a, b) => a.end.localeCompare(b.end)).at(-1);
+      if (last)
+        return reply(
+          `La fin des travaux — et donc votre réception — est planifiée autour du ${fmtDate(last.end)}. Votre conducteur vous confirmera la date exacte le moment venu.`,
+          'votre planning',
+          false,
+        );
       return escalate();
+    }
 
     case 'commande': {
       const orders = dossier?.orders ?? [];
@@ -586,47 +730,78 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     }
 
     case 'document': {
-      const docs = events.filter(isVisibleToClient).filter(isDocument);
-      const openDoc = (d: (typeof docs)[number]): PhenixReply =>
+      // Tout ce que le client peut CONSULTER : fichiers (devis, factures, plans,
+      // attestations…) ET comptes rendus (PV de réception, fiche SAV…), avec un
+      // libellé et un id pour l'ouvrir.
+      type Doc = { id: string; libelle: string; hay: string };
+      const docList: Doc[] = [];
+      for (const e of events.filter(isVisibleToClient)) {
+        if (isDocument(e))
+          docList.push({ id: e.id, libelle: e.content.libelle, hay: strip(e.content.libelle) });
+        else if (e.type === 'compte_rendu') {
+          const titre = e.content.docTitre ?? 'Compte rendu de chantier';
+          docList.push({
+            id: e.id,
+            libelle: titre,
+            hay: strip(`${titre} ${e.content.missionKind ?? ''} compte rendu`),
+          });
+        }
+      }
+
+      // Un BOUTON, jamais une ouverture à l'aveugle : le client garde la main.
+      const openDoc = (d: Doc): PhenixReply =>
         nav(
-          isCommand
-            ? `Je vous ouvre votre « ${d.content.libelle} ».`
-            : `J'ai retrouvé votre « ${d.content.libelle} ». Je peux vous l'ouvrir.`,
+          `J'ai retrouvé votre « ${d.libelle} ». Je peux vous l'ouvrir.`,
           'vos documents',
-          { kind: 'document', ref: d.id, label: `Ouvrir « ${d.content.libelle} »` },
-          isCommand,
+          { kind: 'document', ref: d.id, label: `Ouvrir « ${d.libelle} »` },
+          false,
         );
-      // Avenant : on ouvre le devis (le devis porte les avenants).
+      // Document précis introuvable : on l'explique, PUIS on propose de transmettre
+      // (jamais d'escalade silencieuse — le chat reste ouvert et clair).
+      const notFound = (label: string): PhenixReply =>
+        reply(
+          `Je ne trouve pas de ${label} dans votre espace pour le moment. Voulez-vous que je le demande à votre conducteur ?`,
+          'vos documents',
+          false,
+        );
+
+      // Avenant : le devis porte les avenants → on ouvre le devis s'il existe.
       if (/avenant/.test(q) && dossier?.avenants && dossier.avenants.length > 0) {
-        const devisDoc = docs.find((d) => strip(d.content.libelle).includes('devis'));
-        return nav(
-          isCommand
-            ? 'Je vous ouvre votre devis (avenant inclus).'
-            : "Un avenant a été ajouté à votre devis initial. Je peux vous l'ouvrir.",
-          'votre devis',
-          devisDoc
-            ? { kind: 'document', ref: devisDoc.id, label: 'Ouvrir le devis' }
-            : { kind: 'fil', label: 'Voir mon espace' },
-          isCommand,
-        );
+        const devisDoc = docList.find((d) => d.hay.includes('devis'));
+        if (devisDoc) return openDoc(devisDoc);
       }
-      const want = /devis/.test(q)
-        ? 'devis'
-        : /facture/.test(q)
-          ? 'facture'
-          : /\bplan\b/.test(q)
-            ? 'plan'
-            : /attestation|assurance/.test(q)
-              ? 'attestation'
-              : null;
-      if (want) {
-        const doc = docs.find((d) => strip(d.content.libelle).includes(want));
-        if (doc) return openDoc(doc);
-        return escalate(); // document précis introuvable → on ne devine pas.
+
+      // Type de document reconnu (devis, facture, plan, assurance, DPE, PV…).
+      const wanted = DOC_TYPES.find((t) => t.rx.test(q));
+      if (wanted) {
+        const hits = docList.filter((d) => wanted.rx.test(d.hay));
+        if (hits.length === 1) return openDoc(hits[0]!);
+        if (hits.length > 1) {
+          const names = hits
+            .slice(0, 4)
+            .map((d) => `« ${d.libelle} »`)
+            .join(', ');
+          return nav(
+            `J'ai trouvé ${hits.length} documents de type ${wanted.label} : ${names}. Je peux vous ouvrir « ${hits[0]!.libelle} » ; les autres sont dans « Documents ».`,
+            'vos documents',
+            { kind: 'document', ref: hits[0]!.id, label: `Ouvrir « ${hits[0]!.libelle} »` },
+            false,
+          );
+        }
+        return notFound(wanted.label);
       }
-      const first = docs[0];
+
+      // Recherche libre par mot-clé (aucun type précis reconnu).
+      const qTokens = new Set(tokenize(q));
+      const kw = docList.filter((d) => tokenize(d.hay).some((k) => qTokens.has(k)));
+      if (kw.length >= 1) return openDoc(kw[0]!);
+      const first = docList[0];
       if (first) return openDoc(first);
-      return escalate();
+      return reply(
+        "Vous n'avez pas encore de document dans votre espace. Dès qu'un document sera partagé, vous le retrouverez dans « Documents ».",
+        'vos documents',
+        false,
+      );
     }
 
     case 'reserve': {

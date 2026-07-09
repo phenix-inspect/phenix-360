@@ -2377,3 +2377,42 @@ les coulisses ; `demande-client` → demandes lues dans l'onglet « Vos demandes
 `client-planning.test`, `planning-duree.test` (ils testaient le planning CLIENT, retiré ; la logique
 core de dates reste couverte au niveau `packages/core`). Gate verte (typecheck, lint, prettier, build,
 e2e complet, zéro erreur console). VISION Art. 2, 9, 11.
+
+## 09/07/2026 — Léon IA premium : chercher avant de transmettre (le cerveau, pas le visage)
+
+**Décision produit validée :** Léon devient l'assistant central de l'Espace client. **Aucun changement
+de design / UI / widget** — on améliore uniquement l'**intelligence** (`packages/core/phenix.ts`). Léon
+ne crée une demande conducteur qu'en **dernier recours** : il cherche d'abord dans les données du
+chantier (documents, planning, choix, demandes, coordonnées PHÉNIX, historique).
+
+**Ajouts au cerveau (`askPhenix`) :**
+
+- **Coordonnées PHÉNIX** (`PHENIX_PHONE` / `PHENIX_EMAIL`, configurables) → intention `contact` :
+  « le numéro de PHÉNIX ? » répond directement, jamais d'escalade.
+- **Recherche documentaire robuste** : `DOC_TYPES` (devis, avenant, facture, acompte, facture finale,
+  assurance, DPE, plan, compte rendu, pré-réception, réception, SAV) — recherche par type OU mot-clé,
+  sur les fichiers ET les comptes rendus. 1 résultat → **bouton « Ouvrir »** (jamais d'escalade) ;
+  plusieurs → courte liste + ouverture du 1er ; **aucun → Léon EXPLIQUE puis propose de transmettre**
+  (pas d'escalade silencieuse, pas de demande fantôme).
+- **Réception / planning / avancement** répondent depuis les **dates du dossier** (fin de chantier =
+  réception) au lieu d'escalader.
+- **Actions & décisions** : « ai-je quelque chose à faire ? », « quels documents manque-t-il ? »
+  lues depuis les décisions/demandes en attente.
+- **Escalade ciblée (dernier recours)** : demande explicite de transmission (`TRANSMIT_RX`),
+  **signalement de problème** (`PROBLEM_RX` : fissure, fuite, malfaçon…), **demande d'action /
+  changement / permission** (`REQUEST_RX` sans verbe d'info : « peut-on décaler… », « je voudrais
+  récupérer les clés… »), question de prix, ou photo jointe. Une demande d'**information/navigation**
+  formulée comme une requête (« je voudrais **voir** le devis ») reste traitée par Léon.
+- **Robustesse chat inchangée** : `send` en try/finally (jamais figé), photos conservées, confirmation
+  claire à la création d'une demande.
+
+**Corrections de reconnaissance :** « montre-moi le DPE » n'est plus confondu avec une demande de
+photos (les types de documents priment sur `photo`) ; « réception » n'est traité comme une **date**
+que sur une question de timing (sinon c'est le document « PV de réception ») ; `\bsav\b` / `\bdpe\b`
+/ `\bpv\b` bornés (plus de faux positif sur « **sav**oir »).
+
+**Interdits respectés :** pas de refonte du widget, pas de nouvel écran IA, pas d'ajout visuel — le
+bouton « Ouvrir » et les bulles existent déjà. Nouveau `leon-ia.test` (8/8 : devis trouvé + bouton
+sans escalade, numéro PHÉNIX, réception depuis les dates, document introuvable expliqué + non bloquant,
+demande conducteur créée + reçue dans « Aujourd'hui », message avec photo conservée + chat utilisable).
+Gate verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.
