@@ -2045,3 +2045,47 @@ côté **conducteur** ET côté **client** ; tous les acquis viewer (plein écra
 d'annotation n'existait à supprimer. Gate verte (typecheck, lint, prettier, build, e2e 54/54, zéro
 erreur console). VISION Art. 8, 9, 11 (l'écran se comprend en 10 s, rien d'interne ne fuit, la
 simplicité est une fonctionnalité).
+
+## 09/07/2026 — Fusion « Visite » + « Réunion » → « Compte rendu de chantier » (à points)
+
+**Décision produit validée :** une visite improvisée et une réunion programmée produisent le même
+résultat (des observations, des photos). Le conducteur ne doit plus choisir le bon bouton : il
+**raconte ce qu'il vient de constater**. On supprime la distinction Visite / Réunion → un seul
+**« Compte rendu de chantier »**. Les 5 autres missions (Livraison, Pré-réception, Réception, SAV,
+Note) sont conservées (elles ont leurs propres livrables : PV, fiche SAV, bon de livraison).
+
+**Deux arbitrages tranchés avec le PO :** (1) le nouveau CR est **à points** (photo + commentaire +
+diffusion) et abandonne la déduction décisions/actions/réserves + présents — MAIS **conserve la
+confirmation d'étape** : l'avancement reste porté par le compte rendu (invariant ADR-002 §5) ;
+(2) on **garde** les 5 autres missions (fusion Visite+Réunion uniquement, conforme à « supprimer la
+logique séparant visite et réunion »).
+
+**Structure d'un compte rendu :** infos générales (date / heure / auteur, portées par
+l'événement), puis une suite de **points**. Chaque point = **1 photo (obligatoire)** + **1
+commentaire (obligatoire)** + **1 cible de diffusion** : `Client` / `Artisan` / `Client + Artisan`.
+Aucune autre cible. UX de capture : photographier → écrire une phrase → choisir la cible → point
+suivant. Étape franchie **facultative** en fin de saisie.
+
+**Diffusion & confidentialité (client-safe strict) :**
+
+- La **visibilité de l'événement** est DÉRIVÉE des points : `client` s'il existe ≥ 1 point destiné
+  au client (client ou les deux) ; sinon `interne` (CR 100 % artisan → invisible au client).
+- **Conducteur** : voit TOUS les points, avec le **badge** de diffusion (affichage chronologique
+  photo + commentaire + badge au Suivi).
+- **Client** : ne voit QUE les points `client` + `les deux` — le point `artisan` reste **totalement
+  invisible** (jamais dans l'espace client, jamais dans son PDF).
+- **PDF / document imprimable** filtré par destinataire : **PDF client** = points client + les
+  deux ; **PDF artisan** = points artisan + les deux. En-tête « Version client / artisan ».
+
+**Mécanique :** core — `MissionKind` fusionné (`compte_rendu` remplace `visite`+`reunion` ;
+`reunion`/`visite` restent des `MomentType` HÉRITÉS pour les données antérieures), nouveau modèle
+`Diffusion` + `CompteRenduPoint` + `content.points`, sélecteurs `pointsPourAudience` /
+`crADesPointsPour` ; `prepareMission` ne traite plus visite/réunion. App — nouveau flux de capture
+`CompteRenduFlow` (routé depuis `CompagnonView`), rendu inline `CompteRenduPoints` (Suivi
+conducteur, badges), `buildDocumentHtml` paramétré par audience (points filtrés + style),
+`openDocument`/`downloadDocument` + `DocumentButton` + `ClientDocuments` audience-aware (le client
+ouvre la version client), `MissionPicker` mis à jour. Nouveau `compte-rendu.test` (picker fusionné,
+3 points, conducteur voit tout + badges, client ne voit pas le point artisan, **PDF client / PDF
+artisan filtrés** vérifiés via le document ouvert). Aucun test existant ne sélectionnait Visite /
+Réunion. Gate verte (typecheck, lint, prettier, build, e2e, zéro erreur console).
+VISION Art. 1, 5, 8, 9, 11.

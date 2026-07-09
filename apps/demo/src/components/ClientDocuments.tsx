@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@phenix360/ui';
 import { Download, FileText } from 'lucide-react';
-import { sortByDate, type Event } from '@phenix360/core';
+import { sortByDate, type CrAudience, type Event } from '@phenix360/core';
 import { demo } from '../store';
 import { DocumentButton } from './DocumentButton';
 import { DocumentFilterBar } from './DocumentFilterBar';
@@ -16,7 +16,14 @@ import { fmtDate } from '../lib/format';
  * FILTRE par type (même filtre que le conducteur). Le client ne cherche jamais
  * ailleurs. On ne lit QUE ce qui lui est partagé, on ne crée jamais rien.
  */
-export function ClientDocuments({ events }: { events: Event[] }): React.JSX.Element {
+export function ClientDocuments({
+  events,
+  audience = 'conducteur',
+}: {
+  events: Event[];
+  /** Version des comptes rendus ouverts/téléchargés (filtrage par destinataire). */
+  audience?: CrAudience;
+}): React.JSX.Element {
   const all = sortByDate(
     events.filter((e) => e.type === 'document' || e.type === 'compte_rendu'),
     'desc',
@@ -51,7 +58,7 @@ export function ClientDocuments({ events }: { events: Event[] }): React.JSX.Elem
             >
               <button
                 type="button"
-                onClick={() => demo.openDocument(e)}
+                onClick={() => demo.openDocument(e, audience)}
                 aria-label={`Ouvrir : ${generatedDocumentTitle(e)}`}
                 className="group flex min-w-0 flex-1 items-center gap-3 rounded-md text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
@@ -69,12 +76,12 @@ export function ClientDocuments({ events }: { events: Event[] }): React.JSX.Elem
                   </span>
                 </span>
               </button>
-              <DocumentButton event={e} />
+              <DocumentButton event={e} audience={audience} />
               <Button
                 size="sm"
                 variant="outline"
                 aria-label={`Télécharger : ${generatedDocumentTitle(e)}`}
-                onClick={() => demo.downloadDocument(e)}
+                onClick={() => demo.downloadDocument(e, audience)}
               >
                 <Download aria-hidden /> Télécharger
               </Button>

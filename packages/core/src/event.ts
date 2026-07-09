@@ -111,6 +111,54 @@ export interface CrQuestion {
   etat: QuestionEtat;
 }
 
+/**
+ * Cible de diffusion d'un POINT de compte rendu (décision produit 09/07/2026).
+ * Un compte rendu de chantier est une suite de points ; CHAQUE point est destiné
+ * au client, aux artisans, ou aux deux. Le client ne voit QUE les points qui lui
+ * sont destinés ; l'export PDF est filtré par destinataire.
+ */
+export type Diffusion = 'client' | 'artisan' | 'both';
+
+/** À qui l'on présente un compte rendu (pilote le filtrage des points). */
+export type CrAudience = 'conducteur' | 'client' | 'artisan';
+
+export const DIFFUSION_LABEL: Record<Diffusion, string> = {
+  client: 'Client',
+  artisan: 'Artisan',
+  both: 'Client + Artisan',
+};
+
+/** Un POINT de compte rendu : une observation = 1 photo + 1 commentaire + 1 cible. */
+export interface CompteRenduPoint {
+  /** Photo (obligatoire) — dataURL en démo, URL signée en production. */
+  imageUrl?: string;
+  bucket?: string;
+  storagePath?: string;
+  /** Commentaire (obligatoire) : ce que le conducteur constate. */
+  comment: string;
+  /** Cible de diffusion du point. */
+  diffusion: Diffusion;
+}
+
+/** Les points visibles pour une audience donnée (conducteur : tout). */
+export function pointsPourAudience(
+  points: CompteRenduPoint[] | undefined,
+  audience: CrAudience,
+): CompteRenduPoint[] {
+  const list = points ?? [];
+  if (audience === 'conducteur') return list;
+  if (audience === 'client') return list.filter((p) => p.diffusion !== 'artisan');
+  return list.filter((p) => p.diffusion !== 'client');
+}
+
+/** Un compte rendu a-t-il au moins un point destiné à cette audience ? */
+export function crADesPointsPour(
+  points: CompteRenduPoint[] | undefined,
+  audience: CrAudience,
+): boolean {
+  return pointsPourAudience(points, audience).length > 0;
+}
+
 export interface CompteRenduContent {
   /** Texte du compte rendu (rédigé par l'IA, validé par l'humain). */
   texte: string;
@@ -138,6 +186,12 @@ export interface CompteRenduContent {
   texteClient?: string;
   /** Lien vers le Moment (contexte) d'origine. */
   momentId?: string;
+  /**
+   * Points du compte rendu de chantier (photo + commentaire + diffusion). Présent
+   * sur les CR issus de la mission « Compte rendu de chantier » ; le client ne voit
+   * que les points qui lui sont destinés, l'export PDF est filtré par destinataire.
+   */
+  points?: CompteRenduPoint[];
 }
 
 export interface PhotoContent {

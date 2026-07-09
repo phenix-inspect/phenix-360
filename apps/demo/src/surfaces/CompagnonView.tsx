@@ -17,6 +17,7 @@ import {
   EVENT_TYPE_LABEL,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABEL,
+  crADesPointsPour,
   questionsEnAttente,
   reserveStatut,
   reservesOuvertes,
@@ -29,13 +30,21 @@ import {
   type ProjectStatus,
   type ReserveEvent,
 } from '@phenix360/core';
-import { CalendarClock, CircleCheck, HardHat, Image as ImageIcon, Plus } from 'lucide-react';
+import {
+  CalendarClock,
+  CircleCheck,
+  FileText,
+  HardHat,
+  Image as ImageIcon,
+  Plus,
+} from 'lucide-react';
 import { demo, dossierOf, filOf, nameOf, type DemoSnapshot } from '../store';
 import { fmtDate } from '../lib/format';
 import { eventDescription, eventTitle, journalStatut } from '../lib/eventText';
 import { ProjectHero } from '../components/ProjectHero';
 import { PhotoTile } from '../components/PhotoTile';
 import { DocumentButton } from '../components/DocumentButton';
+import { CompteRenduPoints } from '../components/CompteRenduPoints';
 import { DossierPanel } from '../components/DossierPanel';
 import { DocumentsTab } from '../components/DocumentsTab';
 import { FilView } from '../components/fil/FilView';
@@ -45,6 +54,7 @@ import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
 import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
 import { MissionPicker } from '../components/mission/MissionPicker';
+import { CompteRenduFlow } from '../components/mission/CompteRenduFlow';
 import { MissionFlow } from '../components/mission/MissionFlow';
 import { DeleteChantierButton } from '../components/DeleteChantierButton';
 
@@ -241,7 +251,10 @@ export function CompagnonView({
         />
       )}
 
-      {missionKind && (
+      {missionKind === 'compte_rendu' && (
+        <CompteRenduFlow project={project} actor={actor} onClose={() => setMissionKind(null)} />
+      )}
+      {missionKind && missionKind !== 'compte_rendu' && (
         <MissionFlow
           kind={missionKind}
           project={project}
@@ -345,6 +358,8 @@ function SuiviTab({
                 // Tout document / compte rendu est CONSULTABLE (fichier réel ou
                 // document généré par PHÉNIX) — jamais une simple ligne inerte.
                 const openableDoc = e.type === 'document' || e.type === 'compte_rendu';
+                const crPoints = e.type === 'compte_rendu' ? e.content.points : undefined;
+                const isCrPoints = (crPoints?.length ?? 0) > 0;
                 const hasRow = badge != null || filSrc?.kind === 'fil' || canLever || openableDoc;
                 return (
                   <ActivityItem
@@ -390,8 +405,27 @@ function SuiviTab({
                           </button>
                         )}
                         {openableDoc && <DocumentButton event={e} />}
+                        {isCrPoints && crADesPointsPour(crPoints, 'client') && (
+                          <button
+                            type="button"
+                            onClick={() => demo.openDocument(e, 'client')}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-3.5"
+                          >
+                            <FileText aria-hidden /> PDF client
+                          </button>
+                        )}
+                        {isCrPoints && crADesPointsPour(crPoints, 'artisan') && (
+                          <button
+                            type="button"
+                            onClick={() => demo.openDocument(e, 'artisan')}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-3.5"
+                          >
+                            <FileText aria-hidden /> PDF artisan
+                          </button>
+                        )}
                       </span>
                     )}
+                    {isCrPoints && <CompteRenduPoints points={crPoints} audience="conducteur" />}
                   </ActivityItem>
                 );
               })}

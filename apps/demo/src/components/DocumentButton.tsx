@@ -1,5 +1,5 @@
 import { FileText } from 'lucide-react';
-import type { Event } from '@phenix360/core';
+import type { CrAudience, Event } from '@phenix360/core';
 import { demo } from '../store';
 
 /**
@@ -11,15 +11,18 @@ import { demo } from '../store';
 export function DocumentButton({
   event,
   className,
+  audience = 'conducteur',
 }: {
   event: Event;
   className?: string;
+  /** Version du compte rendu à ouvrir (filtrage des points par destinataire). */
+  audience?: CrAudience;
 }): React.JSX.Element {
   const label = event.type === 'compte_rendu' ? 'Consulter le compte rendu' : 'Ouvrir le document';
   return (
     <button
       type="button"
-      onClick={() => demo.openDocument(event)}
+      onClick={() => demo.openDocument(event, audience)}
       className={`inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&_svg]:size-3.5 ${className ?? ''}`}
     >
       <FileText aria-hidden />

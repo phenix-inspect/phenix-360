@@ -1,4 +1,12 @@
-import { PROJECT_STEP_LABEL, ROLE_LABEL, type DocumentEvent, type Event } from '@phenix360/core';
+import {
+  DIFFUSION_LABEL,
+  PROJECT_STEP_LABEL,
+  ROLE_LABEL,
+  pointsPourAudience,
+  type CrAudience,
+  type DocumentEvent,
+  type Event,
+} from '@phenix360/core';
 import { eventTitle } from './eventText';
 import { fmtDate } from './format';
 
@@ -59,6 +67,36 @@ function compteRenduBody(event: Extract<Event, { type: 'compte_rendu' }>): strin
   ].join('');
 }
 
+/**
+ * Corps d'un compte rendu À POINTS (photo + commentaire + cible de diffusion),
+ * FILTRÉ par destinataire : le PDF client ne montre que les points client + les
+ * deux ; le PDF artisan que les points artisan + les deux ; le conducteur voit
+ * tout (avec le badge de diffusion). Chaque point : sa photo, son commentaire.
+ */
+function compteRenduPointsBody(
+  event: Extract<Event, { type: 'compte_rendu' }>,
+  audience: CrAudience,
+): string {
+  const points = pointsPourAudience(event.content.points, audience);
+  if (points.length === 0)
+    return `<section><p class="muted">Aucun point pour ce destinataire.</p></section>`;
+  return `<section class="points">${points
+    .map(
+      (p, i) => `<article class="point">
+      ${p.imageUrl ? `<img class="point-photo" src="${p.imageUrl}" alt="Point ${i + 1}"/>` : ''}
+      <div class="point-body">
+        <p class="point-comment">${esc(p.comment)}</p>
+        ${
+          audience === 'conducteur'
+            ? `<span class="badge">${esc(DIFFUSION_LABEL[p.diffusion])}</span>`
+            : ''
+        }
+      </div>
+    </article>`,
+    )
+    .join('')}</section>`;
+}
+
 /** Corps d'un document de référence sans fichier joint (fiche de couverture). */
 function documentBody(event: DocumentEvent): string {
   const att = event.content.attachment;
@@ -73,8 +111,22 @@ function documentBody(event: DocumentEvent): string {
  * le PV de réception, la liste de points à reprendre, ou la fiche de référence
  * d'un document sans pièce jointe. Aucune logique métier — pure présentation.
  */
-export function buildDocumentHtml(event: Event, ctx: DocumentContext): string {
+export function buildDocumentHtml(
+  event: Event,
+  ctx: DocumentContext,
+  audience: CrAudience = 'conducteur',
+): string {
   const title = generatedDocumentTitle(event);
+  // Le libellé « Version client / artisan » ne concerne QUE les comptes rendus à
+  // points (jamais un devis ou une facture).
+  const isCrPoints =
+    event.type === 'compte_rendu' && !!event.content.points && event.content.points.length > 0;
+  const audienceLabel =
+    isCrPoints && audience === 'client'
+      ? 'Version client'
+      : isCrPoints && audience === 'artisan'
+        ? 'Version artisan'
+        : '';
   const step =
     event.type === 'compte_rendu' && event.content.etapeConfirmee
       ? PROJECT_STEP_LABEL[event.content.etapeConfirmee]
@@ -86,7 +138,9 @@ export function buildDocumentHtml(event: Event, ctx: DocumentContext): string {
   const categorie = event.type === 'document' ? event.content.categorie : undefined;
   const body =
     event.type === 'compte_rendu'
-      ? compteRenduBody(event)
+      ? event.content.points && event.content.points.length > 0
+        ? compteRenduPointsBody(event, audience)
+        : compteRenduBody(event)
       : event.type === 'document'
         ? documentBody(event)
         : '';
@@ -110,11 +164,18 @@ export function buildDocumentHtml(event: Event, ctx: DocumentContext): string {
   .muted { color: #8a8069; font-size: 14px; }
   ul { margin: 0 0 12px; padding-left: 20px; }
   li { margin: 0 0 6px; }
+  .points { margin-top: 4px; }
+  .point { display: flex; gap: 18px; padding: 18px 0; border-bottom: 1px solid #ece3d2; page-break-inside: avoid; }
+  .point:last-child { border-bottom: none; }
+  .point-photo { width: 200px; height: 150px; object-fit: cover; border-radius: 10px; border: 1px solid #e7dfce; flex-shrink: 0; }
+  .point-body { flex: 1; min-width: 0; }
+  .point-comment { font-size: 17px; margin: 0 0 10px; }
+  .badge { display: inline-block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #a9803a; background: #f6edda; border-radius: 999px; padding: 3px 10px; }
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece3d2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
   @media print { body { background: #fff; } .sheet { border: none; box-shadow: none; margin: 0; } }
 </style></head>
 <body><article class="sheet">
-  <div class="brand">PHÉNIX 360</div>
+  <div class="brand">PHÉNIX 360${audienceLabel ? ` · ${esc(audienceLabel)}` : ''}</div>
   <h1>${esc(title)}</h1>
   <div class="metas">
     ${line('Chantier', ctx.projectName)}

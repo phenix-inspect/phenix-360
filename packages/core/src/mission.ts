@@ -11,9 +11,15 @@
 import type { MomentType } from './fil.js';
 import type { CrAction, CrDecision, CrQuestion } from './event.js';
 
-/** Les 7 missions de la V1 « Gestion du chantier ». Toutes sont des MomentType. */
+/**
+ * Les missions de la V1 « Gestion du chantier ». Toutes sont des MomentType.
+ * Décision produit (09/07/2026) : « Visite » et « Réunion » ont FUSIONNÉ en un
+ * unique « Compte rendu de chantier » (une visite improvisée et une réunion
+ * programmée produisent le même résultat — le conducteur ne choisit plus le bon
+ * bouton, il raconte simplement ce qu'il vient de constater).
+ */
 export type MissionKind =
-  'visite' | 'reunion' | 'livraison' | 'prereception' | 'reception' | 'sav' | 'note';
+  'compte_rendu' | 'livraison' | 'prereception' | 'reception' | 'sav' | 'note';
 
 export interface MissionDef {
   kind: MissionKind;
@@ -24,11 +30,10 @@ export interface MissionDef {
 /** Catalogue des missions (l'écran d'entrée « Pourquoi êtes-vous là ? »). */
 export const MISSIONS: MissionDef[] = [
   {
-    kind: 'visite',
-    label: 'Visite de chantier',
-    description: 'Faire le point, repérer ce qui avance',
+    kind: 'compte_rendu',
+    label: 'Compte rendu de chantier',
+    description: 'Photographier, commenter, diffuser — point par point',
   },
-  { kind: 'reunion', label: 'Réunion de chantier', description: 'Présents, décisions, actions' },
   { kind: 'livraison', label: 'Livraison de matériel', description: 'Contrôler ce qui arrive' },
   { kind: 'prereception', label: 'Pré-réception', description: 'Lister les points à reprendre' },
   { kind: 'reception', label: 'Réception', description: 'Clôturer le chantier proprement' },
@@ -37,8 +42,7 @@ export const MISSIONS: MissionDef[] = [
 ];
 
 export const MISSION_LABEL: Record<MissionKind, string> = {
-  visite: 'Visite de chantier',
-  reunion: 'Réunion de chantier',
+  compte_rendu: 'Compte rendu de chantier',
   livraison: 'Livraison de matériel',
   prereception: 'Pré-réception',
   reception: 'Réception',
@@ -48,8 +52,7 @@ export const MISSION_LABEL: Record<MissionKind, string> = {
 
 /** Titre du document projeté selon la mission. */
 export const MISSION_DOC_TITLE: Record<MissionKind, string> = {
-  visite: 'Compte rendu de visite',
-  reunion: 'Compte rendu de réunion',
+  compte_rendu: 'Compte rendu de chantier',
   livraison: 'Contrôle de livraison',
   prereception: 'Liste des points à reprendre',
   reception: 'PV de réception',
@@ -130,9 +133,6 @@ export function prepareMission(input: {
     ...(firstPhoto ? { photoId: firstPhoto } : {}),
   });
 
-  const decisionsAll: CrDecision[] = ph
-    .filter((p) => RX_DECISION.test(p))
-    .map((p) => ({ libelle: cap(p), bloque: false }));
   const actionsAll: CrAction[] = ph
     .filter((p) => RX_ACTION.test(p))
     .map((label) => ({ label: cap(label), priorite: 'normale' }));
@@ -149,15 +149,6 @@ export function prepareMission(input: {
   let manquants: string[] = [];
 
   switch (input.kind) {
-    case 'reunion':
-      decisions = decisionsAll;
-      actions = actionsAll;
-      reserves = reservesCue.map(asReserve);
-      break;
-    case 'visite':
-      actions = actionsAll;
-      reserves = reservesCue.map(asReserve);
-      break;
     case 'livraison':
       manquants = manquantsAll;
       reserves = manquantsAll.map((m) => asReserve(`Manquant / dommage : ${m}`));

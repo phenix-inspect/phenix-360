@@ -37,8 +37,13 @@ routage, aucun état. VISION Art. 3, 10.
 
 ### EPIC 2 — Mission · ✅ Terminé
 
-7 missions (`MissionFlow`) : capture caméra/voix → **scène signature « PHÉNIX
-prépare → C'est prêt »** → compréhension → validation → partage. VISION Art. 4, 5, 11.
+6 missions : capture caméra/voix → **scène signature « PHÉNIX prépare → C'est prêt »**
+→ compréhension → validation → partage (`MissionFlow`). **Fusion Visite + Réunion
+(09/07)** : un seul **« Compte rendu de chantier »** à **points** (photo + commentaire +
+diffusion `Client` / `Artisan` / `Client + Artisan`) — flux `CompteRenduFlow` ; le
+conducteur voit tout (badges), le client ne voit que ses points, l'export PDF est
+filtré par destinataire ; l'avancement d'étape reste porté par le CR (ADR-002 §5).
+`compte-rendu.test`. VISION Art. 4, 5, 8, 9, 11.
 
 ### EPIC 3 — Compte rendu IA · ✅ Terminé
 

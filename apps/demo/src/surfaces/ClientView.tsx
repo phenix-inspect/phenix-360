@@ -379,7 +379,7 @@ export function ClientView({
               <FileText aria-hidden />
               <h2 className="font-serif text-lg font-semibold tracking-tight">Vos documents</h2>
             </div>
-            <ClientDocuments events={[...clientDocuments, ...comptesRendus]} />
+            <ClientDocuments events={[...clientDocuments, ...comptesRendus]} audience="client" />
           </section>
         </TabsContent>
       </Tabs>

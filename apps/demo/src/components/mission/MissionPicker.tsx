@@ -9,23 +9,21 @@ import {
 import { MISSIONS, type MissionKind } from '@phenix360/core';
 import {
   ClipboardList,
-  Eye,
   FileText,
   HelpCircle,
   Images,
   KeyRound,
+  NotebookPen,
   PenLine,
   Reply,
   Truck,
-  Users,
   Wrench,
   type LucideIcon,
 } from 'lucide-react';
 import type { ComposerKind } from '../Composer';
 
 const ICONS: Record<MissionKind, LucideIcon> = {
-  visite: Eye,
-  reunion: Users,
+  compte_rendu: NotebookPen,
   livraison: Truck,
   prereception: ClipboardList,
   reception: KeyRound,

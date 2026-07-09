@@ -64,6 +64,7 @@ export const SHARED_AUDIENCE: AudienceGroup[] = ['phenix', 'artisans', 'client']
  * prête à accueillir pré-réception / réception / SAV dans les phases suivantes.
  */
 export const MOMENT_TYPES = [
+  'compte_rendu',
   'reunion',
   'visite',
   'livraison',
@@ -77,8 +78,11 @@ export const MOMENT_TYPES = [
 export type MomentType = (typeof MOMENT_TYPES)[number];
 
 export const MOMENT_TYPE_LABEL: Record<MomentType, string> = {
-  reunion: 'Réunion de chantier',
-  visite: 'Visite de chantier',
+  compte_rendu: 'Compte rendu de chantier',
+  // `reunion` / `visite` : valeurs HÉRITÉES (données antérieures) — la mission
+  // « Visite » et « Réunion » a fusionné en un unique « Compte rendu de chantier ».
+  reunion: 'Compte rendu de chantier',
+  visite: 'Compte rendu de chantier',
   livraison: 'Livraison',
   prereception: 'Pré-réception',
   reception: 'Réception',
@@ -90,8 +94,9 @@ export const MOMENT_TYPE_LABEL: Record<MomentType, string> = {
 
 /** Libellé court (pour les puces / chips discrètes). */
 export const MOMENT_TYPE_SHORT: Record<MomentType, string> = {
-  reunion: 'Réunion',
-  visite: 'Visite',
+  compte_rendu: 'Compte rendu',
+  reunion: 'Compte rendu',
+  visite: 'Compte rendu',
   livraison: 'Livraison',
   prereception: 'Pré-réception',
   reception: 'Réception',
@@ -273,6 +278,7 @@ export function momentTypeOf(moment: Moment): MomentType {
  * les Comptes rendus et les Documents — JAMAIS dans « Dans les coulisses ».
  */
 export const MOMENT_TYPES_TRAVAIL: readonly MomentType[] = [
+  'compte_rendu',
   'reunion',
   'visite',
   'livraison',

@@ -42,8 +42,11 @@ import {
   type CommCanal,
   type Contact,
   type ClientSelection,
+  type CompteRenduPoint,
   type CoupDeCoeur,
+  type CrAudience,
   type DecisionEvent,
+  type Diffusion,
   type DemandeResolution,
   type SelectionOption,
   type ActionPriorite,
@@ -444,17 +447,21 @@ export const demo = {
    * événements `document` et `compte_rendu`, côté conducteur comme côté client
    * (le partage gouverne DÉJÀ où le document apparaît — ici on ne fait qu'ouvrir).
    */
-  openDocument(event: Event): void {
+  openDocument(event: Event, audience: CrAudience = 'conducteur'): void {
     if (event.type === 'document' && event.content.attachment.dataUrl) {
       openAttachment(event.content.attachment);
       return;
     }
     const project = snapshot.projects.find((p) => p.id === event.projectId);
     openHtmlDocument(
-      buildDocumentHtml(event, {
-        projectName: project?.name ?? 'Chantier',
-        authorName: nameOf(snapshot, event.actor.userId),
-      }),
+      buildDocumentHtml(
+        event,
+        {
+          projectName: project?.name ?? 'Chantier',
+          authorName: nameOf(snapshot, event.actor.userId),
+        },
+        audience,
+      ),
     );
   },
 
@@ -462,17 +469,21 @@ export const demo = {
    * TÉLÉCHARGE n'importe quel document (règle unique, symétrique de `openDocument`) :
    * un vrai fichier → le fichier d'origine ; un document généré → sa page HTML.
    */
-  downloadDocument(event: Event): void {
+  downloadDocument(event: Event, audience: CrAudience = 'conducteur'): void {
     if (event.type === 'document' && event.content.attachment.dataUrl) {
       downloadAttachment(event.content.attachment);
       return;
     }
     const project = snapshot.projects.find((p) => p.id === event.projectId);
     downloadHtmlDocument(
-      buildDocumentHtml(event, {
-        projectName: project?.name ?? 'Chantier',
-        authorName: nameOf(snapshot, event.actor.userId),
-      }),
+      buildDocumentHtml(
+        event,
+        {
+          projectName: project?.name ?? 'Chantier',
+          authorName: nameOf(snapshot, event.actor.userId),
+        },
+        audience,
+      ),
       generatedDocumentTitle(event),
     );
   },
@@ -1608,6 +1619,56 @@ export const demo = {
     refresh();
     broadcast();
     return { missionEventId: crEvent.id, momentId };
+  },
+
+  /**
+   * COMPTE RENDU DE CHANTIER (mission fusionnée visite + réunion, 09/07/2026).
+   * Une suite de POINTS : chaque point = 1 photo + 1 commentaire + 1 cible de
+   * diffusion (client / artisan / les deux). La visibilité de l'événement est
+   * DÉRIVÉE des points : `client` s'il existe au moins un point destiné au client
+   * (client ou les deux) — le client ne verra que CES points ; sinon `interne`
+   * (points purement artisan, invisibles au client). Optionnellement, le conducteur
+   * confirme l'étape → l'avancement reste porté par le compte rendu (ADR-002 §5).
+   */
+  async createCompteRendu(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: {
+      points: {
+        imageUrl?: string;
+        bucket?: string;
+        storagePath?: string;
+        comment: string;
+        diffusion: Diffusion;
+      }[];
+      etapeConfirmee?: ProjectStep;
+    },
+  ): Promise<{ compteRenduId: string }> {
+    const points: CompteRenduPoint[] = input.points.map((p) => ({
+      ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
+      ...(p.bucket ? { bucket: p.bucket } : {}),
+      ...(p.storagePath ? { storagePath: p.storagePath } : {}),
+      comment: p.comment.trim(),
+      diffusion: p.diffusion,
+    }));
+    const visibleClient = points.some((p) => p.diffusion !== 'artisan');
+    const ev = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'compte_rendu',
+      visibility: visibleClient ? 'client' : 'interne',
+      state: 'publie',
+      content: {
+        texte: '',
+        missionKind: 'compte_rendu',
+        docTitre: 'Compte rendu de chantier',
+        points,
+        ...(input.etapeConfirmee ? { etapeConfirmee: input.etapeConfirmee } : {}),
+      },
+    });
+    refresh();
+    broadcast();
+    return { compteRenduId: ev.id };
   },
 
   /**
