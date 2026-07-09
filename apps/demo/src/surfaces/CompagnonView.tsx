@@ -174,7 +174,11 @@ export function CompagnonView({
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as CompagnonTab)}>
-        <TabsList>
+        {/* 6 onglets : on autorise le RETOUR À LA LIGNE (h-auto flex-wrap) pour
+            qu'aucun onglet (« Demandes client », « Réserves »…) ne soit masqué
+            hors écran sur une largeur normale, au lieu d'un défilement horizontal
+            peu découvrable. */}
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           <TabsTrigger value="preparation">Préparation</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
