@@ -20,7 +20,6 @@ import {
   crADesPointsPour,
   demandeRepondue,
   demandesPourPhenix,
-  questionsEnAttente,
   reserveStatut,
   sortByDate,
   userId,
@@ -213,7 +212,6 @@ export function CompagnonView({
         kind={composer}
         project={project}
         actor={actor}
-        events={events}
         onClose={() => setComposer(null)}
         onEscalateDecision={() => {
           // « Demander au client → Décision » : bascule vers le composer structuré.
@@ -238,7 +236,6 @@ export function CompagnonView({
             setMissionPicker(false);
             setComposer(kind);
           }}
-          pendingReplies={questionsEnAttente(events).length}
           onClose={() => setMissionPicker(false)}
         />
       )}

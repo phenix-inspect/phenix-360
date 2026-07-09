@@ -3,8 +3,9 @@
  * ===========================================================================
  * Règle unique à mémoriser : « je veux faire quelque chose → Nouvelle mission ».
  * Les actions de CRÉATION quittent le Suivi (qui ne sert plus qu'à CONSULTER —
- * radar, dernière activité) : « Ajouter un document », « Demander au client » et
- * « Répondre au client » vivent désormais dans le sélecteur « Nouvelle mission ».
+ * radar, dernière activité) : « Ajouter un document » et « Demander au client »
+ * vivent désormais dans le sélecteur « Nouvelle mission ». (« Répondre au client »
+ * a été retiré : le conducteur répond depuis l'onglet « Demandes client ».)
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -46,17 +47,17 @@ const closeDialog = async () => {
     .catch(() => {});
 };
 
+// « Répondre au client » a été retiré (doublon avec l'onglet « Demandes client »).
 const MOVED = [
   { name: /Ajouter un document/, dialog: 'Ajouter un document' },
   { name: /Demander au client/, dialog: 'Demander au client' },
-  { name: /Répondre au client/, dialog: 'Répondre au client' },
 ];
 
 try {
   await openDemo(page);
   await openChantierSuivi();
 
-  await assert('SUIVI — plus AUCUNE carte de création (document / demande / réponse)', async () => {
+  await assert('SUIVI — plus AUCUNE carte de création (document / demande)', async () => {
     for (const a of MOVED)
       if ((await page.getByRole('button', { name: a.name }).count()) > 0)
         throw new Error(`une carte de création subsiste dans le Suivi : ${a.name}`);
@@ -69,7 +70,7 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('NOUVELLE MISSION — les 3 actions déplacées y sont disponibles', async () => {
+  await assert('NOUVELLE MISSION — les actions déplacées y sont disponibles', async () => {
     await openPicker();
     for (const a of MOVED)
       await page
@@ -78,15 +79,12 @@ try {
         .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert(
-    'NOUVELLE MISSION — « Répondre au client » porte le compteur des questions',
-    async () => {
-      // Le seed a une question client en attente → un badge sur « Répondre au client ».
-      const repondre = page.getByRole('button', { name: /Répondre au client/ }).first();
-      if (!/\d/.test((await repondre.innerText()) ?? ''))
-        throw new Error('aucun compteur de questions en attente sur « Répondre au client »');
-    },
-  );
+  await assert('NOUVELLE MISSION — plus de carte « Répondre au client »', async () => {
+    await openPicker();
+    if ((await page.getByRole('button', { name: /Répondre au client/ }).count()) > 0)
+      throw new Error('la carte « Répondre au client » subsiste (doublon avec « Demandes client »)');
+    await closeDialog();
+  });
 
   // Chaque action ouvre bien son composer (parcours fonctionnels).
   for (const a of MOVED) {

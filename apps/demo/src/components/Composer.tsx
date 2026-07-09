@@ -6,15 +6,12 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  EmptyState,
   Input,
   Textarea,
 } from '@phenix360/ui';
 import {
   PROJECT_STEPS,
   PROJECT_STEP_LABEL,
-  questionsEnAttente,
-  type Event,
   type EventActor,
   type EventAttachment,
   type Project,
@@ -25,7 +22,6 @@ import {
   FileText,
   HelpCircle,
   Image as ImageIcon,
-  Inbox,
   MessageSquareQuote,
   Upload,
   X,
@@ -34,7 +30,7 @@ import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment, readPhotoAttachment } from '../lib/upload';
 import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../lib/media';
 
-export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande' | 'repondre';
+export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande';
 
 /**
  * Types de documents demandables au client (« Demander au client → Document »).
@@ -63,10 +59,6 @@ const TITLES: Record<ComposerKind, { title: string; description: string }> = {
     title: 'Demander au client',
     description: 'Une décision, un document ou une question — au bon endroit, en un geste.',
   },
-  repondre: {
-    title: 'Répondre au client',
-    description: 'Les questions du client en attente de votre réponse.',
-  },
 };
 
 /** Composer ciblé (un dialogue par action). Réutilise les ports `demo.*`. */
@@ -74,14 +66,12 @@ export function Composer({
   kind,
   project,
   actor,
-  events,
   onClose,
   onEscalateDecision,
 }: {
   kind: ComposerKind | null;
   project: Project;
   actor: EventActor;
-  events: Event[];
   onClose: () => void;
   /** « Demander au client → Décision » ouvre le composer de décision structuré. */
   onEscalateDecision?: () => void;
@@ -95,17 +85,13 @@ export function Composer({
           <DialogTitle>{meta.title}</DialogTitle>
           <DialogDescription>{meta.description}</DialogDescription>
         </DialogHeader>
-        {kind === 'repondre' ? (
-          <ReplyList project={project} actor={actor} events={events} onDone={onClose} />
-        ) : (
-          <CaptureForm
-            kind={kind}
-            project={project}
-            actor={actor}
-            onDone={onClose}
-            onEscalateDecision={onEscalateDecision}
-          />
-        )}
+        <CaptureForm
+          kind={kind}
+          project={project}
+          actor={actor}
+          onDone={onClose}
+          onEscalateDecision={onEscalateDecision}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -575,68 +561,6 @@ function BackToMenu({ onClick }: { onClick: () => void }): React.JSX.Element {
       <ChevronLeft aria-hidden />
       Changer de type de demande
     </button>
-  );
-}
-
-function ReplyList({
-  project,
-  actor,
-  events,
-  onDone,
-}: {
-  project: Project;
-  actor: EventActor;
-  events: Event[];
-  onDone: () => void;
-}): React.JSX.Element {
-  const queue = questionsEnAttente(events);
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-
-  if (queue.length === 0) {
-    return (
-      <EmptyState
-        icon={<Inbox aria-hidden />}
-        title="Aucune demande en attente"
-        description="Vos clients n’attendent aucune réponse pour le moment."
-        action={
-          <Button variant="outline" onClick={onDone}>
-            Fermer
-          </Button>
-        }
-      />
-    );
-  }
-
-  const reply = async (eventId: (typeof queue)[number]['id']) => {
-    const texte = (drafts[eventId] ?? '').trim();
-    if (!texte) return;
-    await demo.resolveDemande(eventId, {
-      texte,
-      resolvedBy: actor.userId,
-      resolvedAt: new Date().toISOString(),
-    });
-    if (queue.length === 1) onDone();
-  };
-
-  return (
-    <ul className="space-y-3">
-      {queue.map((d) => (
-        <li key={d.id} className="space-y-2 rounded-lg border border-border bg-surface p-3">
-          <p className="text-sm text-foreground">{d.content.question}</p>
-          <Textarea
-            value={drafts[d.id] ?? ''}
-            onChange={(e) => setDrafts((s) => ({ ...s, [d.id]: e.target.value }))}
-            rows={2}
-            placeholder="Votre réponse au client…"
-          />
-          <div className="flex justify-end">
-            <Button size="sm" onClick={() => void reply(d.id)}>
-              Répondre
-            </Button>
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 }
 

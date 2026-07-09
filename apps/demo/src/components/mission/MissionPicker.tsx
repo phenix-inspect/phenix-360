@@ -1,11 +1,4 @@
-import {
-  Badge,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@phenix360/ui';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@phenix360/ui';
 import { MISSIONS, type MissionKind } from '@phenix360/core';
 import {
   ClipboardList,
@@ -15,7 +8,6 @@ import {
   KeyRound,
   NotebookPen,
   PenLine,
-  Reply,
   Truck,
   Wrench,
   type LucideIcon,
@@ -54,12 +46,8 @@ const COMPOSE_ACTIONS: {
     description: 'Une décision, un document ou une question',
     icon: HelpCircle,
   },
-  {
-    kind: 'repondre',
-    label: 'Répondre au client',
-    description: 'Les questions en attente de réponse',
-    icon: Reply,
-  },
+  // « Répondre au client » a été retiré (09/07/2026) : doublon avec l'onglet
+  // « Demandes client », désormais l'UNIQUE endroit où le conducteur répond.
 ];
 
 /**
@@ -71,16 +59,13 @@ export function MissionPicker({
   onSelect,
   onPublishAlbum,
   onCompose,
-  pendingReplies = 0,
   onClose,
 }: {
   onSelect: (kind: MissionKind) => void;
   /** Publier un album photo dans « Dans les coulisses » (la brique plaisir). */
   onPublishAlbum: () => void;
-  /** Actions administratives (document, demande, réponse) — déplacées du Suivi. */
+  /** Actions administratives (document, demande) — déplacées du Suivi. */
   onCompose: (kind: ComposerKind) => void;
-  /** Nombre de questions client en attente (badge sur « Répondre au client »). */
-  pendingReplies?: number;
   onClose: () => void;
 }): React.JSX.Element {
   return (
@@ -154,11 +139,6 @@ export function MissionPicker({
                   <span className="block text-sm font-medium text-foreground">{a.label}</span>
                   <span className="block text-xs text-muted-foreground">{a.description}</span>
                 </span>
-                {a.kind === 'repondre' && pendingReplies > 0 && (
-                  <span className="absolute right-3 top-3">
-                    <Badge variant="gold">{pendingReplies}</Badge>
-                  </span>
-                )}
               </button>
             );
           })}

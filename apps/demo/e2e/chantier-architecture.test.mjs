@@ -106,7 +106,7 @@ try {
         .waitFor({ state: 'visible', timeout: 6000 });
       if ((await libraryHeading().count()) > 0)
         throw new Error('la bibliothèque de documents apparaît dans le Suivi');
-      for (const creation of [/Ajouter un document/, /Demander au client/, /Répondre au client/])
+      for (const creation of [/Ajouter un document/, /Demander au client/])
         if ((await page.getByRole('button', { name: creation }).count()) > 0)
           throw new Error(`une action de création subsiste dans le Suivi : ${creation}`);
       if ((await notifSection().count()) > 0)

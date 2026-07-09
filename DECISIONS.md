@@ -2416,3 +2416,26 @@ bouton « Ouvrir » et les bulles existent déjà. Nouveau `leon-ia.test` (8/8 :
 sans escalade, numéro PHÉNIX, réception depuis les dates, document introuvable expliqué + non bloquant,
 demande conducteur créée + reçue dans « Aujourd'hui », message avec photo conservée + chat utilisable).
 Gate verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.
+
+## 09/07/2026 — Suppression de « Répondre au client » dans « + Nouvelle mission »
+
+**Décision produit validée :** on retire la carte **« Répondre au client »** du sélecteur « Nouvelle
+mission ». Depuis l'ajout de l'onglet **« Demandes client »**, elle est devenue un **doublon** : le
+conducteur ne doit avoir **qu'un seul endroit** pour répondre à un client. Règle : le client pose ses
+questions via **Léon** → la demande arrive dans **« Aujourd'hui »** et **« Demandes client »** ; le
+conducteur répond **exclusivement** depuis « Demandes client ».
+
+**Fait :** carte + libellé + icône (`Reply`) retirés de `MissionPicker` (+ son badge « compteur de
+questions » et la prop `pendingReplies`) ; kind `'repondre'` retiré de `ComposerKind` ; composant
+`ReplyList` supprimé (seul consommateur) ; nettoyage des imports devenus inutiles (`questionsEnAttente`
+côté `CompagnonView`/`Composer`, prop `events` du `Composer`). La grille des actions ne laisse aucun
+vide (2 cartes : « Ajouter un document », « Demander au client »).
+
+**Conservé (intact) :** **« Demander au client »** (initiative conducteur : décision / document /
+question), l'onglet **« Demandes client »**, **Léon**, **Aujourd'hui**, **Suivi**. Le sélecteur
+`questionsEnAttente` reste (utilisé par « Aujourd'hui »).
+
+**Tests :** `mission-entree-unique` mis à jour (2 actions ; garde négative « plus de carte Répondre au
+client ») ; `chantier-architecture` mis à jour. Gate verte (typecheck, lint, prettier, build, e2e
+complet, zéro erreur console). Objectif : une action = un seul point d'entrée, aucun doublon
+fonctionnel. VISION Art. 4, 8, 9, 11.
