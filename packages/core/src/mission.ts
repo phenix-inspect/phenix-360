@@ -27,14 +27,23 @@ export interface MissionDef {
   description: string;
 }
 
-/** Catalogue des missions (l'écran d'entrée « Pourquoi êtes-vous là ? »). */
+/**
+ * Catalogue des missions PROPOSÉES dans « Nouvelle mission » (l'écran d'entrée
+ * « Pourquoi êtes-vous là ? »). On garde ce menu extrêmement simple : uniquement
+ * les missions réellement utilisées au quotidien — moins le conducteur réfléchit,
+ * plus PHÉNIX est efficace.
+ *
+ * Décision produit (09/07/2026) : « Livraison de matériel » est RETIRÉE du menu
+ * (trop spécifique pour la V1). Sa logique métier reste intacte et isolée
+ * (`MissionKind` / labels / `prepareMission` case `livraison`) : réactiver la
+ * mission = ré-ajouter simplement son entrée ci-dessous.
+ */
 export const MISSIONS: MissionDef[] = [
   {
     kind: 'compte_rendu',
     label: 'Compte rendu de chantier',
     description: 'Photographier, commenter, diffuser — point par point',
   },
-  { kind: 'livraison', label: 'Livraison de matériel', description: 'Contrôler ce qui arrive' },
   { kind: 'prereception', label: 'Pré-réception', description: 'Lister les points à reprendre' },
   { kind: 'reception', label: 'Réception', description: 'Clôturer le chantier proprement' },
   { kind: 'sav', label: 'SAV', description: 'Traiter une intervention après travaux' },

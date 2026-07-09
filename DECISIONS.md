@@ -2130,3 +2130,23 @@ try/catch, pas de fallback blanc : un point historique s'affiche correctement.
 blanche**, que le point historique **s'affiche**, que **tous les onglets** (Suivi / Préparation /
 Documents / Dans les coulisses) s'ouvrent, et **zéro erreur console**. Confirmé : ROUGE avant le
 correctif (`pageerror … reading 'length'`), VERT après. Gate complète relancée. VISION Art. 11.
+
+## 09/07/2026 — « Nouvelle mission » simplifiée : retrait de « Livraison de matériel »
+
+**Décision produit validée :** on retire **provisoirement** la mission « Livraison de matériel »
+du menu « Nouvelle mission ». Trop spécifique, valeur insuffisante pour une V1. Objectif : réduire
+le nombre de choix — moins le conducteur réfléchit, plus PHÉNIX est efficace. Le menu ne propose
+plus que les missions du quotidien : **Compte rendu de chantier · Pré-réception · Réception · SAV ·
+Note** (5 au lieu de 6).
+
+**Réversible (logique métier conservée) :** on ne retire QUE l'entrée du catalogue `MISSIONS` (les
+cartes du picker en dérivent → la carte, son icône et son libellé disparaissent, sans trou dans la
+grille `sm:grid-cols-2`). On **garde** le `MissionKind` `livraison`, ses libellés
+(`MISSION_LABEL` / `MISSION_DOC_TITLE`), son icône (`Truck` dans `ICONS`) et la branche
+`prepareMission` `livraison` : le flux reste isolé et inactif. **Réactiver = ré-ajouter une seule
+ligne** dans `MISSIONS`. À noter : le compteur « Livraisons à contrôler » d'« Aujourd'hui » est
+indépendant (dérivé des commandes/alertes) — inchangé.
+
+**Tests :** garde négative ajoutée à `compte-rendu.test` (le picker ne propose plus « Livraison de
+matériel »). Aucun test ne sélectionnait cette mission. Gate verte (typecheck, lint, prettier,
+build, e2e, zéro erreur console). VISION Art. 4, 11.

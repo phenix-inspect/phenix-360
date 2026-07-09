@@ -68,6 +68,9 @@ try {
         throw new Error('« Visite de chantier » subsiste dans le picker');
       if ((await dlg.getByText('Réunion de chantier').count()) > 0)
         throw new Error('« Réunion de chantier » subsiste dans le picker');
+      // « Livraison de matériel » retirée du menu (V1 simplifiée).
+      if ((await dlg.getByText('Livraison de matériel').count()) > 0)
+        throw new Error('« Livraison de matériel » subsiste dans le picker');
     },
   );
 

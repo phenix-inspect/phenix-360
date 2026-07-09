@@ -37,8 +37,10 @@ routage, aucun état. VISION Art. 3, 10.
 
 ### EPIC 2 — Mission · ✅ Terminé
 
-6 missions : capture caméra/voix → **scène signature « PHÉNIX prépare → C'est prêt »**
-→ compréhension → validation → partage (`MissionFlow`). **Fusion Visite + Réunion
+5 missions : capture caméra/voix → **scène signature « PHÉNIX prépare → C'est prêt »**
+→ compréhension → validation → partage (`MissionFlow`). **« Livraison de matériel »
+retirée du menu (09/07, V1 simplifiée)** — logique conservée, réactivation = 1 ligne.
+**Fusion Visite + Réunion
 (09/07)** : un seul **« Compte rendu de chantier »** à **points** (1 à 3 photos + commentaire +
 diffusion `Client` / `Artisan` / `Client + Artisan`) — flux `CompteRenduFlow` ; le
 conducteur voit tout (badges), le client ne voit que ses points, l'export PDF est
