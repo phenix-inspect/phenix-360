@@ -1,13 +1,11 @@
 /**
- * RC1 — Refonte de l'Espace CLIENT : un onglet = un univers (même philosophie que
- * le conducteur). Le client suit son projet comme un réseau social premium, jamais
- * un ERP.
- *   • AUJOURD'HUI = boîte de réception (décisions, notifications) ;
- *   • LE PROJET = avancement (grandes étapes, planning, choix) — aucun document,
- *     aucune photo ;
- *   • DANS LES COULISSES = photos/albums (❤️ 💬) — aucun document/CR/PV ;
- *   • DOCUMENTS = tout PDF (devis, factures, comptes rendus, PV…), ouvrable +
- *     téléchargeable.
+ * Refonte de l'Espace CLIENT — 5 onglets, un onglet = une question :
+ *   • AUJOURD'HUI = tableau d'actions (notifications d'abord, puis ce qui attend
+ *     une action) ; si rien → « Vous n'avez rien à faire » ;
+ *   • VOS DEMANDES = historique des échanges avec PHÉNIX (via Léon) ;
+ *   • VOS CHOIX = historique des décisions demandées ;
+ *   • DOCUMENTS = tout PDF, ouvrable + téléchargeable ;
+ *   • DANS LES COULISSES = photos/albums (❤️ 💬).
  * Aucun doublon entre onglets. Les notifications ouvrent directement le bon écran.
  */
 import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
@@ -19,17 +17,20 @@ const { assert, summary } = harness();
 const docsHeading = () => page.getByRole('heading', { name: 'Vos documents' });
 const coulissesHeading = () =>
   page.getByRole('heading', { name: 'Dans les coulisses du chantier' });
-const planningHeading = () => page.getByRole('heading', { name: 'Les grandes étapes du chantier' });
+const choixHeading = () => page.getByRole('heading', { name: 'Vos choix', exact: true });
 const download = () => page.getByRole('button', { name: /Télécharger/ });
 
 try {
   await openDemo(page);
 
-  await assert('Les 4 onglets client existent', async () => {
+  await assert('Les 5 onglets client existent', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     const bar = page.locator('main').getByRole('tablist').first();
-    for (const t of ['Aujourd’hui', 'Le projet', 'Dans les coulisses', 'Documents'])
+    for (const t of ['Aujourd’hui', 'Vos demandes', 'Vos choix', 'Documents', 'Dans les coulisses'])
       await bar.getByRole('tab', { name: t }).waitFor({ state: 'visible', timeout: 5000 });
+    // Plus d'onglet « Le projet ».
+    if ((await bar.getByRole('tab', { name: 'Le projet' }).count()) > 0)
+      throw new Error('l’onglet « Le projet » ne devrait plus exister');
   });
 
   // ---- DOCUMENTS : tout PDF, ouvrable + téléchargeable ------------------
@@ -45,7 +46,6 @@ try {
       throw new Error('aucun document ouvrable côté client');
     if ((await download().count()) === 0)
       throw new Error('aucun document téléchargeable côté client');
-    // Aucune photo dans les documents.
     if ((await coulissesHeading().count()) > 0)
       throw new Error('les coulisses (photos) apparaissent dans Documents');
   });
@@ -58,22 +58,21 @@ try {
       throw new Error('la bibliothèque documents apparaît dans les coulisses');
     if ((await download().count()) > 0)
       throw new Error('un document téléchargeable traîne dans les coulisses');
-    // Le client peut aimer.
     if ((await page.getByRole('button', { name: /coup de cœur/i }).count()) === 0)
       throw new Error('impossible d’aimer une photo côté client');
   });
 
-  // ---- LE PROJET : avancement, aucun document ni photo -----------------
-  await assert('LE PROJET — avancement seulement (ni document, ni coulisses)', async () => {
-    await openClientTab(page, 'Le projet');
-    await planningHeading().first().waitFor({ state: 'visible', timeout: 6000 });
+  // ---- VOS CHOIX : les décisions, aucun document ni photo --------------
+  await assert('VOS CHOIX — décisions seulement (ni document, ni coulisses)', async () => {
+    await openClientTab(page, 'Vos choix');
+    await choixHeading().first().waitFor({ state: 'visible', timeout: 6000 });
     if ((await docsHeading().count()) > 0)
-      throw new Error('des documents apparaissent dans Le projet');
+      throw new Error('des documents apparaissent dans Vos choix');
     if ((await coulissesHeading().count()) > 0)
-      throw new Error('les coulisses apparaissent dans Le projet');
+      throw new Error('les coulisses apparaissent dans Vos choix');
   });
 
-  // ---- AUJOURD'HUI : la boîte de réception ; le clic ouvre le bon écran --
+  // ---- AUJOURD'HUI : boîte d'actions ; le clic ouvre le bon écran -------
   await assert(
     'AUJOURD’HUI — une notif document ouvre directement l’onglet Documents',
     async () => {
@@ -81,18 +80,16 @@ try {
       const notif = page
         .locator('section[aria-label="Notifications"]')
         .getByRole('button', { name: /Nouveau document partagé/ });
-      // Le seed partage au moins un document → une notification l'annonce ici.
       if ((await notif.count()) === 0) {
-        // Pas de notif seedée : au moins la boîte de réception existe (bandeau/décision).
+        // Pas de notif seedée : au moins une action ou l'état vide est présent.
         if (
           (await page.getByRole('button', { name: /Voir la décision/ }).count()) === 0 &&
-          (await page.getByText(/Tout est à jour/).count()) === 0
+          (await page.getByText(/Vous n’avez rien à faire|Tout est à jour/).count()) === 0
         )
-          throw new Error('la boîte de réception est vide');
+          throw new Error('la boîte d’actions est vide');
         return;
       }
       await notif.first().click();
-      // Le clic bascule sur Documents (le bon écran).
       await docsHeading().waitFor({ state: 'visible', timeout: 6000 });
     },
   );

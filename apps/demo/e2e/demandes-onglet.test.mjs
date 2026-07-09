@@ -77,8 +77,7 @@ try {
     const order = (await tl.getByRole('tab').allInnerTexts()).map(clean);
     const iCoul = order.findIndex((n) => /Dans les coulisses/.test(n));
     const iDem = order.findIndex((n) => /Demandes client/.test(n));
-    if (!(iCoul >= 0 && iCoul < iDem))
-      throw new Error(`ordre inattendu : ${order.join(' | ')}`);
+    if (!(iCoul >= 0 && iCoul < iDem)) throw new Error(`ordre inattendu : ${order.join(' | ')}`);
     // L'onglet « Réserves » a été retiré.
     if (order.some((n) => /Réserves/.test(n)))
       throw new Error('l’onglet « Réserves » ne devrait plus exister');

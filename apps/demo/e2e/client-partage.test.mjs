@@ -48,10 +48,9 @@ try {
     await openClient();
     if ((await page.getByText('Espace client non prêt').count()) > 0)
       throw new Error('espace client bloqué alors que les 3 bloquants sont validés');
-    // Le planning vit dans l'onglet « Le projet ».
-    await page.getByRole('tab', { name: 'Le projet' }).click();
+    // L'espace client est accessible : ses onglets sont rendus.
     await page
-      .getByRole('heading', { name: 'Les grandes étapes du chantier' })
+      .getByRole('tab', { name: 'Vos demandes' })
       .first()
       .waitFor({ state: 'visible', timeout: 8000 });
   });
@@ -65,9 +64,9 @@ try {
       .getByRole('heading', { name: 'Espace client non prêt' })
       .waitFor({ state: 'visible', timeout: 6000 });
     await page.getByText('Acompte payé').first().waitFor({ state: 'visible', timeout: 4000 });
-    // Aucune fuite : ni récit, ni planning, ni documents côté client.
-    if ((await page.getByText('Les grandes étapes du chantier').count()) > 0)
-      throw new Error('le planning client fuit alors que l’espace est bloqué');
+    // Aucune fuite : les onglets client ne s'affichent pas quand l'espace est bloqué.
+    if ((await page.getByRole('tab', { name: 'Vos demandes' }).count()) > 0)
+      throw new Error('le contenu client fuit alors que l’espace est bloqué');
   });
 
   await assert('Sans date officielle → espace client BLOQUÉ', async () => {

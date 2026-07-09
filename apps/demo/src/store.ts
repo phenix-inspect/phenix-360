@@ -2216,7 +2216,7 @@ export interface AppNotification {
   tab?: string;
   momentId?: string;
   /** Client : onglet de l'espace à ouvrir (aujourdhui / projet / coulisses / documents). */
-  clientTab?: 'aujourdhui' | 'projet' | 'coulisses' | 'documents';
+  clientTab?: 'aujourdhui' | 'demandes' | 'choix' | 'coulisses' | 'documents';
   /** Client : section à faire défiler dans l'onglet (+ éventuel basculement de vue). */
   clientSection?: string;
   clientView?: 'fil' | 'bibliotheque';
@@ -2417,8 +2417,9 @@ export function clientNotifications(
       createdAt: c.resolution.resolvedAt,
       seenKeys: [e.id],
       projectId,
-      clientTab: 'aujourdhui',
-      clientSection: 'section-demandes-client',
+      // La réponse se lit dans l'onglet « Vos demandes ».
+      clientTab: 'demandes',
+      clientSection: 'client-demandes',
     });
   }
 

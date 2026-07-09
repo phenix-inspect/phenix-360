@@ -34,17 +34,20 @@ try {
       throw new Error('l’onglet « Réserves » existe encore');
   });
 
-  await assert('La réserve se lit au Suivi, avec « Lever la réserve » et son responsable', async () => {
-    await goSuivi();
-    await page.getByText(RESERVE).first().waitFor({ state: 'visible', timeout: 6000 });
-    if ((await page.getByRole('button', { name: 'Lever la réserve' }).count()) === 0)
-      throw new Error('action « Lever la réserve » absente du Suivi');
-    // Le responsable (un contact) reste joignable depuis la réserve.
-    await page
-      .getByText(/Joindre .*Élec Pro/)
-      .first()
-      .waitFor({ state: 'visible', timeout: 6000 });
-  });
+  await assert(
+    'La réserve se lit au Suivi, avec « Lever la réserve » et son responsable',
+    async () => {
+      await goSuivi();
+      await page.getByText(RESERVE).first().waitFor({ state: 'visible', timeout: 6000 });
+      if ((await page.getByRole('button', { name: 'Lever la réserve' }).count()) === 0)
+        throw new Error('action « Lever la réserve » absente du Suivi');
+      // Le responsable (un contact) reste joignable depuis la réserve.
+      await page
+        .getByText(/Joindre .*Élec Pro/)
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+    },
+  );
 
   await assert('Aujourd’hui remonte la réserve et l’ouvre au Suivi', async () => {
     await page

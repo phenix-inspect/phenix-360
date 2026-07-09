@@ -83,11 +83,18 @@ try {
   });
 
   await assert('Non-régression Espace client (chantier actif = Croix-Rousse)', async () => {
-    await openClientTab(page, 'Le projet'); // le nom du chantier vit dans « Le projet »
+    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    // Le nom du chantier vit dans la barre de contexte (aperçu client).
+    const sel = page.getByLabel('Choisir le chantier à prévisualiser');
+    await sel.waitFor({ state: 'visible', timeout: 6000 });
+    const text = await sel.evaluate((el) => el.options[el.selectedIndex]?.text ?? '');
+    if (!/Duplex Croix-Rousse/.test(text))
+      throw new Error('l’espace client ne cible pas le bon chantier');
+    // Les onglets de l'espace client sont bien rendus.
     await page
-      .getByRole('heading', { name: /Duplex Croix-Rousse/ })
+      .getByRole('tab', { name: 'Vos demandes' })
       .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Zéro erreur console', async () => {

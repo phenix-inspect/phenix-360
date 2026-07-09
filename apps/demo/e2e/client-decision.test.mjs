@@ -101,9 +101,12 @@ try {
   await assert('CLIENT — valide un choix', async () => {
     await page.getByRole('radio', { name: new RegExp(OPT_A, 'i') }).click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
-    // Le récap « Vos choix » vit dans l'onglet « Le projet ».
-    await page.getByRole('tab', { name: 'Le projet' }).click();
-    await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
+    // Le récap des choix vit dans l'onglet dédié « Vos choix ».
+    await page.getByRole('tab', { name: 'Vos choix' }).click();
+    await page
+      .getByRole('heading', { name: 'Vos choix', exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('CONDUCTEUR — Aujourd’hui affiche le choix validé, exact', async () => {

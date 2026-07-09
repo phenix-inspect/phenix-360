@@ -78,8 +78,17 @@ const parleAleon = async (texte, nbPhotos = 0) => {
   await page.waitForTimeout(300);
 };
 
-/** La section « Vos demandes » côté client. */
-const vosDemandes = () => page.locator('#section-demandes-client');
+/** L'onglet « Vos demandes » côté client. */
+const vosDemandes = () => page.locator('[data-tab="client-demandes"]');
+const goVosDemandes = async () => {
+  await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+  await page.getByRole('tab', { name: 'Vos demandes' }).first().click();
+};
+/** Déplie la carte d'une demande dans « Vos demandes » (pour voir photos / réponse). */
+const openClientCard = async (texte) => {
+  await vosDemandes().getByRole('button').filter({ hasText: texte }).first().click();
+  await page.waitForTimeout(200);
+};
 /** Le thread d'une demande donnée (côté conducteur/Suivi ou client). */
 const threadOf = (texte) =>
   page.locator('div').filter({ hasText: 'Demande client' }).filter({ hasText: texte }).last();
@@ -101,7 +110,8 @@ try {
     // Léon confirme la transmission dans le fil (le client ne parle pas dans le vide).
     await leon().getByText(TRANSMIS).first().waitFor({ state: 'visible', timeout: 6000 });
     await closeLeon();
-    // La demande apparaît côté « Vos demandes » avec un statut client-safe.
+    // La demande apparaît dans l'onglet « Vos demandes » avec un statut client-safe.
+    await goVosDemandes();
     await vosDemandes().getByText(D1).first().waitFor({ state: 'visible', timeout: 6000 });
     if ((await vosDemandes().getByText('En attente').count()) === 0)
       throw new Error('statut « En attente » manquant');
@@ -138,7 +148,10 @@ try {
     if ((await leon().locator('img').count()) < 2)
       throw new Error('les photos jointes n’apparaissent pas dans le fil de Léon');
     await closeLeon();
+    await goVosDemandes();
     await vosDemandes().getByText(D2).first().waitFor({ state: 'visible', timeout: 6000 });
+    // Déplier la carte pour voir les photos jointes à la demande.
+    await openClientCard(D2);
     const imgs = await vosDemandes().locator('li').filter({ hasText: D2 }).locator('img').count();
     if (imgs < 1) throw new Error('les photos jointes n’apparaissent pas dans « Vos demandes »');
   });
@@ -225,12 +238,16 @@ try {
 
   // ---- CÔTÉ CLIENT : notification + réponse visible -----------------------
   await assert('Client : notification après réponse + réponse visible', async () => {
+    // La notification « PHÉNIX a répondu » s'affiche dans « Aujourd'hui ».
     await goClient();
     if ((await page.getByText(/PHÉNIX a répondu à votre demande/).count()) === 0)
       throw new Error('pas de notification de réponse côté client');
-    await vosDemandes().getByText(R1).first().waitFor({ state: 'visible', timeout: 6000 });
+    // La réponse elle-même se lit dans « Vos demandes » (carte dépliée).
+    await goVosDemandes();
     if ((await vosDemandes().getByText('Répondu').count()) === 0)
       throw new Error('statut « Répondu » manquant côté client');
+    await openClientCard(D1);
+    await vosDemandes().getByText(R1).first().waitFor({ state: 'visible', timeout: 6000 });
     // La réponse revient AUSSI dans le fil de Léon (reprise de l'échange).
     await openLeon();
     await leon().getByText(R1).first().waitFor({ state: 'visible', timeout: 6000 });

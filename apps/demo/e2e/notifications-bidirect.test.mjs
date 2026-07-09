@@ -184,9 +184,12 @@ try {
     await page.getByRole('button', { name: 'Voir la décision' }).click();
     await page.getByRole('radio').first().click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
-    // Le récap « Vos choix » vit dans « Le projet ».
-    await page.getByRole('tab', { name: 'Le projet' }).click();
-    await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
+    // Le récap « Vos choix » vit dans son onglet dédié.
+    await page.getByRole('tab', { name: 'Vos choix' }).click();
+    await page
+      .getByRole('heading', { name: 'Vos choix', exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('CONDUCTEUR — reçoit la notification « décision validée »', async () => {

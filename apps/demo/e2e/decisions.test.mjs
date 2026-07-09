@@ -35,9 +35,12 @@ try {
     await page.getByRole('button', { name: 'Voir la décision' }).click();
     await page.getByRole('radio', { name: new RegExp('beige sable', 'i') }).click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
-    // « Vos choix » (le récap) vit dans l'onglet « Le projet ».
-    await page.getByRole('tab', { name: 'Le projet' }).click();
-    await page.getByText('Vos choix').first().waitFor({ state: 'visible', timeout: 5000 });
+    // « Vos choix » (le récap) vit dans son onglet dédié.
+    await page.getByRole('tab', { name: 'Vos choix' }).click();
+    await page
+      .getByRole('heading', { name: 'Vos choix', exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('CONDUCTEUR — le choix validé rejoint « À traiter »', async () => {

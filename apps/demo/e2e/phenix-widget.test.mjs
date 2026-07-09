@@ -130,19 +130,23 @@ try {
     if (action + texte === 0) throw new Error('la recherche de document ne répond pas');
   });
 
-  await assert('Navigation intelligente : « Voir le planning » ouvre les étapes', async () => {
-    const nav = page.getByRole('button', { name: /Voir le planning|Voir les étapes/ });
-    await nav.first().waitFor({ state: 'visible', timeout: 5000 });
-    await nav.first().click();
-    // Sans rupture : le widget se ferme et les étapes sont à l'écran.
-    await page.waitForTimeout(400);
-    if ((await page.getByPlaceholder(/Écrivez à PHÉNIX/).count()) > 0)
-      throw new Error('le widget ne s’est pas fermé après navigation');
-    await page
-      .getByRole('heading', { name: 'Les grandes étapes du chantier' })
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-  });
+  await assert(
+    'Navigation intelligente : « Voir les étapes » ouvre le récit du chantier',
+    async () => {
+      const nav = page.getByRole('button', { name: /Voir le planning|Voir les étapes/ });
+      await nav.first().waitFor({ state: 'visible', timeout: 5000 });
+      await nav.first().click();
+      // Sans rupture : le widget se ferme et on arrive à l'écran d'avancement.
+      await page.waitForTimeout(400);
+      if ((await page.getByPlaceholder(/Écrivez à PHÉNIX/).count()) > 0)
+        throw new Error('le widget ne s’est pas fermé après navigation');
+      // Plus de planning dédié : l'avancement du chantier se vit « Dans les coulisses ».
+      await page
+        .getByRole('heading', { name: 'Dans les coulisses du chantier' })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    },
+  );
 
   await assert(
     'Non-régression espace client : l’historique de conversation est gardé',

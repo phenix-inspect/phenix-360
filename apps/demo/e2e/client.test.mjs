@@ -69,13 +69,12 @@ try {
     async () => {
       const sel = page.getByLabel('Choisir le chantier à prévisualiser');
       await sel.waitFor({ state: 'visible', timeout: 5000 });
+      const activeVal = await sel.inputValue();
       await sel.selectOption({ label: 'Maison Écully' });
-      // Le nom du chantier prévisualisé vit dans l'onglet « Le projet ».
-      await page.getByRole('tab', { name: 'Le projet' }).click();
-      await page
-        .getByRole('heading', { name: 'Maison Écully' })
-        .first()
-        .waitFor({ state: 'visible', timeout: 5000 });
+      // L'aperçu cible bien Maison Écully (le nom vit dans la barre de contexte).
+      const previewText = await sel.evaluate((el) => el.options[el.selectedIndex]?.text ?? '');
+      if (!/Maison Écully/.test(previewText))
+        throw new Error('l’aperçu ne cible pas Maison Écully');
       // Le chantier ACTIF n'a pas bougé : l'onglet Chantier montre toujours Lyon 6e.
       await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
       await page
@@ -83,12 +82,10 @@ try {
         .first()
         .waitFor({ state: 'visible', timeout: 5000 });
       // En rouvrant l'aperçu, il s'est réinitialisé sur le chantier actif (temporaire).
-      await openClientTab(page, 'Le projet');
-      await page
-        .getByRole('heading', { name: 'Appartement Lyon 6e' })
-        .first()
-        .waitFor({ state: 'visible', timeout: 5000 });
-      if ((await page.getByRole('heading', { name: 'Maison Écully' }).count()) > 0)
+      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+      const sel2 = page.getByLabel('Choisir le chantier à prévisualiser');
+      await sel2.waitFor({ state: 'visible', timeout: 5000 });
+      if ((await sel2.inputValue()) !== activeVal)
         throw new Error('l’aperçu n’a pas été réinitialisé en quittant');
     },
   );

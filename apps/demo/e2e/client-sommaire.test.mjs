@@ -1,8 +1,8 @@
 /**
- * RC1 — Navigation de l'Espace client par ONGLETS (un onglet = un univers).
- * Le sommaire de puces est remplacé par 4 onglets clairs : Aujourd'hui (boîte de
- * réception), Le projet (avancement), Dans les coulisses (photos), Documents.
- * Chaque onglet ouvre SON univers, sans mélange. Client-safe préservé.
+ * Navigation de l'Espace client par ONGLETS (un onglet = une question). Cinq
+ * onglets clairs : Aujourd'hui (mes actions), Vos demandes (échanges PHÉNIX),
+ * Vos choix (décisions), Documents, Dans les coulisses (photos). Chaque onglet
+ * ouvre SON univers, sans mélange. Client-safe préservé.
  */
 import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
 
@@ -17,18 +17,32 @@ try {
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
 
   await assert(
-    'Les 4 onglets client existent (Aujourd’hui · Le projet · Coulisses · Documents)',
+    'Les 5 onglets client existent (Aujourd’hui · Vos demandes · Vos choix · Documents · Coulisses)',
     async () => {
       const bar = clientTabsBar();
-      for (const t of ['Aujourd’hui', 'Le projet', 'Dans les coulisses', 'Documents'])
+      for (const t of [
+        'Aujourd’hui',
+        'Vos demandes',
+        'Vos choix',
+        'Documents',
+        'Dans les coulisses',
+      ])
         await bar.getByRole('tab', { name: t }).waitFor({ state: 'visible', timeout: 5000 });
     },
   );
 
-  await assert('« Le projet » ouvre le planning (grandes étapes)', async () => {
-    await openClientTab(page, 'Le projet');
+  await assert('« Vos demandes » ouvre l’historique des échanges PHÉNIX', async () => {
+    await openClientTab(page, 'Vos demandes');
     await page
-      .getByRole('heading', { name: 'Les grandes étapes du chantier' })
+      .getByRole('heading', { name: 'Vos demandes', exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  await assert('« Vos choix » ouvre l’historique des décisions', async () => {
+    await openClientTab(page, 'Vos choix');
+    await page
+      .getByRole('heading', { name: 'Vos choix', exact: true })
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
   });
@@ -49,15 +63,17 @@ try {
       .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('« Aujourd’hui » est la boîte de réception (décision / bandeau)', async () => {
-    await openClientTab(page); // Aujourd'hui
-    // Le seed porte une décision à prendre → « Voir la décision » (ou un bandeau).
-    const hasBanner =
-      (await page.getByRole('button', { name: /Voir la décision/ }).count()) > 0 ||
-      (await page.locator('section[aria-label="Notifications"]').count()) > 0 ||
-      (await page.getByText(/Tout est à jour/).count()) > 0;
-    if (!hasBanner) throw new Error('la boîte de réception ne montre rien');
-  });
+  await assert(
+    '« Aujourd’hui » est un tableau d’ACTIONS (décision / notifs / rien à faire)',
+    async () => {
+      await openClientTab(page); // Aujourd'hui
+      const hasSomething =
+        (await page.getByRole('button', { name: /Voir la décision/ }).count()) > 0 ||
+        (await page.locator('section[aria-label="Notifications"]').count()) > 0 ||
+        (await page.getByText(/Vous n’avez rien à faire|Tout est à jour/).count()) > 0;
+      if (!hasSomething) throw new Error('le tableau d’actions ne montre rien');
+    },
+  );
 
   await assert('Client-safe : rien d’interne ne fuit', async () => {
     for (const secret of ['Réserve n°', 'Moment interne', 'à traiter'])

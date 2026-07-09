@@ -16,23 +16,24 @@ const lotBadge = () => page.getByText('Gros œuvre', { exact: true });
 try {
   await openDemo(page);
 
-  await assert('Espace client : le badge du LOT (« Gros œuvre ») est retiré', async () => {
-    await openClientTab(page, 'Le projet'); // le héros/statut vit dans « Le projet »
-    await page
-      .getByRole('heading', { name: /Appartement Lyon 6e/ })
-      .first()
-      .waitFor({ state: 'visible', timeout: 6000 });
-    if ((await lotBadge().count()) > 0)
-      throw new Error('le badge du lot est encore visible côté client');
-  });
-
-  await assert('Espace client : le statut du chantier reste affiché', async () => {
-    const statuses = ['Pas commencé', 'En cours', 'Pré-réception', 'Levée des réserves', 'Clôturé'];
-    let found = false;
-    for (const s of statuses)
-      if ((await page.getByText(s, { exact: true }).count()) > 0) found = true;
-    if (!found) throw new Error('aucun statut affiché côté client');
-  });
+  await assert(
+    'Espace client : le badge du LOT (« Gros œuvre ») ne fuit dans AUCUN onglet',
+    async () => {
+      // Le lot en cours est une information INTERNE conducteur : elle ne doit
+      // apparaître dans aucun onglet de l'espace client.
+      for (const t of [
+        'Aujourd’hui',
+        'Vos demandes',
+        'Vos choix',
+        'Documents',
+        'Dans les coulisses',
+      ]) {
+        await openClientTab(page, t);
+        if ((await lotBadge().count()) > 0)
+          throw new Error(`le badge du lot fuit dans l’onglet « ${t} »`);
+      }
+    },
+  );
 
   await assert('Conducteur : le lot en cours reste visible', async () => {
     await page.getByRole('tab', { name: 'Chantier', exact: true }).click();

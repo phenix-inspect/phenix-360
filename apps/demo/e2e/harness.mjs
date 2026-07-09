@@ -109,10 +109,10 @@ export async function openDemo(page) {
 }
 
 /**
- * Ouvre l'Espace client sur l'un de ses 4 onglets (Aujourd'hui / Le projet / Dans
- * les coulisses / Documents). L'onglet « Aujourd'hui » du client coexiste avec le
- * sélecteur de vue « Aujourd'hui » de l'en-tête : on cible donc le DERNIER (celui
- * de l'espace client, rendu après l'en-tête).
+ * Ouvre l'Espace client sur l'un de ses onglets (Aujourd'hui / Vos demandes /
+ * Vos choix / Documents / Dans les coulisses). L'onglet « Aujourd'hui » du client
+ * coexiste avec le sélecteur de vue « Aujourd'hui » de l'en-tête : on cible donc
+ * le DERNIER (celui de l'espace client, rendu après l'en-tête).
  */
 export async function openClientTab(page, sub = 'Aujourd’hui') {
   await page.getByRole('tab', { name: 'Espace client', exact: true }).click();

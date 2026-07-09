@@ -179,7 +179,15 @@ réponse (reprise aussi dans le fil de Léon). `demande-client.test`.
 qui diminue à l'ouverture (accusé de lecture `seen`), réponse depuis l'onglet (1 demande = 1
 réponse). « Aujourd'hui » = À traiter ; « Suivi » = trace après réponse (lecture seule).
 `demandes-onglet.test`.
-**Manque** : historique client propre, préférences. VISION Art. 2, 8, 9, 10.
+**Refonte Espace client (09/07)** : **5 onglets**, un onglet = une question. **Aujourd'hui** = tableau
+d'ACTIONS (notifications puis ce qui attend une action ; état vide « Vous n'avez rien à faire »).
+**Vos demandes** (`ClientDemandesTab`, filtres Tous / En attente / Répondues / Non lues) = échanges
+Léon. **Vos choix** (`ClientChoixTab`, filtres Tous / En attente / Répondu / Annulé) = décisions.
+**Documents** + **Dans les coulisses** inchangés. Onglet « Le projet » (planning/hero) RETIRÉ — le
+planning reste un outil conducteur ; l'avancement client se vit « Dans les coulisses ». `client-*`,
+`decisions`, `notifications-bidirect`, `demande-client` mis à jour ; `client-planning` /
+`planning-duree` supprimés (planning client retiré).
+**Manque** : préférences client. VISION Art. 2, 8, 9, 10, 11.
 
 ### EPIC 13 — Administration · 🔴 À développer
 

@@ -2332,3 +2332,48 @@ au Suivi ; remontée « Aujourd'hui » → Suivi ; levée → « Levée » ; cli
 `chantier-architecture`, `chantier-sans-radar`, `chantier-epure` mis à jour (l'onglet « Réserves »
 n'existe plus ; le Suivi / « Demandes client » servent de témoins). Gate verte (typecheck, lint,
 prettier, build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9.
+
+## 09/07/2026 — Refonte de l'Espace client (extrêmement simple, orienté action)
+
+**Décision produit validée :** l'Espace client ne doit **jamais ressembler à un logiciel de
+gestion**. Le client vient savoir **ce qu'il doit faire**, **ce qui nécessite une décision**, **où en
+est son projet**. Chaque écran répond à **une seule question**. Nouvelle architecture à **5 onglets** :
+**Aujourd'hui · Vos demandes · Vos choix · Documents · Dans les coulisses**.
+
+**Aujourd'hui** devient un **tableau d'ACTIONS** : d'abord les **notifications importantes** (réponse
+PHÉNIX, document partagé, photos publiées, décision demandée), puis **uniquement ce qui attend une
+action** (valider un choix, répondre à une demande de décision, envoyer un document…). **État vide**
+(aucune action, aucune notification) → un **seul** message, rien d'autre : « **Vous n'avez rien à
+faire. Tout est à jour. Votre équipe PHÉNIX veille sur votre chantier.** » — le client comprend
+immédiatement qu'il peut profiter de sa journée.
+
+**Nouvel onglet « Vos demandes »** (`ClientDemandesTab`) : l'historique des échanges avec PHÉNIX (via
+Léon). Filtres **Tous / En attente / Répondues / Non lues** (« À traiter » du conducteur adapté en
+« En attente », client-safe). « Non lue » = réponse pas encore ouverte ; l'ouvrir l'éteint
+(`seen['client']`). Lecture seule — pour une nouvelle demande, le client parle à Léon.
+
+**Nouvel onglet « Vos choix »** (`ClientChoixTab`) : l'historique des décisions demandées (carrelage,
+peinture, robinetterie, dates…). Filtres **Tous / En attente / Répondu / Annulé** (« Annulé » réservé
+— aucun choix annulable dans le modèle actuel). Les choix actionnables (une proposition à valider)
+restent **actionnables ici** (`ClientDecisionBanner`), et sont aussi des actions dans « Aujourd'hui ».
+
+**Onglet « Le projet » RETIRÉ** : le planning/grandes-étapes n'est plus une surface client (c'était
+« du logiciel de gestion »). L'avancement se vit désormais **« Dans les coulisses »** (récit
+émotionnel). Le planning reste un outil **conducteur** (Préparation, `SmartPlanningView`) ; sa logique
+core est intacte. Léon répond toujours aux questions de planning en texte ; sa navigation « voir les
+étapes » ouvre « Dans les coulisses ». Le **héros/statut** projet (retiré de « Le projet ») vit dans
+la **barre de contexte** (« Aperçu client · … »).
+
+**Câblage :** `ClientView` réécrite (5 onglets, actions + état vide) ; notification « PHÉNIX a
+répondu » pointe vers l'onglet « Vos demandes » ; `clientTab` ajoute `demandes`/`choix`.
+**Composants supprimés de la vue client :** `ProjectHero`, `GrandesEtapes`, `StepProgress`,
+`SmartBanner` (conservés au dépôt, réutilisables).
+
+**Tests :** `client-architecture`, `client-sommaire` réécrits (5 onglets) ; `client-hero` → le lot
+interne ne fuit dans aucun onglet ; `client-decision`, `decisions`, `notifications-bidirect` → « Vos
+choix » ; `client.test`, `chantier-switch` → nom du chantier via la barre de contexte ;
+`client-partage` → onglets client comme témoin d'accès ; `phenix-widget` → « voir les étapes » ouvre
+les coulisses ; `demande-client` → demandes lues dans l'onglet « Vos demandes ». **Supprimés :**
+`client-planning.test`, `planning-duree.test` (ils testaient le planning CLIENT, retiré ; la logique
+core de dates reste couverte au niveau `packages/core`). Gate verte (typecheck, lint, prettier, build,
+e2e complet, zéro erreur console). VISION Art. 2, 9, 11.

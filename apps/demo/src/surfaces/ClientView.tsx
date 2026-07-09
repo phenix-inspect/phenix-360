@@ -1,17 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Badge, Card, CardContent, Tabs, TabsContent, TabsList, TabsTrigger } from '@phenix360/ui';
-import { CalendarRange, FileText, Lock, MessageCircle, Palette } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@phenix360/ui';
+import { Check, FileText, Lock, MessageCircle } from 'lucide-react';
 import {
-  SELECTION_STATUS_LABEL,
-  momentsCoulisses,
   buildClientDecisions,
   buildClientShareReadiness,
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
-  demandesPourPhenix,
   isPhenixDelegate,
-  nextClientAction,
   pendingClientDecisions,
   userId,
   type ClientDecision,
@@ -22,23 +18,21 @@ import {
   clientNotifications,
   demo,
   dossierOf,
-  filOf,
   mostRecentPendingTeamMoment,
   nameOf,
   pendingTeamMessageCount,
   type DemoSnapshot,
 } from '../store';
 import { NotificationsFeed } from '../components/NotificationsFeed';
-import { SmartBanner } from '../components/SmartBanner';
 import { ClientDecisionBanner } from '../components/ClientDecisionBanner';
-import { ProjectHero } from '../components/ProjectHero';
-import { StepProgress } from '../components/StepProgress';
-import { GrandesEtapes } from '../components/GrandesEtapes';
 import { ClientDocuments } from '../components/ClientDocuments';
+import { ClientDemandesTab } from '../components/ClientDemandesTab';
+import { ClientChoixTab } from '../components/ClientChoixTab';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
-import { DemandeThread } from '../components/DemandeThread';
 import { PhenixWidget } from '../components/PhenixWidget';
+
+type ClientTab = 'aujourdhui' | 'demandes' | 'choix' | 'documents' | 'coulisses';
 
 function clientActor(snap: DemoSnapshot, project: Project): EventActor {
   const member = snap.members.find((m) => m.projectId === project.id && m.role === 'client');
@@ -56,38 +50,23 @@ export function ClientView({
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
   const dossier = dossierOf(snap, project.id);
-  // Décision client la plus urgente que le client peut traiter (un choix
-  // proposé à valider). Prioritaire sur le bandeau intelligent générique.
-  const clientDecision = dossier
-    ? (buildClientDecisions(dossier).find((d) => d.clientActionable) ?? null)
-    : null;
-  // Le Fil porte le récit visuel (photos, moments). Ici on ne conserve que les
-  // éléments de suivi utiles au client et absents du Fil : comptes rendus et
-  // documents publiés. Les décisions vivent dans le bandeau et « Vos choix ».
+
+  // « Vos choix » : toutes les décisions demandées au client (dossier), avec leur
+  // statut. Celles actionnables (une proposition à valider) sont aussi des ACTIONS
+  // du jour → surfacées dans « Aujourd'hui ».
+  const clientChoix = dossier ? buildClientDecisions(dossier) : [];
+  const actionableChoix = clientChoix.filter((d) => d.clientActionable);
+
+  // Documents & comptes rendus publiés (onglet Documents).
   const updates = clientFeed(events).filter(
     (e) => e.type === 'compte_rendu' || e.type === 'document',
   );
-  // Sections distinctes et lisibles pour le client (VISION Art. 11) : les
-  // documents d'un côté, les comptes rendus de l'autre.
   const clientDocuments = updates.filter((e) => e.type === 'document');
   const comptesRendus = updates.filter((e) => e.type === 'compte_rendu');
-  // Les demandes faites par le client à PHÉNIX (question → réponse, sa mémoire).
-  const clientDemandes = demandesPourPhenix(events).filter((e) => e.actor.role === 'client');
-  // Notification client : l'équipe a laissé un mot sur le récit (symétrique du
-  // signal conducteur). Un clic emmène le client vers le récit.
+
   const teamMessages = pendingTeamMessageCount(snap, project.id);
-  // Le Récit et la Bibliothèque sont deux vues d'une même section : le sommaire
-  // pilote la vue affichée (Récit ↔ Bibliothèque) en plus du défilement.
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
-  // Un onglet = un univers (même philosophie que le conducteur) : Aujourd'hui
-  // (boîte de réception), Le projet (où en est le chantier), Dans les coulisses
-  // (photos), Documents (tout PDF). Défaut : la boîte de réception.
-  const [clientTab, setClientTab] = useState<'aujourdhui' | 'projet' | 'coulisses' | 'documents'>(
-    'aujourdhui',
-  );
-  // « Dans les coulisses » côté client = albums photo partagés UNIQUEMENT (pas de
-  // comptes rendus / PV / documents : ceux-ci ont leurs propres sections).
-  const filMoments = momentsCoulisses(filOf(snap, project.id).moments);
+  const [clientTab, setClientTab] = useState<ClientTab>('aujourdhui');
 
   const validateDecision = async (d: ClientDecision, optionId?: string) => {
     if (!dossier) return;
@@ -128,31 +107,23 @@ export function ClientView({
     });
   };
 
+  // Décisions demandées via le Journal (échange documentaire ou question) — des
+  // ACTIONS du jour, distinctes des choix préparés du dossier.
   const decisions = pendingClientDecisions(events);
-  // Une demande de DOCUMENT n'est pas une « décision » : c'est un échange
-  // documentaire (le document est l'élément principal). On la sort du bandeau
-  // « Une décision vous attend » et on la place dans sa propre liste, toujours
-  // atteignable. Le bandeau ne raisonne donc que sur les vraies décisions.
   const docRequests = decisions.filter((d) => d.attendu === 'document');
   const decisionRequests = decisions.filter((d) => d.attendu !== 'document');
-  const docRequestIds = new Set(docRequests.map((d) => d.eventId));
-  const bannerEvents = events.filter((e) => !docRequestIds.has(e.id));
-  const action = nextClientAction(project, bannerEvents);
-  // La décision prioritaire est portée par le SmartBanner — mais seulement quand il
-  // s'affiche (pas de décision d'ambiance qui occupe déjà le bandeau). Sinon on la
-  // laisse dans la liste pour qu'aucune décision ne devienne inatteignable.
-  const otherDecisions =
-    !clientDecision && action.kind === 'decision_attendue'
-      ? decisionRequests.filter((d) => d.eventId !== action.decision.eventId)
-      : decisionRequests;
 
   // Boîte de réception : ce que l'équipe a publié (photos, comptes rendus, documents).
   const clientNotificationsList = clientNotifications(snap, project.id);
+  const hasNotifs = clientNotificationsList.length > 0 || teamMessages > 0;
+  const hasActions =
+    actionableChoix.length > 0 || docRequests.length > 0 || decisionRequests.length > 0;
+
   // Ouvrir une notification : basculer sur le BON onglet, éteindre le signal, puis
   // défiler jusqu'à l'élément concerné (après le rendu de l'onglet).
   const openNotif = (n: (typeof clientNotificationsList)[number]): void => {
     demo.markSeen('client', n.seenKeys);
-    if (n.clientTab) setClientTab(n.clientTab);
+    if (n.clientTab) setClientTab(n.clientTab as ClientTab);
     if (n.clientView) setFilView(n.clientView);
     requestAnimationFrame(() =>
       document
@@ -165,23 +136,19 @@ export function ClientView({
   const clientTarget = snap.clientTarget;
   useEffect(() => {
     if (!clientTarget) return;
-    const tab =
+    const tab: ClientTab =
       clientTarget.kind === 'document'
         ? 'documents'
         : clientTarget.kind === 'decision'
-          ? 'aujourdhui'
-          : clientTarget.kind === 'etapes'
-            ? 'projet'
-            : 'coulisses';
+          ? 'choix'
+          : 'coulisses'; // 'etapes' / 'fil' → le récit visuel du chantier
     setClientTab(tab);
     const id =
       clientTarget.kind === 'document'
         ? `ev-${clientTarget.ref}`
         : clientTarget.kind === 'decision'
-          ? 'section-decision'
-          : clientTarget.kind === 'etapes'
-            ? 'section-etapes'
-            : 'section-fil';
+          ? 'section-choix'
+          : 'section-fil';
     requestAnimationFrame(() => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -201,195 +168,117 @@ export function ClientView({
   // GARDE-FOU PARTAGE : tant que les 3 bloquants ne sont pas validés (devis signé,
   // acompte payé, date officielle fixée à la main), le dossier n'est PAS
   // partageable. Le conducteur voit un écran INTERNE — aucun contenu client ne
-  // s'affiche (récit, documents, décisions, planning), aucune fuite possible.
+  // s'affiche, aucune fuite possible.
   const share = buildClientShareReadiness(dossier);
   if (!share.shareable) return <EspaceClientNonPret missing={share.missing} />;
 
   return (
     <div className="space-y-6">
-      <Tabs
-        value={clientTab}
-        onValueChange={(v) =>
-          setClientTab(v as 'aujourdhui' | 'projet' | 'coulisses' | 'documents')
-        }
-      >
-        <TabsList>
+      <Tabs value={clientTab} onValueChange={(v) => setClientTab(v as ClientTab)}>
+        <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="aujourdhui">Aujourd’hui</TabsTrigger>
-          <TabsTrigger value="projet">Le projet</TabsTrigger>
-          <TabsTrigger value="coulisses">Dans les coulisses</TabsTrigger>
+          <TabsTrigger value="demandes">Vos demandes</TabsTrigger>
+          <TabsTrigger value="choix">Vos choix</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
+          <TabsTrigger value="coulisses">Dans les coulisses</TabsTrigger>
         </TabsList>
 
-        {/* AUJOURD'HUI — la boîte de réception : tout ce qui attend une réaction. */}
+        {/* AUJOURD'HUI — un tableau d'ACTIONS : notifications d'abord, puis ce qui
+            attend une action. Si rien n'attend le client, un seul message : il peut
+            profiter de sa journée. */}
         <TabsContent value="aujourdhui">
-          <div className="space-y-6">
-            {teamMessages > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  // Ouvre les coulisses au Moment concerné (défilement + curseur).
-                  setClientTab('coulisses');
-                  const target = mostRecentPendingTeamMoment(snap, project.id);
-                  if (target) demo.focusMoment(target, actor.role);
-                }}
-                className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
-              >
-                <MessageCircle aria-hidden />
-                Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''} —
-                voir les coulisses
-              </button>
-            )}
+          {hasNotifs || hasActions ? (
+            <div className="space-y-6">
+              {/* 1) Notifications importantes, AVANT les actions. */}
+              {(teamMessages > 0 || clientNotificationsList.length > 0) && (
+                <div className="space-y-3">
+                  {teamMessages > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClientTab('coulisses');
+                        const target = mostRecentPendingTeamMoment(snap, project.id);
+                        if (target) demo.focusMoment(target, actor.role);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
+                    >
+                      <MessageCircle aria-hidden />
+                      Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''}{' '}
+                      — voir les coulisses
+                    </button>
+                  )}
+                  <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
+                </div>
+              )}
 
-            {/* Notifications : ce que l'ÉQUIPE a publié. Un clic ouvre le bon onglet. */}
-            <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
-
-            {/* Suivi de mes demandes. Le client ne crée aucun ticket : il parle
-                simplement à Léon (widget flottant), qui répond ou transmet au
-                conducteur. Les demandes transmises se retrouvent ici (mémoire). */}
-            {clientDemandes.length > 0 && (
-              <section id="section-demandes-client" className="scroll-mt-24 space-y-2">
-                <h3 className="text-sm font-medium text-foreground">
-                  Vos demandes ({clientDemandes.length})
-                </h3>
-                <ul className="space-y-2">
-                  {clientDemandes.map((d) => (
-                    <li key={d.id}>
-                      <DemandeThread demande={d} actor={actor} nameOf={(u) => nameOf(snap, u)} />
-                    </li>
+              {/* 2) Actions attendues du client. */}
+              {actionableChoix.length > 0 && (
+                <div id="section-decision" className="scroll-mt-24 space-y-3">
+                  {actionableChoix.map((d) => (
+                    <ClientDecisionBanner
+                      key={d.id}
+                      decision={d}
+                      onValidate={(optionId) => validateDecision(d, optionId)}
+                    />
                   ))}
-                </ul>
-              </section>
-            )}
+                </div>
+              )}
 
-            <div id="section-decision" className="scroll-mt-24 rounded-2xl">
-              {clientDecision ? (
-                <ClientDecisionBanner
-                  decision={clientDecision}
-                  onValidate={(optionId) => validateDecision(clientDecision, optionId)}
-                />
-              ) : (
-                <SmartBanner project={project} events={bannerEvents} actor={actor} />
+              {docRequests.length > 0 && (
+                <section id="section-documents-demandes" className="space-y-2">
+                  <h3 className="text-sm font-medium text-foreground">
+                    Documents demandés ({docRequests.length})
+                  </h3>
+                  <ul className="space-y-2">
+                    {docRequests.map((d) => (
+                      <li
+                        key={d.eventId}
+                        className="rounded-xl border border-gold-200 bg-gold-50 p-4"
+                      >
+                        <p className="flex items-center gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+                          <FileText aria-hidden />
+                          {d.question}
+                        </p>
+                        <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {decisionRequests.length > 0 && (
+                <section className="space-y-2">
+                  <h3 className="text-sm font-medium text-foreground">
+                    Décisions en attente ({decisionRequests.length})
+                  </h3>
+                  <ul className="space-y-2">
+                    {decisionRequests.map((d) => (
+                      <li
+                        key={d.eventId}
+                        className="rounded-xl border border-border bg-surface p-4"
+                      >
+                        <p className="text-sm text-foreground">{d.question}</p>
+                        <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               )}
             </div>
-
-            {docRequests.length > 0 && (
-              <section id="section-documents-demandes" className="space-y-2">
-                <h3 className="text-sm font-medium text-foreground">
-                  Documents demandés ({docRequests.length})
-                </h3>
-                <ul className="space-y-2">
-                  {docRequests.map((d) => (
-                    <li
-                      key={d.eventId}
-                      className="rounded-xl border border-gold-200 bg-gold-50 p-4"
-                    >
-                      <p className="flex items-center gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
-                        <FileText aria-hidden />
-                        {d.question}
-                      </p>
-                      <DecisionResponder decision={d} actor={actor} className="mt-2" />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {otherDecisions.length > 0 && (
-              <section className="space-y-2">
-                <h3 className="text-sm font-medium text-foreground">
-                  Autres décisions en attente ({otherDecisions.length})
-                </h3>
-                <ul className="space-y-2">
-                  {otherDecisions.map((d) => (
-                    <li key={d.eventId} className="rounded-xl border border-border bg-surface p-4">
-                      <p className="text-sm text-foreground">{d.question}</p>
-                      <DecisionResponder decision={d} actor={actor} className="mt-2" />
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
+          ) : (
+            <ClientRienAFaire />
+          )}
         </TabsContent>
 
-        {/* LE PROJET — où en est mon chantier : étapes, planning, choix. Rassure. */}
-        <TabsContent value="projet">
-          <div className="space-y-6">
-            <Card>
-              <CardContent className="space-y-5 p-6">
-                {/* Statut seulement, JAMAIS le lot en cours (info interne conducteur). */}
-                <ProjectHero
-                  project={project}
-                  clientName={nameOf(snap, project.clientId)}
-                  showStep={false}
-                />
-                {!dossier && <StepProgress current={project.currentStep} />}
-              </CardContent>
-            </Card>
-
-            {dossier && (
-              <section id="section-etapes" className="scroll-mt-24 space-y-3 rounded-2xl">
-                <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-                  <CalendarRange aria-hidden />
-                  <h2 className="font-serif text-lg font-semibold tracking-tight">
-                    Les grandes étapes du chantier
-                  </h2>
-                </div>
-                <GrandesEtapes status={project.status} dossier={dossier} />
-              </section>
-            )}
-
-            {dossier && dossier.selections.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center gap-2 text-foreground [&_svg]:size-5 [&_svg]:text-gold-600">
-                  <Palette aria-hidden />
-                  <h2 className="font-serif text-lg font-semibold tracking-tight">Vos choix</h2>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {dossier.selections.map((s) => (
-                    <div
-                      key={s.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface p-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium uppercase tracking-wide text-gold-700">
-                          {s.categorie}
-                        </p>
-                        <p className="truncate text-sm text-foreground">{s.label}</p>
-                        {s.detail && (
-                          <p className="truncate text-xs text-muted-foreground">{s.detail}</p>
-                        )}
-                      </div>
-                      <Badge
-                        variant={
-                          s.statut === 'valide'
-                            ? 'success'
-                            : s.statut === 'propose'
-                              ? 'info'
-                              : 'neutral'
-                        }
-                      >
-                        {SELECTION_STATUS_LABEL[s.statut]}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
+        {/* VOS DEMANDES — l'historique des échanges avec PHÉNIX (via Léon). */}
+        <TabsContent value="demandes">
+          <ClientDemandesTab snap={snap} project={project} actor={actor} />
         </TabsContent>
 
-        {/* DANS LES COULISSES — l'Instagram du projet : photos, ❤️, 💬. */}
-        <TabsContent value="coulisses">
-          <div id="section-fil" className="scroll-mt-24 rounded-2xl">
-            <FilView
-              snap={snap}
-              project={project}
-              actor={actor}
-              canCompose={false}
-              view={filView}
-              onViewChange={setFilView}
-            />
+        {/* VOS CHOIX — l'historique des décisions demandées au client. */}
+        <TabsContent value="choix">
+          <div id="section-choix" className="scroll-mt-24">
+            <ClientChoixTab decisions={clientChoix} onValidate={validateDecision} />
           </div>
         </TabsContent>
 
@@ -404,6 +293,20 @@ export function ClientView({
             <ClientDocuments events={[...clientDocuments, ...comptesRendus]} audience="client" />
           </section>
         </TabsContent>
+
+        {/* DANS LES COULISSES — le récit visuel du projet : photos, ❤️, 💬. */}
+        <TabsContent value="coulisses">
+          <div id="section-fil" className="scroll-mt-24 rounded-2xl">
+            <FilView
+              snap={snap}
+              project={project}
+              actor={actor}
+              canCompose={false}
+              view={filView}
+              onViewChange={setFilView}
+            />
+          </div>
+        </TabsContent>
       </Tabs>
 
       <PhenixWidget snap={snap} project={project} actor={actor} />
@@ -412,9 +315,30 @@ export function ClientView({
 }
 
 /**
+ * État vide de l'Espace client : rien à faire, aucune notification. Un seul
+ * message rassurant — le client peut profiter de sa journée. Aucun autre contenu.
+ */
+function ClientRienAFaire(): React.JSX.Element {
+  return (
+    <div className="mx-auto max-w-md py-16 text-center">
+      <span className="mx-auto flex size-16 items-center justify-center rounded-full bg-success text-success-foreground [&_svg]:size-8">
+        <Check aria-hidden />
+      </span>
+      <h2 className="mt-5 font-serif text-2xl font-semibold tracking-tight text-foreground">
+        Vous n’avez rien à faire.
+      </h2>
+      <p className="mt-2 text-base text-muted-foreground">Tout est à jour.</p>
+      <p className="mt-1 text-base text-muted-foreground">
+        Votre équipe PHÉNIX veille sur votre chantier.
+      </p>
+    </div>
+  );
+}
+
+/**
  * Écran INTERNE conducteur (jamais montré au client) : le dossier n'est pas encore
  * partageable. On liste précisément ce qui bloque, sans afficher AUCUN contenu
- * client (récit, documents, décisions, planning) → aucune fuite possible.
+ * client → aucune fuite possible.
  */
 function EspaceClientNonPret({ missing }: { missing: string[] }): React.JSX.Element {
   return (

@@ -71,16 +71,19 @@ try {
     await page.getByText(RESERVE_LYON).first().waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Cliquer une réserve OUVRE le chantier au Suivi (plus d’onglet Réserves)', async () => {
-    await page.getByText(RESERVE_LYON).first().click();
-    // Plus de page dédiée : la réserve se lit dans le Suivi (historique).
-    await page
-      .getByRole('tab', { name: 'Suivi', exact: true, selected: true })
-      .waitFor({ state: 'visible', timeout: 6000 });
-    const voir = page.getByRole('button', { name: /Voir tout le journal/ });
-    if (await voir.count()) await voir.first().click();
-    await page.getByText(RESERVE_LYON).first().waitFor({ state: 'visible', timeout: 6000 });
-  });
+  await assert(
+    'Cliquer une réserve OUVRE le chantier au Suivi (plus d’onglet Réserves)',
+    async () => {
+      await page.getByText(RESERVE_LYON).first().click();
+      // Plus de page dédiée : la réserve se lit dans le Suivi (historique).
+      await page
+        .getByRole('tab', { name: 'Suivi', exact: true, selected: true })
+        .waitFor({ state: 'visible', timeout: 6000 });
+      const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+      if (await voir.count()) await voir.first().click();
+      await page.getByText(RESERVE_LYON).first().waitFor({ state: 'visible', timeout: 6000 });
+    },
+  );
 
   await assert('Retour « Aujourd’hui » : cliquer une décision ouvre l’onglet Suivi', async () => {
     await page
