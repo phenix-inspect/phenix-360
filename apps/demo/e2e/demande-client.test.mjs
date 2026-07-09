@@ -127,13 +127,22 @@ try {
   });
 
   // ---- CÔTÉ CONDUCTEUR : Aujourd'hui + réponse ----------------------------
-  await assert('Conducteur : la demande remonte dans « Aujourd’hui »', async () => {
+  await assert('Conducteur : NOTIFICATION « Nouvelle demande client à traiter »', async () => {
     await page
       .getByRole('tab', { name: /Aujourd’hui/ })
       .first()
       .click();
+    // La notification saute aux yeux, sans même dérouler un filtre.
     await page
-      .getByRole('button', { name: /à traiter/i })
+      .getByText(/Nouvelle demande client à traiter/)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  await assert('Conducteur : la demande remonte aussi dans « à traiter »', async () => {
+    // Filtre « à traiter aujourd’hui » (distinct de la notification homonyme).
+    await page
+      .getByRole('button', { name: /à traiter aujourd’hui/ })
       .first()
       .click();
     await page.getByText(`Question client · ${D1}`).first().waitFor({ timeout: 6000 });
@@ -170,12 +179,15 @@ try {
       .first()
       .click();
     await page
-      .getByRole('button', { name: /à traiter/i })
+      .getByRole('button', { name: /à traiter aujourd’hui/ })
       .first()
       .click();
     await page.waitForTimeout(300);
     if ((await page.getByText(`Question client · ${D1}`).count()) > 0)
       throw new Error('la demande répondue reste dans Aujourd’hui');
+    // La notification de demande a disparu elle aussi (demande traitée).
+    if ((await page.getByText(/Nouvelle demande client à traiter/).count()) > 0)
+      throw new Error('la notification de demande persiste après réponse');
   });
 
   // ---- SUIVI : mémoire officielle -----------------------------------------

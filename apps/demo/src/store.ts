@@ -172,15 +172,27 @@ export interface MomentFocus {
 const emptyState = (): BackendState => ({ projects: [], members: [], events: [] });
 
 /**
- * Écriture localStorage BEST-EFFORT. Le Mode Démo garde sa vérité en mémoire ;
- * localStorage n'est qu'un cache de confort (survie au rechargement). Quand le
- * quota est atteint (utilisateur qui a beaucoup testé, photos accumulées),
- * `setItem` lève `QuotaExceededError` : on ne laisse JAMAIS cette exception
- * remonter — elle casserait le flux en cours (chat figé, demande perdue). On
- * journalise et on continue : la session reste fonctionnelle, seule la
- * persistance dégrade. Ne masque rien (avertissement console explicite).
+ * MIROIR MÉMOIRE de l'espace de travail. Le Mode Démo garde sa vérité en MÉMOIRE
+ * VIVE ; localStorage n'est qu'un cache de confort (survie au rechargement).
+ * Quand le quota est atteint (utilisateur qui a beaucoup testé, photos
+ * accumulées), `setItem` lève `QuotaExceededError`. Sans miroir, le backend est
+ * « read-through » localStorage : une écriture qui échoue = donnée PERDUE (au
+ * `refresh` suivant, `build()` relit localStorage sans la nouveauté → la demande
+ * disparaît, le fil s'efface, aucune notification conducteur). Avec le miroir, la
+ * lecture voit d'abord ce qu'on a écrit en mémoire : la session reste PLEINEMENT
+ * fonctionnelle même quota plein — seule la survie au rechargement dégrade. Ne
+ * masque rien (avertissement console explicite).
  */
+const memMirror = new Map<string, string>();
+
+function lsGet(key: string): string | null {
+  if (memMirror.has(key)) return memMirror.get(key) ?? null;
+  return localStorage.getItem(key);
+}
+
 function safeSetItem(key: string, value: string): boolean {
+  // Vérité en mémoire — TOUJOURS. localStorage ensuite, best-effort.
+  memMirror.set(key, value);
   try {
     localStorage.setItem(key, value);
     return true;
@@ -194,9 +206,27 @@ function safeSetItem(key: string, value: string): boolean {
   }
 }
 
+function lsRemove(key: string): void {
+  memMirror.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* rien à faire : la clé mémoire est déjà retirée */
+  }
+}
+
+/**
+ * Vide le miroir mémoire : à appeler quand une AUTRE onglet a modifié le stockage
+ * (message `channel`), pour que `build()` relise la vérité de localStorage plutôt
+ * qu'un cache mémoire devenu périmé.
+ */
+function clearMemMirror(): void {
+  memMirror.clear();
+}
+
 class LocalStorageKeyValueStore implements KeyValueStore {
   load(): BackendState | null {
-    const raw = localStorage.getItem(STATE_KEY);
+    const raw = lsGet(STATE_KEY);
     return raw ? (JSON.parse(raw) as BackendState) : null;
   }
   save(state: BackendState): void {
@@ -205,7 +235,7 @@ class LocalStorageKeyValueStore implements KeyValueStore {
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = localStorage.getItem(key);
+  const raw = lsGet(key);
   return raw ? (JSON.parse(raw) as T) : fallback;
 }
 
@@ -387,7 +417,7 @@ const BACKUP_VERSION = 1;
 
 /** Vide TOUT l'espace de travail (toutes les clés) et le marque initialisé. */
 function clearWorkspace(): void {
-  for (const key of WORKSPACE_KEYS) localStorage.removeItem(key);
+  for (const key of WORKSPACE_KEYS) lsRemove(key);
   localStorage.setItem(SEEDED_KEY, '1');
 }
 
@@ -400,7 +430,12 @@ function broadcast(): void {
   channel.postMessage('changed');
 }
 
-channel.onmessage = () => refresh();
+// Un AUTRE onglet a modifié le stockage : on jette le miroir mémoire (devenu
+// potentiellement périmé) pour que `build()` relise la vérité de localStorage.
+channel.onmessage = () => {
+  clearMemMirror();
+  refresh();
+};
 
 async function mutate<T>(p: Promise<T>): Promise<T> {
   const r = await p;
@@ -1888,8 +1923,8 @@ export const demo = {
     localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
     localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
     localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
-    localStorage.removeItem(PHENIX_CONV_KEY);
-    localStorage.removeItem(SHARES_KEY);
+    lsRemove(PHENIX_CONV_KEY);
+    lsRemove(SHARES_KEY);
     // Nouvelle démo = ardoise de notifications propre : l'historique seedé ne
     // notifie pas ; seules les actions à venir le feront.
     localStorage.setItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
@@ -1924,7 +1959,7 @@ export const demo = {
   exportWorkspace(): string {
     const data: Record<string, unknown> = {};
     for (const key of WORKSPACE_KEYS) {
-      const raw = localStorage.getItem(key);
+      const raw = lsGet(key);
       if (raw === null) continue;
       try {
         data[key] = JSON.parse(raw);
@@ -1967,12 +2002,15 @@ export const demo = {
     // Restauration COMPLÈTE : on remplace l'espace par la sauvegarde.
     for (const key of WORKSPACE_KEYS) {
       if (Object.prototype.hasOwnProperty.call(data, key)) {
-        localStorage.setItem(key, JSON.stringify(data[key]));
+        safeSetItem(key, JSON.stringify(data[key]));
       } else {
-        localStorage.removeItem(key);
+        lsRemove(key);
       }
     }
     localStorage.setItem(SEEDED_KEY, '1');
+    // Remplacement COMPLET : le miroir mémoire (états d'avant l'import) n'a plus
+    // lieu d'être — on le vide pour que `build()` relise la sauvegarde restaurée.
+    clearMemMirror();
     refresh();
     broadcast();
     return { ok: true };
@@ -2274,6 +2312,25 @@ export function conductorNotifications(
       projectId,
       // Le document reçu est classé dans « Documents » ; sinon, la demande au Suivi.
       tab: doc ? 'documents' : 'suivi',
+    });
+  }
+
+  // 📩 Nouvelle demande du client (posée à Léon, escaladée au conducteur) : tant
+  // qu'elle est OUVERTE, elle doit sauter aux yeux dans « Aujourd'hui ». C'est le
+  // signal « Nouvelle demande client à traiter » attendu côté conducteur.
+  for (const e of snap.events) {
+    if (e.projectId !== projectId || e.type !== 'demande') continue;
+    const c = e.content;
+    if (c.destinataire !== 'phenix' || e.state !== 'ouverte' || e.actor.role !== 'client') continue;
+    if (e.createdAt <= base || seen[e.id]) continue;
+    out.push({
+      id: `demande-client-${e.id}`,
+      icon: '📩',
+      text: `Nouvelle demande client à traiter`,
+      createdAt: e.createdAt,
+      seenKeys: [e.id],
+      projectId,
+      tab: 'suivi',
     });
   }
 

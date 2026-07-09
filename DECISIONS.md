@@ -2234,3 +2234,35 @@ créée et visible côté conducteur, 0 exception. Nouveau `demande-client-quota
 d'exception quota non rattrapée, confirmation visible sous pression mémoire). `demande-client.test`
 enrichi (11/11 : chat utilisable juste après l'envoi). Gate verte (typecheck, lint, prettier, build,
 e2e complet, zéro erreur console). VISION Art. 8, 9, 11.
+
+## 09/07/2026 — Correctif : notification conducteur manquante + demande perdue quota plein
+
+**Deux retours client :** (1) aucune notification dans « Aujourd'hui » côté conducteur quand le
+client envoie une demande ; (2) toujours le même problème avec une photo — la question disparaît de
+la conversation et « rien ne fonctionne ».
+
+**Cause 1 — notification absente :** `conductorNotifications` couvrait ❤️, 💬, décisions et réponses
+de document du client, mais **aucune entrée pour une nouvelle demande client**. La demande n'apparaissait
+que comme item du filtre « à traiter », jamais comme la notification attendue. **Correctif :** ajout
+d'une notification **« Nouvelle demande client à traiter »** (📩, onglet Suivi) tant que la demande est
+`ouverte` ; elle disparaît dès la réponse (demande `traitee`).
+
+**Cause 2 — demande perdue quand localStorage est plein :** le premier correctif avait retiré les
+photos du fil et rendu les écritures best-effort, mais le backend démo est **« read-through »**
+localStorage : `build()` **relit** localStorage à chaque `refresh()`. Donc quand le quota est atteint,
+une écriture qui échoue = donnée réellement perdue — au refresh suivant, la demande et le message du
+fil **disparaissent** (et le conducteur n'a rien). **Correctif structurel :** un **miroir mémoire**
+(`memMirror`) devient la vérité de session ; `lsGet`/`safeSetItem`/`lsRemove` lisent/écrivent d'abord
+en mémoire, puis persistent en best-effort. `kv.load/save`, `readJson`, `clearWorkspace`,
+`import/export` et le reset passent par le miroir ; un message inter-onglets vide le miroir pour
+relire localStorage (cohérence multi-onglets). Résultat : la session reste **pleinement
+fonctionnelle** même quota plein (demande créée, fil conservé, conducteur notifié) — seule la survie
+au rechargement dégrade.
+
+**Vérifié (reproduction déterministe) :** localStorage rempli jusqu'à ~4,5 Mo (proche de la limite
+navigateur) avec une vraie photo — la question reste dans le fil, la confirmation s'affiche, le chat
+n'est pas figé, **la demande est créée et le conducteur reçoit « Nouvelle demande client à traiter »**,
+zéro exception. `demande-client.test` (12/12, + assertion notification conducteur) ;
+`demande-client-quota.test` (4/4 : question conservée + demande créée + conducteur notifié sous
+pression). Gate verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console).
+VISION Art. 8, 9, 11.

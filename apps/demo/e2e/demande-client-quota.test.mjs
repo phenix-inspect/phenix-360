@@ -9,7 +9,9 @@
  * Garanties verrouillées ici, sous pression de stockage réelle :
  *   • aucune exception `quota` non rattrapée (persistance best-effort) ;
  *   • le chat reste UTILISABLE (jamais figé sur `busy`) ;
- *   • la confirmation de transmission s'affiche (le client ne parle pas dans le vide).
+ *   • la confirmation de transmission s'affiche (le client ne parle pas dans le vide) ;
+ *   • la question NE DISPARAÎT PAS du fil (miroir mémoire vs read-through localStorage) ;
+ *   • la demande est bien CRÉÉE et le conducteur est NOTIFIÉ, même quota plein.
  */
 import zlib from 'node:zlib';
 import { launch, session, harness, openDemo } from './harness.mjs';
@@ -96,16 +98,29 @@ try {
     if ((await leon().getByText(/transmettre votre demande/).count()) === 0)
       throw new Error('aucune confirmation affichée après l’envoi sous pression');
 
-    // 2) Le chat reste utilisable : « Envoyer » se réactive dès qu'on retape.
+    // 2) La question ne disparaît PAS du fil (bug observé : elle s'effaçait).
+    if ((await leon().getByText('Peut-on décaler la réception ?').count()) === 0)
+      throw new Error('la question a disparu du fil sous pression mémoire');
+
+    // 3) Le chat reste utilisable : « Envoyer » se réactive dès qu'on retape.
     await leon().getByPlaceholder('Écrivez à PHÉNIX').fill('encore un mot');
     await page.waitForTimeout(150);
     if (await leon().getByRole('button', { name: 'Envoyer' }).isDisabled())
       throw new Error('CHAT FIGÉ : « Envoyer » reste désactivé (busy bloqué)');
 
-    // 3) Aucune exception quota non rattrapée n'a fui (persistance best-effort).
+    // 4) Aucune exception quota non rattrapée n'a fui (persistance best-effort).
     const quotaLeak = pageErrors.filter((e) => /quota/i.test(e));
     if (quotaLeak.length > 0)
       throw new Error('exception quota non rattrapée : ' + quotaLeak.join(' | '));
+  });
+
+  await assert('Sous pression : la demande EST créée et le conducteur est NOTIFIÉ', async () => {
+    await leon().getByRole('button', { name: 'Fermer' }).click();
+    await page.getByRole('tab', { name: /Aujourd’hui/ }).first().click();
+    await page
+      .getByText(/Nouvelle demande client à traiter/)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Zéro erreur console (hors avertissements de quota volontaires)', async () => {
