@@ -182,38 +182,57 @@ function CaptureForm({
 
   const submitDemande = async () => {
     if (!canSubmit || busy) return;
-    if (demandeMode === 'document') {
-      // Demande de DOCUMENT : visible client automatiquement (échange documentaire).
-      await demo.appendEvent({
-        projectId: project.id,
-        actor,
-        visibility: 'client',
-        type: 'demande',
-        state: 'ouverte',
-        content: {
-          question: question.trim() || `Pouvez-vous nous transmettre : ${docLibelle.trim()} ?`,
-          destinataire: 'client',
-          attendu: 'document',
-          docLibelle: docLibelle.trim(),
-          docCategorie: docType,
-          ...(echeance ? { echeance } : {}),
-        },
-      });
-    } else {
-      await demo.appendEvent({
-        projectId: project.id,
-        actor,
-        visibility: 'client',
-        type: 'demande',
-        state: 'ouverte',
-        content: { question: question.trim(), destinataire: 'client' },
-      });
+    // Verrou anti double-envoi : on désactive les boutons pendant l'écriture (sinon
+    // un double-clic rapide crée deux demandes identiques + deux notifications).
+    setBusy(true);
+    try {
+      if (demandeMode === 'document') {
+        // Demande de DOCUMENT : visible client automatiquement (échange documentaire).
+        await demo.appendEvent({
+          projectId: project.id,
+          actor,
+          visibility: 'client',
+          type: 'demande',
+          state: 'ouverte',
+          content: {
+            question: question.trim() || `Pouvez-vous nous transmettre : ${docLibelle.trim()} ?`,
+            destinataire: 'client',
+            attendu: 'document',
+            docLibelle: docLibelle.trim(),
+            docCategorie: docType,
+            ...(echeance ? { echeance } : {}),
+          },
+        });
+      } else {
+        await demo.appendEvent({
+          projectId: project.id,
+          actor,
+          visibility: 'client',
+          type: 'demande',
+          state: 'ouverte',
+          content: { question: question.trim(), destinataire: 'client' },
+        });
+      }
+      onDone();
+    } finally {
+      setBusy(false);
     }
-    onDone();
   };
 
   const submit = async (publish: boolean) => {
     if (!canSubmit || busy) return;
+    // Verrou anti double-envoi (double-clic → événements dupliqués, photos postées
+    // deux fois). On désactive les boutons le temps de l'écriture.
+    setBusy(true);
+    try {
+      await doSubmit(publish);
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doSubmit = async (publish: boolean) => {
     const base = { projectId: project.id, actor, visibility } as const;
     if (kind === 'compte_rendu') {
       await demo.appendEvent({
@@ -254,7 +273,6 @@ function CaptureForm({
         content: { question: question.trim(), destinataire: 'client' },
       });
     }
-    onDone();
   };
 
   const selectCls = 'h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground';

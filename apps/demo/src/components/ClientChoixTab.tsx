@@ -5,7 +5,7 @@ import { MessageSquare, Palette, Sparkles } from 'lucide-react';
 import { ClientDecisionBanner } from './ClientDecisionBanner';
 import { demo } from '../store';
 
-type Filtre = 'tous' | 'en_attente' | 'repondu' | 'annule';
+type Filtre = 'tous' | 'en_attente' | 'repondu';
 
 /**
  * « Vos choix » (côté client) — l'historique des DÉCISIONS demandées au client :
@@ -33,23 +33,15 @@ export function ClientChoixTab({
     tous: decisions.length,
     en_attente: decisions.filter(enAttente).length,
     repondu: decisions.filter(repondu).length,
-    annule: 0,
   };
   const matches = (d: ClientDecision): boolean =>
-    filtre === 'tous'
-      ? true
-      : filtre === 'en_attente'
-        ? enAttente(d)
-        : filtre === 'repondu'
-          ? repondu(d)
-          : false; // « annulé » : aucun choix annulable pour l'instant
+    filtre === 'tous' ? true : filtre === 'en_attente' ? enAttente(d) : repondu(d);
   const visibles = decisions.filter(matches);
 
   const filtres: { value: Filtre; label: string }[] = [
     { value: 'tous', label: `Tous (${counts.tous})` },
     { value: 'en_attente', label: `En attente (${counts.en_attente})` },
     { value: 'repondu', label: `Répondu (${counts.repondu})` },
-    { value: 'annule', label: `Annulé (${counts.annule})` },
   ];
 
   return (

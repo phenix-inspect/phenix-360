@@ -161,7 +161,7 @@ export function buildEveningReview(input: {
 
   const faits = [
     { label: comptesRendus > 1 ? 'comptes rendus' : 'compte rendu', count: comptesRendus },
-    { label: reponses > 1 ? 'réponses clients' : 'réponse client', count: reponses },
+    { label: reponses > 1 ? 'réponses client' : 'réponse client', count: reponses },
     { label: actionsJour > 1 ? 'actions créées' : 'action créée', count: actionsJour },
     { label: levees > 1 ? 'réserves levées' : 'réserve levée', count: levees },
     {

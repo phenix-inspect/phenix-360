@@ -246,6 +246,15 @@ const INFO_VERB_RX =
   /(voir|montre|montrer|montrez|afficher|affiche|ouvrir|ouvre|savoir|connaitre|connaître|consulter|retrouver|ou est|où est|\bquand\b|\bquel(le|les|s)?\b|combien|c'est quoi|joindre|contacter|coordonnees|coordonnées)/;
 
 /**
+ * DEMANDE DE MODIFICATION d'un rendez-vous / d'une date / du planning (« je veux
+ * déplacer la réception », « avancer la livraison », « reporter le rdv »). C'est
+ * une décision humaine → conducteur, quelle que soit la tournure (« je veux… » n'est
+ * pas dans REQUEST_RX exprès, pour ne pas escalader « je veux le devis »).
+ */
+const MODIFY_RX =
+  /(deplac|déplac|decal|décal|avanc|repouss|report|reprogramm|changer (la|le|de|ma|mon)|modifier (la|le|ma|mon|mes)|annuler (la|le|ma|mon)).*(reception|réception|rdv|rendez-vous|\bdate\b|livraison|planning|visite|intervention|creneau|créneau)/;
+
+/**
  * SIGNALEMENT D'UN PROBLÈME (fissure, fuite, malfaçon…) → l'œil humain du
  * conducteur est requis, on transmet immédiatement (jamais de réponse à côté).
  */
@@ -622,7 +631,16 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   const q = strip(input.question);
   const events = input.events;
   const dossier = input.dossier ?? null;
-  const todos = clientTodos(events);
+  // Ce que le client doit FAIRE : les décisions du journal (documents/questions
+  // attendus) ET les CHOIX proposés (dossier, statut « propose ») — les deux
+  // apparaissent comme des actions dans « Aujourd'hui », donc « ai-je quelque chose
+  // à faire ? » doit les compter tous. Sans ça, Léon dirait « rien à faire » alors
+  // qu'un choix est en attente (incohérent avec « quels choix en attente ? »).
+  const decisionTodos = clientTodos(events);
+  const choixTodos = (dossier?.selections ?? [])
+    .filter((s) => s.statut === 'propose')
+    .map((s) => ({ label: `valider votre choix « ${s.categorie} »`, effort: '≈ 2 minutes' }));
+  const todos = [...decisionTodos, ...choixTodos];
   const nextTodo = todos[0];
 
   // --- Étape mémoire : intention + zone reportées du tour précédent. On ne
@@ -710,6 +728,18 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   if (PROBLEM_RX.test(q)) return escalate();
   // Besoin logistique / administratif (clés, RDV, sinistre…) → conducteur.
   if (ADMIN_RX.test(q)) return escalate();
+  // Demande de MODIFICATION d'un rendez-vous / d'une date (« déplacer la
+  // réception », « avancer la livraison ») → décision humaine → conducteur.
+  if (MODIFY_RX.test(q)) return escalate();
+  // Le client veut ENVOYER une photo : on ne le renvoie pas vers les coulisses —
+  // on lui explique comment joindre sa photo (il la transmettra à son conducteur).
+  if (/(envoy|joind|transmet|ajout|partag|mettre|montrer une).*(photo|image|cliche|cliché)/.test(q))
+    return reply(
+      'Vous pouvez joindre une photo directement à votre message, avec l’icône appareil photo ' +
+        'ci-dessous. Je la transmettrai aussitôt à votre conducteur.',
+      undefined,
+      false,
+    );
   // Demande d'ACTION / de changement / de permission (hors info & navigation) →
   // décision humaine → conducteur. « je voudrais VOIR le devis » reste traité seul.
   // Les intentions d'INFORMATION DIRECTE (coordonnées, adresse, artisans…) ne sont

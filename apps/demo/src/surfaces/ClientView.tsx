@@ -16,6 +16,7 @@ import {
 } from '@phenix360/core';
 import {
   clientNotifications,
+  clientSettingsOf,
   demo,
   dossierOf,
   mostRecentPendingTeamMoment,
@@ -194,8 +195,10 @@ export function ClientView({
             toujours où en est son chantier, sans demander à Léon. */}
         <TabsContent value="aujourdhui">
           <div className="space-y-6">
-            {/* Rappel de la prochaine grande étape (si une échéance approche). */}
-            <ClientProchaineEtape status={project.status} dossier={dossier} />
+            {/* Rappel de la prochaine grande étape (si le client l'a laissé activé). */}
+            {clientSettingsOf(snap, project.id).notifPrefs.rappelReception && (
+              <ClientProchaineEtape status={project.status} dossier={dossier} />
+            )}
 
             {hasNotifs || hasActions ? (
               <div className="space-y-6">

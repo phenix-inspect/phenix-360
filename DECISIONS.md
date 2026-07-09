@@ -2723,3 +2723,42 @@ organisation interne — uniquement les grandes étapes (garde-fou testé).
 conducteur** (statut → Levée des réserves fait passer Pré-réception « Terminé » et Réception « En
 cours »), et garde client-safe (aucun détail technique). Gate verte (typecheck, lint, prettier, build,
 e2e complet, zéro erreur console). VISION Art. 2, 3, 8, 9, 11.
+
+## 09/07/2026 — Revue totale 110 % (conducteur + client) : bugs corrigés
+
+**Décision produit validée :** revue complète de l'app comme deux vrais utilisateurs (conducteur +
+client). On corrige la VRAIE CAUSE, jamais un contournement, et on renforce les tests.
+
+**Bugs Léon (batterie live des 12 questions) :**
+
+- **Incohérence « ai-je quelque chose à faire ? »** répondait « rien à faire » alors qu'un CHOIX était
+  proposé (alors que « quels choix en attente ? » le trouvait). Cause : `clientTodos` ne comptait que
+  les décisions du journal, pas les choix `propose` du dossier. → Léon compte désormais les deux.
+- **« je veux déplacer la réception »** → « je ne trouve pas de réception » (routé « document »). Cause :
+  « je veux » n'est pas dans `REQUEST_RX` (exprès), donc pas escaladé. → Nouveau garde-fou `MODIFY_RX`
+  (déplacer/décaler/avancer/reporter une réception/date/livraison…) → escalade conducteur.
+- **« je veux envoyer une photo »** → « les photos sont dans les coulisses » (à côté). → Léon explique
+  désormais comment JOINDRE une photo à son message.
+
+**Bugs parcours (audit statique + traçage) :**
+
+- **Double-envoi (`Composer`)** : « Publier »/« Envoyer » n'étaient jamais désactivés pendant l'écriture
+  → un double-clic créait des événements dupliqués (photos postées deux fois) + doubles notifications.
+  → Verrou `busy` en try/finally sur `submit`/`submitDemande`.
+- **Toggles de notification MORTS (`Mon espace`)** : `clientNotifications` ne consultait jamais
+  `notifPrefs` → désactiver une catégorie ne changeait rien. → Chaque catégorie (photos, documents,
+  réponse, décision, rappel réception) est maintenant respectée ; le rappel réception d'« Aujourd'hui »
+  aussi.
+- **Double-validation (`DecisionResponder`)** : bouton « Valider ma décision » sans garde `busy`. → Garde
+  ajoutée + bouton désactivé pendant l'envoi.
+- **Filtre mort « Annulé » (`Vos choix`)** : onglet cliquable toujours vide (aucun choix annulable). →
+  Retiré.
+
+**Corrections de copie (audit orthographe/cohérence) :** « clients à répondre » → « questions client en
+attente » (`PointDuSoir`) ; « réponses clients » → « réponses client » (`journee`, invariable) ;
+« Acompte » → « Acomptes » (chip de filtre, cohérence avec les autres pluriels).
+
+**Tests ajoutés / renforcés :** nouvelle suite `notif-prefs` (5/5 : désactiver « Décision attendue »
+retire la notification, la réactiver la ramène) ; `leon-intentions` étendu (62/62 : modification →
+escalade, envoyer-photo, todo compte les choix). Gate verte (typecheck, lint, prettier, build, e2e
+complet, zéro erreur console). VISION Art. 2, 4, 8, 9, 11.

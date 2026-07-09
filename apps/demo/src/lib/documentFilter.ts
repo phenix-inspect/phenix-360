@@ -27,7 +27,7 @@ export type DocFilter = 'tous' | DocFamily;
 export const DOC_FAMILY_LABEL: Record<DocFamily, string> = {
   devis: 'Devis',
   avenant: 'Avenants',
-  acompte: 'Acompte',
+  acompte: 'Acomptes',
   facture: 'Factures',
   plan: 'Plans',
   compte_rendu: 'Comptes rendus',

@@ -2517,28 +2517,33 @@ export function clientNotifications(
   const base = notifBaseline();
   const seen = snap.seen['client'] ?? {};
   const out: AppNotification[] = [];
+  // Préférences de notification du client (« Mon espace ») : une catégorie
+  // désactivée n'apparaît plus dans « Aujourd'hui ». Par défaut, tout est activé.
+  const prefs = snap.clientSettings[projectId]?.notifPrefs;
+  const allow = (k: ClientNotifPrefKey): boolean => !prefs || prefs[k] !== false;
 
   // 📷 Nouvelles photos partagées dans les coulisses (album = UN seul moment →
   // UNE seule notification, jamais une par photo). Uniquement les albums photo.
-  for (const m of snap.fil.moments[projectId] ?? [])
-    if (estMomentCoulisses(m) && momentPartageClient(m) && m.createdAt > base && !seen[m.id])
-      out.push({
-        id: `moment-${m.id}`,
-        icon: '📷',
-        text: `Nouvelles photos ajoutées dans les coulisses`,
-        createdAt: m.createdAt,
-        seenKeys: [m.id],
-        projectId,
-        clientTab: 'coulisses',
-        clientSection: 'section-fil',
-        clientView: 'fil',
-      });
+  if (allow('photos'))
+    for (const m of snap.fil.moments[projectId] ?? [])
+      if (estMomentCoulisses(m) && momentPartageClient(m) && m.createdAt > base && !seen[m.id])
+        out.push({
+          id: `moment-${m.id}`,
+          icon: '📷',
+          text: `Nouvelles photos ajoutées dans les coulisses`,
+          createdAt: m.createdAt,
+          seenKeys: [m.id],
+          projectId,
+          clientTab: 'coulisses',
+          clientSection: 'section-fil',
+          clientView: 'fil',
+        });
 
   for (const e of snap.events) {
     if (e.projectId !== projectId || e.visibility !== 'client' || e.state !== 'publie') continue;
     if (e.createdAt <= base || seen[e.id]) continue;
     // 💬 Nouveau compte rendu de l'équipe → il vit dans l'onglet DOCUMENTS.
-    if (e.type === 'compte_rendu')
+    if (e.type === 'compte_rendu' && allow('documents'))
       out.push({
         id: `cr-${e.id}`,
         icon: '💬',
@@ -2551,7 +2556,7 @@ export function clientNotifications(
       });
     // 📄 Nouveau document partagé PAR L'ÉQUIPE → onglet DOCUMENTS. On ignore les
     // documents que le CLIENT a lui-même envoyés (il ne se notifie pas lui-même).
-    else if (e.type === 'document' && e.actor.role !== 'client')
+    else if (e.type === 'document' && e.actor.role !== 'client' && allow('documents'))
       out.push({
         id: `doc-${e.id}`,
         icon: '📄',
@@ -2568,6 +2573,7 @@ export function clientNotifications(
   // demande est passée à `traitee` (hors de la boucle « publie » ci-dessus) → on
   // la traite à part. La réponse vit dans « Vos demandes » (onglet Aujourd'hui).
   for (const e of snap.events) {
+    if (!allow('reponse')) break;
     if (e.projectId !== projectId || e.type !== 'demande') continue;
     const c = e.content;
     if (c.destinataire !== 'phenix' || !c.resolution) continue;
@@ -2591,7 +2597,7 @@ export function clientNotifications(
   // conducteur voit son statut passer de « Non lu » à « En attente ». Disparaît
   // dès que le client l'ouvre, et l'action reste dans « Aujourd'hui » tant qu'il
   // n'a pas validé.
-  const dossierNotif = snap.dossiers[projectId];
+  const dossierNotif = allow('decision') ? snap.dossiers[projectId] : undefined;
   if (dossierNotif) {
     const proposeById = new Map(
       dossierNotif.selections.filter((s) => s.statut === 'propose').map((s) => [s.id, s] as const),

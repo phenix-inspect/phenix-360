@@ -69,13 +69,19 @@ export function DecisionResponder({
   };
 
   const submitDecision = async (): Promise<void> => {
-    if (!texte.trim()) return;
-    await demo.resolveDemande(decision.eventId, {
-      texte: texte.trim(),
-      resolvedBy: actor.userId,
-      resolvedAt: new Date().toISOString(),
-    });
-    reset();
+    if (!texte.trim() || busy) return;
+    // Verrou anti double-envoi (double-clic → deux réponses sur la même demande).
+    setBusy(true);
+    try {
+      await demo.resolveDemande(decision.eventId, {
+        texte: texte.trim(),
+        resolvedBy: actor.userId,
+        resolvedAt: new Date().toISOString(),
+      });
+      reset();
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!open) {
@@ -97,7 +103,7 @@ export function DecisionResponder({
           autoFocus
         />
         <div className="mt-2 flex gap-2">
-          <Button size="sm" onClick={() => void submitDecision()}>
+          <Button size="sm" disabled={busy || !texte.trim()} onClick={() => void submitDecision()}>
             Valider ma décision
           </Button>
           <Button size="sm" variant="ghost" onClick={reset}>

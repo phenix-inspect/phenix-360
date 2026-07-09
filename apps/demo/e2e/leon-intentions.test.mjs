@@ -99,7 +99,7 @@ const dossier = {
     { id: 'o1', label: 'Cuisine équipée', statut: 'commandee', dateLivraisonEstimee: '2026-07-14' },
   ],
   selections: [
-    { id: 's1', categorie: 'Carrelage', label: 'Carrelage sol', statut: 'a_choisir' },
+    { id: 's1', categorie: 'Carrelage', label: 'Carrelage sol', statut: 'propose' },
     { id: 's2', categorie: 'Peinture', label: 'Peinture murs', statut: 'valide', detail: 'Blanc' },
   ],
   planning: [
@@ -266,6 +266,27 @@ check(
   'todo — « il me reste quoi à faire »',
   say('Il me reste quoi à faire ?', /action|attend|carrelage|décision/i),
 );
+// Un CHOIX proposé (dossier) compte comme une action : « rien à faire » serait
+// incohérent avec « quels choix en attente ? ». On isole le cas (aucune décision
+// du journal, seulement le choix « Carrelage » proposé).
+check('todo — compte les choix en attente (jamais « rien à faire »)', () => {
+  const r = askPhenix({
+    ...base,
+    events: base.events.filter((e) => e.type !== 'demande' || e.content?.destinataire !== 'client'),
+    question: 'Ai-je quelque chose à faire ?',
+  });
+  if (/rien à faire/i.test(r.message))
+    throw new Error(`« rien à faire » alors qu’un choix est proposé : ${r.message.slice(0, 70)}`);
+  if (!/Carrelage/.test(r.message))
+    throw new Error(`le choix proposé n’est pas cité : ${r.message}`);
+});
+check('envoyer une photo — Léon explique comment joindre (pas « les coulisses »)', () => {
+  const r = ask('Je veux envoyer une photo');
+  if (!/joindre une photo|icône appareil photo/i.test(r.message))
+    throw new Error(`« envoyer une photo » mal orienté : ${r.message.slice(0, 70)}`);
+  if (/coulisses/i.test(r.message))
+    throw new Error('« envoyer une photo » renvoie vers les coulisses');
+});
 check(
   'todo ≠ date de réception',
   notSay('Qu’est-ce qu’il me reste à faire ?', /réception.*autour du/i),
@@ -312,6 +333,11 @@ check(
   escalates('Je voudrais déplacer la réception'),
 );
 check('modification — « peut-on décaler »', escalates('Peut-on décaler la réception ?'));
+check(
+  'modification — « je veux déplacer la réception »',
+  escalates('Je veux déplacer la réception'),
+);
+check('modification — « avancer la livraison »', escalates('Je veux avancer la livraison'));
 check(
   'administratif — « je n’ai plus les clés »',
   escalates('Je n’ai plus les clés, comment récupérer'),
