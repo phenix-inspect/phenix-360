@@ -2689,3 +2689,37 @@ photo + commentaire → disparition d'Aujourd'hui (delta) → conservé dans Vos
 trace au Suivi). `demandes-onglet` mis à jour (nouveaux filtres). `client-decision` (10/10),
 `client-architecture` (7/7) conservés. Gate verte (typecheck, lint, prettier, build, e2e complet, zéro
 erreur console). VISION Art. 3, 4, 8, 9, 11.
+
+## 09/07/2026 — Planning simplifié côté client (« Planning de votre projet »)
+
+**Décision produit validée :** le client doit toujours savoir **où en est son chantier**, **quelle est
+la prochaine étape** et **quand**, sans demander à Léon. On rend visible dans l'Espace client un bloc
+**« Planning de votre projet »** — les **GRANDES ÉTAPES** seulement, jamais un planning technique.
+
+**Découverte :** le cerveau existait déjà (`buildClientPlanning` dans `core/client-planning.ts` — 5
+jalons de cycle de vie : Projet validé · Préparation · Démarrage · Pré-réception · Réception, avec
+état terminé/en cours/à venir et dates dérivées) et son rendu aussi (`GrandesEtapes`), mais le
+composant était **orphelin** depuis la suppression de l'onglet « Le projet ». On le **remonte** au lieu
+de dupliquer.
+
+**Fait :**
+
+- Nouveau bloc **`ClientPlanningBlock`** (en-tête « Planning de votre projet » + `GrandesEtapes`),
+  affiché en bas de l'onglet **« Aujourd'hui »** du client. Timeline simple : étapes terminées
+  **cochées**, étape en cours **mise en évidence** (« En cours »), étapes futures **grisées**
+  (« À venir »).
+- **Rappel « Aujourd'hui »** : `ClientProchaineEtape` — « Prochaine étape : Pré-réception dans 5 jours »
+  / « Réception prévue le 25 septembre 2026 », via le nouveau sélecteur core `nextClientMilestone`.
+- **Synchronisation automatique** : les dates viennent du chantier conducteur (source unique
+  `buildSmartPlanning` / statut métier). Le client ne peut rien modifier ; toute modification
+  conducteur (statut, dates) met à jour le bloc client sans code additionnel.
+- **Aujourd'hui** conserve ses actions/notifications ; le planning s'ajoute (sans casser l'état vide).
+
+**Interdits respectés :** aucun planning artisans, tâche technique, check-list conducteur ni
+organisation interne — uniquement les grandes étapes (garde-fou testé).
+
+**Tests :** nouvelle suite `client-planning` (9/9) : bloc visible, 3 jalons principaux, étape terminée
+(cochée) / en cours (évidence) / future (grisée), rappel dans « Aujourd'hui », **mise à jour après modif
+conducteur** (statut → Levée des réserves fait passer Pré-réception « Terminé » et Réception « En
+cours »), et garde client-safe (aucun détail technique). Gate verte (typecheck, lint, prettier, build,
+e2e complet, zéro erreur console). VISION Art. 2, 3, 8, 9, 11.

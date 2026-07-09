@@ -29,6 +29,7 @@ import { ClientDocuments } from '../components/ClientDocuments';
 import { ClientDemandesTab } from '../components/ClientDemandesTab';
 import { ClientChoixTab } from '../components/ClientChoixTab';
 import { ClientMonEspaceTab, CookieConsentBanner } from '../components/ClientMonEspaceTab';
+import { ClientPlanningBlock, ClientProchaineEtape } from '../components/ClientPlanning';
 import { FilView } from '../components/fil/FilView';
 import { DecisionResponder } from '../components/DecisionResponder';
 import { PhenixWidget } from '../components/PhenixWidget';
@@ -188,92 +189,100 @@ export function ClientView({
           <TabsTrigger value="monespace">Mon espace</TabsTrigger>
         </TabsList>
 
-        {/* AUJOURD'HUI — un tableau d'ACTIONS : notifications d'abord, puis ce qui
-            attend une action. Si rien n'attend le client, un seul message : il peut
-            profiter de sa journée. */}
+        {/* AUJOURD'HUI — le tableau de bord du client : la prochaine grande étape,
+            les actions/notifications, puis le planning du projet. Le client sait
+            toujours où en est son chantier, sans demander à Léon. */}
         <TabsContent value="aujourdhui">
-          {hasNotifs || hasActions ? (
-            <div className="space-y-6">
-              {/* 1) Notifications importantes, AVANT les actions. */}
-              {(teamMessages > 0 || clientNotificationsList.length > 0) && (
-                <div className="space-y-3">
-                  {teamMessages > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setClientTab('coulisses');
-                        const target = mostRecentPendingTeamMoment(snap, project.id);
-                        if (target) demo.focusMoment(target, actor.role);
-                      }}
-                      className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
-                    >
-                      <MessageCircle aria-hidden />
-                      Votre équipe vous a laissé {teamMessages} message{teamMessages > 1 ? 's' : ''}{' '}
-                      — voir les coulisses
-                    </button>
-                  )}
-                  <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
-                </div>
-              )}
+          <div className="space-y-6">
+            {/* Rappel de la prochaine grande étape (si une échéance approche). */}
+            <ClientProchaineEtape status={project.status} dossier={dossier} />
 
-              {/* 2) Actions attendues du client. */}
-              {actionableChoix.length > 0 && (
-                <div id="section-decision" className="scroll-mt-24 space-y-3">
-                  {actionableChoix.map((d) => (
-                    <ClientDecisionBanner
-                      key={d.id}
-                      decision={d}
-                      onOpen={() => demo.markChoixOpenedByClient([d.id])}
-                      onValidate={(optionId, comment) => validateDecision(d, optionId, comment)}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {docRequests.length > 0 && (
-                <section id="section-documents-demandes" className="space-y-2">
-                  <h3 className="text-sm font-medium text-foreground">
-                    Documents demandés ({docRequests.length})
-                  </h3>
-                  <ul className="space-y-2">
-                    {docRequests.map((d) => (
-                      <li
-                        key={d.eventId}
-                        className="rounded-xl border border-gold-200 bg-gold-50 p-4"
+            {hasNotifs || hasActions ? (
+              <div className="space-y-6">
+                {/* 1) Notifications importantes, AVANT les actions. */}
+                {(teamMessages > 0 || clientNotificationsList.length > 0) && (
+                  <div className="space-y-3">
+                    {teamMessages > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setClientTab('coulisses');
+                          const target = mostRecentPendingTeamMoment(snap, project.id);
+                          if (target) demo.focusMoment(target, actor.role);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-2xl border border-gold-200 bg-gold-50 px-4 py-3 text-left text-sm font-medium text-gold-800 transition-colors duration-base hover:bg-gold-100 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600"
                       >
-                        <p className="flex items-center gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
-                          <FileText aria-hidden />
-                          {d.question}
-                        </p>
-                        <DecisionResponder decision={d} actor={actor} className="mt-2" />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
+                        <MessageCircle aria-hidden />
+                        Votre équipe vous a laissé {teamMessages} message
+                        {teamMessages > 1 ? 's' : ''} — voir les coulisses
+                      </button>
+                    )}
+                    <NotificationsFeed notifications={clientNotificationsList} onOpen={openNotif} />
+                  </div>
+                )}
 
-              {decisionRequests.length > 0 && (
-                <section className="space-y-2">
-                  <h3 className="text-sm font-medium text-foreground">
-                    Décisions en attente ({decisionRequests.length})
-                  </h3>
-                  <ul className="space-y-2">
-                    {decisionRequests.map((d) => (
-                      <li
-                        key={d.eventId}
-                        className="rounded-xl border border-border bg-surface p-4"
-                      >
-                        <p className="text-sm text-foreground">{d.question}</p>
-                        <DecisionResponder decision={d} actor={actor} className="mt-2" />
-                      </li>
+                {/* 2) Actions attendues du client. */}
+                {actionableChoix.length > 0 && (
+                  <div id="section-decision" className="scroll-mt-24 space-y-3">
+                    {actionableChoix.map((d) => (
+                      <ClientDecisionBanner
+                        key={d.id}
+                        decision={d}
+                        onOpen={() => demo.markChoixOpenedByClient([d.id])}
+                        onValidate={(optionId, comment) => validateDecision(d, optionId, comment)}
+                      />
                     ))}
-                  </ul>
-                </section>
-              )}
-            </div>
-          ) : (
-            <ClientRienAFaire />
-          )}
+                  </div>
+                )}
+
+                {docRequests.length > 0 && (
+                  <section id="section-documents-demandes" className="space-y-2">
+                    <h3 className="text-sm font-medium text-foreground">
+                      Documents demandés ({docRequests.length})
+                    </h3>
+                    <ul className="space-y-2">
+                      {docRequests.map((d) => (
+                        <li
+                          key={d.eventId}
+                          className="rounded-xl border border-gold-200 bg-gold-50 p-4"
+                        >
+                          <p className="flex items-center gap-2 text-sm text-foreground [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-gold-600">
+                            <FileText aria-hidden />
+                            {d.question}
+                          </p>
+                          <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {decisionRequests.length > 0 && (
+                  <section className="space-y-2">
+                    <h3 className="text-sm font-medium text-foreground">
+                      Décisions en attente ({decisionRequests.length})
+                    </h3>
+                    <ul className="space-y-2">
+                      {decisionRequests.map((d) => (
+                        <li
+                          key={d.eventId}
+                          className="rounded-xl border border-border bg-surface p-4"
+                        >
+                          <p className="text-sm text-foreground">{d.question}</p>
+                          <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            ) : (
+              <ClientRienAFaire />
+            )}
+
+            {/* PLANNING DE VOTRE PROJET — les grandes étapes (lecture seule). */}
+            <ClientPlanningBlock status={project.status} dossier={dossier} />
+          </div>
         </TabsContent>
 
         {/* VOS DEMANDES — l'historique des échanges avec PHÉNIX (via Léon). */}

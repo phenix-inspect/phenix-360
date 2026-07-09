@@ -156,3 +156,22 @@ export function buildClientPlanning(
 
   return { started, milestones, message: MESSAGE[status] };
 }
+
+/**
+ * La PROCHAINE grande étape à RAPPELER au client (pour « Aujourd'hui ») : le jalon
+ * « en cours » qui porte une date ou une estimation ; à défaut, le prochain jalon
+ * non terminé qui en porte une. Null si rien de datable (rien à rappeler).
+ */
+export function nextClientMilestone(
+  status: ProjectStatus,
+  dossier: ProjectDossier | null,
+  nowMs: number = Date.now(),
+): ClientMilestone | null {
+  const { milestones } = buildClientPlanning(status, dossier, nowMs);
+  const hasInfo = (m: ClientMilestone): boolean => Boolean(m.date || m.estimate);
+  return (
+    milestones.find((m) => m.state === 'current' && hasInfo(m)) ??
+    milestones.find((m) => m.state !== 'done' && hasInfo(m)) ??
+    null
+  );
+}
