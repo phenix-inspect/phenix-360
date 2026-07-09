@@ -60,6 +60,15 @@ export interface DemoSeed {
 const uuid = (): string => globalThis.crypto.randomUUID();
 const daysAgo = (n: number): string => new Date(Date.now() - n * 86_400_000).toISOString();
 
+/**
+ * Un VRAI petit PDF (valide, lisible par le navigateur) servant de fichier
+ * d'origine aux documents IMPORTÉS de la démo. Sans lui, un document importé
+ * seedé n'aurait pas de fichier réel — or un document importé doit TOUJOURS
+ * s'ouvrir tel qu'il a été déposé, jamais via une page générée.
+ */
+const SAMPLE_PDF_DATAURL =
+  'data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2VzL0tpZHNbMyAwIFJdL0NvdW50IDE+PgplbmRvYmoKMyAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDIgMCBSL01lZGlhQm94WzAgMCA1OTUgODQyXS9Db250ZW50cyA0IDAgUi9SZXNvdXJjZXM8PC9Gb250PDwvRjEgNSAwIFI+Pj4+Pj4KZW5kb2JqCjQgMCBvYmoKPDwvTGVuZ3RoIDEwNj4+CnN0cmVhbQpCVCAvRjEgMjAgVGYgNjAgNzYwIFRkIChQSEVOSVggMzYwIC0gRGV2aXMgc2lnbmUpIFRqIDAgLTQwIFRkIC9GMSAxMiBUZiAoRG9jdW1lbnQgZGUgZGVtb25zdHJhdGlvbi4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2EvRW5jb2RpbmcvV2luQW5zaUVuY29kaW5nPj4KZW5kb2JqCnRyYWlsZXIKPDwvUm9vdCAxIDAgUi9TaXplIDY+PgolJUVPRg==';
+
 export function buildDemoSeed(): DemoSeed {
   const pid = projectId(uuid());
   const compaId = userId(uuid());
@@ -141,6 +150,9 @@ export function buildDemoSeed(): DemoSeed {
           storagePath: `${pid}/${uuid()}.pdf`,
           mimeType: 'application/pdf',
           fileName: 'Devis-plomberie.pdf',
+          // Vrai fichier PDF importé : « Ouvrir » doit rendre CE fichier, jamais
+          // une page HTML de remplacement.
+          dataUrl: SAMPLE_PDF_DATAURL,
           createdAt: daysAgo(10),
         },
         libelle: 'Devis plomberie — lot sanitaire',
@@ -195,6 +207,8 @@ export function buildDemoSeed(): DemoSeed {
           storagePath: `${pid}/${uuid()}.pdf`,
           mimeType: 'application/pdf',
           fileName: 'Contrat-sous-traitant.pdf',
+          // Vrai fichier PDF importé (interne) : « Ouvrir » rend CE fichier.
+          dataUrl: SAMPLE_PDF_DATAURL,
           createdAt: daysAgo(7),
         },
         libelle: 'Contrat sous-traitant (interne)',

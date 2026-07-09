@@ -88,6 +88,7 @@ import {
   downloadHtmlDocument,
   openAttachment,
   openHtmlDocument,
+  openUnavailableDocument,
 } from './lib/document';
 import { buildDocumentHtml, generatedDocumentTitle } from './lib/generatedDocument';
 
@@ -566,16 +567,22 @@ export const demo = {
   },
 
   /**
-   * Ouvre N'IMPORTE QUEL document pour consultation — règle unique : un document
-   * n'est JAMAIS une simple ligne. S'il porte un vrai fichier (PDF / image) →
-   * ouverture du fichier ; sinon (compte rendu, PV de réception, devis de
-   * référence…) → PHÉNIX GÉNÈRE le document et l'ouvre. Fonctionne pour les
-   * événements `document` et `compte_rendu`, côté conducteur comme côté client
-   * (le partage gouverne DÉJÀ où le document apparaît — ici on ne fait qu'ouvrir).
+   * Ouvre un document pour consultation. DEUX catégories, jamais confondues :
+   *
+   *   • DOCUMENT IMPORTÉ (`type === 'document'`) — un vrai fichier déposé (PDF,
+   *     image…). On ouvre TOUJOURS le FICHIER D'ORIGINE, jamais une page HTML de
+   *     remplacement. Si le fichier n'est plus récupérable → message clair
+   *     (« Le document n'est plus disponible. »), jamais une fausse page.
+   *   • DOCUMENT GÉNÉRÉ par PHÉNIX (`type === 'compte_rendu'` : compte rendu, PV de
+   *     réception, liste de points à reprendre…) — PHÉNIX le rend en HTML autonome.
+   *
+   * Fonctionne côté conducteur comme côté client (le partage gouverne DÉJÀ où le
+   * document apparaît — ici on ne fait qu'ouvrir).
    */
   openDocument(event: Event, audience: CrAudience = 'conducteur'): void {
-    if (event.type === 'document' && event.content.attachment.dataUrl) {
-      openAttachment(event.content.attachment);
+    if (event.type === 'document') {
+      if (event.content.attachment.dataUrl) openAttachment(event.content.attachment);
+      else openUnavailableDocument();
       return;
     }
     const project = snapshot.projects.find((p) => p.id === event.projectId);
@@ -592,12 +599,14 @@ export const demo = {
   },
 
   /**
-   * TÉLÉCHARGE n'importe quel document (règle unique, symétrique de `openDocument`) :
-   * un vrai fichier → le fichier d'origine ; un document généré → sa page HTML.
+   * TÉLÉCHARGE un document (symétrique de `openDocument`) : un document IMPORTÉ →
+   * le fichier d'origine (ou message clair s'il a disparu) ; un document GÉNÉRÉ par
+   * PHÉNIX → sa page HTML autonome.
    */
   downloadDocument(event: Event, audience: CrAudience = 'conducteur'): void {
-    if (event.type === 'document' && event.content.attachment.dataUrl) {
-      downloadAttachment(event.content.attachment);
+    if (event.type === 'document') {
+      if (event.content.attachment.dataUrl) downloadAttachment(event.content.attachment);
+      else openUnavailableDocument();
       return;
     }
     const project = snapshot.projects.find((p) => p.id === event.projectId);

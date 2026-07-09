@@ -2610,3 +2610,38 @@ au client.
 entrées présentes) et bascule son parcours de flux générique sur **Pré-réception** (Note utilisait le
 même `MissionFlow`) ; `suivi-entree-unique` idem. `mission` (8/8), `suivi-entree-unique` (7/7). Gate
 verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console). VISION Art. 4, 8, 9, 11.
+
+## 09/07/2026 — BUG CRITIQUE : ouvrir un document rend le FICHIER d'origine (jamais une page HTML)
+
+**Symptôme :** Espace client → Documents → « Devis signé » → Ouvrir affichait une **page HTML générée**
+(« Ce document a été enregistré dans PHÉNIX… ») au lieu du **PDF réel**. Impression bas de gamme,
+inacceptable.
+
+**Diagnostic.** `openDocument` ouvrait le fichier UNIQUEMENT si `attachment.dataUrl` était présent ;
+**sinon il générait une page HTML** (`buildDocumentHtml`) — comportement voulu à l'origine (« fiche de
+référence d'un devis sans pièce »). Or les documents importés seedés (« Devis plomberie — lot
+sanitaire », « Contrat sous-traitant ») portaient un `bucket`/`storagePath` factices **sans `dataUrl`**
+→ ils tombaient dans la génération HTML. (Les imports réels, eux, portent bien un `dataUrl` via
+`readDocumentAttachment` — donc un vrai import s'ouvrait correctement ; c'est le seed qui trompait.)
+
+**Nouvelle règle produit — DEUX catégories, jamais confondues :**
+
+1. **Document IMPORTÉ** (`type === 'document'`, un vrai fichier déposé : PDF, image…) → on ouvre
+   **TOUJOURS le fichier d'origine**, jamais une page HTML de remplacement. Si le fichier a disparu
+   (non persisté / purgé) → **message clair** « Le document n'est plus disponible. » (jamais une fausse
+   page).
+2. **Document GÉNÉRÉ par PHÉNIX** (`type === 'compte_rendu'` : compte rendu, PV de réception, liste de
+   points à reprendre…) → PHÉNIX le rend en **page HTML autonome** (légitime, c'est sa nature).
+
+**Correctifs.** `store.openDocument` / `downloadDocument` branchent sur le **type d'événement** : un
+`document` ouvre le fichier ou, à défaut, `openUnavailableDocument()` (nouveau helper dans
+`lib/document.ts`, page honnête « indisponible ») — **jamais** `buildDocumentHtml`. Le **seed** fournit
+désormais un **vrai PDF** (`SAMPLE_PDF_DATAURL`, PDF valide) aux documents importés (« Devis
+plomberie », « Contrat sous-traitant ») pour qu'ils s'ouvrent tels quels.
+
+**Tests.** Nouvelle suite `documents-originaux` (5/5) : on **intercepte `URL.createObjectURL`** et on
+lit le **type MIME** réellement ouvert — import PDF → `application/pdf`, import image → `image/*`,
+compte rendu généré → `text/html`, et **garde de régression** sur le devis seedé côté client
+(`application/pdf`, jamais `text/html`). `documents-consultables` mis à jour (devis / contrat importés →
+ouverture du fichier). `documents-cliquables` (7/7) conservé. Gate verte (typecheck, lint, prettier,
+build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.

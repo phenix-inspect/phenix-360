@@ -1,11 +1,12 @@
 /**
  * RC1 — Tout document est CONSULTABLE (retour terrain).
  * ===========================================================================
- * Règle unique : un document n'est JAMAIS une simple ligne. Un clic l'ouvre —
- *   • vrai fichier (PDF / image) → ouverture du fichier ;
- *   • document généré par PHÉNIX (compte rendu, PV de réception, liste de points
- *     à reprendre, fiche de référence d'un devis sans pièce) → PHÉNIX le génère
- *     et l'ouvre (page HTML autonome, imprimable).
+ * DEUX catégories, jamais confondues :
+ *   • document IMPORTÉ (PDF / image déposé) → on ouvre TOUJOURS le FICHIER
+ *     d'origine, jamais une page HTML de remplacement (fichier manquant → message
+ *     clair « Le document n'est plus disponible. ») ;
+ *   • document GÉNÉRÉ par PHÉNIX (compte rendu, PV de réception, liste de points à
+ *     reprendre) → PHÉNIX le rend en page HTML autonome, imprimable.
  * Vérifié des DEUX côtés : documents partagés (client) et internes (conducteur).
  * Aucun nouvel écran — on enrichit le comportement des documents existants.
  */
@@ -80,20 +81,20 @@ try {
     if (!/Compte rendu/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
-  // ---- Devis (document sans fichier → fiche de référence générée) ---------
-  await assert('Ouverture d’un DEVIS sans fichier → fiche de référence générée', async () => {
-    const title = await openAndTitle(
+  // ---- Devis IMPORTÉ (vrai PDF) → ouverture du FICHIER, jamais une page HTML --
+  await assert('Ouverture d’un DEVIS importé → le fichier d’origine s’ouvre', async () => {
+    // Un document importé s'ouvre en tant que fichier (blob:) ; on ne substitue
+    // JAMAIS une page HTML générée (« Ce document a été enregistré… »).
+    await openAndTitle(
       journalRow('Devis plomberie').getByRole('button', { name: 'Ouvrir le document' }),
     );
-    if (!/Devis plomberie/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
-  // ---- Document interne côté conducteur (sans fichier → généré) -----------
-  await assert('Ouverture d’un DOCUMENT INTERNE (conducteur) → généré', async () => {
-    const title = await openAndTitle(
+  // ---- Document interne IMPORTÉ (conducteur) → ouverture du fichier ---------
+  await assert('Ouverture d’un DOCUMENT INTERNE importé → le fichier s’ouvre', async () => {
+    await openAndTitle(
       journalRow('Contrat sous-traitant').getByRole('button', { name: 'Ouvrir le document' }),
     );
-    if (!/Contrat sous-traitant/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
   // ---- Pré-réception (mission → « Liste des points à reprendre ») ----------

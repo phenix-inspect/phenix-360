@@ -44,12 +44,31 @@ export function openAttachment(attachment: EventAttachment): void {
 }
 
 /**
- * Ouvre un document GÉNÉRÉ par PHÉNIX (compte rendu, PV de réception, fiche de
- * référence…) : une page HTML autonome, lisible et imprimable, rendue dans un
- * nouvel onglet. Même mécanique d'ouverture que les fichiers réels — pour
- * l'utilisateur, tout document se consulte de la même façon.
+ * Ouvre un document GÉNÉRÉ par PHÉNIX (compte rendu, PV de réception…) : une page
+ * HTML autonome, lisible et imprimable, rendue dans un nouvel onglet. Même
+ * mécanique d'ouverture que les fichiers réels — pour l'utilisateur, tout document
+ * se consulte de la même façon. RÉSERVÉ aux documents générés (jamais un import).
  */
 export function openHtmlDocument(html: string): void {
+  openBlob(new Blob([html], { type: 'text/html;charset=utf-8' }));
+}
+
+/**
+ * Un document IMPORTÉ dont le FICHIER n'est plus récupérable (non persisté /
+ * purgé). Règle produit : on n'invente JAMAIS une fausse page à sa place — on
+ * affiche un message honnête et clair, « Le document n'est plus disponible. ».
+ */
+export function openUnavailableDocument(): void {
+  const html =
+    '<!doctype html><html lang="fr"><head><meta charset="utf-8">' +
+    '<title>Document indisponible</title>' +
+    '<style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:grid;place-items:center;' +
+    'min-height:100vh;margin:0;color:#1a1a1a;background:#faf9f7}' +
+    '.box{text-align:center;max-width:30rem;padding:2rem}h1{font-size:1.15rem;margin:0 0 .5rem}' +
+    'p{color:#6b6b6b;margin:0}</style></head><body><div class="box">' +
+    "<h1>Le document n'est plus disponible.</h1>" +
+    "<p>Ce fichier n'a pas pu être retrouvé. Contactez votre conducteur PHÉNIX si vous en avez besoin.</p>" +
+    '</div></body></html>';
   openBlob(new Blob([html], { type: 'text/html;charset=utf-8' }));
 }
 
