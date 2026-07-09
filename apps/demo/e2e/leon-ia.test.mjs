@@ -86,6 +86,71 @@ try {
       throw new Error('Léon a escaladé une simple demande de coordonnées');
   });
 
+  await assert(
+    '« L’adresse du chantier ? » → adresse du CHANTIER (jamais une commande)',
+    async () => {
+      const before = await demandeCount();
+      await ask('C’est quoi l’adresse du chantier ?');
+      await leon()
+        .getByText(/8 rue Vauban/)
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // Léon ne doit PAS répondre une commande (« Cuisine équipée ») à côté.
+      const lastBubble = await leon().getByText(/adresse de votre chantier/i).innerText();
+      if (/cuisine|commande/i.test(lastBubble))
+        throw new Error('Léon confond adresse du chantier et commande');
+      if ((await demandeCount()) !== before)
+        throw new Error('Léon a escaladé une adresse qu’il connaît');
+    },
+  );
+
+  await assert('« C’est quoi votre adresse ? » → adresse de PHÉNIX (distincte)', async () => {
+    await ask('C’est quoi votre adresse ?');
+    await leon()
+      .getByText(/adresse de PHÉNIX/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  await assert(
+    '« Qu’est-ce qu’il me reste à faire ? » → lit les actions (pas une date de réception)',
+    async () => {
+      await ask('Qu’est-ce qu’il me reste à faire ?');
+      // Réponse de type « action attendue / rien à faire », jamais « réception autour du ».
+      await leon()
+        .getByText(/action|attend|rien à faire|décision/i)
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // À ce stade de la conversation, aucune date de réception ne doit apparaître.
+      if ((await leon().getByText(/réception.*autour du/i).count()) > 0)
+        throw new Error('Léon répond une date de réception à « qu’il me reste à faire »');
+    },
+  );
+
+  await assert(
+    'Question incompréhensible → Léon dit « je ne trouve pas » (aucun doc au hasard)',
+    async () => {
+      const before = await demandeCount();
+      const docBtnsBefore = await leon()
+        .getByRole('button', { name: /Ouvrir «/ })
+        .count();
+      await ask('azerty qsdfgh wxcvbn');
+      await leon()
+        .getByText(/ne trouve pas|transmettre votre demande/i)
+        .last()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // Il ne propose SURTOUT pas d’ouvrir un NOUVEAU document au hasard.
+      const docBtnsAfter = await leon()
+        .getByRole('button', { name: /Ouvrir «/ })
+        .count();
+      if (docBtnsAfter > docBtnsBefore)
+        throw new Error('Léon propose un document au hasard sur une question incomprise');
+      // Une question incomprise ne crée pas de demande dans le dos du client.
+      if ((await demandeCount()) !== before)
+        throw new Error('Léon a créé une demande sans que le client l’ait demandé');
+    },
+  );
+
   await assert('« Quand est prévue la réception ? » → réponse depuis les dates', async () => {
     const before = await demandeCount();
     await ask('Quand est prévue la réception ?');

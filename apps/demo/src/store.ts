@@ -1839,6 +1839,9 @@ export const demo = {
 
     const events = snapshot.events.filter((e) => e.projectId === projectId);
     const dossier = snapshot.dossiers[projectId] ?? null;
+    // L'adresse du CHANTIER (donnée du projet) — distincte de l'adresse PHÉNIX.
+    // Léon doit pouvoir répondre « l'adresse du chantier » sans jamais la confondre.
+    const chantierAddress = snapshot.projects.find((p) => p.id === projectId)?.address ?? null;
     // PHÉNIX est le concierge du CLIENT : il ne connaît que les Moments partagés
     // (jamais l'interne). Le Fil client est une projection — la règle est unique.
     const moments = (snapshot.fil.moments[projectId] ?? []).filter(momentPartageClient);
@@ -1853,6 +1856,7 @@ export const demo = {
       moments,
       zones,
       history,
+      chantierAddress,
       hasPhotos: photos.length > 0,
     });
 

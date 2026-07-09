@@ -2439,3 +2439,55 @@ question), l'onglet **« Demandes client »**, **Léon**, **Aujourd'hui**, **Sui
 client ») ; `chantier-architecture` mis à jour. Gate verte (typecheck, lint, prettier, build, e2e
 complet, zéro erreur console). Objectif : une action = un seul point d'entrée, aucun doublon
 fonctionnel. VISION Art. 4, 8, 9, 11.
+
+## 09/07/2026 — Sprint qualité premium + Léon V2 (compréhension de l'intention)
+
+**Décision produit validée :** on élève la **qualité** et la **robustesse** de Léon sans **rien
+toucher au design** (widget, bulles, bouton « Ouvrir » inchangés). Léon comprend d'abord **l'intention
+réelle** et le **sujet**, choisit **ensuite** la bonne source, puis répond — **jamais l'inverse**.
+Règle d'or renforcée : **une mauvaise réponse est pire qu'un « je ne trouve pas »**. En cas de doute,
+Léon admet honnêtement qu'il n'a pas l'information puis **propose** (sans l'imposer) de transmettre.
+
+**Bug critique corrigé — « adresse du chantier » ≠ « votre adresse » :** « C'est quoi l'adresse du
+chantier ? » renvoyait une réponse **totalement à côté** (une commande « Cuisine équipée »). Léon
+distingue désormais deux adresses **bien réelles et jamais interchangeables** :
+
+- **adresse du chantier** (le bien en travaux, donnée du dossier `project.address`, câblée jusqu'au
+  cerveau via `PhenixInput.chantierAddress`) → « L'adresse de votre chantier est : … » ;
+- **adresse de l'entreprise PHÉNIX** (`PHENIX_ADDRESS`, configurable) → « L'adresse de PHÉNIX est : … ».
+  « votre adresse », « adresse de PHÉNIX », « vos bureaux » tombent ici ; « adresse **du chantier** »,
+  « où est **le chantier** » tombent là. On exclut l'adresse **e-mail** (traitée par le contact).
+
+**Fin des réponses au hasard (les « fallbacks faibles ») :**
+
+- **Document introuvable** : on a supprimé le repli « on ouvre le **premier** document de la liste » —
+  Léon n'ouvre un document que s'il **recoupe réellement** la demande, sinon il l'admet et oriente
+  vers « Documents ». Une question incomprise ne fait **plus** remonter un document au hasard.
+- **Recherche de dernier recours** (`searchKnowledge`) : les **étiquettes génériques** de catégorie
+  (`document`, `commande`, `photo`, `planning`…) ne suffisent **plus** à « matcher » — il faut un
+  recouvrement sur un mot **spécifique** (libellé, pièce, fournisseur). Sinon → « je ne trouve pas ».
+- **Défaut** : une question **non comprise** ne crée **plus** une demande dans le dos du client
+  (plus d'escalade silencieuse) — Léon dit « je ne trouve pas » et **propose** de transmettre.
+
+**Mémoire de conversation resserrée (fini le hors-sujet hérité) :** l'intention du tour précédent
+n'est **reportée** que pour une **vraie relance de continuité** (« et la cuisine ? », « et le salon ? » :
+message commençant par un connecteur de suite **ou** désignant seulement une pièce). Un charabia court
+(« azerty qsdfgh ») ne **récupère plus** l'intention précédente — il porte son propre (non-)sujet.
+
+**Reconnaissance affinée :** intention `todo` élargie (« qu'est-ce qu'il me **reste à faire** ? »,
+« que **faire** ? ») ; intention `conducteur` (« comment s'appelle mon conducteur ? ») → Léon
+**n'invente pas** un nom et **n'oppose pas** un numéro à la place : il oriente vers la transmission ;
+contact e-mail reconnu même avec « **votre** » (« votre adresse mail »).
+
+**Interdits respectés :** aucun changement de design / widget / écran ; on n'a touché qu'au **cerveau**
+(`packages/core/phenix.ts`) et au **câblage de données** (`store.askPhenix` passe `chantierAddress`).
+
+**Tests :** `leon-ia` étendu (12/12) — adresse **du chantier** (jamais une commande), adresse **PHÉNIX**
+(distincte), « qu'il me reste à faire » (actions, pas une date de réception), **question incomprise**
+→ « je ne trouve pas » **sans** document au hasard **ni** demande fantôme — en plus des cas conservés
+(devis + bouton, numéro PHÉNIX, réception depuis les dates, document introuvable expliqué, demande
+conducteur créée + reçue dans « Aujourd'hui », photo conservée + chat utilisable). **Audit QA** : la
+suite Playwright complète (58 suites : navigation, onglets, formulaires, modales, uploads, photos,
+PDF/visionneuse, documents, notifications, responsive, robustesse) sert de filet de non-régression et
+**assert zéro erreur console** sur chaque surface. Gate verte (typecheck, lint, prettier, build, e2e
+complet). VISION Art. 2, 8, 9, 11.
