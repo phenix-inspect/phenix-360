@@ -146,10 +146,27 @@ export const MAX_POINT_PHOTOS = 3;
 export interface CompteRenduPoint {
   /** Photos du point (1 à 3) — illustrent la même observation. */
   photos: CompteRenduPhoto[];
+  /**
+   * @deprecated Ancien format : un point ne portait qu'UNE photo (`imageUrl`).
+   * Conservé pour lire les comptes rendus créés avant le mini-album — toujours lu
+   * via `pointPhotos()`, jamais écrit. Ne pas utiliser dans du nouveau code.
+   */
+  imageUrl?: string;
   /** Commentaire (obligatoire) : ce que le conducteur constate. */
   comment: string;
   /** Cible de diffusion du point. */
   diffusion: Diffusion;
+}
+
+/**
+ * Photos d'un point — TOLÉRANTE à l'ancien format (un point pouvait ne porter
+ * qu'un `imageUrl` unique, sans `photos`). Source unique de lecture des photos
+ * d'un point : garantit la compatibilité ascendante et un rendu jamais cassé.
+ */
+export function pointPhotos(point: CompteRenduPoint): CompteRenduPhoto[] {
+  if (point.photos && point.photos.length > 0) return point.photos;
+  if (point.imageUrl) return [{ imageUrl: point.imageUrl }];
+  return [];
 }
 
 /** Les points visibles pour une audience donnée (conducteur : tout). */

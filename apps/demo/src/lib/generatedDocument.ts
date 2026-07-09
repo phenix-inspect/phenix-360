@@ -2,6 +2,7 @@ import {
   DIFFUSION_LABEL,
   PROJECT_STEP_LABEL,
   ROLE_LABEL,
+  pointPhotos,
   pointsPourAudience,
   type CrAudience,
   type DocumentEvent,
@@ -83,7 +84,7 @@ function compteRenduPointsBody(
   return `<section class="points">${points
     .map(
       (p, i) => `<article class="point">
-      <div class="point-album">${p.photos
+      <div class="point-album">${pointPhotos(p)
         .filter((ph) => ph.imageUrl)
         .map((ph) => `<img class="point-photo" src="${ph.imageUrl}" alt="Point ${i + 1}"/>`)
         .join('')}</div>

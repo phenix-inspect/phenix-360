@@ -2106,3 +2106,27 @@ ajouter un point → 1 à 3 photos → commentaire → cible → point suivant �
 vignettes au-dessus du commentaire). Le filtrage par destinataire et la confidentialité client-safe
 sont inchangés (par point). `compte-rendu.test` étendu (point à 3 photos, plafond à 3 vérifié).
 Gate verte (typecheck, lint, prettier, build, e2e, zéro erreur console). VISION Art. 5, 8, 11.
+
+## 09/07/2026 — Correctif CRITIQUE : page Chantier blanche (compat comptes rendus)
+
+**Bug :** la page « Chantier » restait BLANCHE. **Cause racine reproduite** (test dédié) : le
+passage du compte rendu au mini-album a changé le modèle d'un point de `imageUrl` (photo unique)
+à `photos: CompteRenduPhoto[]`. Les comptes rendus créés avec la version PRÉCÉDENTE (points avec
+`imageUrl`, **sans `photos`**) restaient en base locale ; au rendu du Suivi, `point.photos.length` /
+`point.photos.map` s'exécutaient sur `undefined` → `TypeError: Cannot read properties of undefined
+(reading 'length')` → tout le chantier plantait (pas de garde-fou d'erreur) → écran blanc. Un
+chantier **frais** (seed sans point) ne plantait pas — d'où une suite verte mais un PO bloqué : le
+défaut ne touchait QUE les données déjà présentes.
+
+**Correction (vraie cause, sans contournement) :** compatibilité ASCENDANTE explicite. On garde
+`imageUrl?` sur `CompteRenduPoint` en champ **déprécié (lecture seule, jamais écrit)** et on ajoute
+un accesseur unique `pointPhotos(point)` qui normalise : `photos` si présent, sinon
+`[{ imageUrl }]`, sinon `[]`. **Tous les sites de lecture** des photos d'un point stocké passent
+désormais par lui (`CompteRenduPoints` du Suivi, `buildDocumentHtml` du document / PDF). Pas de
+try/catch, pas de fallback blanc : un point historique s'affiche correctement.
+
+**Anti-régression :** nouveau `chantier-blanche.test` — injecte un compte rendu à l'ANCIEN format
+(point `imageUrl`, sans `photos`) daté du jour, puis vérifie que la page Chantier **ne reste pas
+blanche**, que le point historique **s'affiche**, que **tous les onglets** (Suivi / Préparation /
+Documents / Dans les coulisses) s'ouvrent, et **zéro erreur console**. Confirmé : ROUGE avant le
+correctif (`pageerror … reading 'length'`), VERT après. Gate complète relancée. VISION Art. 11.
