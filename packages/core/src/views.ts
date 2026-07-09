@@ -95,8 +95,8 @@ export function clientFeed(events: Event[]): Event[] {
 /**
  * Un événement est un JALON de l'historique (moment majeur de la vie du
  * chantier) : compte rendu publié, document publié (devis, avenant, contractuel),
- * ou demande/décision. Les photos n'entrent dans l'historique que si elles sont
- * épinglées (annotation, hors journal). Vue dérivée — aucune duplication.
+ * ou demande/décision. Les photos de l'album (« Dans les coulisses ») n'entrent
+ * pas dans l'historique du Journal. Vue dérivée — aucune duplication.
  */
 export function isMilestone(e: Event): boolean {
   if (isCompteRendu(e)) return isPublished(e);

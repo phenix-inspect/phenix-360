@@ -21,7 +21,6 @@
  * mais non exploités → les bricks suivantes n'imposeront aucune refonte.
  */
 import type {
-  AnnotationId,
   CoupDeCoeurId,
   FilPhotoId,
   IsoDateTime,
@@ -185,7 +184,7 @@ export interface Moment {
 }
 
 /* -------------------------------------------------------------------------- *
- * Annotations — coup de cœur (geste unique) & messages (2 niveaux préparés)
+ * Interactions — coup de cœur (geste unique) & messages (2 niveaux préparés)
  * -------------------------------------------------------------------------- */
 
 /** ♡ Coup de cœur : un seul geste d'appréciation, par personne et par Moment. */
@@ -392,78 +391,6 @@ export function comptesMessagesParPhoto(messages: Message[]): Map<string, number
     if (m.photoId) counts.set(m.photoId, (counts.get(m.photoId) ?? 0) + 1);
   }
   return counts;
-}
-
-/* -------------------------------------------------------------------------- *
- * ANNOTATIONS sur photo — un CALQUE indépendant, jamais l'image d'origine
- * -------------------------------------------------------------------------- *
- * On dessine PAR-DESSUS la photo (cercle, flèche, trait, texte, numéro) sans
- * jamais modifier l'image source : l'affichage des annotations s'active ou se
- * masque. Coordonnées NORMALISÉES (0..1) → valables quelle que soit la taille
- * d'affichage. Une annotation peut être rattachée à un message (commentaire
- * contextualisé). Brique INDÉPENDANTE : une annotation (ou un message annoté)
- * pourra ensuite être convertie en Demande / Décision / Réserve / SAV sans
- * refonte — c'est pourquoi elle vit dans son propre modèle.
- */
-export const ANNOTATION_TYPES = ['fleche', 'cercle', 'trait', 'texte', 'numero'] as const;
-export type AnnotationType = (typeof ANNOTATION_TYPES)[number];
-
-/** Point en coordonnées normalisées (0..1) relatives au cadre d'affichage. */
-export interface AnnotationPoint {
-  x: number;
-  y: number;
-}
-
-export interface Annotation {
-  id: AnnotationId;
-  projectId: ProjectId;
-  momentId: MomentId;
-  photoId: FilPhotoId;
-  type: AnnotationType;
-  /**
-   * Points NORMALISÉS : flèche/cercle = 2 points (début/fin) ; trait =
-   * polyligne (n points) ; texte/numéro = 1 point d'ancrage.
-   */
-  points: AnnotationPoint[];
-  /** Couleur du tracé (donnée de présentation). */
-  color: string;
-  /** Texte (type « texte ») / numéro (type « numero »). */
-  texte?: string;
-  numero?: number;
-  authorId: UserId;
-  authorRole: ActorRole;
-  visibleTo: AudienceGroup[];
-  createdAt: IsoDateTime;
-  /** Rattachement éventuel à un message (commentaire de l'annotation). */
-  messageId?: MessageId | null;
-  /**
-   * Action chantier créée depuis cette annotation (pont MANUEL, unidirectionnel).
-   * V1 : 'reserve' ; le modèle accueille déjà décision / sav sans refonte.
-   * `ref` = l'événement créé dans le Journal.
-   */
-  action?: { kind: 'decision' | 'reserve' | 'sav'; ref: string };
-}
-
-/** Annotations d'une photo (anciennes d'abord, ordre de tracé). */
-export function annotationsDePhoto(photoId: FilPhotoId, annotations: Annotation[]): Annotation[] {
-  return annotations
-    .filter((a) => a.photoId === photoId)
-    .sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
-}
-
-/** Nombre d'annotations par photo (repères discrets). */
-export function comptesAnnotationsParPhoto(annotations: Annotation[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const a of annotations) counts.set(a.photoId, (counts.get(a.photoId) ?? 0) + 1);
-  return counts;
-}
-
-/** Prochain numéro disponible pour une annotation « numéro » sur une photo. */
-export function prochainNumeroAnnotation(photoId: FilPhotoId, annotations: Annotation[]): number {
-  const nums = annotations
-    .filter((a) => a.photoId === photoId && a.type === 'numero' && a.numero != null)
-    .map((a) => a.numero as number);
-  return (nums.length > 0 ? Math.max(...nums) : 0) + 1;
 }
 
 /* -------------------------------------------------------------------------- *

@@ -1,37 +1,16 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Flag,
-  MessageCircle,
-  PenLine,
-  Send,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, MessageCircle, Send, X, ZoomIn, ZoomOut } from 'lucide-react';
 import {
   ROLE_LABEL,
-  annotationsDePhoto,
   comptesMessagesParPhoto,
   messagesDePhoto,
-  type Annotation,
   type FilPhoto,
   type Message,
   type Moment,
 } from '@phenix360/core';
 import { fmtDateTime } from '../../lib/format';
 import { FilImage } from './FilImage';
-import { PhotoAnnotator, type AnnotationInput } from './PhotoAnnotator';
-
-const ACTION_LABEL: Record<'decision' | 'reserve' | 'sav', string> = {
-  decision: 'Décision',
-  reserve: 'Réserve',
-  sav: 'SAV',
-};
 
 /** Délai d'inactivité avant que les contrôles secondaires s'effacent (ms). */
 const IDLE_MS = 4000;
@@ -43,45 +22,33 @@ const ratioDePhoto = (p?: FilPhoto): number | null =>
 /**
  * Viewer photo plein écran — une EXPÉRIENCE immersive type Photos iPhone /
  * Instagram, pas un composant métier. Pendant qu'il est ouvert, on oublie PHÉNIX :
- * la photo est le sujet, l'interface s'efface.
+ * la photo est le sujet, l'interface s'efface. Dans « Dans les coulisses », une
+ * photo se REGARDE, se LIKE et se COMMENTE — elle ne s'annote pas.
  *
- * Architecture (verrouillée — RC1) : portal sur `document.body`, `z-viewer`
- * (au-dessus du header et du concierge Léon), fond noir opaque, scroll du body
- * verrouillé, focus piégé + rendu à l'ouvrant à la fermeture. La photo est
- * dimensionnée « au pixel » (zone mesurée × ratio réel) : entière, centrée, sans
- * scroll, et le calque d'annotations reste aligné.
+ * Architecture (verrouillée) : portal sur `document.body`, `z-viewer` (au-dessus
+ * du header et du concierge Léon), fond noir opaque, scroll du body verrouillé,
+ * focus piégé + rendu à l'ouvrant à la fermeture. La photo est dimensionnée « au
+ * pixel » (zone mesurée × ratio réel) : entière, centrée, sans scroll.
  *
- * Chrome (RC2) : au repos on ne voit que le compteur, le bouton fermer et les
- * flèches ; les contrôles secondaires (titre, zoom, annoter, miniatures, bouton
- * commentaires, légende) apparaissent au mouvement et s'effacent après inactivité.
- * Un tap sur la photo bascule le mode immersif (tout disparaît / réapparaît). Les
- * commentaires et annotations vivent dans un Bottom Sheet qui ne vole plus de
- * hauteur. Fermeture : Échap, croix, clic sur le fond, glissé vers le bas.
+ * Chrome : au repos on ne voit que le compteur, le bouton fermer et les flèches ;
+ * les contrôles secondaires (titre, zoom, miniatures, bouton commentaires, légende)
+ * apparaissent au mouvement et s'effacent après inactivité. Un tap sur la photo
+ * bascule le mode immersif. Les commentaires vivent dans un Bottom Sheet qui ne
+ * vole plus de hauteur. Fermeture : Échap, croix, clic sur le fond, glissé bas.
  */
 export function MomentGallery({
   moment,
   messages,
-  annotations,
   nameOf,
-  canCreateAction,
   initialPhotoId,
   onSendPhotoMessage,
-  onAddAnnotation,
-  onCreateReserve,
   onClose,
 }: {
   moment: Moment;
   messages: Message[];
-  annotations: Annotation[];
   nameOf: (userId: string) => string;
-  canCreateAction: boolean;
   initialPhotoId?: string;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
-  onAddAnnotation: (input: AnnotationInput) => void;
-  onCreateReserve: (
-    annotationId: string,
-    options: { responsable?: string; echeance?: string },
-  ) => void;
   onClose: () => void;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
@@ -91,12 +58,6 @@ export function MomentGallery({
   );
   const [index, setIndex] = useState(start);
   const [draft, setDraft] = useState('');
-  const [showAnnotations, setShowAnnotations] = useState(true);
-  const [editing, setEditing] = useState(false);
-  // Réserve : annotation pour laquelle on saisit responsable / échéance.
-  const [reserveFor, setReserveFor] = useState<string | null>(null);
-  const [resp, setResp] = useState('');
-  const [ech, setEch] = useState('');
   // Zoom : la photo reste ENTIÈRE ; le zoom regarde un détail (glisser pour déplacer).
   const [zoom, setZoom] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -118,9 +79,7 @@ export function MomentGallery({
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [ratio, setRatio] = useState<number | null>(ratioDePhoto(photos[start]));
 
-  // Refs miroir : lues dans les timers/écouteurs sans les recréer.
-  const editingRef = useRef(editing);
-  editingRef.current = editing;
+  // Ref miroir : lue dans le timer d'inactivité sans le recréer.
   const sheetRef = useRef(sheet);
   sheetRef.current = sheet;
 
@@ -134,8 +93,8 @@ export function MomentGallery({
   const scheduleHide = (): void => {
     clearIdle();
     idle.current = setTimeout(() => {
-      // On garde les contrôles tant qu'on annote ou que la feuille est ouverte.
-      if (!editingRef.current && !sheetRef.current) setControls(false);
+      // On garde les contrôles tant que la feuille commentaires est ouverte.
+      if (!sheetRef.current) setControls(false);
     }, IDLE_MS);
   };
   /** Tout réveiller : sortir de l'immersif, montrer les contrôles, réarmer l'inactivité. */
@@ -263,16 +222,6 @@ export function MomentGallery({
   if (!current) return <></>;
 
   const photoMessages = messagesDePhoto(current.id, messages);
-  const photoAnnotations = annotationsDePhoto(current.id, annotations);
-  const messageById = new Map(messages.map((m) => [m.id, m] as const));
-  const annotationLabel = (a: Annotation): string => {
-    if (a.messageId && messageById.get(a.messageId)) return messageById.get(a.messageId)!.texte;
-    if (a.texte) return a.texte;
-    if (a.type === 'numero') return `Point ${a.numero ?? ''}`.trim();
-    return { cercle: 'Zone entourée', fleche: 'Flèche', trait: 'Tracé', texte: 'Texte' }[
-      a.type
-    ] as string;
-  };
   const send = (): void => {
     const t = draft.trim();
     if (!t) return;
@@ -345,7 +294,6 @@ export function MomentGallery({
         onPointerUp={(e) => {
           const s = pointerStart.current;
           pointerStart.current = null;
-          if (editing) return;
           if (zoom) {
             drag.current = null;
             return;
@@ -380,28 +328,17 @@ export function MomentGallery({
                 if (el.naturalWidth && el.naturalHeight)
                   setRatio(el.naturalWidth / el.naturalHeight);
               }}
-              onDoubleClick={() => {
-                if (!editing) toggleZoom();
-              }}
+              onDoubleClick={toggleZoom}
               draggable={false}
               className="absolute inset-0 block size-full select-none object-contain"
             />
           ) : (
             <FilImage photo={current} className="absolute inset-0 size-full" />
           )}
-          <PhotoAnnotator
-            key={current.id}
-            photo={current}
-            annotations={photoAnnotations}
-            show={showAnnotations}
-            editing={editing}
-            onAdd={onAddAnnotation}
-          />
         </div>
       </div>
 
-      {/* Barre haute. Niveau 1 : compteur + fermer. Niveau 2 : titre + zoom /
-          annoter / afficher-masquer (apparaissent au mouvement). */}
+      {/* Barre haute. Niveau 1 : compteur + fermer. Niveau 2 : titre + zoom. */}
       <div
         data-chrome="top"
         className={`absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 text-paper-0 ${fade(
@@ -418,50 +355,19 @@ export function MomentGallery({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <div className={`flex items-center gap-1 ${fade(tier2)}`}>
-            {current.imageUrl && !editing && (
-              <button
-                type="button"
-                onClick={toggleZoom}
-                aria-label={zoom ? 'Dézoomer' : 'Zoomer'}
-                aria-pressed={zoom}
-                className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-              >
-                {zoom ? <ZoomOut aria-hidden /> : <ZoomIn aria-hidden />}
-              </button>
-            )}
-            {photoAnnotations.length > 0 && !editing && (
-              <button
-                type="button"
-                onClick={() => setShowAnnotations((v) => !v)}
-                aria-label={
-                  showAnnotations ? 'Masquer les annotations' : 'Afficher les annotations'
-                }
-                aria-pressed={showAnnotations}
-                className="inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5"
-              >
-                {showAnnotations ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
-              </button>
-            )}
+          {current.imageUrl && (
             <button
               type="button"
-              onClick={() => {
-                setEditing((v) => !v);
-                setShowAnnotations(true);
-                setZoom(false);
-                setPan({ x: 0, y: 0 });
-                wake();
-              }}
-              aria-label={editing ? 'Terminer l’annotation' : 'Annoter la photo'}
-              aria-pressed={editing}
-              className={`inline-flex h-10 items-center gap-1.5 rounded-full px-3 text-sm transition-colors duration-base [&_svg]:size-4 ${
-                editing ? 'bg-gold-500 text-primary-foreground' : 'text-paper-0 hover:bg-paper-0/10'
-              }`}
+              onClick={toggleZoom}
+              aria-label={zoom ? 'Dézoomer' : 'Zoomer'}
+              aria-pressed={zoom}
+              className={`inline-flex size-10 items-center justify-center rounded-full text-paper-0 transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-5 ${fade(
+                tier2,
+              )}`}
             >
-              <PenLine aria-hidden />
-              {editing ? 'Terminer' : 'Annoter'}
+              {zoom ? <ZoomOut aria-hidden /> : <ZoomIn aria-hidden />}
             </button>
-          </div>
+          )}
           <button
             type="button"
             onClick={requestClose}
@@ -549,8 +455,8 @@ export function MomentGallery({
         )}
       </div>
 
-      {/* BOTTOM SHEET commentaires / annotations — la photo reste visible derrière.
-          Fermable au clic (croix / fond) ou au glissé vers le bas. */}
+      {/* BOTTOM SHEET commentaires — la photo reste visible derrière. Fermable au
+          clic (croix / fond) ou au glissé vers le bas. */}
       {sheet && (
         <>
           <button
@@ -587,7 +493,7 @@ export function MomentGallery({
             </div>
 
             <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pb-3">
-              {photoMessages.length === 0 && !(canCreateAction && photoAnnotations.length > 0) && (
+              {photoMessages.length === 0 && (
                 <p className="py-6 text-center text-sm opacity-70">
                   Aucun commentaire pour l’instant.
                 </p>
@@ -601,77 +507,6 @@ export function MomentGallery({
                         {ROLE_LABEL[m.authorRole]} · {fmtDateTime(m.createdAt)}
                       </span>
                       <p className="opacity-90">{m.texte}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {/* PONT conducteur : créer une réserve depuis une annotation. */}
-              {canCreateAction && photoAnnotations.length > 0 && (
-                <ul className="space-y-2 border-t border-paper-0/15 pt-2">
-                  {photoAnnotations.map((a) => (
-                    <li key={a.id} className="space-y-1.5 text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex min-w-0 items-center gap-1.5 [&_svg]:size-3.5 [&_svg]:shrink-0">
-                          <PenLine aria-hidden className="opacity-70" />
-                          <span className="truncate">{annotationLabel(a)}</span>
-                        </span>
-                        {a.action ? (
-                          <span className="shrink-0 rounded-full bg-gold-500/20 px-2 py-0.5 text-xs text-gold-300">
-                            {ACTION_LABEL[a.action.kind]} créée
-                          </span>
-                        ) : reserveFor === a.id ? null : (
-                          <span className="flex shrink-0 gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setReserveFor(a.id);
-                                setResp('');
-                                setEch('');
-                              }}
-                              className="inline-flex items-center gap-1.5 rounded-lg border border-paper-0/20 px-2.5 py-1 text-xs transition-colors duration-base hover:bg-paper-0/10 [&_svg]:size-3.5"
-                            >
-                              <Flag aria-hidden />
-                              Créer une réserve
-                            </button>
-                          </span>
-                        )}
-                      </div>
-
-                      {reserveFor === a.id && !a.action && (
-                        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-paper-0/15 bg-paper-0/5 p-2">
-                          <input
-                            value={resp}
-                            onChange={(e) => setResp(e.target.value)}
-                            placeholder="Responsable (ex. Peintre)"
-                            className="h-9 min-w-[8rem] flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                          />
-                          <input
-                            type="date"
-                            value={ech}
-                            onChange={(e) => setEch(e.target.value)}
-                            aria-label="Échéance"
-                            className="h-9 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onCreateReserve(a.id, { responsable: resp, echeance: ech });
-                              setReserveFor(null);
-                            }}
-                            className="h-9 rounded-lg bg-gold-500 px-3 text-sm font-medium text-primary-foreground"
-                          >
-                            Créer la réserve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setReserveFor(null)}
-                            className="h-9 rounded-lg px-2 text-sm hover:bg-paper-0/10"
-                          >
-                            Annuler
-                          </button>
-                        </div>
-                      )}
                     </li>
                   ))}
                 </ul>

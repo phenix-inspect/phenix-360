@@ -175,15 +175,13 @@ export interface DemandeResolution {
 }
 
 /**
- * Provenance d'une action chantier créée depuis une photo annotée du Fil (pont
- * manuel annotation → action). Ids en chaînes : la colonne vertébrale reste
- * indépendante du module Fil. Lien RETOUR vers la photo / l'annotation.
+ * Provenance d'une action chantier créée depuis une photo du Fil. Ids en chaînes :
+ * la colonne vertébrale reste indépendante du module Fil. Lien RETOUR vers la photo.
  */
 export interface FilSource {
   kind: 'fil';
   momentId: string;
   photoId?: string;
-  annotationId?: string;
 }
 
 export interface DemandeContent {
@@ -246,7 +244,7 @@ export interface DecisionEventContent {
  * RÉSERVE — vrai objet de pilotage, porté par le Journal. Cycle : `ouverte` →
  * `levée`. La levée n'est JAMAIS une mutation de la réserve : c'est un événement
  * `levee` AJOUTÉ (append-only) qui pointe vers elle. La réserve garde donc à vie
- * sa photo source, son annotation source et son origine ; le statut « levée »
+ * sa photo source et son origine ; le statut « levée »
  * est une LECTURE dérivée (présence d'un événement de levée). Pourra alimenter
  * la réception et le SAV.
  * -------------------------------------------------------------------------- */

@@ -18,7 +18,6 @@ import {
   InMemoryBackend,
   PROJECT_STEPS,
   PROJECT_STEP_LABEL,
-  annotationId as toAnnotationId,
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
   buildDecisionContent,
@@ -39,8 +38,6 @@ import {
   momentPartageClient,
   nextReserveNumero,
   userId as toUserId,
-  type Annotation,
-  type AnnotationType,
   type BackendState,
   type CommCanal,
   type Contact,
@@ -99,7 +96,6 @@ const FIL_MOMENTS_KEY = 'phenix-demo:fil-moments:v1';
 const FIL_COUPS_KEY = 'phenix-demo:fil-coups:v1';
 const FIL_MESSAGES_KEY = 'phenix-demo:fil-messages:v1';
 const FIL_ZONES_KEY = 'phenix-demo:fil-zones:v1';
-const FIL_ANNOTATIONS_KEY = 'phenix-demo:fil-annotations:v1';
 // PHÉNIX (conversation client) — agrégat léger, distinct du Journal.
 const PHENIX_CONV_KEY = 'phenix-demo:phenix-conv:v1';
 // Gestion du chantier — journal des partages (simulation / aperçu, hors Journal).
@@ -236,7 +232,6 @@ export interface DemoSnapshot extends BackendState {
     coups: Record<string, CoupDeCoeur[]>;
     messages: Record<string, Message[]>;
     zones: Record<string, ProjectZone[]>;
-    annotations: Record<string, Annotation[]>;
   };
   /** Conversation PHÉNIX (par projet) — fil client, distinct du Journal. */
   phenix: Record<string, PhenixMessage[]>;
@@ -322,7 +317,6 @@ function build(): DemoSnapshot {
       coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
       messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
       zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
-      annotations: readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {}),
     },
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
@@ -351,7 +345,6 @@ const WORKSPACE_KEYS = [
   FIL_COUPS_KEY,
   FIL_MESSAGES_KEY,
   FIL_ZONES_KEY,
-  FIL_ANNOTATIONS_KEY,
   PHENIX_CONV_KEY,
   SHARES_KEY,
   CONTACTS_KEY,
@@ -828,7 +821,6 @@ export const demo = {
       FIL_COUPS_KEY,
       FIL_MESSAGES_KEY,
       FIL_ZONES_KEY,
-      FIL_ANNOTATIONS_KEY,
       PHENIX_CONV_KEY,
       SHARES_KEY,
     ]) {
@@ -1336,136 +1328,9 @@ export const demo = {
   },
 
   /**
-   * Ajoute une ANNOTATION sur une photo (calque indépendant — l'image d'origine
-   * n'est jamais modifiée). Si `note` est fournie, on crée aussi un message
-   * (niveau 2) rattaché à l'annotation (commentaire contextualisé).
-   */
-  addAnnotation(
-    projectId: ProjectId,
-    input: {
-      momentId: string;
-      photoId: string;
-      actor: EventActor;
-      type: AnnotationType;
-      points: { x: number; y: number }[];
-      color?: string;
-      texte?: string;
-      numero?: number;
-      note?: string;
-    },
-  ): void {
-    const now = new Date().toISOString();
-    let linkedMessageId: Annotation['messageId'] = null;
-
-    const note = input.note?.trim();
-    if (note) {
-      const msgMap = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {});
-      const message: Message = {
-        id: toMessageId(crypto.randomUUID()),
-        momentId: input.momentId as Message['momentId'],
-        photoId: input.photoId as Message['photoId'],
-        parentId: null,
-        authorId: input.actor.userId,
-        authorRole: input.actor.role,
-        texte: note,
-        createdAt: now,
-      };
-      msgMap[projectId] = [...(msgMap[projectId] ?? []), message];
-      localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(msgMap));
-      linkedMessageId = message.id;
-    }
-
-    const annotation: Annotation = {
-      id: toAnnotationId(crypto.randomUUID()),
-      projectId,
-      momentId: input.momentId as Annotation['momentId'],
-      photoId: input.photoId as Annotation['photoId'],
-      type: input.type,
-      points: input.points,
-      color: input.color ?? '#d4452f',
-      ...(input.texte ? { texte: input.texte } : {}),
-      ...(input.numero != null ? { numero: input.numero } : {}),
-      authorId: input.actor.userId,
-      authorRole: input.actor.role,
-      visibleTo: DEFAULT_AUDIENCE,
-      createdAt: now,
-      messageId: linkedMessageId,
-    };
-    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
-    map[projectId] = [...(map[projectId] ?? []), annotation];
-    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
-    refresh();
-    broadcast();
-  },
-
-  /** Supprime une annotation (le calque ; l'image d'origine est intacte). */
-  deleteAnnotation(projectId: ProjectId, annotationId: string): void {
-    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
-    map[projectId] = (map[projectId] ?? []).filter((a) => a.id !== annotationId);
-    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
-    refresh();
-    broadcast();
-  },
-
-  /**
-   * PONT MANUEL annotation → Réserve. Crée une RÉSERVE (vrai objet de pilotage)
-   * dans le Journal — numérotée, datée, avec responsable/échéance et lien retour
-   * vers la photo annotée. Marque l'annotation comme convertie.
-   */
-  async createReserveFromAnnotation(
-    projectId: ProjectId,
-    annotationId: string,
-    actor: EventActor,
-    options: { responsable?: string; echeance?: string } = {},
-  ): Promise<void> {
-    const map = readJson<Record<string, Annotation[]>>(FIL_ANNOTATIONS_KEY, {});
-    const list = map[projectId] ?? [];
-    const annotation = list.find((a) => a.id === annotationId);
-    if (!annotation || annotation.action) return;
-
-    const messages = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {})[projectId] ?? [];
-    const linked = annotation.messageId
-      ? messages.find((m) => m.id === annotation.messageId)
-      : undefined;
-    const libelle = (linked?.texte ?? annotation.texte ?? 'Point signalé sur une photo').trim();
-
-    const projectEvents = snapshot.events.filter((e) => e.projectId === projectId);
-    const responsable = options.responsable?.trim();
-    const echeance = options.echeance?.trim();
-
-    const event = await backend.appendEvent({
-      projectId,
-      actor,
-      type: 'reserve',
-      visibility: 'interne',
-      state: 'ouverte',
-      content: {
-        numero: nextReserveNumero(projectEvents),
-        libelle,
-        ...(responsable ? { responsable } : {}),
-        ...(echeance ? { echeance } : {}),
-        source: {
-          kind: 'fil',
-          momentId: annotation.momentId,
-          photoId: annotation.photoId,
-          annotationId: annotation.id,
-        },
-      },
-    });
-
-    map[projectId] = list.map((a) =>
-      a.id === annotationId ? { ...a, action: { kind: 'reserve', ref: event.id } } : a,
-    );
-    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(map));
-    refresh();
-    broadcast();
-  },
-
-  /**
-   * Création MANUELLE d'une réserve par le conducteur (registre pilotable). Même
-   * objet que celles nées d'une photo annotée — interne, ouverte, numérotée par
-   * projet — mais sans source Fil. Append-only : elle rejoint le Journal, la
-   * lentille Réserves la lit, Aujourd'hui/soir la comptent (VISION Art. 7, 8, 9).
+   * Création MANUELLE d'une réserve par le conducteur (registre pilotable) :
+   * interne, ouverte, numérotée par projet. Append-only : elle rejoint le Journal,
+   * la lentille Réserves la lit, Aujourd'hui/soir la comptent (VISION Art. 7, 8, 9).
    */
   async createReserve(
     projectId: ProjectId,
@@ -1879,7 +1744,6 @@ export const demo = {
     localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
     localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
     localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
-    localStorage.setItem(FIL_ANNOTATIONS_KEY, JSON.stringify(fil.annotations));
     localStorage.removeItem(PHENIX_CONV_KEY);
     localStorage.removeItem(SHARES_KEY);
     // Nouvelle démo = ardoise de notifications propre : l'historique seedé ne
@@ -2354,7 +2218,7 @@ export function choixClientValidesATraiter(
   return choixClientValides(events).filter((e) => snap.choixTraites[e.id] === undefined);
 }
 
-/** Le Fil d'un projet (moments + annotations + zones). */
+/** Le Fil d'un projet (moments + coups de cœur + messages + zones). */
 export function filOf(
   snap: DemoSnapshot,
   projectId: string | null | undefined,
@@ -2363,14 +2227,12 @@ export function filOf(
   coups: CoupDeCoeur[];
   messages: Message[];
   zones: ProjectZone[];
-  annotations: Annotation[];
 } {
-  if (!projectId) return { moments: [], coups: [], messages: [], zones: [], annotations: [] };
+  if (!projectId) return { moments: [], coups: [], messages: [], zones: [] };
   return {
     moments: snap.fil.moments[projectId] ?? [],
     coups: snap.fil.coups[projectId] ?? [],
     messages: snap.fil.messages[projectId] ?? [],
     zones: snap.fil.zones[projectId] ?? [],
-    annotations: snap.fil.annotations[projectId] ?? [],
   };
 }

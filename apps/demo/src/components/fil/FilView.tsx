@@ -57,7 +57,7 @@ export function FilView({
   const [gallery, setGallery] = useState<{ moment: Moment; photoId?: string } | null>(null);
   // Moment sur lequel poser le curseur de réponse (ouvert depuis une notification).
   const [focusMomentId, setFocusMomentId] = useState<string | null>(null);
-  const { moments, coups, messages, zones, annotations } = filOf(snap, project.id);
+  const { moments, coups, messages, zones } = filOf(snap, project.id);
   // Signal « nouveau message » symétrique : côté conducteur, un commentaire client
   // en attente ; côté client, un mot de l'équipe non encore vu.
   const viewerIsClient = actor.role === 'client';
@@ -206,18 +206,10 @@ export function FilView({
         <MomentGallery
           moment={gallery.moment}
           messages={messages.filter((m) => m.momentId === gallery.moment.id)}
-          annotations={annotations.filter((a) => a.momentId === gallery.moment.id)}
           nameOf={name}
-          canCreateAction={canCompose}
           {...(gallery.photoId ? { initialPhotoId: gallery.photoId } : {})}
           onSendPhotoMessage={(photoId, texte) =>
             demo.addMessage(project.id, gallery.moment.id, actor, texte, photoId)
-          }
-          onAddAnnotation={(input) =>
-            demo.addAnnotation(project.id, { momentId: gallery.moment.id, actor, ...input })
-          }
-          onCreateReserve={(annotationId, options) =>
-            void demo.createReserveFromAnnotation(project.id, annotationId, actor, options)
           }
           onClose={() => setGallery(null)}
         />

@@ -2009,3 +2009,39 @@ clic-fond / glissé). Aucun changement de modèle, de sélecteur core, ni de l'a
 `coulisses-viewer.test` étendu (tap masque puis mouvement révèle via `data-chrome`, Bottom Sheet
 ouvre/ferme avec photo derrière, fermeture Échap + clic-fond, focus rendu à l'ouvrant) ; les acquis
 RC1 restent couverts. Gate vert (e2e 54/54, zéro erreur console). VISION Art. 8, 9, 11.
+
+## 09/07/2026 — Suppression complète de l'annotation photo (moins, c'est plus)
+
+**Décision produit validée :** on RETIRE totalement la fonction « Annoter » du viewer photo.
+L'annotation sur photo créait **plus de complexité que de valeur** : risque de confusion et de
+mauvais usage côté client, surcharge UX, maintenance inutile, et surtout **doublon avec les
+commentaires**. Nouvelle règle : dans « Dans les coulisses », une photo se **regarde**, se **like**
+et se **commente** — elle **ne s'annote plus**.
+
+**Retiré, de bout en bout (aucune trace morte) :**
+
+- **Viewer** (`MomentGallery`) : bouton « Annoter », icône crayon, bouton afficher/masquer, mode
+  édition, calque de dessin, états (`editing`, `showAnnotations`, `reserveFor`…), et le pont
+  « créer une réserve depuis une annotation » du Bottom Sheet. Props `annotations`,
+  `canCreateAction`, `onAddAnnotation`, `onCreateReserve` supprimées.
+- **Composant dédié** : `PhotoAnnotator.tsx` **supprimé**.
+- **Câblage** (`FilView`) : ne lit plus ni ne passe les annotations.
+- **Store** : clé `FIL_ANNOTATIONS_KEY`, état `annotations`, `addAnnotation`, `deleteAnnotation`,
+  `createReserveFromAnnotation`, persistance, purge par projet, sauvegarde/restauration, et
+  `filOf.annotations`.
+- **Core** : `Annotation`, `AnnotationType`, `AnnotationPoint`, `ANNOTATION_TYPES`,
+  `annotationsDePhoto`, `comptesAnnotationsParPhoto`, `prochainNumeroAnnotation`, `AnnotationId` +
+  `annotationId`. `FilSource.annotationId` retiré (le lien réserve→photo `photoId` **reste**).
+- **Seed** : annotation seedée retirée ; la **réserve** correspondante est **conservée** (interne,
+  levable) avec son lien `photoId` — « Voir la photo » reste fonctionnel.
+
+**Préservé (intact) :** commentaires (photo + Bottom Sheet), likes ❤️, albums, miniatures, viewer
+plein écran (portal, `z-viewer`, verrou body, dimensionnement mesuré, navigation, zoom), documents,
+notifications, **réserves** (création manuelle + « Voir la photo »), journal.
+
+**Tests :** `coulisses-viewer.test` — nouvelles assertions **« plus aucune fonction Annoter »**
+côté **conducteur** ET côté **client** ; tous les acquis viewer (plein écran, body lock,
+`z-viewer`, navigation, pellicule, commentaires, occlusion, desktop) conservés. Aucun test
+d'annotation n'existait à supprimer. Gate verte (typecheck, lint, prettier, build, e2e 54/54, zéro
+erreur console). VISION Art. 8, 9, 11 (l'écran se comprend en 10 s, rien d'interne ne fuit, la
+simplicité est une fonctionnalité).

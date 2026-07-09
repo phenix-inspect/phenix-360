@@ -101,11 +101,13 @@ détection de conflits, impact des décisions/commandes en retard. VISION Art. 3
 
 **Objectif PO** : une vraie **GED** — classement automatique, recherche,
 **versionning**, assistance IA au rangement. Base : `BibliothequeView` (le Fil par
-pièce/album). **Album & viewer (Sprint 08/07)** : viewer photo premium — photo **entière**
-(fin du recadrage, annotations toujours alignées), **zoom + déplacement**, **pellicule de
-miniatures**, **aperçu mosaïque** des albums sur la carte, et **vignettes Bibliothèque
-cliquables** (ouverture du viewer d'un clic). `coulisses-viewer.test`. **Manque** : recherche,
-filtres (pièce / type / partagé), versionning, classement automatique. VISION Art. 8, 9.
+pièce/album). **Album & viewer (Sprint 08–09/07)** : viewer photo immersif (type Photos
+iPhone / Instagram) — photo **entière** (fin du recadrage), plein écran noir, **zoom +
+déplacement**, **pellicule** compacte, **aperçu mosaïque** des albums, **vignettes
+Bibliothèque cliquables**, commentaires en **Bottom Sheet**. Une photo se **regarde, se like,
+se commente** — l'**annotation a été retirée** (plus de valeur que de complexité).
+`coulisses-viewer.test`. **Manque** : recherche, filtres (pièce / type / partagé), versionning,
+classement automatique. VISION Art. 8, 9.
 
 ### EPIC 8 — Documents · 🔴 À développer
 

@@ -145,6 +145,23 @@ try {
     await waitTop('1');
   });
 
+  await assert('Conducteur : plus AUCUNE fonction « Annoter » dans le viewer', async () => {
+    await wake();
+    if (
+      (await viewer()
+        .getByRole('button', { name: /Annoter/i })
+        .count()) !== 0
+    )
+      throw new Error('le bouton « Annoter » subsiste côté conducteur');
+    // Ni bouton d'affichage/masquage d'annotations.
+    if (
+      (await viewer()
+        .getByRole('button', { name: /annotation/i })
+        .count()) !== 0
+    )
+      throw new Error('un contrôle d’annotation subsiste côté conducteur');
+  });
+
   await assert('Viewer : pellicule + saut de photo (compteur clair)', async () => {
     await wake();
     await viewer()
@@ -237,6 +254,14 @@ try {
     const vp = page.viewportSize();
     if (!(await topIsViewer(vp.width - 24, vp.height - 24)))
       throw new Error('Léon reste visible au-dessus du viewer');
+    // Côté client aussi : plus aucune fonction « Annoter ».
+    await wake();
+    if (
+      (await viewer()
+        .getByRole('button', { name: /Annoter/i })
+        .count()) !== 0
+    )
+      throw new Error('le bouton « Annoter » subsiste côté client');
     await page.keyboard.press('Escape');
     await viewer().waitFor({ state: 'hidden', timeout: 5000 });
   });
