@@ -68,6 +68,10 @@ urgence (priorité puis échéance), levée avec note + preuve, lien photo sourc
 alimente Aujourd'hui/soir. Interne strict (jamais côté client). Testé (réserves
 7/7, sans régression). Report tracé dans `DECISIONS.md` : édition/réattribution
 d'une réserve existante → futur sprint « Amendement de faits ». VISION Art. 7, 8, 9.
+**Onglet « Réserves » retiré (09/07)** : une réserve est un événement du Journal, pas un espace dédié.
+Création via les missions (Pré-réception / Réception) ; lecture + levée + join du responsable au
+**Suivi** ; remontée dans « Aujourd'hui ». Modèle de données, événements et logique métier conservés
+(`ReservesView` supprimée, `ReserveResponsable` greffée au Suivi). `reserves.test` réécrit.
 
 ### EPIC 5 — Préparation chantier · ✅ Terminé (Sprint 3 + EPIC 1 complète)
 
@@ -171,7 +175,7 @@ jointe). Modèle **1 demande = 1 réponse** ; statut À traiter / Répondu (clie
 remontée dans « Aujourd'hui » conducteur, trace Suivi (mémoire officielle), notification client à la
 réponse (reprise aussi dans le fil de Léon). `demande-client.test`.
 **Onglet « Demandes client » (Chantier, 09/07)** : tableau de pilotage de toutes les demandes Léon
-(entre Coulisses et Réserves), filtres **Tous / À traiter / Non lus / Répondus**, badge « non lus »
+(après « Dans les coulisses »), filtres **Tous / À traiter / Non lus / Répondus**, badge « non lus »
 qui diminue à l'ouverture (accusé de lecture `seen`), réponse depuis l'onglet (1 demande = 1
 réponse). « Aujourd'hui » = À traiter ; « Suivi » = trace après réponse (lecture seule).
 `demandes-onglet.test`.

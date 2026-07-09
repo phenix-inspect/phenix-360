@@ -101,8 +101,12 @@ try {
 
   // ---- Réserves : photo de preuve à la levée (natif) ----------------------
   await assert('RÉSERVES — champ photo natif à la levée', async () => {
+    // Plus d'onglet « Réserves » : la levée se fait depuis le Suivi (la réserve y
+    // figure comme événement du Journal).
     await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
-    await page.getByRole('tab', { name: /^Réserves/ }).click();
+    await page.getByRole('tab', { name: 'Suivi', exact: true }).first().click();
+    const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+    if (await voir.count()) await voir.first().click();
     await page.getByRole('button', { name: 'Lever la réserve' }).first().click();
     const dialog = page.getByRole('dialog');
     await dialog.waitFor({ state: 'visible', timeout: 6000 });

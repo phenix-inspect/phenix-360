@@ -28,29 +28,17 @@ try {
     },
   );
 
-  await assert('Réserve : le responsable est un CONTACT (lien réel, pas du texte)', async () => {
-    await page.getByRole('tab', { name: /^Réserves/ }).click();
-    await page
-      .getByRole('heading', { name: 'Réserves du chantier' })
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByRole('button', { name: /Nouvelle réserve/ }).click();
-    await page.getByLabel('Description de la réserve').fill('Reprise étanchéité douche');
-    const sel = page.getByLabel('Responsable', { exact: true });
-    const optVal = await sel.locator('option', { hasText: 'Karim Bouaziz' }).getAttribute('value');
-    await sel.selectOption(optVal);
-    await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-    await page.getByText('Responsable :').first().waitFor({ state: 'visible', timeout: 5000 });
-    await page
-      .getByText(/Joindre .*Karim Bouaziz/)
-      .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
-  });
-
-  await assert('Réserve seedée : responsable relié à Élec Pro (join direct)', async () => {
+  await assert('Réserve seedée : le responsable est un CONTACT joignable (au Suivi)', async () => {
+    // Plus d'onglet « Réserves » : la réserve est un événement du Journal, lue et
+    // actionnée au Suivi. Son responsable (un contact) reste joignable en un geste.
+    await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
+    const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+    if (await voir.count()) await voir.first().click();
+    await page.getByText('Responsable :').first().waitFor({ state: 'visible', timeout: 6000 });
     await page
       .getByText(/Joindre .*Élec Pro/)
       .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Commande : le fournisseur est un CONTACT (sélecteur, pas du texte)', async () => {
@@ -88,13 +76,7 @@ try {
   await assert('Client-safe : contacts/responsable/fournisseur ne fuient pas', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     await page.waitForTimeout(500);
-    for (const secret of [
-      'Karim Bouaziz',
-      'Élec Pro',
-      'Showroom Mobalpa',
-      'Responsable :',
-      'Reprise étanchéité',
-    ]) {
+    for (const secret of ['Karim Bouaziz', 'Élec Pro', 'Showroom Mobalpa', 'Responsable :']) {
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
     }

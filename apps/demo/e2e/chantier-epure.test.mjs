@@ -36,7 +36,7 @@ try {
     // Le projet reste le héros, le statut est éditable, la mission accessible.
     await page.getByLabel('Statut du chantier').waitFor({ state: 'visible', timeout: 5000 });
     await page.getByRole('button', { name: /Nouvelle mission/ }).waitFor({ state: 'visible' });
-    for (const tab of ['Suivi', 'Préparation', 'Dans les coulisses', 'Réserves'])
+    for (const tab of ['Suivi', 'Préparation', 'Dans les coulisses', /Demandes client/])
       await page.getByRole('tab', { name: tab }).waitFor({ state: 'visible', timeout: 4000 });
   });
 

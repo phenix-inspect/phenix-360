@@ -34,7 +34,7 @@ try {
   });
 
   await assert('On arrive DIRECTEMENT sur les onglets du chantier', async () => {
-    for (const t of ['Suivi', 'Préparation', 'Documents', 'Dans les coulisses', 'Réserves'])
+    for (const t of ['Suivi', 'Préparation', 'Documents', 'Dans les coulisses', 'Demandes client'])
       await page
         .getByRole('tab', { name: new RegExp(`^${t}`) })
         .first()
@@ -64,9 +64,9 @@ try {
       .first()
       .waitFor({ state: 'visible', timeout: 6000 });
 
-    await page.getByRole('tab', { name: /^Réserves/ }).click();
+    await page.getByRole('tab', { name: /^Demandes client/ }).click();
     await page
-      .getByRole('tab', { name: /^Réserves/, selected: true })
+      .getByRole('tab', { name: /^Demandes client/, selected: true })
       .waitFor({ state: 'visible', timeout: 6000 });
 
     await page.getByRole('tab', { name: /^Suivi/ }).click();

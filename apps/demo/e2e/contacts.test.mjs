@@ -17,7 +17,11 @@ const joindre = page.locator('div.border-dashed').filter({ hasText: 'Élec Pro' 
 try {
   await openDemo(page);
   await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-  await page.getByRole('tab', { name: /Réserves/ }).click();
+  // Plus d'onglet « Réserves » : le responsable d'une réserve se joint depuis le
+  // Suivi (la réserve y figure comme événement du Journal).
+  await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
+  const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+  if (await voir.count()) await voir.first().click();
 
   await assert('Le responsable de la réserve seedée est joignable (contact vivant)', async () => {
     await joindre.waitFor({ state: 'visible', timeout: 6000 });

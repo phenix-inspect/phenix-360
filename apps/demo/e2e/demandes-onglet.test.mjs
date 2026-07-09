@@ -69,7 +69,7 @@ const clean = (s) => s.replace(/\s+/g, ' ').trim();
 try {
   await openDemo(page);
 
-  await assert('L’onglet « Demandes client » existe, entre Coulisses et Réserves', async () => {
+  await assert('L’onglet « Demandes client » existe, après « Dans les coulisses »', async () => {
     await goChantier();
     const tl = page
       .getByRole('tablist')
@@ -77,9 +77,11 @@ try {
     const order = (await tl.getByRole('tab').allInnerTexts()).map(clean);
     const iCoul = order.findIndex((n) => /Dans les coulisses/.test(n));
     const iDem = order.findIndex((n) => /Demandes client/.test(n));
-    const iRes = order.findIndex((n) => /Réserves/.test(n));
-    if (!(iCoul >= 0 && iCoul < iDem && iDem < iRes))
+    if (!(iCoul >= 0 && iCoul < iDem))
       throw new Error(`ordre inattendu : ${order.join(' | ')}`);
+    // L'onglet « Réserves » a été retiré.
+    if (order.some((n) => /Réserves/.test(n)))
+      throw new Error('l’onglet « Réserves » ne devrait plus exister');
   });
 
   const base = await badgeNum();

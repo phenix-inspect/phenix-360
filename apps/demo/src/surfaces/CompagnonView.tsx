@@ -22,7 +22,6 @@ import {
   demandesPourPhenix,
   questionsEnAttente,
   reserveStatut,
-  reservesOuvertes,
   sortByDate,
   userId,
   type Event,
@@ -49,11 +48,11 @@ import { DocumentButton } from '../components/DocumentButton';
 import { CompteRenduPoints } from '../components/CompteRenduPoints';
 import { DemandeThread } from '../components/DemandeThread';
 import { DemandesClientTab } from '../components/DemandesClientTab';
+import { ReserveResponsable } from '../components/ReserveResponsable';
 import { DossierPanel } from '../components/DossierPanel';
 import { DocumentsTab } from '../components/DocumentsTab';
 import { FilView } from '../components/fil/FilView';
 import { MomentComposer } from '../components/fil/MomentComposer';
-import { ReservesView } from '../components/ReservesView';
 import { ReserveLeveeDialog } from '../components/ReserveLeveeDialog';
 import { Composer, type ComposerKind } from '../components/Composer';
 import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
@@ -68,7 +67,7 @@ function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   return { userId: id, role: 'compagnon', displayName: nameOf(snap, id) };
 }
 
-export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'demandes' | 'reserves';
+export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'demandes';
 
 export function CompagnonView({
   snap,
@@ -107,7 +106,6 @@ export function CompagnonView({
     if (tab === 'preparation' && !dossier) setTab('suivi');
   }, [project.id, tab, dossier]);
 
-  const nbReservesOuvertes = reservesOuvertes(events).length;
   // Badge « Demandes client » : demandes du client NON LUES ET pas encore
   // répondues (une demande répondue est « Répondu », jamais « Non lu »). Le badge
   // diminue quand le conducteur ouvre la demande (accusé `seen['compagnon']`).
@@ -174,10 +172,12 @@ export function CompagnonView({
       </div>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as CompagnonTab)}>
-        {/* 6 onglets : on autorise le RETOUR À LA LIGNE (h-auto flex-wrap) pour
-            qu'aucun onglet (« Demandes client », « Réserves »…) ne soit masqué
-            hors écran sur une largeur normale, au lieu d'un défilement horizontal
-            peu découvrable. */}
+        {/* Onglets nombreux : on autorise le RETOUR À LA LIGNE (h-auto flex-wrap)
+            pour qu'aucun onglet (« Demandes client »…) ne soit masqué hors écran
+            sur une largeur normale, au lieu d'un défilement horizontal peu
+            découvrable. Plus d'onglet « Réserves » : une réserve est un événement
+            du Journal, gérée depuis les missions (Pré-réception / Réception) et
+            lue au Suivi. */}
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="suivi">Suivi</TabsTrigger>
           <TabsTrigger value="preparation">Préparation</TabsTrigger>
@@ -187,12 +187,6 @@ export function CompagnonView({
             <span className="flex items-center gap-1.5">
               Demandes client
               {nbDemandesNonLues > 0 && <Badge variant="info">{nbDemandesNonLues}</Badge>}
-            </span>
-          </TabsTrigger>
-          <TabsTrigger value="reserves">
-            <span className="flex items-center gap-1.5">
-              Réserves
-              {nbReservesOuvertes > 0 && <Badge variant="warning">{nbReservesOuvertes}</Badge>}
             </span>
           </TabsTrigger>
         </TabsList>
@@ -212,16 +206,6 @@ export function CompagnonView({
         </TabsContent>
         <TabsContent value="demandes">
           <DemandesClientTab snap={snap} project={project} actor={actor} />
-        </TabsContent>
-        <TabsContent value="reserves">
-          <ReservesView
-            snap={snap}
-            project={project}
-            actor={actor}
-            events={events}
-            onLeverReserve={setLever}
-            onOpenFilPhoto={openFilPhoto}
-          />
         </TabsContent>
       </Tabs>
 
@@ -392,6 +376,12 @@ function SuiviTab({
                   e.type === 'demande' && e.content.destinataire === 'phenix' && demandeRepondue(e)
                     ? e
                     : null;
+                // Réserve OUVERTE avec un responsable (contact) : on peut le joindre
+                // directement depuis le Suivi (l'onglet « Réserves » a été retiré).
+                const reserveResponsableId =
+                  e.type === 'reserve' && statut === 'ouverte'
+                    ? e.content.responsableContactId
+                    : undefined;
                 const hasRow = badge != null || filSrc?.kind === 'fil' || canLever || openableDoc;
                 return (
                   <ActivityItem
@@ -464,6 +454,14 @@ function SuiviTab({
                           demande={demandeClient}
                           actor={actor}
                           nameOf={(u) => nameOf(snap, u)}
+                        />
+                      </div>
+                    )}
+                    {reserveResponsableId && (
+                      <div className="mt-3">
+                        <ReserveResponsable
+                          projectId={e.projectId}
+                          contactId={reserveResponsableId}
                         />
                       </div>
                     )}

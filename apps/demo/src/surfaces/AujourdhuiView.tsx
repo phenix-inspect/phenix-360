@@ -175,10 +175,12 @@ export function AujourdhuiView({
           })),
         ];
       case 'reserves':
+        // Plus d'onglet dédié « Réserves » : une réserve est un événement du
+        // Journal. On ouvre le Suivi (historique), où elle se lit et se lève.
         return reservesOuvertes(events).map((r) => ({
           key: r.id,
           label: `Réserve n°${r.content.numero} · ${r.content.libelle}`,
-          tab: 'reserves' as CompagnonTab,
+          tab: 'suivi' as CompagnonTab,
         }));
       case 'livraisons':
         return (snap.dossiers[projectId]?.orders ?? [])

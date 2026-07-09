@@ -48,13 +48,22 @@ try {
   });
 
   await assert(
-    'Les 5 univers existent (Suivi · Préparation · Documents · Coulisses · Réserves)',
+    'Les 5 univers existent (Suivi · Préparation · Documents · Coulisses · Demandes client)',
     async () => {
-      for (const t of ['Suivi', 'Préparation', 'Documents', 'Dans les coulisses', 'Réserves'])
+      for (const t of [
+        'Suivi',
+        'Préparation',
+        'Documents',
+        'Dans les coulisses',
+        /Demandes client/,
+      ])
         await page
           .getByRole('tab', { name: t })
           .first()
           .waitFor({ state: 'visible', timeout: 6000 });
+      // L'onglet « Réserves » a été retiré (une réserve est un événement du Journal).
+      if ((await page.getByRole('tab', { name: /Réserves/ }).count()) > 0)
+        throw new Error('l’onglet « Réserves » ne devrait plus exister');
     },
   );
 

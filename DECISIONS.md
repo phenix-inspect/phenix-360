@@ -2301,3 +2301,34 @@ onglet visible + position, demande Léon listée, filtres, badge +1/−1, ouvert
 Répondu, disparition d'Aujourd'hui, conservation dans l'onglet, trace au Suivi) ; `demande-client`
 (12/12) mis à jour pour répondre **via l'onglet**. Gate verte (typecheck, lint, prettier, build,
 e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.
+
+## 09/07/2026 — Suppression de l'onglet « Réserves » (page Chantier)
+
+**Décision produit validée :** on **retire complètement l'onglet « Réserves »** de la page Chantier.
+Au départ un espace dédié, il ne répond plus à une question distincte : **une réserve est un
+événement métier parmi d'autres** (Journal). On réduit le nombre d'onglets et on évite les doublons.
+Onglets restants : **Suivi · Préparation · Documents · Dans les coulisses · Demandes client**.
+
+**Nouvelle philosophie :** une réserve est **créée via une mission** (Pré-réception / Réception) et
+reste rattachée à ces événements. Le conducteur la retrouve **au Suivi** (historique), **pendant la
+Pré-réception / Réception**, et **dans « Aujourd'hui »** quand une action est attendue. **Plus de page
+dédiée.**
+
+**Fait :** onglet « Réserves » + son badge retirés ; la navigation « Aujourd'hui → réserve » ouvre
+désormais le **Suivi** (au lieu de l'onglet supprimé) ; le bouton « Nouvelle réserve » disparaît (la
+création manuelle passait par la page ; elle se fait via les missions) ; **`ReservesView` supprimée**
+(vue devenue inutile).
+
+**Conservé (aucune perte de logique métier) :** le **modèle de données** des réserves, tous les
+**événements existants**, la **création via Pré-réception / Réception**, le **suivi**, la **levée** et
+l'**historique**. La réserve est désormais **pleinement actionnable au Suivi** : on la **lève** (dialogue
+de levée, déjà présent) et on **joint son responsable** (contact — Appeler / SMS / WhatsApp / Mail) via
+un nouveau composant `ReserveResponsable` (extrait de l'ancienne page, greffé sur l'entrée réserve du
+Suivi). Rien de tout cela n'apparaît côté client (Art. 9).
+
+**Tests :** `reserves.test` réécrit autour du Suivi (plus d'onglet ; réserve lue + responsable joignable
+au Suivi ; remontée « Aujourd'hui » → Suivi ; levée → « Levée » ; client-safe). `contacts.test` et
+`consolidation.test` repointés vers le Suivi (join du responsable). `aujourdhui`, `chantier-switch`,
+`chantier-architecture`, `chantier-sans-radar`, `chantier-epure` mis à jour (l'onglet « Réserves »
+n'existe plus ; le Suivi / « Demandes client » servent de témoins). Gate verte (typecheck, lint,
+prettier, build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9.

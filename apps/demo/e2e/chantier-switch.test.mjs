@@ -25,28 +25,32 @@ try {
     if ((await selector().inputValue()) === '') throw new Error('aucun chantier sélectionné');
   });
 
-  await assert(
-    'On se place sur un onglet non par défaut (Réserves) du chantier actif',
-    async () => {
-      await page.getByRole('tab', { name: /Réserves/ }).click();
-      await page.getByText(RESERVE_LYON).first().waitFor({ state: 'visible', timeout: 5000 });
-    },
-  );
+  // Plus d'onglet « Réserves » : une réserve se lit au Suivi (historique). Le
+  // Suivi n'est PAS l'onglet par défaut de ces chantiers seedés (dossier prêt →
+  // défaut « Préparation »), il sert donc de bon témoin de persistance d'onglet.
+  const voirTout = async () => {
+    const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+    if (await voir.count()) await voir.first().click();
+  };
 
-  await assert(
-    'Changer de chantier CONSERVE l’onglet (Réserves) et CHANGE les données',
-    async () => {
-      await selector().selectOption({ label: 'Maison Écully' });
-      // On reste en vue Chantier, onglet Réserves toujours sélectionné.
-      await page
-        .getByRole('tab', { name: /Réserves/, selected: true })
-        .waitFor({ state: 'visible', timeout: 6000 });
-      // Les données affichées sont celles du NOUVEAU chantier.
-      await page.getByText(RESERVE_ECULLY).first().waitFor({ state: 'visible', timeout: 5000 });
-      if ((await page.getByText(RESERVE_LYON).count()) > 0)
-        throw new Error('les réserves de l’ancien chantier sont encore affichées');
-    },
-  );
+  await assert('On se place sur un onglet non par défaut (Suivi) du chantier actif', async () => {
+    await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
+    await voirTout();
+    await page.getByText(RESERVE_LYON).first().waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  await assert('Changer de chantier CONSERVE l’onglet (Suivi) et CHANGE les données', async () => {
+    await selector().selectOption({ label: 'Maison Écully' });
+    // On reste en vue Chantier, onglet Suivi toujours sélectionné.
+    await page
+      .getByRole('tab', { name: 'Suivi', exact: true, selected: true })
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await voirTout();
+    // Les données affichées sont celles du NOUVEAU chantier.
+    await page.getByText(RESERVE_ECULLY).first().waitFor({ state: 'visible', timeout: 6000 });
+    if ((await page.getByText(RESERVE_LYON).count()) > 0)
+      throw new Error('les réserves de l’ancien chantier sont encore affichées');
+  });
 
   await assert('Changer de chantier CONSERVE aussi la Préparation (dossier prêt)', async () => {
     // Sur un chantier AVEC dossier, onglet Préparation.

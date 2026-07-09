@@ -1,85 +1,85 @@
 /**
- * Registre des réserves : création (responsable = Contact via sélecteur),
- * segments en retard / à lever / levées, report dans « Aujourd'hui », levée,
- * client-safe.
+ * Réserves après le RETRAIT de l'onglet dédié : une réserve est un événement du
+ * Journal. Le conducteur la retrouve au SUIVI (historique), joint son responsable
+ * (contact) et la LÈVE — elle passe alors « Levée ». Elle remonte dans
+ * « Aujourd'hui » tant qu'une action est attendue, et reste client-safe. Toute la
+ * logique métier (création via missions, suivi, levée, historique) est conservée.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
 const browser = await launch();
-const { page, consoleErrors } = await session(browser, { height: 1600 });
+const { page, consoleErrors } = await session(browser, { height: 2000 });
 const { assert, summary } = harness();
 
-const A = 'Joint de silicone à refaire dans la douche';
-const B = 'Reprise peinture couloir niveau 1';
+// Réserve OUVERTE du seed (chantier « Appartement Lyon 6e »).
+const RESERVE = /Cette prise peut-elle être déplacée/;
 
-async function addReserve({ libelle, responsable, echeance, priorite }) {
-  await page.getByRole('button', { name: /Nouvelle réserve/ }).click();
-  await page.getByLabel('Description de la réserve').fill(libelle);
-  if (responsable) await page.getByLabel('Responsable', { exact: true }).selectOption({ index: 1 });
-  if (echeance) await page.getByLabel('Échéance', { exact: true }).fill(echeance);
-  if (priorite) await page.getByRole('button', { name: priorite, exact: true }).click();
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-  await page.getByText(libelle).first().waitFor({ state: 'visible', timeout: 5000 });
-}
+const voirTout = async () => {
+  const voir = page.getByRole('button', { name: /Voir tout le journal/ });
+  if (await voir.count()) await voir.first().click();
+};
+const goSuivi = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('tab', { name: 'Suivi', exact: true }).first().click();
+  await voirTout();
+};
 
 try {
   await openDemo(page);
+  await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
 
-  await assert('Ouvrir le registre des réserves', async () => {
-    await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-    await page.getByRole('tab', { name: /^Réserves/ }).click();
+  await assert('La page Chantier n’a PLUS d’onglet « Réserves »', async () => {
+    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+    if ((await page.getByRole('tab', { name: /Réserves/ }).count()) > 0)
+      throw new Error('l’onglet « Réserves » existe encore');
+  });
+
+  await assert('La réserve se lit au Suivi, avec « Lever la réserve » et son responsable', async () => {
+    await goSuivi();
+    await page.getByText(RESERVE).first().waitFor({ state: 'visible', timeout: 6000 });
+    if ((await page.getByRole('button', { name: 'Lever la réserve' }).count()) === 0)
+      throw new Error('action « Lever la réserve » absente du Suivi');
+    // Le responsable (un contact) reste joignable depuis la réserve.
     await page
-      .getByRole('heading', { name: 'Réserves du chantier' })
-      .waitFor({ state: 'visible', timeout: 5000 });
+      .getByText(/Joindre .*Élec Pro/)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('Créer une réserve EN RETARD (échéance passée, priorité haute)', async () => {
-    await addReserve({ libelle: A, responsable: true, echeance: '2020-01-01', priorite: 'Haute' });
-    await page
-      .getByRole('heading', { name: /En retard/ })
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page.getByText('en retard').first().waitFor({ state: 'visible', timeout: 4000 });
-    await page.getByText('Priorité haute').first().waitFor({ state: 'visible', timeout: 4000 });
-  });
-
-  await assert('Créer une réserve À LEVER (échéance future)', async () => {
-    await addReserve({ libelle: B, echeance: '2030-06-01', priorite: 'Normale' });
-    await page.getByText(B).first().waitFor({ state: 'visible', timeout: 4000 });
-  });
-
-  await assert('Aujourd’hui reflète les nouvelles réserves (1 seed + 2 = 3)', async () => {
+  await assert('Aujourd’hui remonte la réserve et l’ouvre au Suivi', async () => {
     await page
       .getByRole('tab', { name: /Aujourd/ })
       .first()
       .click();
+    await page.getByRole('button', { name: /Filtrer.*réserves à lever/i }).click();
+    await page.getByText(RESERVE).first().click();
     await page
-      .getByRole('heading', { name: /Bonjour Mickaël/ })
-      .waitFor({ state: 'visible', timeout: 5000 });
-    const cardBtn = page.getByRole('button', { name: /Appartement Lyon 6e/ });
-    await cardBtn.getByText(/3 réserves/).waitFor({ state: 'visible', timeout: 5000 });
+      .getByRole('tab', { name: 'Suivi', exact: true, selected: true })
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('Lever une réserve la fait passer en « Levées »', async () => {
-    await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
-    await page.getByRole('tab', { name: /^Réserves/ }).click();
+  await assert('Lever la réserve depuis le Suivi → elle passe « Levée »', async () => {
+    await voirTout();
     await page.getByRole('button', { name: 'Lever la réserve' }).first().click();
     const dialog = page.getByRole('dialog');
-    await dialog.getByRole('textbox').fill('Silicone repris et contrôlé sur place.');
+    await dialog.getByRole('textbox').first().fill('Prise déplacée et contrôlée sur place.');
     await dialog.getByRole('button', { name: 'Lever la réserve' }).click();
-    await dialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await dialog.waitFor({ state: 'hidden', timeout: 6000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    // Plus d'action « à lever » sur cette réserve (la seule ouverte du chantier).
+    if ((await page.getByRole('button', { name: 'Lever la réserve' }).count()) > 0)
+      throw new Error('la réserve reste « à lever » après la levée');
+    // La levée est tracée au Journal : « Réserve n°N levée ».
     await page
-      .getByRole('heading', { name: /^Levées/ })
-      .waitFor({ state: 'visible', timeout: 5000 });
-    await page
-      .getByText(/Levée le .* par Mickaël/)
+      .getByText(/Réserve n°\d+ levée/)
       .first()
-      .waitFor({ state: 'visible', timeout: 5000 });
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Client-safe : les réserves ne fuient jamais côté client', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     await page.waitForTimeout(600);
-    for (const secret of [A, B, 'Réserve n°']) {
+    for (const secret of ['Cette prise peut-elle être déplacée', 'Réserve n°']) {
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
     }
