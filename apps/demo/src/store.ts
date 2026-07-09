@@ -571,7 +571,7 @@ export const demo = {
     const now = new Date().toISOString();
     for (const id of ids) forRole[id] = now;
     seen[role] = forRole;
-    localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    safeSetItem(SEEN_KEY, JSON.stringify(seen));
     refresh();
     broadcast();
   },
@@ -951,7 +951,7 @@ export const demo = {
           delete seen[role]![mid];
           seenChanged = true;
         }
-    if (seenChanged) localStorage.setItem(SEEN_KEY, JSON.stringify(seen));
+    if (seenChanged) safeSetItem(SEEN_KEY, JSON.stringify(seen));
 
     // 5) Identités (noms) devenues orphelines : plus référencées par aucun membre.
     const after = kv.load() ?? emptyState();

@@ -18,6 +18,8 @@ import {
   PROJECT_STATUSES,
   PROJECT_STATUS_LABEL,
   crADesPointsPour,
+  demandeRepondue,
+  demandesPourPhenix,
   questionsEnAttente,
   reserveStatut,
   reservesOuvertes,
@@ -46,6 +48,7 @@ import { PhotoTile } from '../components/PhotoTile';
 import { DocumentButton } from '../components/DocumentButton';
 import { CompteRenduPoints } from '../components/CompteRenduPoints';
 import { DemandeThread } from '../components/DemandeThread';
+import { DemandesClientTab } from '../components/DemandesClientTab';
 import { DossierPanel } from '../components/DossierPanel';
 import { DocumentsTab } from '../components/DocumentsTab';
 import { FilView } from '../components/fil/FilView';
@@ -65,7 +68,7 @@ function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
   return { userId: id, role: 'compagnon', displayName: nameOf(snap, id) };
 }
 
-export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'reserves';
+export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'demandes' | 'reserves';
 
 export function CompagnonView({
   snap,
@@ -105,6 +108,13 @@ export function CompagnonView({
   }, [project.id, tab, dossier]);
 
   const nbReservesOuvertes = reservesOuvertes(events).length;
+  // Badge « Demandes client » : demandes du client NON LUES ET pas encore
+  // répondues (une demande répondue est « Répondu », jamais « Non lu »). Le badge
+  // diminue quand le conducteur ouvre la demande (accusé `seen['compagnon']`).
+  const seenCompagnon = snap.seen['compagnon'] ?? {};
+  const nbDemandesNonLues = demandesPourPhenix(events).filter(
+    (e) => e.actor.role === 'client' && !seenCompagnon[e.id] && !demandeRepondue(e),
+  ).length;
 
   const openFilPhoto = (momentId: string, photoId?: string): void => {
     demo.openFilPhoto(momentId, photoId);
@@ -169,6 +179,12 @@ export function CompagnonView({
           <TabsTrigger value="preparation">Préparation</TabsTrigger>
           <TabsTrigger value="documents">Documents</TabsTrigger>
           <TabsTrigger value="fil">Dans les coulisses</TabsTrigger>
+          <TabsTrigger value="demandes">
+            <span className="flex items-center gap-1.5">
+              Demandes client
+              {nbDemandesNonLues > 0 && <Badge variant="info">{nbDemandesNonLues}</Badge>}
+            </span>
+          </TabsTrigger>
           <TabsTrigger value="reserves">
             <span className="flex items-center gap-1.5">
               Réserves
@@ -189,6 +205,9 @@ export function CompagnonView({
         </TabsContent>
         <TabsContent value="fil">
           <FilView snap={snap} project={project} actor={actor} canCompose />
+        </TabsContent>
+        <TabsContent value="demandes">
+          <DemandesClientTab snap={snap} project={project} actor={actor} />
         </TabsContent>
         <TabsContent value="reserves">
           <ReservesView
@@ -361,10 +380,14 @@ function SuiviTab({
                 const openableDoc = e.type === 'document' || e.type === 'compte_rendu';
                 const crPoints = e.type === 'compte_rendu' ? e.content.points : undefined;
                 const isCrPoints = (crPoints?.length ?? 0) > 0;
-                // Demande du client (question → réponse) : la mémoire officielle,
-                // avec la réponse conducteur (texte + photos) directement au Suivi.
+                // Demande du client : le Suivi ne conserve que la TRACE OFFICIELLE
+                // une fois RÉPONDUE (lecture seule). Le pilotage et la réponse se
+                // font dans l'onglet « Demandes client » — le Suivi n'est pas un
+                // centre d'action pour les demandes, juste la mémoire.
                 const demandeClient =
-                  e.type === 'demande' && e.content.destinataire === 'phenix' ? e : null;
+                  e.type === 'demande' && e.content.destinataire === 'phenix' && demandeRepondue(e)
+                    ? e
+                    : null;
                 const hasRow = badge != null || filSrc?.kind === 'fil' || canLever || openableDoc;
                 return (
                   <ActivityItem
@@ -437,7 +460,6 @@ function SuiviTab({
                           demande={demandeClient}
                           actor={actor}
                           nameOf={(u) => nameOf(snap, u)}
-                          canReply
                         />
                       </div>
                     )}

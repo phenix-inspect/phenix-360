@@ -170,6 +170,11 @@ sinon il **crée automatiquement une demande conducteur** (escalade forcée dès
 jointe). Modèle **1 demande = 1 réponse** ; statut À traiter / Répondu (client-safe « En attente »),
 remontée dans « Aujourd'hui » conducteur, trace Suivi (mémoire officielle), notification client à la
 réponse (reprise aussi dans le fil de Léon). `demande-client.test`.
+**Onglet « Demandes client » (Chantier, 09/07)** : tableau de pilotage de toutes les demandes Léon
+(entre Coulisses et Réserves), filtres **Tous / À traiter / Non lus / Répondus**, badge « non lus »
+qui diminue à l'ouverture (accusé de lecture `seen`), réponse depuis l'onglet (1 demande = 1
+réponse). « Aujourd'hui » = À traiter ; « Suivi » = trace après réponse (lecture seule).
+`demandes-onglet.test`.
 **Manque** : historique client propre, préférences. VISION Art. 2, 8, 9, 10.
 
 ### EPIC 13 — Administration · 🔴 À développer

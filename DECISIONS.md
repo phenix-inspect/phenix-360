@@ -2266,3 +2266,38 @@ zéro exception. `demande-client.test` (12/12, + assertion notification conducte
 `demande-client-quota.test` (4/4 : question conservée + demande créée + conducteur notifié sous
 pression). Gate verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console).
 VISION Art. 8, 9, 11.
+
+## 09/07/2026 — Onglet Chantier « Demandes client » (tableau de pilotage)
+
+**Décision produit validée :** un nouvel onglet **« Demandes client »** dans la page Chantier
+(entre « Dans les coulisses » et « Réserves ») regroupe **toutes les demandes créées via Léon** pour
+les piloter **sans polluer le Suivi**. C'est un **tableau de pilotage, PAS une messagerie** — le
+modèle reste **1 demande = 1 réponse**.
+
+**Contenu :** toutes les demandes du chantier avec, pour chacune, le message client + photos
+éventuelles, la date, le statut, la réponse conducteur (+ photos) si elle existe, et un bouton
+**« Répondre »** tant qu'elle n'est pas répondue. **Filtres simples** (segmented) : **Tous / À
+traiter / Non lus / Répondus**, avec compteurs — pas de filtres complexes.
+
+**Répartition des surfaces :** « Aujourd'hui » ne montre que les demandes **À traiter** (+ la
+notification d'arrivée) ; « Demandes client » montre **tout l'historique filtrable** ; « Suivi » ne
+conserve que la **trace officielle après réponse** (lecture seule — le bouton « Répondre » a quitté
+le Suivi pour l'onglet). Le pilotage/réponse se fait donc dans l'onglet dédié, la mémoire reste au
+Suivi.
+
+**Nouveau concept « Non lu / Lu » :** on réutilise l'accusé de lecture existant `seen['compagnon']`.
+Une demande est **Non lu** si le conducteur ne l'a **jamais ouverte** ET qu'elle n'est **pas encore
+répondue** (une demande répondue est « Répondu », jamais « Non lu »). Un **badge** sur l'onglet
+compte les non-lues ; **l'ouvrir la marque lue** (le badge diminue) ; **y répondre** la passe
+**Répondu**, la fait **quitter « Aujourd'hui »**, **notifie le client** et **conserve la trace** ici
+et au Suivi. Les écritures d'accusés de lecture passent par le miroir mémoire (`safeSetItem`) →
+résilientes au quota.
+
+**Mise en œuvre :** composant `DemandesClientTab` (SegmentedControl + cartes dépliables ; ouvrir =
+`markSeen('compagnon')` ; répondre = `DemandeThread canReply`) ; onglet + badge « non lus » dans
+`CompagnonView` ; `SuiviTab` n'affiche plus le fil de demande qu'une fois **répondue** (lecture
+seule). Aucune messagerie, aucune conversation infinie. Nouveau `demandes-onglet.test` (11/11 :
+onglet visible + position, demande Léon listée, filtres, badge +1/−1, ouverture → lu, réponse →
+Répondu, disparition d'Aujourd'hui, conservation dans l'onglet, trace au Suivi) ; `demande-client`
+(12/12) mis à jour pour répondre **via l'onglet**. Gate verte (typecheck, lint, prettier, build,
+e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.

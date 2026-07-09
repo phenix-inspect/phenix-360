@@ -42,6 +42,15 @@ const goSuivi = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
   await page.getByRole('tab', { name: 'Suivi', exact: true }).first().click();
 };
+const goDemandes = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('tab', { name: /Demandes client/ }).click();
+};
+/** Déplie la carte d'une demande (onglet « Demandes client ») → la marque lue. */
+const openCard = async (texte) => {
+  await page.getByRole('button').filter({ hasText: texte }).first().click();
+  await page.waitForTimeout(200);
+};
 
 const leon = () => page.getByRole('dialog', { name: /concierge/ });
 const openLeon = async () => {
@@ -96,7 +105,11 @@ try {
     await vosDemandes().getByText(D1).first().waitFor({ state: 'visible', timeout: 6000 });
     if ((await vosDemandes().getByText('En attente').count()) === 0)
       throw new Error('statut « En attente » manquant');
-    if ((await vosDemandes().getByText(/à traiter/i).count()) > 0)
+    if (
+      (await vosDemandes()
+        .getByText(/à traiter/i)
+        .count()) > 0
+    )
       throw new Error('le « à traiter » interne fuite côté client');
   });
 
@@ -108,7 +121,11 @@ try {
     if (await leon().getByRole('button', { name: 'Envoyer' }).isDisabled())
       throw new Error('chat figé : « Envoyer » reste désactivé malgré un nouveau message');
     // On peut aussi rouvrir le sélecteur de photos (bouton d’ajout actif).
-    if (await leon().getByRole('button', { name: /Ajouter une photo/ }).isDisabled())
+    if (
+      await leon()
+        .getByRole('button', { name: /Ajouter une photo/ })
+        .isDisabled()
+    )
       throw new Error('chat figé : l’ajout de photo est bloqué');
     await leon().getByPlaceholder('Écrivez à PHÉNIX').fill('');
     await closeLeon();
@@ -148,19 +165,24 @@ try {
     await page.getByText(`Question client · ${D1}`).first().waitFor({ timeout: 6000 });
   });
 
-  await assert('Conducteur : ouvrir la demande au Suivi et RÉPONDRE (texte seul)', async () => {
-    await goSuivi();
-    const th = threadOf(D1);
-    await th.getByRole('button', { name: 'Répondre' }).click();
-    await th.getByLabel('Réponse au client').fill(R1);
-    await th.getByRole('button', { name: /Envoyer la réponse/ }).click();
-    // Statut → Répondu, réponse visible.
-    await th.getByText(R1).first().waitFor({ state: 'visible', timeout: 6000 });
-    if ((await th.getByText('Répondu').count()) === 0)
-      throw new Error('statut « Répondu » manquant');
-  });
+  await assert(
+    'Conducteur : RÉPONDRE depuis l’onglet « Demandes client » (texte seul)',
+    async () => {
+      await goDemandes();
+      await openCard(D1); // déplie la carte → la marque lue
+      const th = threadOf(D1);
+      await th.getByRole('button', { name: 'Répondre' }).click();
+      await th.getByLabel('Réponse au client').fill(R1);
+      await th.getByRole('button', { name: /Envoyer la réponse/ }).click();
+      // Statut → Répondu, réponse visible.
+      await th.getByText(R1).first().waitFor({ state: 'visible', timeout: 6000 });
+      if ((await th.getByText('Répondu').count()) === 0)
+        throw new Error('statut « Répondu » manquant');
+    },
+  );
 
   await assert('Conducteur : répondre avec texte + photos (2e demande)', async () => {
+    await openCard(D2);
     const th = threadOf(D2);
     await th.getByRole('button', { name: 'Répondre' }).click();
     await th.getByLabel('Réponse au client').fill(R2);
