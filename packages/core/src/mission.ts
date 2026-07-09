@@ -34,9 +34,12 @@ export interface MissionDef {
  * plus PHÉNIX est efficace.
  *
  * Décision produit (09/07/2026) : « Livraison de matériel » est RETIRÉE du menu
- * (trop spécifique pour la V1). Sa logique métier reste intacte et isolée
- * (`MissionKind` / labels / `prepareMission` case `livraison`) : réactiver la
- * mission = ré-ajouter simplement son entrée ci-dessous.
+ * (trop spécifique pour la V1). Puis « SAV » et « Note / observation » sont à leur
+ * tour RETIRÉES (peu de valeur au quotidien, elles alourdissaient le menu). Dans
+ * les trois cas, la LOGIQUE MÉTIER reste intacte et isolée (`MissionKind` / labels
+ * / `prepareMission` cases `livraison`, `sav`, `note`) : réactiver une mission =
+ * ré-ajouter simplement son entrée ci-dessous. On ne supprime jamais le code —
+ * on ne le retire que de l'interface.
  */
 export const MISSIONS: MissionDef[] = [
   {
@@ -46,8 +49,10 @@ export const MISSIONS: MissionDef[] = [
   },
   { kind: 'prereception', label: 'Pré-réception', description: 'Lister les points à reprendre' },
   { kind: 'reception', label: 'Réception', description: 'Clôturer le chantier proprement' },
-  { kind: 'sav', label: 'SAV', description: 'Traiter une intervention après travaux' },
-  { kind: 'note', label: 'Note / observation', description: 'Une trace rapide' },
+  // « SAV » et « Note / observation » RETIRÉES du menu (V1) — logique conservée
+  // (type + labels + `prepareMission`), il suffit de ré-ajouter leur entrée ici :
+  // { kind: 'sav', label: 'SAV', description: 'Traiter une intervention après travaux' },
+  // { kind: 'note', label: 'Note / observation', description: 'Une trace rapide' },
 ];
 
 export const MISSION_LABEL: Record<MissionKind, string> = {

@@ -2587,3 +2587,26 @@ Accepter, non-retour au reload, état dans « Mon espace »), code masqué + ref
 concordants) + succès, invitation (apparition + statut) + retrait, toggles sans crash, mention
 sécurité. `client-architecture` mis à jour (6 onglets). Gate verte (typecheck, lint, prettier, build,
 e2e complet, zéro erreur console). VISION Art. 6, 8, 9, 11.
+
+## 09/07/2026 — « Nouvelle mission » : retrait de « SAV » et « Note / observation »
+
+**Décision produit validée :** pour la V1, on **allège encore** le sélecteur « Nouvelle mission ». On
+retire de l'interface **« SAV »** et **« Note / observation »** (peu de valeur au quotidien, elles
+alourdissaient le menu). Objectif : le conducteur choisit sa mission **en quelques secondes** — moins
+de choix, meilleure expérience, chaque mission restante à forte valeur métier.
+
+**On ne supprime PAS la logique métier — on la cache.** Même geste que pour « Livraison de matériel »
+(retirée plus tôt) : les deux entrées sont **commentées** dans `MISSIONS` (`packages/core/mission.ts`).
+Tout le reste est **conservé** : le type `MissionKind` (`sav`, `note`), les libellés (`MISSION_LABEL`,
+`MISSION_DOC_TITLE`), les cas de `prepareMission` (`sav`, `note`), l'icône dans `ICONS`. Réactiver une
+mission = **décommenter** son entrée. Aucune route/point d'entrée résiduel : le seul accès passe par
+`MISSIONS.map` dans `MissionPicker`.
+
+**Le menu « Nouvelle mission » devient (6 entrées, grille propre, aucun trou de carte) :** Publier dans
+les coulisses · Compte rendu de chantier · Pré-réception · Réception · Ajouter un document · Demander
+au client.
+
+**Tests :** `mission` gagne une garde négative (« SAV » / « Note / observation » absents ; les 6
+entrées présentes) et bascule son parcours de flux générique sur **Pré-réception** (Note utilisait le
+même `MissionFlow`) ; `suivi-entree-unique` idem. `mission` (8/8), `suivi-entree-unique` (7/7). Gate
+verte (typecheck, lint, prettier, build, e2e complet, zéro erreur console). VISION Art. 4, 8, 9, 11.

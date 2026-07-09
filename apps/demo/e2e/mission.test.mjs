@@ -19,11 +19,31 @@ try {
 
   await assert('« Nouvelle mission » ouvre le choix des missions', async () => {
     await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-    await page.getByText('Note / observation').waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByText('Compte rendu de chantier').waitFor({ state: 'visible', timeout: 5000 });
   });
 
+  await assert(
+    'Menu allégé (V1) : « SAV » et « Note / observation » n’apparaissent plus',
+    async () => {
+      const dialog = page.getByRole('dialog');
+      for (const label of ['SAV', 'Note / observation'])
+        if ((await dialog.getByText(label, { exact: true }).count()) > 0)
+          throw new Error(`la mission « ${label} » ne devrait plus apparaître dans le menu`);
+      // Les six entrées du quotidien restent présentes (3 missions + album + 2 actions).
+      for (const label of [
+        'Publier dans les coulisses',
+        'Compte rendu de chantier',
+        'Pré-réception',
+        'Réception',
+        'Ajouter un document',
+        'Demander au client',
+      ])
+        await dialog.getByText(label, { exact: true }).first().waitFor({ state: 'visible' });
+    },
+  );
+
   await assert('Capture : on dicte/écrit une observation', async () => {
-    await page.getByText('Note / observation').click();
+    await page.getByRole('dialog').getByText('Pré-réception').click();
     const draft = page.getByPlaceholder(/Dites ce qu/);
     await draft.waitFor({ state: 'visible', timeout: 5000 });
     await draft.fill('Coulage de la dalle terminé, séchage en cours côté séjour.');
