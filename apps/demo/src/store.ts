@@ -1635,9 +1635,7 @@ export const demo = {
     actor: EventActor,
     input: {
       points: {
-        imageUrl?: string;
-        bucket?: string;
-        storagePath?: string;
+        photos: { imageUrl?: string; bucket?: string; storagePath?: string }[];
         comment: string;
         diffusion: Diffusion;
       }[];
@@ -1645,9 +1643,11 @@ export const demo = {
     },
   ): Promise<{ compteRenduId: string }> {
     const points: CompteRenduPoint[] = input.points.map((p) => ({
-      ...(p.imageUrl ? { imageUrl: p.imageUrl } : {}),
-      ...(p.bucket ? { bucket: p.bucket } : {}),
-      ...(p.storagePath ? { storagePath: p.storagePath } : {}),
+      photos: p.photos.map((ph) => ({
+        ...(ph.imageUrl ? { imageUrl: ph.imageUrl } : {}),
+        ...(ph.bucket ? { bucket: ph.bucket } : {}),
+        ...(ph.storagePath ? { storagePath: ph.storagePath } : {}),
+      })),
       comment: p.comment.trim(),
       diffusion: p.diffusion,
     }));

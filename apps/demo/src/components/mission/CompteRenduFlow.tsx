@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import {
   DIFFUSION_LABEL,
+  MAX_POINT_PHOTOS,
   PROJECT_STEPS,
   PROJECT_STEP_LABEL,
   type Diffusion,
@@ -15,7 +16,7 @@ import { demo } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
 interface DraftPoint {
-  media: UploadedMedia;
+  photos: UploadedMedia[];
   comment: string;
   diffusion: Diffusion;
 }
@@ -25,9 +26,10 @@ const DIFFUSIONS: Diffusion[] = ['client', 'artisan', 'both'];
 /**
  * Compte rendu de chantier — la mission fusionnée (visite + réunion). Le conducteur
  * ne « crée pas une réunion » : il raconte ce qu'il vient de constater, point par
- * point. Un point = 1 photo (obligatoire) + 1 commentaire (obligatoire) + 1 cible de
- * diffusion (client / artisan / les deux). Objectif UX : photographier, écrire une
- * phrase, choisir la cible, passer au point suivant. Aucune complexité superflue.
+ * point. Un point = 1 à 3 photos (obligatoire, un mini-album) + 1 commentaire
+ * (obligatoire, commun aux photos) + 1 cible de diffusion (client / artisan / les
+ * deux). Objectif UX : ajouter un point → 1 à 3 photos → commentaire → cible →
+ * point suivant → publier. Aucune étape inutile.
  */
 export function CompteRenduFlow({
   project,
@@ -39,7 +41,7 @@ export function CompteRenduFlow({
   onClose: () => void;
 }): React.JSX.Element {
   const [points, setPoints] = useState<DraftPoint[]>([]);
-  const [media, setMedia] = useState<UploadedMedia | null>(null);
+  const [photos, setPhotos] = useState<UploadedMedia[]>([]);
   const [comment, setComment] = useState('');
   const [diffusion, setDiffusion] = useState<Diffusion>('client');
   const [etape, setEtape] = useState<ProjectStep | ''>('');
@@ -48,24 +50,32 @@ export function CompteRenduFlow({
   const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const pickPhoto = async (file: File | undefined): Promise<void> => {
-    if (!file) return;
+  const addPhotos = async (files: FileList | null): Promise<void> => {
+    if (!files || files.length === 0) return;
+    const room = MAX_POINT_PHOTOS - photos.length;
+    if (room <= 0) return;
     setBusy(true);
     try {
-      setMedia(await mediaUploader(file));
+      const chosen = Array.from(files).slice(0, room);
+      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
+      setPhotos((ps) => [...ps, ...uploaded].slice(0, MAX_POINT_PHOTOS));
     } finally {
       setBusy(false);
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
-  const canAdd = media != null && comment.trim().length > 0;
-  const addPoint = (): void => {
-    if (!canAdd || !media) return;
-    setPoints((ps) => [...ps, { media, comment: comment.trim(), diffusion }]);
-    setMedia(null);
+  const canAdd = photos.length >= 1 && comment.trim().length > 0;
+  const resetDraft = (): void => {
+    setPhotos([]);
     setComment('');
     setDiffusion('client');
     if (fileRef.current) fileRef.current.value = '';
+  };
+  const addPoint = (): void => {
+    if (!canAdd) return;
+    setPoints((ps) => [...ps, { photos, comment: comment.trim(), diffusion }]);
+    resetDraft();
   };
 
   const removePoint = (i: number): void => setPoints((ps) => ps.filter((_, idx) => idx !== i));
@@ -76,9 +86,11 @@ export function CompteRenduFlow({
     try {
       await demo.createCompteRendu(project.id, actor, {
         points: points.map((p) => ({
-          imageUrl: p.media.imageUrl,
-          bucket: p.media.bucket,
-          storagePath: p.media.storagePath,
+          photos: p.photos.map((ph) => ({
+            imageUrl: ph.imageUrl,
+            bucket: ph.bucket,
+            storagePath: ph.storagePath,
+          })),
           comment: p.comment,
           diffusion: p.diffusion,
         })),
@@ -106,7 +118,7 @@ export function CompteRenduFlow({
             Compte rendu de chantier
           </p>
           <p className="text-xs text-muted-foreground">
-            {done ? 'Compte rendu publié' : 'Une photo, une phrase, une cible — point par point.'}
+            {done ? 'Compte rendu publié' : 'Des photos, une phrase, une cible — point par point.'}
           </p>
         </div>
       </header>
@@ -130,7 +142,7 @@ export function CompteRenduFlow({
       ) : (
         <>
           <div className="flex-1 space-y-6 overflow-y-auto p-5">
-            {/* Points déjà ajoutés (aperçu chronologique). */}
+            {/* Points déjà ajoutés (aperçu chronologique, mini-album par point). */}
             {points.length > 0 && (
               <ol className="space-y-3">
                 {points.map((p, i) => (
@@ -138,11 +150,16 @@ export function CompteRenduFlow({
                     key={i}
                     className="flex gap-3 rounded-2xl border border-border bg-surface p-3 shadow-sm"
                   >
-                    <img
-                      src={p.media.imageUrl}
-                      alt=""
-                      className="size-16 shrink-0 rounded-lg object-cover"
-                    />
+                    <div className="flex shrink-0 gap-1">
+                      {p.photos.map((ph, j) => (
+                        <img
+                          key={j}
+                          src={ph.imageUrl}
+                          alt=""
+                          className="size-14 rounded-lg object-cover"
+                        />
+                      ))}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm text-foreground">{p.comment}</p>
                       <span className="mt-1 inline-flex items-center rounded-full bg-gold-100 px-2 py-0.5 text-xs font-medium text-gold-800">
@@ -162,7 +179,7 @@ export function CompteRenduFlow({
               </ol>
             )}
 
-            {/* Nouveau point : photo → commentaire → cible. */}
+            {/* Nouveau point : 1 à 3 photos → commentaire → cible. */}
             <section className="space-y-3 rounded-2xl border border-dashed border-border p-4">
               <p className="text-sm font-medium text-foreground">
                 Nouveau point{points.length > 0 ? ` (${points.length + 1})` : ''}
@@ -172,38 +189,48 @@ export function CompteRenduFlow({
                 ref={fileRef}
                 type="file"
                 accept={ACCEPT_IMAGE}
+                multiple
                 className="sr-only"
-                onChange={(e) => void pickPhoto(e.target.files?.[0])}
+                onChange={(e) => void addPhotos(e.target.files)}
               />
-              {media ? (
-                <div className="relative overflow-hidden rounded-xl">
-                  <img src={media.imageUrl} alt="" className="max-h-64 w-full object-cover" />
+
+              {/* Mini-album du point en cours (jusqu'à 3 photos). */}
+              <div className="grid grid-cols-3 gap-2">
+                {photos.map((ph, i) => (
+                  <div key={i} className="relative aspect-square overflow-hidden rounded-xl">
+                    <img src={ph.imageUrl} alt="" className="size-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setPhotos((ps) => ps.filter((_, idx) => idx !== i))}
+                      aria-label={`Retirer la photo ${i + 1}`}
+                      className="absolute right-1 top-1 grid size-6 place-items-center rounded-full bg-ink-900/70 text-paper-0 [&_svg]:size-3.5"
+                    >
+                      <X aria-hidden />
+                    </button>
+                  </div>
+                ))}
+                {photos.length < MAX_POINT_PHOTOS && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMedia(null);
-                      if (fileRef.current) fileRef.current.value = '';
-                    }}
-                    aria-label="Changer la photo"
-                    className="absolute right-2 top-2 inline-flex items-center gap-1.5 rounded-full bg-ink-900/70 px-3 py-1.5 text-xs text-paper-0 [&_svg]:size-3.5"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={busy}
+                    className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-6"
                   >
-                    <ImagePlus aria-hidden />
-                    Changer
+                    {photos.length === 0 ? <Camera aria-hidden /> : <ImagePlus aria-hidden />}
+                    <span className="text-xs font-medium">
+                      {busy
+                        ? 'Chargement…'
+                        : photos.length === 0
+                          ? 'Photo'
+                          : `Ajouter (${photos.length}/${MAX_POINT_PHOTOS})`}
+                    </span>
                   </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  disabled={busy}
-                  className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-border bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-8"
-                >
-                  <Camera aria-hidden />
-                  <span className="text-sm font-medium">
-                    {busy ? 'Chargement…' : 'Ajouter une photo'}
-                  </span>
-                </button>
-              )}
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                1 à {MAX_POINT_PHOTOS} photos — prise directe ou choix dans la galerie. Le
+                commentaire concerne l’ensemble des photos.
+              </p>
 
               <textarea
                 value={comment}

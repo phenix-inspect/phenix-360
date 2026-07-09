@@ -83,7 +83,10 @@ function compteRenduPointsBody(
   return `<section class="points">${points
     .map(
       (p, i) => `<article class="point">
-      ${p.imageUrl ? `<img class="point-photo" src="${p.imageUrl}" alt="Point ${i + 1}"/>` : ''}
+      <div class="point-album">${p.photos
+        .filter((ph) => ph.imageUrl)
+        .map((ph) => `<img class="point-photo" src="${ph.imageUrl}" alt="Point ${i + 1}"/>`)
+        .join('')}</div>
       <div class="point-body">
         <p class="point-comment">${esc(p.comment)}</p>
         ${
@@ -165,11 +168,12 @@ export function buildDocumentHtml(
   ul { margin: 0 0 12px; padding-left: 20px; }
   li { margin: 0 0 6px; }
   .points { margin-top: 4px; }
-  .point { display: flex; gap: 18px; padding: 18px 0; border-bottom: 1px solid #ece3d2; page-break-inside: avoid; }
+  .point { padding: 18px 0; border-bottom: 1px solid #ece3d2; page-break-inside: avoid; }
   .point:last-child { border-bottom: none; }
-  .point-photo { width: 200px; height: 150px; object-fit: cover; border-radius: 10px; border: 1px solid #e7dfce; flex-shrink: 0; }
-  .point-body { flex: 1; min-width: 0; }
-  .point-comment { font-size: 17px; margin: 0 0 10px; }
+  .point-album { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .point-photo { width: 200px; height: 150px; object-fit: cover; border-radius: 10px; border: 1px solid #e7dfce; }
+  .point-body { min-width: 0; }
+  .point-comment { font-size: 17px; margin: 0 0 8px; }
   .badge { display: inline-block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #a9803a; background: #f6edda; border-radius: 999px; padding: 3px 10px; }
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece3d2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
   @media print { body { background: #fff; } .sheet { border: none; box-shadow: none; margin: 0; } }

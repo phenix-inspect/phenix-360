@@ -39,7 +39,7 @@ routage, aucun état. VISION Art. 3, 10.
 
 6 missions : capture caméra/voix → **scène signature « PHÉNIX prépare → C'est prêt »**
 → compréhension → validation → partage (`MissionFlow`). **Fusion Visite + Réunion
-(09/07)** : un seul **« Compte rendu de chantier »** à **points** (photo + commentaire +
+(09/07)** : un seul **« Compte rendu de chantier »** à **points** (1 à 3 photos + commentaire +
 diffusion `Client` / `Artisan` / `Client + Artisan`) — flux `CompteRenduFlow` ; le
 conducteur voit tout (badges), le client ne voit que ses points, l'export PDF est
 filtré par destinataire ; l'avancement d'étape reste porté par le CR (ADR-002 §5).

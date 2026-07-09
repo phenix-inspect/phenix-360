@@ -27,12 +27,17 @@ export function CompteRenduPoints({
           key={i}
           className="flex gap-3 rounded-xl border border-border bg-surface p-2.5 shadow-sm"
         >
-          {p.imageUrl && (
-            <img
-              src={p.imageUrl}
-              alt=""
-              className="size-20 shrink-0 rounded-lg border border-border object-cover"
-            />
+          {p.photos.length > 0 && (
+            <div className="flex shrink-0 gap-1">
+              {p.photos.map((ph, j) => (
+                <img
+                  key={j}
+                  src={ph.imageUrl}
+                  alt=""
+                  className="size-16 rounded-lg border border-border object-cover"
+                />
+              ))}
+            </div>
           )}
           <div className="min-w-0 flex-1 leading-snug">
             <p className="text-sm text-foreground">{p.comment}</p>

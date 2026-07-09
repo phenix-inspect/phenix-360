@@ -128,12 +128,24 @@ export const DIFFUSION_LABEL: Record<Diffusion, string> = {
   both: 'Client + Artisan',
 };
 
-/** Un POINT de compte rendu : une observation = 1 photo + 1 commentaire + 1 cible. */
-export interface CompteRenduPoint {
-  /** Photo (obligatoire) — dataURL en démo, URL signée en production. */
+/** Une photo d'un point (dataURL en démo, URL signée en production). */
+export interface CompteRenduPhoto {
   imageUrl?: string;
   bucket?: string;
   storagePath?: string;
+}
+
+/** Nombre maximum de photos par point (mini-album d'une observation). */
+export const MAX_POINT_PHOTOS = 3;
+
+/**
+ * Un POINT de compte rendu = UNE observation : 1 à 3 photos (obligatoire) qui
+ * l'illustrent, 1 commentaire (obligatoire) commun aux photos, et 1 cible de
+ * diffusion. Les photos s'affichent en mini-album dans le compte rendu.
+ */
+export interface CompteRenduPoint {
+  /** Photos du point (1 à 3) — illustrent la même observation. */
+  photos: CompteRenduPhoto[];
   /** Commentaire (obligatoire) : ce que le conducteur constate. */
   comment: string;
   /** Cible de diffusion du point. */

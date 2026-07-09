@@ -2089,3 +2089,20 @@ ouvre la version client), `MissionPicker` mis à jour. Nouveau `compte-rendu.tes
 artisan filtrés** vérifiés via le document ouvert). Aucun test existant ne sélectionnait Visite /
 Réunion. Gate verte (typecheck, lint, prettier, build, e2e, zéro erreur console).
 VISION Art. 1, 5, 8, 9, 11.
+
+## 09/07/2026 — Compte rendu : un point porte 1 à 3 photos (mini-album)
+
+**Évolution produit :** un point représente UNE observation ; il mérite parfois plusieurs angles
+(vue générale, détail, gros plan). Un point porte désormais **1 à 3 photos** (au lieu d'une seule),
+le **commentaire reste unique** et concerne l'ensemble des photos. Le conducteur peut **prendre une
+photo directement OU en choisir une existante** (sélecteur natif `image/*` sans `capture`, déjà en
+place — appareil / galerie / fichiers) et en ajouter jusqu'à trois. UX inchangée dans l'esprit :
+ajouter un point → 1 à 3 photos → commentaire → cible → point suivant → publier.
+
+**Mécanique :** core — `CompteRenduPoint.imageUrl` (photo unique) devient `photos: CompteRenduPhoto[]`
+(1 à 3), + constante `MAX_POINT_PHOTOS = 3`. App — `CompteRenduFlow` capture un mini-album par point
+(sélection multiple, retrait photo par photo, bouton d'ajout masqué à 3) ; `CompteRenduPoints`
+(Suivi) et `buildDocumentHtml` (document / PDF) affichent les photos en **mini-album** (rangée de
+vignettes au-dessus du commentaire). Le filtrage par destinataire et la confidentialité client-safe
+sont inchangés (par point). `compte-rendu.test` étendu (point à 3 photos, plafond à 3 vérifié).
+Gate verte (typecheck, lint, prettier, build, e2e, zéro erreur console). VISION Art. 5, 8, 11.

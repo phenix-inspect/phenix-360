@@ -31,9 +31,13 @@ const openComposer = async () => {
   await page.getByRole('button', { name: /Nouvelle mission/ }).click();
 };
 
-/** Ajoute un point : photo + commentaire + cible, puis « Ajouter ce point ». */
-const addPoint = async (i, comment, cible) => {
-  await page.locator('input[type=file]').first().setInputFiles(photo(i));
+/** La section « nouveau point » en cours de saisie. */
+const draftSection = () => page.locator('section').filter({ hasText: 'Ajouter ce point' });
+
+/** Ajoute un point : n photos + commentaire + cible, puis « Ajouter ce point ». */
+const addPoint = async (i, comment, cible, nbPhotos = 1) => {
+  const files = Array.from({ length: nbPhotos }, (_, k) => photo(i * 10 + k));
+  await page.locator('input[type=file]').first().setInputFiles(files);
   await page.getByPlaceholder(/Décrivez ce point/).fill(comment);
   await page.getByRole('button', { name: cible, exact: true }).click();
   await page.getByRole('button', { name: 'Ajouter ce point' }).click();
@@ -67,12 +71,30 @@ try {
     },
   );
 
-  await assert('Créer un compte rendu de 3 points (client / artisan / les deux)', async () => {
+  await assert('Un point porte 1 à 3 photos (mini-album), commentaire commun', async () => {
     await page.getByRole('dialog').getByText('Compte rendu de chantier').first().click();
+    await page.getByText('point par point', { exact: false }).first().waitFor({ timeout: 6000 });
+    // Point 1 : un mini-album de 3 photos (l'upload est asynchrone → on attend).
     await page
-      .getByText('Une photo, une phrase, une cible', { exact: false })
-      .waitFor({ timeout: 6000 });
-    await addPoint(1, P1, 'Client');
+      .locator('input[type=file]')
+      .first()
+      .setInputFiles([photo(10), photo(11), photo(12)]);
+    await draftSection().locator('img').nth(2).waitFor({ state: 'visible', timeout: 5000 });
+    if ((await draftSection().locator('img').count()) !== 3)
+      throw new Error('le point ne montre pas ses 3 photos (mini-album)');
+    // Limite atteinte → plus de bouton d'ajout de photo.
+    if (
+      (await draftSection()
+        .getByRole('button', { name: /Ajouter \(/ })
+        .count()) > 0
+    )
+      throw new Error('on peut dépasser 3 photos');
+    await page.getByPlaceholder(/Décrivez ce point/).fill(P1);
+    await page.getByRole('button', { name: 'Client', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajouter ce point' }).click();
+  });
+
+  await assert('Enchaîner les points puis publier', async () => {
     await addPoint(2, P2, 'Artisan');
     await addPoint(3, P3, 'Client + Artisan');
     await page.getByRole('button', { name: /Publier le compte rendu/ }).click();
