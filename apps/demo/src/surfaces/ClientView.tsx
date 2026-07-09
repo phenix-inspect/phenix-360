@@ -69,7 +69,7 @@ export function ClientView({
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
   const [clientTab, setClientTab] = useState<ClientTab>('aujourdhui');
 
-  const validateDecision = async (d: ClientDecision, optionId?: string) => {
+  const validateDecision = async (d: ClientDecision, optionId?: string, comment?: string) => {
     if (!dossier) return;
     const sel = dossier.selections.find((s) => s.id === d.id);
     if (!sel) return;
@@ -87,6 +87,8 @@ export function ClientView({
               detail: detail ?? s.detail,
               delegatedToPhenix: delegated,
               modificationRequested: false,
+              // La réponse conserve le commentaire libre du client (le cas échéant).
+              ...(comment ? { clientComment: comment } : {}),
             }
           : s,
       ),
@@ -97,6 +99,7 @@ export function ClientView({
       selection: sel,
       statutApres: 'valide',
       optionId,
+      ...(comment ? { message: comment } : {}),
     });
     await demo.appendEvent({
       projectId: project.id,
@@ -220,7 +223,8 @@ export function ClientView({
                     <ClientDecisionBanner
                       key={d.id}
                       decision={d}
-                      onValidate={(optionId) => validateDecision(d, optionId)}
+                      onOpen={() => demo.markChoixOpenedByClient([d.id])}
+                      onValidate={(optionId, comment) => validateDecision(d, optionId, comment)}
                     />
                   ))}
                 </div>

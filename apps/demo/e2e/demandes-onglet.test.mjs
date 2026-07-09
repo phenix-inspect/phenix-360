@@ -1,10 +1,11 @@
 /**
  * Onglet « Demandes client » (Chantier) — tableau de pilotage des demandes Léon.
  * =============================================================================
- * Regroupe TOUTES les demandes créées via Léon, sans polluer le Suivi. Filtres
- * simples (Tous / À traiter / Non lus / Répondus), badge « non lu » qui diminue à
- * l'ouverture, réponse unique (1 demande = 1 réponse) qui fait passer « Répondu »,
- * disparaître d'« Aujourd'hui » et conserver la trace ici comme au Suivi.
+ * Regroupe TOUTES les demandes créées via Léon (ET les choix client), sans
+ * polluer le Suivi. Filtres (Tous / Demandes / Choix client / Non lus / En attente
+ * / Répondus), badge « non lu » qui diminue à l'ouverture, réponse unique
+ * (1 demande = 1 réponse) qui fait passer « Répondu », disparaître d'« Aujourd'hui »
+ * et conserver la trace ici comme au Suivi. Ce test cible les DEMANDES simples.
  *
  * Le seed porte déjà des demandes client : le test raisonne en DELTAS et par le
  * TEXTE d'une demande unique qu'il crée, pour rester robuste au jeu de données.
@@ -96,8 +97,8 @@ try {
     await tabBox().getByText(UNIQ).first().waitFor({ state: 'visible', timeout: 6000 });
   });
 
-  await assert('Filtres : Tous / À traiter / Non lus la montrent, Répondus non', async () => {
-    for (const name of [/^Tous/, /^À traiter/, /^Non lus/]) {
+  await assert('Filtres : Tous / Demandes / Non lus la montrent, Répondus non', async () => {
+    for (const name of [/^Tous/, /^Demandes \(/, /^Non lus/]) {
       await filtre(name).click();
       await tabBox().getByText(UNIQ).first().waitFor({ state: 'visible', timeout: 6000 });
     }
@@ -132,13 +133,13 @@ try {
       throw new Error('statut « Répondu » manquant');
   });
 
-  await assert('Après réponse : dans « Répondus », plus dans « À traiter »', async () => {
+  await assert('Après réponse : dans « Répondus », plus dans « En attente »', async () => {
     await filtre(/^Répondus/).click();
     await tabBox().getByText(UNIQ).first().waitFor({ state: 'visible', timeout: 6000 });
-    await filtre(/^À traiter/).click();
+    await filtre(/^En attente/).click();
     await page.waitForTimeout(200);
     if ((await tabBox().getByText(UNIQ).count()) > 0)
-      throw new Error('la demande répondue reste dans « À traiter »');
+      throw new Error('la demande répondue reste dans « En attente »');
   });
 
   await assert('La demande répondue DISPARAÎT d’« Aujourd’hui »', async () => {

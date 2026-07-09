@@ -2645,3 +2645,47 @@ compte rendu généré → `text/html`, et **garde de régression** sur le devis
 (`application/pdf`, jamais `text/html`). `documents-consultables` mis à jour (devis / contrat importés →
 ouverture du fichier). `documents-cliquables` (7/7) conservé. Gate verte (typecheck, lint, prettier,
 build, e2e complet, zéro erreur console). VISION Art. 2, 8, 9, 11.
+
+## 09/07/2026 — Choix client : suivi complet dans « Demandes client »
+
+**Décision produit validée :** une « Demande de choix » (« Nouvelle mission → Demander au client →
+Demander une décision ») devient un **objet pilotable** — statut + historique — suivi dans l'onglet
+CONDUCTEUR existant **« Demandes client »**, aux côtés des demandes simples de Léon. **Pas de nouvel
+onglet, pas de doublon.** Un choix ne disparaît jamais.
+
+**Statuts d'un choix (côté conducteur, reflétant l'état CLIENT) :**
+
+- **Non lu** = le client n'a pas encore ouvert le choix ;
+- **En attente de réponse** = il l'a ouvert (clic « Voir la décision ») mais n'a pas répondu ;
+- **Répondu** = il a validé une option.
+
+Traçage : l'ouverture par le client marque `seen['client'][selectionId]` (via `markChoixOpenedByClient`),
+la validation passe la sélection en `valide`.
+
+**Onglet « Demandes client » unifié** : demandes simples + choix dans une seule liste filtrable —
+**Tous · Demandes · Choix client · Non lus · En attente · Répondus** (statut normalisé non_lu /
+en_attente / repondu pour les deux types). Ouvrir une demande simple la marque lue (conducteur) ;
+ouvrir un choix ne change jamais son statut (c'est l'ouverture CLIENT qui compte).
+
+**Carte de choix conducteur (`ChoixClientCard`)** : titre, texte (contexte), date, statut, options
+proposées avec photos, et — une fois répondu — l'**option choisie EN CLAIR** : « Option B — Carrelage
+effet pierre beige » + **photo de l'option** + **commentaire du client**. Jamais un simple « Option 2 ».
+
+**Côté client** : le choix reste une **action dans « Aujourd'hui »** tant qu'il n'est pas validé, et
+figure toujours dans **« Vos choix »** (avec, une fois répondu, l'option choisie + photo + commentaire —
+`ChoixReponse`). Le client peut joindre un **commentaire** en validant (nouveau champ, `ClientDecisionBanner`).
+Une **notification client** « Un choix vous attend » apparaît (clé = la sélection : l'ouvrir bascule le
+statut conducteur). À la validation → **notification conducteur** « Décision validée par le client »
+(déjà en place), le choix **quitte « Aujourd'hui »**, **reste dans « Vos choix »** et **« Demandes
+client »**, **trace au Suivi**.
+
+**Modèle** : `ClientSelection.clientComment` (core) conserve le commentaire ; `ClientDecision` expose
+`chosenOptionId` + `clientComment`. La réponse conserve id + libellé + photo de l'option + commentaire +
+date. **Demandes simples via Léon inchangées** (elles cohabitent avec les choix, filtres partagés).
+
+**Tests :** nouvelle suite `choix-client-suivi` (12/12) couvrant les 9 étapes (création 2 options +
+photos → Non lu → Aujourd'hui + Vos choix → ouverture → En attente → réponse → Répondu avec libellé +
+photo + commentaire → disparition d'Aujourd'hui (delta) → conservé dans Vos choix + Demandes client →
+trace au Suivi). `demandes-onglet` mis à jour (nouveaux filtres). `client-decision` (10/10),
+`client-architecture` (7/7) conservés. Gate verte (typecheck, lint, prettier, build, e2e complet, zéro
+erreur console). VISION Art. 3, 4, 8, 9, 11.

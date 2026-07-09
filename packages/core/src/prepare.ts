@@ -205,6 +205,8 @@ export interface ClientSelection {
   delegatedToPhenix?: boolean;
   /** Le client a demandé une modification : à renvoyer par le conducteur. */
   modificationRequested?: boolean;
+  /** Commentaire libre laissé par le client en validant son choix (facultatif). */
+  clientComment?: string;
 }
 
 /**
@@ -933,6 +935,10 @@ export interface ClientDecision {
   photos: string[];
   /** Propositions présentées au client (A–E), le cas échéant. */
   options: SelectionOption[];
+  /** Option retenue par le client (id), une fois le choix validé. */
+  chosenOptionId: string | null;
+  /** Commentaire libre laissé par le client en validant (le cas échéant). */
+  clientComment: string | null;
 }
 
 /**
@@ -986,6 +992,8 @@ export function buildClientDecisions(
       contexte: s.contexte ?? null,
       photos: s.photos ?? [],
       options: s.options ?? [],
+      chosenOptionId: s.chosenOptionId ?? null,
+      clientComment: s.clientComment ?? null,
     };
   });
 

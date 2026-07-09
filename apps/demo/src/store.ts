@@ -650,6 +650,15 @@ export const demo = {
     broadcast();
   },
   /**
+   * Le CLIENT a OUVERT un choix (il l'a consulté depuis son espace). On le trace
+   * via `seen['client'][selectionId]` : côté conducteur, le statut du choix passe
+   * de « Non lu » à « En attente de réponse » (tant qu'il n'a pas validé).
+   */
+  markChoixOpenedByClient(selectionIds: string[]): void {
+    demo.markSeen('client', selectionIds);
+  },
+
+  /**
    * Marque un choix client validé comme PRIS EN COMPTE par le conducteur : il a
    * lancé l'action (commande, artisan, planning). Éteint la notification.
    */
@@ -2574,6 +2583,35 @@ export function clientNotifications(
       clientTab: 'demandes',
       clientSection: 'client-demandes',
     });
+  }
+
+  // 🎨 Un CHOIX vient d'être proposé au client (« Demande de choix » du conducteur)
+  // et n'a pas encore été OUVERT. La clé de lecture est l'id de la SÉLECTION :
+  // ouvrir la notification (ou la décision) marque le choix « ouvert » → le
+  // conducteur voit son statut passer de « Non lu » à « En attente ». Disparaît
+  // dès que le client l'ouvre, et l'action reste dans « Aujourd'hui » tant qu'il
+  // n'a pas validé.
+  const dossierNotif = snap.dossiers[projectId];
+  if (dossierNotif) {
+    const proposeById = new Map(
+      dossierNotif.selections.filter((s) => s.statut === 'propose').map((s) => [s.id, s] as const),
+    );
+    for (const e of snap.events) {
+      if (e.projectId !== projectId || e.type !== 'decision') continue;
+      if (e.content.kind !== 'envoyee' || e.createdAt <= base) continue;
+      const sel = proposeById.get(e.content.selectionId);
+      if (!sel || seen[sel.id]) continue;
+      out.push({
+        id: `choix-${sel.id}`,
+        icon: '🎨',
+        text: `Un choix vous attend : ${sel.categorie}`,
+        createdAt: e.createdAt,
+        seenKeys: [sel.id],
+        projectId,
+        clientTab: 'choix',
+        clientSection: 'section-choix',
+      });
+    }
   }
 
   return out.sort(byDateDesc);

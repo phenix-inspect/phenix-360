@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from '@phenix360/ui';
+import { Button, Textarea } from '@phenix360/ui';
 import { Lock, Sparkles } from 'lucide-react';
 import { proposalNoun, type ClientDecision } from '@phenix360/core';
 import { fmtDate } from '../lib/format';
@@ -16,22 +16,31 @@ import { ProposalGallery } from './ProposalGallery';
 export function ClientDecisionBanner({
   decision,
   onValidate,
+  onOpen,
 }: {
   decision: ClientDecision;
-  onValidate: (optionId?: string) => Promise<void>;
+  onValidate: (optionId?: string, comment?: string) => Promise<void>;
+  /** Le client OUVRE la décision (clic « Voir la décision ») — marque « ouverte ». */
+  onOpen?: () => void;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
 
   const cat = decision.categorie.toLowerCase();
   const hasOptions = decision.options.length > 0;
   const canValidate = !hasOptions || selectedId != null;
 
+  const reveal = (): void => {
+    setOpen(true);
+    onOpen?.();
+  };
+
   const validate = async () => {
     if (!canValidate) return;
     setBusy(true);
-    await onValidate(selectedId ?? undefined);
+    await onValidate(selectedId ?? undefined, comment.trim() || undefined);
     setBusy(false);
     setOpen(false);
   };
@@ -98,7 +107,7 @@ export function ClientDecisionBanner({
           </div>
 
           {!open && (
-            <Button size="sm" onClick={() => setOpen(true)}>
+            <Button size="sm" onClick={reveal}>
               Voir la décision
             </Button>
           )}
@@ -112,6 +121,18 @@ export function ClientDecisionBanner({
                   onSelect={setSelectedId}
                 />
               )}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  Un commentaire ?{' '}
+                  <span className="font-normal text-muted-foreground">(facultatif)</span>
+                </label>
+                <Textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={2}
+                  placeholder="Ex. On préfère celui-ci pour rester lumineux."
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" disabled={busy || !canValidate} onClick={() => void validate()}>
                   {hasOptions ? 'Valider mon choix' : 'Valider le choix proposé'}
