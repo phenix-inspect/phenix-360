@@ -44,6 +44,8 @@ const card = (label) => page.locator('li').filter({ hasText: label }).first();
 const setStatut = async (label, name) => {
   await card(label).getByRole('button', { name, exact: true }).click();
 };
+/** Boutons « Prévisualiser » de l'écran de validation : 0 = client, 1 = artisan. */
+const previewBtn = (i) => page.getByRole('button', { name: 'Prévisualiser' }).nth(i);
 
 /** Ouvre le document généré (popup blob) et renvoie son texte. */
 const openedDocText = async (action) => {
@@ -142,24 +144,25 @@ try {
     await page.getByPlaceholder(/La pré-réception s.est déroulée/).fill(MOT_GENERAL);
   });
 
-  await assert('Générer les documents → enregistré (deux versions)', async () => {
+  await assert('Générer les documents → ÉCRAN DE VALIDATION (brouillon, non envoyé)', async () => {
     await page.getByRole('button', { name: /Générer les documents/ }).click();
-    await page.getByText('Pré-réception enregistrée').waitFor({ state: 'visible', timeout: 8000 });
-    await page.getByText('Version client', { exact: true }).first().waitFor({ state: 'visible' });
-    await page.getByText('Version artisan', { exact: true }).first().waitFor({ state: 'visible' });
+    await page
+      .getByRole('heading', { name: 'Validation avant envoi' })
+      .waitFor({ state: 'visible', timeout: 8000 });
+    // Les deux versions sont en BROUILLON ; les actions de décision sont là.
+    await page
+      .getByText(/Brouillon/)
+      .first()
+      .waitFor({ state: 'visible' });
+    for (const b of ['Valider et envoyer', 'Modifier la Pré-réception'])
+      if ((await page.getByRole('button', { name: b }).count()) === 0)
+        throw new Error(`action « ${b} » absente de l’écran de validation`);
   });
 
   await assert(
-    'Document ARTISAN : tout l’opérationnel (responsable, reprise, motif, commentaires)',
+    'Prévisualisation ARTISAN : tout l’opérationnel (responsable, reprise, motif, commentaires)',
     async () => {
-      const text = await openedDocText(() =>
-        page
-          .locator('div')
-          .filter({ hasText: /^Version artisan/ })
-          .getByRole('button', { name: 'Ouvrir' })
-          .first()
-          .click(),
-      );
+      const text = await openedDocText(() => previewBtn(1).click());
       if (!/Version artisan/i.test(text)) throw new Error('doc non marqué « Version artisan »');
       for (const must of [
         P_WC,
@@ -174,15 +177,8 @@ try {
     },
   );
 
-  await assert('Document CLIENT : aucune donnée interne ne fuite', async () => {
-    const text = await openedDocText(() =>
-      page
-        .locator('div')
-        .filter({ hasText: /^Version client/ })
-        .getByRole('button', { name: 'Ouvrir' })
-        .first()
-        .click(),
-    );
+  await assert('Prévisualisation CLIENT : aucune donnée interne ne fuite', async () => {
+    const text = await openedDocText(() => previewBtn(0).click());
     if (!/Version client/i.test(text)) throw new Error('doc non marqué « Version client »');
     // Ce que le client DOIT voir : prestations, statuts, la réserve (commentaire).
     for (const must of [P_WC, RESERVE_COMMENT, 'Fait sans réserve'])
@@ -193,7 +189,31 @@ try {
         throw new Error(`fuite interne dans le document client : « ${leak} »`);
   });
 
-  await assert('Terminer referme le flux', async () => {
+  await assert('« Modifier la Pré-réception » revient à la saisie sans rien perdre', async () => {
+    await page.getByRole('button', { name: /Modifier la Pré-réception/ }).click();
+    await page
+      .getByText('Vérifiez chaque prestation vendue')
+      .waitFor({ state: 'visible', timeout: 6000 });
+    // La réserve saisie est conservée (commentaire toujours là).
+    if ((await card(P_WC).locator('textarea').first().inputValue()) !== RESERVE_COMMENT)
+      throw new Error('la saisie a été perdue en revenant en arrière');
+    // On repart vers la validation.
+    await page.getByRole('button', { name: 'Voir la synthèse' }).click();
+    await page.getByRole('button', { name: /Générer les documents/ }).click();
+    await page
+      .getByRole('heading', { name: 'Validation avant envoi' })
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
+  await assert('Valider et envoyer → document validé, verrouillé, diffusé', async () => {
+    await page.getByRole('button', { name: /Valider et envoyer/ }).click();
+    await page
+      .getByText('Pré-réception validée et envoyée')
+      .waitFor({ state: 'visible', timeout: 8000 });
+    await page
+      .getByText(/verrouillé et non modifiable/)
+      .first()
+      .waitFor({ state: 'visible' });
     await page.getByRole('button', { name: /^Terminer$/ }).click();
     await page
       .getByRole('heading', { name: /Appartement Lyon 6e/ })
@@ -223,10 +243,17 @@ try {
         throw new Error(`bouton « ${b} » absent du Suivi`);
   });
 
+  await assert('Le client est notifié de la pré-réception validée', async () => {
+    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await page
+      .getByText(/Votre pré-réception est disponible/)
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+  });
+
   await assert(
     'Espace client : la version client est consultable, sans fuite interne',
     async () => {
-      await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
       await page.getByRole('tab', { name: 'Documents' }).first().click();
       await page
         .getByText('Pré-réception', { exact: true })
@@ -244,6 +271,30 @@ try {
           throw new Error(`fuite interne dans l’espace client : « ${leak} »`);
     },
   );
+
+  await assert('Règle : un document PRÉPARÉ mais NON VALIDÉ ne quitte jamais PHÉNIX', async () => {
+    // On prépare une nouvelle pré-réception jusqu'à l'écran de validation…
+    await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+    await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+    await page.getByRole('dialog').getByText('Pré-réception', { exact: true }).click();
+    await page
+      .getByText('Vérifiez chaque prestation vendue')
+      .waitFor({ state: 'visible', timeout: 8000 });
+    await page.getByRole('button', { name: 'Voir la synthèse' }).click();
+    await page.getByRole('button', { name: /Générer les documents/ }).click();
+    await page
+      .getByRole('heading', { name: 'Validation avant envoi' })
+      .waitFor({ state: 'visible', timeout: 6000 });
+    // …puis on ferme SANS valider.
+    await page.getByRole('button', { name: 'Fermer' }).click();
+    // Côté client : aucune nouvelle pré-réception, une seule (celle déjà validée).
+    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await page.getByRole('tab', { name: 'Documents' }).first().click();
+    await page.waitForTimeout(300);
+    const n = await page.getByRole('button', { name: /Ouvrir : Pré-réception/ }).count();
+    if (n !== 1)
+      throw new Error(`une pré-réception non validée a fuité côté client (${n} au lieu de 1)`);
+  });
 
   await assert('Zéro erreur console', async () => {
     if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));

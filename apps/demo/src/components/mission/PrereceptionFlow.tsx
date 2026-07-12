@@ -11,6 +11,7 @@ import {
   prereceptionSynthese,
   prestationComplete,
   type EventActor,
+  type PrereceptionData,
   type PrestationStatut,
   type PrestationVerif,
   type Project,
@@ -21,8 +22,11 @@ import {
   Check,
   ClipboardCheck,
   Download,
+  Eye,
   FileText,
   Loader2,
+  Lock,
+  Pencil,
   Plus,
   ShieldCheck,
   X,
@@ -30,7 +34,7 @@ import {
 import { demo, dossierOf } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
-type Step = 'verifier' | 'finaliser' | 'termine';
+type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
 
 /** Les quatre statuts, dans l'ordre, avec leur pastille de couleur. */
 const STATUTS: { statut: PrestationStatut; dot: string; short: string }[] = [
@@ -78,7 +82,8 @@ export function PrereceptionFlow({
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
-      if (step === 'finaliser') setStep('verifier');
+      if (step === 'valider') setStep('finaliser');
+      else if (step === 'finaliser') setStep('verifier');
       else onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -109,17 +114,18 @@ export function PrereceptionFlow({
   const patchPrestation = (posteId: string, patch: Partial<PrestationVerif>): void =>
     setPrestations((ps) => ps.map((p) => (p.posteId === posteId ? { ...p, ...patch } : p)));
 
-  const generate = async (): Promise<void> => {
+  // La saisie complète, prête à prévisualiser puis à valider. Tant qu'elle n'est
+  // pas validée, RIEN n'est créé ni diffusé (le client ne voit rien).
+  const data: PrereceptionData = { presents, prestations, commentaireGeneral };
+
+  // VALIDER ET ENVOYER — le seul moment où le document quitte PHÉNIX.
+  const validate = async (): Promise<void> => {
     if (busy || !prereceptionComplete(prestations)) return;
     setBusy(true);
     try {
-      const { prereceptionId } = await demo.createPrereception(project.id, actor, {
-        presents,
-        prestations,
-        commentaireGeneral,
-      });
+      const { prereceptionId } = await demo.createPrereception(project.id, actor, data);
       setCreatedId(prereceptionId);
-      setStep('termine');
+      setStep('envoye');
     } finally {
       setBusy(false);
     }
@@ -146,7 +152,9 @@ export function PrereceptionFlow({
             ? 'Vérification du contrat'
             : step === 'finaliser'
               ? 'Synthèse'
-              : 'Enregistré'}
+              : step === 'valider'
+                ? 'Validation avant envoi'
+                : 'Envoyé'}
         </span>
       </header>
 
@@ -222,8 +230,15 @@ export function PrereceptionFlow({
           </div>
         )}
 
-        {step === 'termine' && (
-          <TermineStep createdId={createdId} synthese={synthese} project={project} />
+        {step === 'valider' && (
+          <ValidationStep
+            project={project}
+            onPreview={(audience) => demo.previewPrereception(project.id, actor, data, audience)}
+          />
+        )}
+
+        {step === 'envoye' && (
+          <EnvoyeStep createdId={createdId} synthese={synthese} project={project} />
         )}
       </div>
 
@@ -248,22 +263,28 @@ export function PrereceptionFlow({
               </Button>
               <Button
                 size="lg"
-                onClick={() => void generate()}
-                disabled={busy || incomplets > 0 || !hasContract}
+                onClick={() => setStep('valider')}
+                disabled={incomplets > 0 || !hasContract}
               >
-                {busy ? (
-                  <Loader2 aria-hidden className="animate-spin" />
-                ) : (
-                  <ShieldCheck aria-hidden />
-                )}
-                Générer les documents
+                <ShieldCheck aria-hidden /> Générer les documents
               </Button>
             </>
           )}
-          {step === 'termine' && (
+          {step === 'valider' && (
+            <>
+              <Button variant="ghost" onClick={() => setStep('verifier')}>
+                <Pencil aria-hidden /> Modifier la Pré-réception
+              </Button>
+              <Button size="lg" onClick={() => void validate()} disabled={busy || incomplets > 0}>
+                {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
+                Valider et envoyer
+              </Button>
+            </>
+          )}
+          {step === 'envoye' && (
             <>
               <span className="text-xs text-muted-foreground">
-                Enregistré dans Documents et le Suivi.
+                Document validé — diffusé et verrouillé.
               </span>
               <Button size="lg" onClick={onClose}>
                 <Check aria-hidden /> Terminer
@@ -677,9 +698,97 @@ function SyntheseTiles({
   );
 }
 
-/* ------------------------------ Étape finale ------------------------------ */
+/* --------------------- Étape « Validation avant envoi » ------------------- */
 
-function TermineStep({
+/**
+ * Aucun document contractuel ne quitte PHÉNIX sans validation humaine (VISION
+ * Art. 9). Les deux versions sont préparées en BROUILLON, visibles du seul
+ * conducteur : il les prévisualise EXACTEMENT comme le destinataire les recevra,
+ * puis décide — Modifier ou Valider et envoyer.
+ */
+function ValidationStep({
+  project,
+  onPreview,
+}: {
+  project: Project;
+  onPreview: (audience: 'client' | 'artisan') => void;
+}): React.JSX.Element {
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 px-5 py-8">
+      <div className="space-y-1">
+        <h2 className="font-serif text-2xl font-semibold text-foreground">
+          Validation avant envoi
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Document contractuel : vous gardez le dernier contrôle. Rien n’est transmis tant que vous
+          n’avez pas validé.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-3 rounded-2xl border border-warning bg-warning/10 p-4">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-warning/20 text-warning [&_svg]:size-5">
+          <Lock aria-hidden />
+        </span>
+        <p className="text-sm text-foreground">
+          <span className="font-medium">Brouillon</span> — visible de vous seul. Le client et les
+          artisans ne voient rien, aucune notification n’est envoyée.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Prévisualisez chaque version — {project.name}
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <PreviewCard
+            title="Version client"
+            description="Prestations, statuts, réserves (photos + commentaire), commentaire général. Aucune donnée interne."
+            onPreview={() => onPreview('client')}
+          />
+          <PreviewCard
+            title="Version artisan"
+            description="Tout l’opérationnel : responsables, dates de reprise, photos et commentaires."
+            onPreview={() => onPreview('artisan')}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Vérifiez photos, commentaires, statuts, prestations, informations affichées et masquées,
+          mise en page et qualité générale avant de valider.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PreviewCard({
+  title,
+  description,
+  onPreview,
+}: {
+  title: string;
+  description: string;
+  onPreview: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+        <FileText aria-hidden />
+        {title}
+        <span className="ml-auto rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-medium text-warning">
+          Brouillon
+        </span>
+      </div>
+      <p className="flex-1 text-xs text-muted-foreground">{description}</p>
+      <Button size="sm" variant="outline" onClick={onPreview}>
+        <Eye aria-hidden /> Prévisualiser
+      </Button>
+    </div>
+  );
+}
+
+/* --------------------------- Étape « Envoyé » ----------------------------- */
+
+function EnvoyeStep({
   createdId,
   synthese,
   project,
@@ -700,33 +809,40 @@ function TermineStep({
         </span>
         <div>
           <p className="font-serif text-lg font-semibold text-foreground">
-            Pré-réception enregistrée
+            Pré-réception validée et envoyée
           </p>
           <p className="text-sm text-muted-foreground">
-            Rangée dans Documents et le Suivi. Deux versions ont été générées.
+            Version client → Espace client (le client est notifié). Version artisan → à transmettre
+            aux artisans concernés.
           </p>
         </div>
       </div>
 
       <SyntheseTiles synthese={synthese} />
 
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+        <Lock aria-hidden />
+        Document verrouillé et non modifiable. Une correction se fait en créant une nouvelle
+        version.
+      </div>
+
       {event && (
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Documents générés — {project.name}
+            Documents diffusés — {project.name}
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <DocCard
               title="Version client"
-              description="Prestations, statuts, réserves (photos + commentaire), commentaire général. Sans donnée interne."
-              onOpen={() => demo.openDocument(event, 'client')}
-              onDownload={() => demo.downloadDocument(event, 'client')}
+              description="Envoyée à l’Espace client. Prestations, statuts, réserves. Sans donnée interne."
+              onOpen={() => (event ? demo.openDocument(event, 'client') : undefined)}
+              onDownload={() => (event ? demo.downloadDocument(event, 'client') : undefined)}
             />
             <DocCard
               title="Version artisan"
-              description="Tout l’opérationnel : responsables, dates de reprise, photos et commentaires."
-              onOpen={() => demo.openDocument(event, 'artisan')}
-              onDownload={() => demo.downloadDocument(event, 'artisan')}
+              description="À transmettre aux artisans. Responsables, dates de reprise, photos et commentaires."
+              onOpen={() => (event ? demo.openDocument(event, 'artisan') : undefined)}
+              onDownload={() => (event ? demo.downloadDocument(event, 'artisan') : undefined)}
             />
           </div>
         </div>

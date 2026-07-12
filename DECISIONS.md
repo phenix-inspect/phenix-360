@@ -2832,3 +2832,35 @@ stockage Documents, Suivi, responsive (375 px). Suites adaptées au flux dédié
 `suivi-entree-unique`, `media-capture` (parcours de capture générique exercé via « Réception »),
 `coulisses-photos` et `documents-consultables` (nouveau flux). Gate verte (typecheck, lint, prettier,
 build, e2e complet 65/65, zéro erreur console). VISION Art. 5, 7, 8, 9, 11.
+
+## 12/07/2026 — Validation humaine avant tout envoi (Pré-réception)
+
+**Décision produit validée :** aucun document contractuel généré par PHÉNIX ne quitte l'outil sans
+validation HUMAINE. La pré-réception est un document contractuel : une erreur de génération pourrait
+avoir des conséquences juridiques. Le conducteur garde le dernier contrôle — PHÉNIX assiste, génère et
+prépare ; le conducteur contrôle et valide avant toute diffusion (VISION Art. 9).
+
+**Nouveau parcours :** à la fin de sa saisie, le conducteur ouvre un **écran de validation avant envoi**.
+Les deux versions (client / artisan) y sont préparées en **brouillon**, visibles de lui seul. Il peut
+**Prévisualiser** chaque version EXACTEMENT comme le destinataire la recevra, puis décide :
+**Modifier la Pré-réception** (retour à la saisie, rien n'est perdu) ou **Valider et envoyer**.
+
+**Règle stricte (avant validation) :** tant que le conducteur n'a pas validé, RIEN n'est créé ni
+diffusé — le client ne voit rien, les artisans ne voient rien, aucune notification n'est envoyée.
+Implémentation : la saisie vit dans l'écran (React) ; l'événement `compte_rendu` publié n'est créé
+qu'à « Valider et envoyer ». La prévisualisation passe par `demo.previewPrereception` (rendu HTML
+synthétique, jamais journalisé). Comme `clientNotifications` et le flux client ne lisent que les
+événements `visibility: 'client'` ET `state: 'publie'`, l'absence d'événement garantit l'étanchéité.
+
+**Après validation :** le document est **verrouillé** (append-only : non modifiable) et **diffusé** —
+version client → Espace client (+ notification « Votre pré-réception est disponible ») ; version artisan
+→ conservée côté conducteur, à transmettre aux artisans concernés. Une correction se fait en créant une
+**nouvelle version (V2)** — jamais de modification silencieuse d'un document déjà transmis. Le numéro de
+version est calculé à la validation (`prereceptionDocTitle`) et porté par le titre (« Pré-réception V2 »).
+
+**Tests :** `prereception` passe à 19/19 — écran de validation (brouillon + actions), prévisualisation
+client/artisan, « Modifier » sans perte de saisie, « Valider et envoyer » (verrouillage + diffusion),
+notification client, et la garde **« un document préparé mais non validé ne quitte jamais PHÉNIX »**
+(préparer puis fermer sans valider ⇒ le client ne voit rien). Suites `documents-consultables` et
+`coulisses-photos` adaptées à l'étape de validation. Gate verte (typecheck, lint, prettier, build,
+e2e complet 65/65, zéro erreur console). VISION Art. 8, 9, 11.

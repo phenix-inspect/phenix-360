@@ -79,7 +79,10 @@ const runPrereception = async () => {
     .waitFor({ state: 'visible', timeout: 8000 });
   await page.getByRole('button', { name: 'Voir la synthèse' }).click();
   await page.getByRole('button', { name: /Générer les documents/ }).click();
-  await page.getByText('Pré-réception enregistrée').waitFor({ state: 'visible', timeout: 8000 });
+  await page.getByRole('button', { name: /Valider et envoyer/ }).click();
+  await page
+    .getByText('Pré-réception validée et envoyée')
+    .waitFor({ state: 'visible', timeout: 8000 });
   await page.getByRole('button', { name: /^Terminer$/ }).click();
   await page
     .getByRole('heading', { name: /Appartement Lyon 6e/ })

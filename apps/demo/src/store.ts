@@ -71,6 +71,7 @@ import {
   type PhenixTodo,
   type PrepDocCategory,
   type PrereceptionData,
+  prereceptionDocTitle,
   type Project,
   type ProjectDocument,
   type ProjectDossier,
@@ -1902,20 +1903,76 @@ export const demo = {
   },
 
   /**
-   * PRÉ-RÉCEPTION — vérification de l'exécution du contrat signé (devis +
-   * avenants). UNE seule saisie produit UN événement (compte rendu structuré),
-   * visible du client, d'où sont DÉRIVÉS les deux documents (client / artisan)
-   * par destinataire — aucune double saisie (VISION Art. 8). La saisie porte les
-   * données INTERNES (responsable, date de reprise, motifs) ; le rendu client les
-   * masque à la source (`buildDocumentHtml(..., 'client')`). La pré-réception
-   * apparaît aussitôt dans le Suivi et dans Documents (famille « Pré-réceptions »).
+   * PRÉ-VISUALISATION d'une pré-réception — le document EXACTEMENT tel que le
+   * destinataire le recevra, SANS rien persister ni diffuser. Sert l'écran de
+   * validation : le conducteur ouvre la version client / artisan (brouillon)
+   * avant de décider. Aucun événement n'est créé — rien ne quitte PHÉNIX.
+   */
+  previewPrereception(
+    projectId: ProjectId,
+    actor: EventActor,
+    data: PrereceptionData,
+    audience: CrAudience,
+  ): void {
+    const project = snapshot.projects.find((p) => p.id === projectId);
+    const presents = data.presents.map((s) => s.trim()).filter(Boolean);
+    const now = new Date().toISOString();
+    // Événement SYNTHÉTIQUE (jamais journalisé) : seul le rendu nous intéresse.
+    const preview = {
+      id: toEventId('preview'),
+      projectId,
+      type: 'compte_rendu',
+      actor,
+      visibility: 'client',
+      state: 'brouillon',
+      captureId: null,
+      createdAt: now,
+      publishedBy: null,
+      publishedAt: null,
+      content: {
+        texte: '',
+        missionKind: 'prereception',
+        docTitre: prereceptionDocTitle(data.version),
+        ...(presents.length ? { presents } : {}),
+        prereception: { ...data, presents },
+      },
+    } as Event;
+    openHtmlDocument(
+      buildDocumentHtml(
+        preview,
+        {
+          projectName: project?.name ?? 'Chantier',
+          authorName: nameOf(snapshot, actor.userId),
+        },
+        audience,
+      ),
+    );
+  },
+
+  /**
+   * VALIDER ET ENVOYER une pré-réception (VISION Art. 8, 9) — le SEUL moment où le
+   * document contractuel quitte PHÉNIX. Le conducteur reste juridiquement maître :
+   * tant qu'il n'a pas validé, RIEN n'est créé (le client et les artisans ne
+   * voient rien, aucune notification). À la validation, on émet UN événement
+   * `compte_rendu` PUBLIÉ (visible du client) — d'où sont dérivés les deux
+   * documents (client / artisan) par destinataire, sans double saisie. Le document
+   * publié est APPEND-ONLY : non modifiable. Une correction crée une NOUVELLE
+   * version (V2) — jamais de modification silencieuse d'un document déjà transmis.
+   * La version client atterrit dans l'Espace client (+ notification) ; la version
+   * artisan reste côté conducteur, à transmettre aux artisans concernés.
    */
   async createPrereception(
     projectId: ProjectId,
     actor: EventActor,
     input: PrereceptionData,
-  ): Promise<{ prereceptionId: string }> {
+  ): Promise<{ prereceptionId: string; version: number }> {
     const presents = input.presents.map((s) => s.trim()).filter(Boolean);
+    // Version = nombre de pré-réceptions déjà validées pour ce chantier + 1.
+    const version =
+      snapshot.events.filter(
+        (e) =>
+          e.projectId === projectId && e.type === 'compte_rendu' && Boolean(e.content.prereception),
+      ).length + 1;
     const ev = await backend.appendEvent({
       projectId,
       actor,
@@ -1925,14 +1982,14 @@ export const demo = {
       content: {
         texte: '',
         missionKind: 'prereception',
-        docTitre: 'Pré-réception',
+        docTitre: prereceptionDocTitle(version),
         ...(presents.length ? { presents } : {}),
-        prereception: { ...input, presents },
+        prereception: { ...input, presents, version },
       },
     });
     refresh();
     broadcast();
-    return { prereceptionId: ev.id };
+    return { prereceptionId: ev.id, version };
   },
 
   /**
@@ -2582,7 +2639,9 @@ export function clientNotifications(
       out.push({
         id: `cr-${e.id}`,
         icon: '💬',
-        text: `Nouveau compte rendu de votre équipe`,
+        text: e.content.prereception
+          ? `Votre pré-réception est disponible`
+          : `Nouveau compte rendu de votre équipe`,
         createdAt: e.createdAt,
         seenKeys: [e.id],
         projectId,

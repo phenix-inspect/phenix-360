@@ -115,6 +115,17 @@ export interface PrereceptionData {
   prestations: PrestationVerif[];
   /** Commentaire général de pré-réception — apparaît dans TOUS les documents. */
   commentaireGeneral: string;
+  /**
+   * Numéro de version (1, 2, 3…). Un document VALIDÉ est verrouillé et
+   * non modifiable : une correction crée une NOUVELLE version (jamais de
+   * modification silencieuse d'un document déjà transmis). Fixé à la validation.
+   */
+  version?: number;
+}
+
+/** Titre du document de pré-réception, versionné (« Pré-réception » / « … V2 »). */
+export function prereceptionDocTitle(version = 1): string {
+  return version > 1 ? `Pré-réception V${version}` : 'Pré-réception';
 }
 
 /* -------------------------------------------------------------------------- *
