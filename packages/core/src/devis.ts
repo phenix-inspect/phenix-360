@@ -10,6 +10,19 @@
  * derrière le port `DossierAnalyzer` SANS changer ce modèle ni les écrans.
  */
 
+/**
+ * Niveau de confiance d'une donnée transcrite depuis le document. Une
+ * transcription incertaine ne doit JAMAIS être présentée comme un fait certain :
+ * l'écran de vérification met en évidence ce qui reste à contrôler.
+ */
+export type ConfidenceLevel = 'eleve' | 'moyen' | 'faible';
+
+export const CONFIDENCE_LABEL: Record<ConfidenceLevel, string> = {
+  eleve: 'Confiance élevée',
+  moyen: 'À vérifier',
+  faible: 'Incertain',
+};
+
 /** Un POSTE du devis : une ligne chiffrée (fourniture et/ou pose). */
 export interface DevisPoste {
   id: string;
@@ -25,6 +38,14 @@ export interface DevisPoste {
   materiau?: string;
   /** Poste (du devis initial ou d'un avenant précédent) que ce poste remplace. */
   remplacePosteId?: string;
+  /**
+   * Confiance de la TRANSCRIPTION (issu de l'extraction automatique). Absent ⇒
+   * donnée saisie/validée à la main (certaine). Une transcription à faible
+   * confiance doit être vérifiée avant de valider le contrat.
+   */
+  confidence?: ConfidenceLevel;
+  /** Extrait de texte source (traçabilité : comparer au document original). */
+  sourceText?: string;
 }
 
 /** Un LOT du devis : un corps d'état regroupant des postes. */

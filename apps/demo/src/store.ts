@@ -16,8 +16,6 @@ import {
   INTERNAL_AUDIENCE,
   SHARED_AUDIENCE,
   InMemoryBackend,
-  PROJECT_STEPS,
-  PROJECT_STEP_LABEL,
   PROJECT_STATUS_LABEL,
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
@@ -72,6 +70,8 @@ import {
   type PrepDocCategory,
   type PrereceptionData,
   prereceptionDocTitle,
+  reconcileTotals,
+  type Devis,
   type Project,
   type ProjectDocument,
   type ProjectDossier,
@@ -93,6 +93,7 @@ import {
   openUnavailableDocument,
 } from './lib/document';
 import { buildDocumentHtml, generatedDocumentTitle } from './lib/generatedDocument';
+import { readDocumentAttachment } from './lib/upload';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
@@ -842,6 +843,8 @@ export const demo = {
   async createFromProposal(
     proposal: ProjectProposal,
     photosAvantTravaux: UploadedMedia[] = [],
+    /** Fichier ORIGINAL du devis (archivé tel quel, ouvrable — source officielle). */
+    devisFile?: File,
   ): Promise<ProjectId> {
     const clientId = toUserId(crypto.randomUUID());
     const compaId = toUserId(crypto.randomUUID());
@@ -870,25 +873,20 @@ export const demo = {
     const compaActor: EventActor = { userId: compaId, role: 'compagnon', displayName: 'Mickaël' };
 
     // Le devis signé est la pièce fondatrice : il ouvre le journal du chantier.
-    await backend.appendEvent({
-      projectId: project.id,
-      actor: compaActor,
-      type: 'document',
-      visibility: 'client',
-      state: 'publie',
-      content: {
-        attachment: {
-          id: toAttachmentId(crypto.randomUUID()),
-          kind: 'document',
-          bucket: 'demo',
-          storagePath: `${project.id}/devis-signe.pdf`,
-          mimeType: 'application/pdf',
-          fileName: 'Devis-signé.pdf',
-          createdAt: new Date().toISOString(),
-        },
-        libelle: 'Devis signé',
-      },
-    });
+    // On ARCHIVE le fichier ORIGINAL tel quel (source officielle, ouvrable à tout
+    // moment) — jamais une pièce jointe factice. Sans fichier réel (texte collé),
+    // on n'invente aucun document.
+    const devisAttachment = devisFile && (await readDocumentAttachment(project.id, devisFile));
+    if (devisAttachment && devisAttachment.ok) {
+      await backend.appendEvent({
+        projectId: project.id,
+        actor: compaActor,
+        type: 'document',
+        visibility: 'client',
+        state: 'publie',
+        content: { attachment: devisAttachment.value, libelle: 'Devis signé' },
+      });
+    }
 
     await backend.appendEvent({
       projectId: project.id,
@@ -1143,7 +1141,10 @@ export const demo = {
         ...(clientName ? { clientName } : {}),
         ...(project.address ? { address: project.address } : {}),
       },
-      roadmap: PROJECT_STEPS.map((s) => ({ id: s, label: PROJECT_STEP_LABEL[s] })),
+      // Pas de feuille de route GÉNÉRIQUE fabriquée : les étapes contractuelles
+      // proviendront du devis analysé et validé. Tant qu'aucun contrat n'est
+      // validé, on n'affiche aucune prestation simulée (règle produit 12/07/2026).
+      roadmap: [],
       planning: [],
       orders: [],
       selections: [],
@@ -1376,6 +1377,41 @@ export const demo = {
   saveDossier(projectId: ProjectId, dossier: ProjectDossier): void {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     dossiers[projectId] = dossier;
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * Enregistre les CORRECTIONS de la transcription du devis (brouillon) et
+   * recalcule la réconciliation des totaux. Le statut reste `brouillon` : rien
+   * n'est contractuel tant que le conducteur n'a pas validé.
+   */
+  saveContractTranscription(projectId: ProjectId, devis: Devis): void {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[projectId];
+    if (!dossier) return;
+    const reconciliation = reconcileTotals(
+      devis,
+      dossier.reconciliation?.totalHTDeclare,
+      dossier.reconciliation?.totalTTCDeclare,
+    );
+    dossiers[projectId] = { ...dossier, devis, devisStatut: 'brouillon', reconciliation };
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /**
+   * VALIDE la transcription : le conducteur a vérifié le devis face à l'original.
+   * Le contrat devient exploitable en aval (prestations, pré-réception, budget,
+   * Léon). C'est une décision HUMAINE — aucune automatisation ne valide à sa place.
+   */
+  validateContract(projectId: ProjectId): void {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[projectId];
+    if (!dossier?.devis) return;
+    dossiers[projectId] = { ...dossier, devisStatut: 'valide' };
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();

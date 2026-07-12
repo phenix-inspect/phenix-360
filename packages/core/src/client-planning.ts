@@ -16,6 +16,7 @@
  * client ne pourra pas dire « vous aviez prévu le carrelage mardi ».
  */
 import { PROJECT_STATUSES, type ProjectStatus } from './project.js';
+import { contratValide } from './contract.js';
 import { buildSmartPlanning, isAcompteDocument, type ProjectDossier } from './prepare.js';
 
 /* -------------------------------------------------------------------------- *
@@ -44,7 +45,9 @@ export function buildClientShareReadiness(dossier: ProjectDossier | null): Clien
   const docs = dossier?.documents ?? [];
   const fourni = (re: RegExp): boolean =>
     docs.some((d) => re.test(d.label) && d.status === 'fourni');
-  const devisSigne = Boolean(dossier?.devis) || fourni(/devis/i);
+  // Une transcription en BROUILLON ne « signe » pas le devis : on exige un contrat
+  // VALIDÉ ou le document devis fourni. Un brouillon non vérifié ne partage rien.
+  const devisSigne = contratValide(dossier) || fourni(/devis/i);
   // « Acompte reçu » : validé par tout document FOURNI classé « Acompte » (ou
   // reconnu au libellé) — un dépôt de preuve d'acompte suffit désormais.
   const acomptePaye = docs.some((d) => d.status === 'fourni' && isAcompteDocument(d));

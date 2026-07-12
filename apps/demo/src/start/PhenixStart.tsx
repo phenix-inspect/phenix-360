@@ -92,7 +92,9 @@ export function PhenixStart({
   };
 
   const enter = async (p: ProjectProposal): Promise<void> => {
-    await demo.createFromProposal(p, photos());
+    // On ARCHIVE le fichier original du devis (source officielle, ouvrable).
+    const devisFile = files.find((f) => /\.pdf$/i.test(f.name) && f.file)?.file;
+    await demo.createFromProposal(p, photos(), devisFile);
     onCreated();
   };
 

@@ -2864,3 +2864,54 @@ notification client, et la garde **« un document préparé mais non validé ne 
 (préparer puis fermer sans valider ⇒ le client ne voit rien). Suites `documents-consultables` et
 `coulisses-photos` adaptées à l'étape de validation. Gate verte (typecheck, lint, prettier, build,
 e2e complet 65/65, zéro erreur console). VISION Art. 8, 9, 11.
+
+## 12/07/2026 — Moteur de transcription contractuelle (devis → contrat structuré, validé par l'humain)
+
+**Priorité critique.** Le devis n'était pas réellement exploité : l'extraction s'arrêtait aux
+LIBELLÉS de lots (mots-clés) sans jamais produire de postes chiffrés, `realAnalyzeDossier` ne
+construisait AUCUN `dossier.devis`, le PDF original était jeté (pièce jointe factice non ouvrable), et
+il n'existait aucune notion « transcrit / validé » : la Préparation affichait les prestations sur simple
+PRÉSENCE d'un devis. Conséquence en cascade : pré-réception vide, budget faux, Léon incapable, avenants
+impossibles.
+
+**Décision produit validée :** le document original reste la source officielle ; PHÉNIX en produit une
+TRANSCRIPTION structurée (lots → postes : libellé, quantité, unité, PU, montant HT, TVA) avec un niveau
+de confiance par ligne. La transcription n'est JAMAIS contractuelle tant que le conducteur ne l'a pas
+VÉRIFIÉE et VALIDÉE. « Fichier importé » et « contrat correctement transcrit » sont deux états distincts.
+
+**Moteur (core, pur, testé) :** nouveau `packages/core/src/contract.ts` — `extractDevisContract(texte)`
+transcrit le tableau (format Phenix-amo + tableaux génériques) en `Devis { lots → postes }`, avec
+confiance (`eleve` / `moyen` / `faible`, jamais inventé : un montant non lu reste absent), et
+`reconcileTotals` réconcilie la somme des lignes avec le Total HT déclaré — un écart hors tolérance rend
+la transcription `incoherent` et **bloque la validation aveugle**. Cycle de vie
+`devisStatut: 'brouillon' | 'valide'` + gardes `contratValide` / `contratEnBrouillon` (rétro-compatibles :
+un devis historique/démo sans statut = validé ; seul un brouillon explicite est mis en attente).
+
+**Chaîne branchée :** `realAnalyzeDossier` construit désormais `dossier.devis` (structuré) en BROUILLON +
+la réconciliation. Le fichier ORIGINAL du devis est ARCHIVÉ tel quel (pièce jointe réelle, ouvrable) —
+fini la pièce factice. `ensureDossier` ne fabrique plus de feuille de route générique.
+
+**Validation humaine :** nouvel écran `ContractReview` « Vérifier la transcription du devis » — document
+original ouvrable, prestations éditables (libellé, quantité, PU, montant, TVA, ajout/suppression),
+niveaux de confiance mis en évidence, réconciliation des totaux ; actions _Enregistrer le brouillon_ /
+_Valider la transcription_. Une validation en cas d'écart exige une confirmation explicite du conducteur.
+
+**Gating anti-générique :** tant que le contrat n'est pas VALIDÉ, la Préparation affiche « Le devis doit
+être analysé et validé avant d'afficher les prestations du chantier » (bannière + accès à l'écran de
+vérification) au lieu des prestations ; la pré-réception est bloquée avec le même message ; la
+check-list « Devis signé » et la préparation au partage client exigent un contrat validé (un brouillon
+ne « signe » rien). Aucune donnée simulée n'est présentée comme réelle.
+
+**Tests :** unitaires `contract-parser` (9/9 : postes structurés, confiance, réconciliation cohérente
+ET incohérence détectée, poste non chiffré jamais inventé, forfait, gating) ; e2e `contract-transcription`
+(8/8 : dépôt d'un vrai devis → transcription brouillon → prestations MASQUÉES + pré-réception bloquée →
+écran de vérification (prestations + confiance + totaux) → un écart bloque la validation → validation →
+prestations en Préparation ET reprises en pré-réception). Gate verte (typecheck, lint, prettier, build,
+Playwright complet, zéro erreur console).
+
+**Non couvert (itérations suivantes) :** OCR des devis scannés/photographiés (tesseract.js), formats de
+logiciels au-delà de Phenix-amo + tableaux génériques, reconstruction visuelle de tableaux complexes /
+multi-pages, éditeur avancé (déplacer entre lots, fusionner/scinder, qualifier titre/commentaire),
+intent Léon lisant le contenu du contrat validé, et la batterie complète de documents réels hétérogènes.
+Les seams sont prêts (port `DossierAnalyzer` / `setDossierAnalyzer`, extraction binaire côté app).
+VISION Art. 8, 9, 11.

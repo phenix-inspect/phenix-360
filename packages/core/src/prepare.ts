@@ -40,6 +40,12 @@ import {
   type DevisExtraction,
 } from './devis-extract.js';
 import {
+  contratValide,
+  extractDevisContract,
+  type DevisStatut,
+  type TotalsReconciliation,
+} from './contract.js';
+import {
   DEFAULT_CALENDAR,
   addCalendarDays,
   businessToCalendarDays,
@@ -583,6 +589,16 @@ export interface ProjectDossier {
   budgetPrevisionnel?: number;
   /** Lecture structurée du devis signé (lots, postes, montants, TVA). */
   devis?: Devis;
+  /**
+   * Statut de la TRANSCRIPTION du devis : `brouillon` = extraite mais pas encore
+   * vérifiée/validée par le conducteur → NON exploitable en aval (pré-réception,
+   * prestations, budget « devis », Léon « certain »). `valide` = contrôlée par
+   * l'humain → contractuelle. Absent ⇒ donnée historique/démo, traitée comme
+   * validée (rétro-compatible). Voir `contratValide`.
+   */
+  devisStatut?: DevisStatut;
+  /** Réconciliation des totaux de la transcription (somme des lignes vs déclaré). */
+  reconciliation?: TotalsReconciliation;
   /**
    * Avenants signés (append-only). Chacun est un nouveau devis lié à l'initial :
    * il ajoute des postes, peut en remplacer (le poste d'origine reste visible).
@@ -1879,7 +1895,9 @@ export function buildPreparation(
     {
       id: 'devis',
       label: 'Devis signé',
-      tone: dossier.devis ? 'fait' : 'bloquant',
+      // Un devis TRANSCRIT mais non validé (brouillon) reste bloquant : la
+      // transcription doit être vérifiée avant de faire foi.
+      tone: contratValide(dossier) ? 'fait' : 'bloquant',
       detail: dossier.devis?.reference,
       auto: true,
     },
@@ -2110,11 +2128,16 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   // la vraie date officielle de démarrage. On ne préremplit donc PAS
   // `infos.startDate` : le conducteur la saisit à la main (bloquant partage client).
 
-  // Feuille de route DÉRIVÉE des lots réellement détectés (jamais inventée).
-  const roadmap: RoadmapStep[] = fields.prestations.map((label, i) => ({
-    id: `step-${i + 1}`,
-    label,
-  }));
+  // TRANSCRIPTION STRUCTURÉE du contrat : lots → postes (jamais inventée). Reste
+  // en BROUILLON jusqu'à la vérification/validation humaine — non exploitable en
+  // aval tant qu'elle n'est pas validée (VISION Art. 9 : le conducteur contrôle).
+  const contract = extractDevisContract(fullText);
+
+  // Feuille de route DÉRIVÉE des lots réellement transcrits, sinon des lots
+  // détectés par mots-clés. Jamais de feuille de route générique fabriquée.
+  const roadmap: RoadmapStep[] = (
+    contract.devis ? contract.devis.lots.map((l) => l.label) : fields.prestations
+  ).map((label, i) => ({ id: `step-${i + 1}`, label }));
 
   const city = fields.address?.match(/\d{5}\s+([A-Za-zÀ-ÿ'’ \-]{2,30})/)?.[1]?.trim();
   const projectName = fields.clientName
@@ -2125,7 +2148,17 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
 
   return {
     projectName,
-    dossier: baseDossier({ infos, roadmap }),
+    dossier: baseDossier({
+      infos,
+      roadmap,
+      ...(contract.devis
+        ? {
+            devis: contract.devis,
+            devisStatut: 'brouillon',
+            reconciliation: contract.reconciliation,
+          }
+        : {}),
+    }),
     extraction: buildDevisExtraction(fields, chars, false),
   };
 };
