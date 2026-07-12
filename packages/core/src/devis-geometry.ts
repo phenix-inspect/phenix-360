@@ -88,6 +88,7 @@ export type BlocType =
   | 'garantie'
   | 'delai'
   | 'remise'
+  | 'liste_prix'
   | 'pied_de_page'
   | 'indetermine';
 
@@ -111,6 +112,7 @@ export const BLOCS_NON_CONTRACTUELS: ReadonlySet<BlocType> = new Set<BlocType>([
   'garantie',
   'delai',
   'remise',
+  'liste_prix',
   'pied_de_page',
   'indetermine',
 ]);
@@ -165,7 +167,12 @@ export interface DevisAnalyseMeta {
   options: { posteId: string; label: string }[];
   metriques: DevisAnalyseGeo['metriques'];
   versionMoteur: string;
+  /** Profil d'analyse retenu : `obat` (spécialisé) ou `generique`. */
+  profil?: ProfilAnalyse;
 }
+
+/** Profil d'analyse appliqué au document. */
+export type ProfilAnalyse = 'obat' | 'generique';
 
 /** Résultat complet de l'analyse géométrique. */
 export interface DevisAnalyseGeo {
@@ -186,6 +193,9 @@ export interface DevisAnalyseGeo {
     options: number;
   };
   versionMoteur: string;
+  /** Profil d'analyse retenu : `obat` (spécialisé, colonnes ancrées sur l'en-tête)
+   *  ou `generique` (colonnes apprises des données). */
+  profil: ProfilAnalyse;
   /** true quand la géométrie n'expose pas de tableau colonné exploitable : il
    *  faut retomber sur le lecteur texte (`extractDevisContract`). */
   fallbackTexte: boolean;
@@ -256,7 +266,7 @@ interface ColonneValeur {
   max: number;
   center: number;
 }
-interface Colonnes {
+export interface Colonnes {
   /** Bord gauche de la zone des valeurs (à gauche = désignation). */
   valueLeft: number;
   cols: ColonneValeur[];
@@ -375,6 +385,40 @@ function detecterColonnes(pages: PageGeom[]): Colonnes | undefined {
   return { valueLeft: Math.min(...cols.map((c) => c.min)), cols };
 }
 
+/**
+ * PROFIL OBAT — colonnes ANCRÉES SUR L'EN-TÊTE (positions fixes du gabarit OBAT),
+ * et non apprises des données. L'en-tête OBAT « N° DÉSIGNATION QTÉ U. PRIX U. TVA
+ * TOTAL HT » donne les x de chaque colonne ; on en déduit des frontières par
+ * milieux. Fiable même sur un devis à une seule ligne (pas de dépendance aux
+ * données), là où l'apprentissage générique peut vaciller. Renvoie `undefined`
+ * si l'en-tête OBAT n'est pas trouvé (→ repli générique).
+ */
+export function colonnesObat(pages: PageGeom[]): Colonnes | undefined {
+  let headerToks: MotToken[] | undefined;
+  for (const pg of pages) {
+    for (const row of grouperLignes(pg.tokens)) {
+      const brut = norm(row.toks.map((t) => t.str).join(' '));
+      if (RE_DESIGNATION.test(brut) && RE_TOTAL_HT.test(brut)) {
+        headerToks = row.toks;
+        break;
+      }
+    }
+    if (headerToks) break;
+  }
+  if (!headerToks) return undefined;
+  const entete = colonnesEntete(headerToks); // colonnes de valeurs, ordre x
+  if (entete.length < 2) return undefined;
+  const xs = entete.map((e) => e.x);
+  // Frontières = milieux entre x d'en-tête consécutifs ; la désignation s'arrête
+  // 15 px avant la 1ʳᵉ colonne de valeurs (quantités cadrées à droite comprises).
+  const cols: ColonneValeur[] = entete.map((e, i) => {
+    const min = i === 0 ? xs[0]! - 15 : (xs[i - 1]! + xs[i]!) / 2;
+    const max = i === entete.length - 1 ? Infinity : (xs[i]! + xs[i + 1]!) / 2;
+    return { col: e.col, min, max, center: e.x };
+  });
+  return { valueLeft: xs[0]! - 15, cols };
+}
+
 /** Assigne les mots d'une ligne à leurs colonnes (désignation = à gauche des valeurs). */
 function cellulesDeLigne(toks: MotToken[], col: Colonnes): CellulesLigne {
   const cells: CellulesLigne = {
@@ -431,7 +475,7 @@ function cellulesDeLigne(toks: MotToken[], col: Colonnes): CellulesLigne {
  * -------------------------------------------------------------------------- */
 const RE_MONTANT = /\d[\d\s]*,\d{2}/;
 const RE_PIED =
-  /(RCS|Page\s+\d+\s+sur\s+\d+|\d+\s*\/\s*\d+\s*$|Tél\s*:|Email\s*:|SASU|SIRET|APE\s|scannez\s+le\s+code|retrouver\s+ce\s+(?:bon|devis))/i;
+  /(RCS|Page\s+\d+\s+sur\s+\d+|^\s*\d{1,3}\s*\/\s*\d{1,3}\s*$|Tél\s*:|Email\s*:|SASU|SIRET|APE\s|scannez\s+le\s+code|retrouver\s+ce\s+(?:bon|devis))/i;
 const RE_EXCLUSION =
   /(ATTENTION\s*:|n['’]est\s+pas\s+inclus|non\s+inclus|hors\s+devis|à\s+la\s+charge\s+du\s+client|non\s+compris(?:e)?\s+dans)/i;
 // « plus-value » est un SUPPLÉMENT ferme (pas une option) : on ne le capte PAS ici.
@@ -451,6 +495,11 @@ const RE_NOTES = /^notes?$/i;
 const RE_GARANTIE = /(garantie|décennale|parfait\s+achèvement)/i;
 const RE_DELAI = /(délai|durée\s+estimée|début\s+des\s+travaux)/i;
 const RE_REMISE = /(remise|rabais|geste\s+commercial)/i;
+// « Transparence des prix » / « prestations supplémentaires » (OBAT) : liste de
+// PRIX À LA CARTE (add-ons à quantité 0), non contractuelle — jamais des prestations.
+const RE_LISTE_PRIX = /(transparence\s+des\s+prix|prestations?\s+suppl[ée]mentaires?)/i;
+/** Quantité entre parenthèses d'une ligne de matériau (« (2 u) », « (15 ml) »). */
+const RE_QTE_PAREN = /\(\d+([.,]\d+)?\s*(u|ml|m2|m²|m3|m³|pce|pcs|pc|kg|g|l|h)\b/i;
 
 /** Une ligne a-t-elle au moins une valeur chiffrée (prix / total) ? */
 const aValeurs = (c: CellulesLigne): boolean =>
@@ -468,6 +517,8 @@ const aValeurs = (c: CellulesLigne): boolean =>
 function classerLigne(c: CellulesLigne, brut: string): BlocType {
   if (RE_PIED.test(brut)) return 'pied_de_page';
   if (RE_DESIGNATION.test(brut) && RE_TOTAL_HT.test(brut)) return 'entete_tableau';
+  // Liste de prix à la carte (add-ons non contractuels) : ouvre une zone d'options.
+  if (RE_LISTE_PRIX.test(brut)) return 'liste_prix';
 
   // Blocs de fin de document reconnus par MOT-CLÉ (robustes à la colonne/zone).
   if (RE_VENTIL_TVA.test(brut)) return 'ventilation_tva';
@@ -546,7 +597,11 @@ function libelleCourt(exact: string): string {
  * détectable (PDF non colonné, texte synthétique…), renvoie `fallbackTexte:true`
  * pour que l'appelant retombe sur le lecteur texte.
  */
-export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
+export function analyserDevisGeo(
+  pages: PageGeom[],
+  opts: { colonnes?: Colonnes; profil?: ProfilAnalyse } = {},
+): DevisAnalyseGeo {
+  const profil: ProfilAnalyse = opts.profil ?? 'generique';
   const vide = (fallback: boolean): DevisAnalyseGeo => ({
     reconciliation: reconcileTotals(undefined, undefined, undefined),
     lignes: [],
@@ -561,10 +616,12 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
       options: 0,
     },
     versionMoteur: MOTEUR_VERSION,
+    profil,
     fallbackTexte: fallback,
   });
 
-  const col = detecterColonnes(pages);
+  // Colonnes fournies (profil OBAT ancré sur l'en-tête) ou apprises des données.
+  const col = opts.colonnes ?? detecterColonnes(pages);
   if (!col) return vide(true);
 
   // 1-3) Lignes reconstruites + classées, dans l'ordre de lecture (pages, puis y↓).
@@ -583,13 +640,21 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
   const exclusions: ExclusionDetectee[] = [];
   const options: { posteId: string; label: string }[] = [];
   let currentLot: DevisLot | null = null;
-  let current: { poste: DevisPoste; complements: string[] } | null = null;
+  let current: {
+    poste: DevisPoste;
+    complements: string[];
+    dernierY: number;
+    dernierPage: number;
+  } | null = null;
   let seq = 0;
   let lignesNumerotees = 0;
   // On ne crée lots/prestations qu'À L'INTÉRIEUR du tableau (entre l'en-tête et le
   // bloc des totaux) : les intitulés courts des mentions de fin ne deviennent pas
   // des lots. Un devis mono-page sans en-tête distinct reste couvert (repli texte).
   let dansTableau = false;
+  // Après une « Transparence des prix » / « prestations supplémentaires » : les
+  // lignes chiffrées sont des OPTIONS à la carte (jamais intégrées sans validation).
+  let apresListePrix = false;
   const orphelins: LigneClasse[] = [];
 
   const ouvrirLot = (id: string, label: string): DevisLot => {
@@ -639,6 +704,13 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         dansTableau = false;
         break;
       }
+      case 'liste_prix': {
+        // Début de la liste de prix à la carte : bascule en zone d'OPTIONS.
+        finaliser();
+        lastExclusion = null;
+        apresListePrix = true;
+        break;
+      }
       case 'lot': {
         dansTableau = true;
         lastExclusion = null;
@@ -660,9 +732,11 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         finaliser();
         lastExclusion = null;
         lignesNumerotees += 1;
+        // Devis PLAT (OBAT sans lots : prestations numérotées 1, 2, 3… directement) :
+        // on ouvre un lot IMPLICITE unique pour ne jamais perdre de prestation.
         if (!currentLot) {
-          orphelins.push(l);
-          break;
+          dansTableau = true;
+          currentLot = ouvrirLot('lot-prestations', 'Prestations');
         }
         seq += 1;
         const qte = parseMontantFr(c.qte);
@@ -681,12 +755,12 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         if (qte != null) poste.quantite = qte;
         if (c.unite) poste.unite = c.unite.replace(/\.$/, '');
         if (pu != null) poste.prixUnitaireHT = pu;
-        if (l.type === 'option') {
+        if (l.type === 'option' || apresListePrix) {
           poste.option = true;
           options.push({ posteId: poste.id, label: poste.label });
         }
         currentLot.postes.push(poste);
-        current = { poste, complements: [] };
+        current = { poste, complements: [], dernierY: l.y, dernierPage: l.page };
         break;
       }
       case 'description_complement': {
@@ -694,7 +768,11 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         // Un intitulé de SECTION est court, commence par une majuscule ET est suivi
         // de prestations (≠ continuation de libellé, qui précède un lot).
         const sectionLike =
-          dansTableau && estIntituleSection(txt) && /^[A-ZÀ-Þ]/.test(txt) && prestationSuit(idx);
+          dansTableau &&
+          estIntituleSection(txt) &&
+          /^[A-ZÀ-Þ]/.test(txt) &&
+          !RE_QTE_PAREN.test(txt) && // une ligne de matériau (« … (2 u) ») n'est pas une section
+          prestationSuit(idx);
 
         if (current) {
           // 1ʳᵉ ligne de description d'une prestation à libellé COURT (« Faïence »
@@ -703,6 +781,8 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
             current.complements.length === 0 && current.poste.label.length < 22;
           if (besoinDescription || !sectionLike) {
             current.complements.push(txt);
+            current.dernierY = l.y;
+            current.dernierPage = l.page;
             break;
           }
           // Sinon (libellé déjà complet + intitulé de section) : nouvelle section.
@@ -747,7 +827,36 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         }
         break;
       }
-      // 'materiau' et tous les blocs non contractuels : ignorés du contrat.
+      // Blocs « à mot-clé » (déchetterie, garantie, délai, mentions, acompte…) :
+      // un tel mot dans la DESCRIPTION d'une prestation en cours (ligne juste en
+      // dessous, même page) n'est PAS un bloc de fin → on le rattache. Sinon
+      // (footer, hors contexte de prestation) : ignoré.
+      case 'gestion_dechets':
+      case 'garantie':
+      case 'delai':
+      case 'remise':
+      case 'notes':
+      case 'mentions_legales':
+      case 'conditions_paiement':
+      case 'echeancier':
+      case 'acompte': {
+        if (
+          current &&
+          l.page === current.dernierPage &&
+          current.dernierY - l.y >= 0 &&
+          current.dernierY - l.y < 22 &&
+          c.designation &&
+          !c.num &&
+          !RE_MONTANT.test(c.total) &&
+          !c.prix
+        ) {
+          current.complements.push(norm(c.designation));
+          current.dernierY = l.y;
+          current.dernierPage = l.page;
+        }
+        break;
+      }
+      // 'materiau' et tous les autres blocs non contractuels : ignorés du contrat.
       default:
         break;
     }
@@ -792,6 +901,7 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
       options: options.length,
     },
     versionMoteur: MOTEUR_VERSION,
+    profil,
     fallbackTexte: false,
   };
 }

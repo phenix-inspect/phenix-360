@@ -33,7 +33,7 @@ const outFile = join(mkdtempSync(join(tmpdir(), 'corpus-')), 'geo.mjs');
 execFileSync(
   ESBUILD,
   [
-    join(root, 'packages/core/src/devis-geometry.ts'),
+    join(root, 'packages/core/src/devis-obat.ts'),
     '--bundle',
     '--format=esm',
     '--platform=node',
@@ -42,7 +42,9 @@ execFileSync(
   ],
   { cwd: root },
 );
-const { analyserDevisGeo } = await import(outFile);
+// On teste le POINT D'ENTRÉE réel (dispatcher) : reconnaissance OBAT → profil OBAT,
+// sinon moteur générique — exactement ce que fait l'application.
+const { analyserDevis } = await import(outFile);
 
 const results = [];
 const check = (label, fn) => {
@@ -129,9 +131,12 @@ const mesures = [];
 for (const entry of CORPUS) {
   // geomPath est relatif au dossier `corpus/` (là où vit le manifeste).
   const geom = JSON.parse(readFileSync(join(here, 'corpus', entry.geomPath), 'utf8'));
-  const analyse = analyserDevisGeo(geom);
+  const analyse = analyserDevis(geom);
   const m = mesurer(analyse, entry.truth);
-  mesures.push({ entry, m, fallback: analyse.fallbackTexte });
+  mesures.push({ entry, m, fallback: analyse.fallbackTexte, analyse });
+  console.log(
+    `   profil : ${analyse.profil} · OBAT reconnu : ${analyse.detection.estObat} (confiance ${analyse.detection.confiance.toFixed(2)})`,
+  );
   const gt = m.attendues == null ? ' (vérité à établir)' : '';
   console.log(
     `\n── ${entry.id}  [${entry.truth.source} · ${entry.truth.type}${entry.truth.critique ? ' · CRITIQUE' : ''}]`,
@@ -155,8 +160,18 @@ for (const entry of CORPUS) {
 }
 
 /* ---- Seuils d'acceptation sur le corpus CRITIQUE ---------------------------- */
-for (const { entry, m } of mesures.filter((x) => x.entry.truth.critique)) {
+for (const { entry, m, analyse } of mesures.filter((x) => x.entry.truth.critique)) {
   const id = entry.id;
+  if (entry.truth.logiciel === 'obat')
+    check(`[${id}] reconnu OBAT → profil spécialisé OBAT`, () => {
+      if (!analyse.detection.estObat) throw new Error(`non reconnu (${analyse.detection.confiance})`);
+      if (analyse.profil !== 'obat') throw new Error(`profil ${analyse.profil}`);
+    });
+  else
+    check(`[${id}] NON reconnu OBAT → moteur générique`, () => {
+      if (analyse.detection.estObat) throw new Error('faux positif OBAT');
+      if (analyse.profil !== 'generique') throw new Error(`profil ${analyse.profil}`);
+    });
   check(`[${id}] comptage exact (0 oubliée, 0 inventée)`, () => {
     if (m.oublieesN !== 0 || m.inventeesN !== 0)
       throw new Error(`attendues ${m.attendues}, détectées ${m.detectees}`);

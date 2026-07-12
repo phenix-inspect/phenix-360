@@ -3023,3 +3023,41 @@ main + `build-fixture.mjs` + harnais de métriques). 4 documents CRITIQUES tous 
 document en main (numérotation profonde, TVA héritée par section). Verdict de readiness
 HONNÊTE : « OPÉRATIONNEL : NON » — 5/15 docs, 0 scanné, OCR local à venir. Devis026/027/028
 inchangés. Gate complète verte. VISION Art. 8, 9, 11.
+
+---
+
+12/07/2026
+Décision : PROFIL SPÉCIALISÉ OBAT — le lecteur reconnaît le format OBAT du conducteur
+et lui applique un pipeline prioritaire, plus fiable que le générique.
+Pourquoi : Décision produit du conducteur : ses devis seront principalement générés
+depuis OBAT. Sur 5 nouveaux devis OBAT réels, deux failles génériques sont apparues :
+(a) devis PLAT (prestations numérotées 1,2,3… SANS lot) → 0 prestation (le moteur
+exigeait un lot pour rattacher) ; (b) une variante de gabarit identique où
+l'apprentissage des colonnes par les données mésassignait quantité/unité (qté vide,
+unité = prix) alors que la mise en page était pourtant standard. S'y ajoutent des
+variantes OBAT : « Transparence des prix / prestations supplémentaires » (options à la
+carte à quantité 0), descriptions multi-pages, sous-listes de matériaux (« … (2 u) »),
+un mot-clé (« déchetterie », « garantie ») DANS une description de prestation.
+Corrections : (1) lot IMPLICITE pour les devis plats (aucune prestation perdue) ;
+(2) profil OBAT à COLONNES ANCRÉES SUR L'EN-TÊTE (positions fixes du gabarit, fiables
+même à une seule ligne) au lieu de l'apprentissage — via `colonnesObat` + option
+`colonnes` de `analyserDevisGeo` ; (3) bloc « liste de prix » → zone d'OPTIONS (jamais
+intégrées) ; (4) lignes de matériau « (N u) » exclues de la détection de section ;
+(5) mot-clé de bloc dans une description de prestation ADJACENTE → rattaché, pas un
+bloc de fin. `detecterObat` (indices sémantiques : en-tête colonnes, Total net HT, NET
+À PAYER, Valable jusqu'au, Page X sur Y, ventilation TVA, garantie décennale) →
+confiance 0–1 ; `analyserDevis` dispatche OBAT reconnu → profil OBAT, sinon générique.
+Jamais OBAT sur un document non reconnu.
+Alternatives rejetées : (a) coordonnées de colonnes FIGÉES → fragile aux variantes ;
+on ancre sémantiquement sur l'en-tête. (b) un parseur OBAT dupliqué → dette ; le
+pipeline (reconstruction, classification, contrôles) reste PARTAGÉ, seul l'ancrage des
+colonnes change. (c) forcer OBAT partout → casserait bon de commande / Revel (bien
+routés en générique, confiance 0,25 / 0,13).
+Impact : 6 devis OBAT tous CRITIQUES et verts (réf. 13 lots, variante 12 lots, mono-
+poste, multi-TVA, PLAT 6 postes, PLAT + liste de prix 5 fermes / 8 options) —
+réconciliation exacte, comptage exact, 0 inventée, qté/unité par colonne, page source,
+détection OBAT vérifiée. Bon de commande Martos et Revel restent en générique. Harnais
+de qualification élargi (63/63), profil affiché au conducteur (« Format OBAT reconnu »).
+Verdict de readiness HONNÊTE inchangé : OPÉRATIONNEL : NON (8/15 docs, 0 scanné ; OCR
+local à venir). Non-régression : générique, synthétique (14/14), lecteur texte (13/13),
+Playwright complet. VISION Art. 8, 9, 11.

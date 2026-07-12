@@ -236,7 +236,14 @@ export function DevisVerification({
           {/* Contrôles de cohérence du moteur (montants, comptage, options…). */}
           {dossier.analyse && dossier.analyse.controles.length > 0 && (
             <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
-              <p className="text-sm font-medium text-foreground">Contrôles de cohérence</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-foreground">Contrôles de cohérence</p>
+                {dossier.analyse.profil === 'obat' && (
+                  <span className="rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-medium text-gold-700">
+                    Format OBAT reconnu — lecture spécialisée
+                  </span>
+                )}
+              </div>
               <ul className="space-y-1.5">
                 {dossier.analyse.controles.map((c) => (
                   <li key={c.id} className="flex items-start gap-2 text-sm">

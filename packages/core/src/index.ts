@@ -23,6 +23,7 @@ export * from './devis.js';
 export * from './devis-extract.js';
 export * from './contract.js';
 export * from './devis-geometry.js';
+export * from './devis-obat.js';
 export * from './contract-derivation.js';
 export * from './prereception.js';
 export * from './prepare.js';

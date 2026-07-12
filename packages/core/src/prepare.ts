@@ -49,7 +49,8 @@ import {
   type LotStatut,
   type TotalsReconciliation,
 } from './contract.js';
-import { analyserDevisGeo, type DevisAnalyseMeta, type PageGeom } from './devis-geometry.js';
+import { type DevisAnalyseMeta, type PageGeom } from './devis-geometry.js';
+import { analyserDevis } from './devis-obat.js';
 import {
   DEFAULT_CALENDAR,
   addCalendarDays,
@@ -2170,12 +2171,15 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   // démarre en BROUILLON (à vérifier) — non exploitable en aval tant que le
   // conducteur ne l'a pas validé (VISION Art. 9 : le conducteur contrôle).
   //
-  // Moteur NATIF (géométrie) en priorité quand un PDF colonné a été lu : il
-  // reconstruit les colonnes/descriptions, classe les blocs (~25 types) et écarte
-  // exclusions, totaux et ventilations TVA. À défaut de tableau exploitable, on
-  // retombe sur le lecteur TEXTE (`extractDevisContract`) — mêmes garanties.
+  // Moteur NATIF (géométrie) en priorité quand un PDF colonné a été lu. Le
+  // dispatcher `analyserDevis` RECONNAÎT d'abord le format : un devis OBAT (gabarit
+  // du conducteur) passe par le PROFIL SPÉCIALISÉ OBAT (colonnes ancrées sur
+  // l'en-tête, maximum de fiabilité) ; sinon le moteur GÉNÉRIQUE (colonnes apprises)
+  // reconstruit colonnes/descriptions, classe les blocs (~25 types) et écarte
+  // exclusions/totaux/ventilations TVA. À défaut de tableau exploitable, on retombe
+  // sur le lecteur TEXTE (`extractDevisContract`) — mêmes garanties.
   const pages = files.flatMap((f) => f.pages ?? []);
-  const geo = pages.length > 0 ? analyserDevisGeo(pages) : undefined;
+  const geo = pages.length > 0 ? analyserDevis(pages) : undefined;
   const useGeo = geo != null && !geo.fallbackTexte && geo.devis != null;
   const contract = useGeo
     ? { devis: geo!.devis, reconciliation: geo!.reconciliation }
@@ -2187,6 +2191,7 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
         options: geo!.options,
         metriques: geo!.metriques,
         versionMoteur: geo!.versionMoteur,
+        profil: geo!.profil,
       }
     : undefined;
   // Journal d'audit : trace l'import + l'analyse (l'horodatage vient de l'app).
