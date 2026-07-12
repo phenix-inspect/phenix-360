@@ -61,60 +61,61 @@ const has = (label, frag) => label.toLowerCase().includes(String(frag).toLowerCa
 
 /** Confronte une lecture du moteur à la vérité attendue → batterie de métriques. */
 function mesurer(analyse, truth) {
-  const fermes = analyse.devis ? analyse.devis.lots.flatMap((l) => l.postes).filter((p) => !p.option) : [];
-  const optionsDetectees = analyse.options.length;
-  const exclusionsDetectees = analyse.exclusions.length;
+  const fermes = analyse.devis
+    ? analyse.devis.lots.flatMap((l) => l.postes).filter((p) => !p.option)
+    : [];
+  const detectees = fermes.length;
+  const attendues = truth.prestations; // peut être null (vérité à établir)
+  // Comptage : lignes oubliées / inventées (net) — indépendant de l'appariement fin.
+  const oublieesN = attendues == null ? null : Math.max(0, attendues - detectees);
+  const inventeesN = attendues == null ? null : Math.max(0, detectees - attendues);
 
-  // Appariement glouton attendu → prestation détectée (départage par montant).
+  // Contrôles PONCTUELS via `attendus` (présence, montant, non-troncature).
   const restants = [...fermes];
-  const oubliees = [];
+  const spotManquants = [];
   const tronquees = [];
   const montantsIncorrects = [];
-  let apparies = 0;
   for (const att of truth.attendus ?? []) {
     const candidats = restants.filter((p) => has(p.label, att.cle));
     if (candidats.length === 0) {
-      oubliees.push(att.cle);
+      spotManquants.push(att.cle);
       continue;
     }
     let pick = candidats[0];
-    if (att.montantHT != null) {
+    if (att.montantHT != null)
       for (const c of candidats)
         if (Math.abs(c.montantHT - att.montantHT) < Math.abs(pick.montantHT - att.montantHT)) pick = c;
-    }
     restants.splice(restants.indexOf(pick), 1);
-    apparies += 1;
     if (att.montantHT != null && Math.abs(pick.montantHT - att.montantHT) > EUR)
       montantsIncorrects.push(`${att.cle}: attendu ${att.montantHT} obtenu ${pick.montantHT}`);
     if (att.doitContenir && !has(pick.label, att.doitContenir))
       tronquees.push(`${att.cle}: « ${att.doitContenir} » perdu`);
   }
-  // Prestations détectées non rattachées à une vérité = potentiellement inventées.
-  const inventees = truth.attendus ? restants.map((p) => p.label) : [];
 
   const r = analyse.reconciliation;
-  const ttcReconstruit = r.totalTTCDeclare; // le moteur lit le TTC déclaré
-  const ecartHT = r.ecartHT ?? (r.totalHTDeclare != null ? Math.abs(r.sommeLignesHT - r.totalHTDeclare) : 0);
+  const ecartHT =
+    r.ecartHT ?? (r.totalHTDeclare != null ? Math.abs(r.sommeLignesHT - r.totalHTDeclare) : 0);
   const tolerance = Math.max(1, (r.totalHTDeclare ?? 0) * 0.005);
   // Invariant : tout écart réel HORS tolérance doit être signalé (coherent=false).
   const ecartDetecte = ecartHT <= tolerance ? true : r.coherent === false;
 
   return {
-    prestationsAttendues: truth.prestations,
-    prestationsDetectees: fermes.length,
-    oubliees,
-    inventees,
+    attendues,
+    detectees,
+    oublieesN,
+    inventeesN,
+    spotManquants,
     tronquees,
     montantsIncorrects,
     lotsAttendus: truth.lots,
     lotsDetectes: analyse.devis ? analyse.devis.lots.length : 0,
     optionsAttendues: truth.options,
-    optionsDetectees,
+    optionsDetectees: analyse.options.length,
     exclusionsAttendues: truth.exclusions,
-    exclusionsDetectees,
+    exclusionsDetectees: analyse.exclusions.length,
     htDeclareLu: r.totalHTDeclare,
     htReconstruit: r.sommeLignesHT,
-    ttcDeclareLu: ttcReconstruit,
+    ttcDeclareLu: r.totalTTCDeclare,
     ecartHT,
     coherent: r.coherent,
     ecartDetecte,
@@ -131,15 +132,24 @@ for (const entry of CORPUS) {
   const analyse = analyserDevisGeo(geom);
   const m = mesurer(analyse, entry.truth);
   mesures.push({ entry, m, fallback: analyse.fallbackTexte });
-  console.log(`\n── ${entry.id}  [${entry.truth.source} · ${entry.truth.type}${entry.truth.critique ? ' · CRITIQUE' : ''}]`);
-  console.log(`   prestations : attendues ${m.prestationsAttendues} · détectées ${m.prestationsDetectees}`);
-  console.log(`   lignes oubliées ${m.oubliees.length} · inventées ${m.inventees.length} · tronquées ${m.tronquees.length}`);
-  console.log(`   montants incorrects ${m.montantsIncorrects.length} · lots ${m.lotsDetectes}/${m.lotsAttendus}`);
-  console.log(`   options ${m.optionsDetectees}/${m.optionsAttendues} · exclusions ${m.exclusionsDetectees}/${m.exclusionsAttendues}`);
-  console.log(`   HT déclaré lu ${m.htDeclareLu} (vérité ${entry.truth.totalHT}) · Σ lignes ${m.htReconstruit} · écart ${m.ecartHT} · détecté ${m.ecartDetecte}`);
-  console.log(`   TTC déclaré lu ${m.ttcDeclareLu} (vérité ${entry.truth.totalTTC}) · lignes incertaines signalées ${m.incertaines}`);
-  if (m.oubliees.length) console.log(`   ⚠ oubliées: ${m.oubliees.join(' | ')}`);
-  if (m.inventees.length) console.log(`   ⚠ inventées: ${m.inventees.join(' | ')}`);
+  const gt = m.attendues == null ? ' (vérité à établir)' : '';
+  console.log(
+    `\n── ${entry.id}  [${entry.truth.source} · ${entry.truth.type}${entry.truth.critique ? ' · CRITIQUE' : ''}]`,
+  );
+  console.log(`   prestations : attendues ${m.attendues ?? '?'} · détectées ${m.detectees}${gt}`);
+  console.log(
+    `   lignes oubliées ${m.oublieesN ?? '?'} · inventées ${m.inventeesN ?? '?'} · tronquées ${m.tronquees.length} · montants incorrects ${m.montantsIncorrects.length}`,
+  );
+  console.log(
+    `   lots ${m.lotsDetectes}/${m.lotsAttendus ?? '?'} · options ${m.optionsDetectees}/${m.optionsAttendues} · exclusions ${m.exclusionsDetectees}/${m.exclusionsAttendues}`,
+  );
+  console.log(
+    `   HT déclaré lu ${m.htDeclareLu} (vérité ${entry.truth.totalHT}) · Σ lignes ${m.htReconstruit} · écart ${m.ecartHT} · détecté ${m.ecartDetecte}`,
+  );
+  console.log(
+    `   TTC déclaré lu ${m.ttcDeclareLu} (vérité ${entry.truth.totalTTC}) · lignes incertaines signalées ${m.incertaines}`,
+  );
+  if (m.spotManquants.length) console.log(`   ⚠ contrôles absents: ${m.spotManquants.join(' | ')}`);
   if (m.tronquees.length) console.log(`   ⚠ tronquées: ${m.tronquees.join(' | ')}`);
   if (m.montantsIncorrects.length) console.log(`   ⚠ montants: ${m.montantsIncorrects.join(' | ')}`);
 }
@@ -147,16 +157,17 @@ for (const entry of CORPUS) {
 /* ---- Seuils d'acceptation sur le corpus CRITIQUE ---------------------------- */
 for (const { entry, m } of mesures.filter((x) => x.entry.truth.critique)) {
   const id = entry.id;
-  check(`[${id}] 0 prestation inventée`, () => {
-    if (m.inventees.length) throw new Error(m.inventees.join(' | '));
+  check(`[${id}] comptage exact (0 oubliée, 0 inventée)`, () => {
+    if (m.oublieesN !== 0 || m.inventeesN !== 0)
+      throw new Error(`attendues ${m.attendues}, détectées ${m.detectees}`);
   });
-  check(`[${id}] 0 prestation oubliée`, () => {
-    if (m.oubliees.length) throw new Error(m.oubliees.join(' | '));
+  check(`[${id}] contrôles ponctuels présents (aucune prestation-clé manquante)`, () => {
+    if (m.spotManquants.length) throw new Error(m.spotManquants.join(' | '));
   });
   check(`[${id}] 0 description tronquée`, () => {
     if (m.tronquees.length) throw new Error(m.tronquees.join(' | '));
   });
-  check(`[${id}] montants exacts`, () => {
+  check(`[${id}] montants exacts (contrôles ponctuels)`, () => {
     if (m.montantsIncorrects.length) throw new Error(m.montantsIncorrects.join(' | '));
   });
   check(`[${id}] lots exacts (${m.lotsAttendus})`, () => {
@@ -175,8 +186,9 @@ for (const { entry, m } of mesures.filter((x) => x.entry.truth.critique)) {
     if (Math.abs((m.ttcDeclareLu ?? -1) - entry.truth.totalTTC) > EUR)
       throw new Error(`TTC lu ${m.ttcDeclareLu} ≠ ${entry.truth.totalTTC}`);
   });
-  check(`[${id}] tout écart financier réel est DÉTECTÉ (jamais masqué)`, () => {
-    if (!m.ecartDetecte) throw new Error(`écart ${m.ecartHT} non signalé (coherent=${m.coherent})`);
+  check(`[${id}] réconciliation cohérente (montants alignés)`, () => {
+    if (!m.coherent) throw new Error(`écart ${m.ecartHT}`);
+    if (!m.ecartDetecte) throw new Error(`écart ${m.ecartHT} non signalé`);
   });
 }
 
@@ -184,15 +196,18 @@ for (const { entry, m } of mesures.filter((x) => x.entry.truth.critique)) {
 const critiques = mesures.filter((x) => x.entry.truth.critique);
 const natifs = mesures.filter((x) => x.entry.truth.type === 'natif').length;
 const scannes = mesures.filter((x) => x.entry.truth.type === 'scanne').length;
-const zeroInvente = critiques.every((x) => x.m.inventees.length === 0);
+const zeroInvente = critiques.every((x) => x.m.inventeesN === 0);
 const ecartsOk = critiques.every((x) => x.m.ecartDetecte);
+const aQualifier = mesures.filter((x) => x.m.attendues == null).length;
 console.log('\n===== VERDICT DE READINESS =====');
 console.log(`  Documents réels             : ${CORPUS.length} (objectif ≥ 15)`);
+console.log(`  Dont critiques / à qualifier: ${critiques.length} / ${aQualifier}`);
 console.log(`  Familles cibles             : ${FAMILLES_CIBLES.length} à couvrir`);
 console.log(`  PDF natifs / scannés        : ${natifs} / ${scannes}`);
 console.log(`  0 prestation inventée (crit): ${zeroInvente ? 'oui' : 'NON'}`);
 console.log(`  100 % écarts détectés (crit): ${ecartsOk ? 'oui' : 'NON'}`);
-const operationnel = CORPUS.length >= 15 && natifs > 0 && scannes > 0 && zeroInvente && ecartsOk;
+const operationnel =
+  CORPUS.length >= 15 && natifs > 0 && scannes > 0 && aQualifier === 0 && zeroInvente && ecartsOk;
 console.log(
   `  → OPÉRATIONNEL : ${operationnel ? 'OUI' : 'NON — en attente du corpus complet (≥15 docs, natifs + scannés)'}`,
 );

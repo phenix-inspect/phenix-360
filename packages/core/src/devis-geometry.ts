@@ -8,13 +8,19 @@
  * GÉOMÉTRIE réelle du PDF (chaque mot connaît sa page, son x, son y, sa largeur)
  * et déroule un pipeline explicite :
  *
- *   1. Reconstruction des lignes   (regroupement par y, tri par x)
- *   2. Détection des colonnes       (ancrées sur l'en-tête du tableau)
- *   3. Retrait en-têtes / pieds     (pieds de page répétés, bandeaux)
- *   4. Classification des blocs      (~25 types ; « indéterminé » ≠ prestation)
+ *   1. Reconstruction des lignes   (regroupement par y, tri par x, fusion milliers)
+ *   2. Détection des colonnes       (sémantique de l'en-tête + positions APPRISES
+ *                                     des données : ordre des colonnes agnostique)
+ *   3. Retrait en-têtes / pieds     (pieds de page répétés, QR, bandeaux)
+ *   4. Classification des blocs      (~25 types, STRUCTURELLE ; numéro OPTIONNEL ;
+ *                                     « indéterminé » n'est JAMAIS une prestation)
  *   5. Construction des prestations  (libellé exact + libellé court, source,
- *                                     confiance, statut brouillon)
+ *                                     confiance, statut brouillon ; sections nommées)
  *   6. Contrôles de cohérence        (montants, comptage, prix orphelin, options)
+ *
+ * Qualifié sur un corpus RÉEL hétérogène : Phenix-amo, Renovely, bon de commande
+ * SANS numéro (sections nommées), devis multi-corps d'état à numérotation 3 niveaux
+ * et colonnes réordonnées (TVA avant Qté). Aucune règle calée sur un logiciel donné.
  *
  * Règle d'or inchangée : ne JAMAIS inventer. Un bloc non classé en prestation
  * (exclusion, note, total, ventilation TVA, pied de page) n'entre pas au contrat.
@@ -191,6 +197,31 @@ export interface DevisAnalyseGeo {
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 const norm = (s: string): string => s.replace(/\s{2,}/g, ' ').trim();
 
+/**
+ * Fusionne un montant coupé par le SÉPARATEUR DE MILLIERS (« 1 127,50 » rendu en
+ * deux mots « 1 » + « 127,50 ») quand les deux mots sont adjacents. Sans cela, la
+ * partie « milliers » pollue la reconstruction des colonnes (grappe des totaux
+ * élargie) et l'assignation. Ne fusionne que des chiffres réellement contigus.
+ */
+function fusionnerMilliers(toks: MotToken[]): MotToken[] {
+  const sorted = [...toks].sort((a, b) => a.x - b.x);
+  const out: MotToken[] = [];
+  for (let i = 0; i < sorted.length; i += 1) {
+    const t = sorted[i]!;
+    const n = sorted[i + 1];
+    if (
+      n &&
+      /^\d{1,3}$/.test(t.str) &&
+      /^\d{3}([.,\s]\d{1,3})*\s*€?$/.test(n.str) &&
+      n.x - (t.x + t.w) < 12
+    ) {
+      out.push({ x: t.x, y: t.y, w: n.x + n.w - t.x, str: `${t.str} ${n.str}` });
+      i += 1;
+    } else out.push(t);
+  }
+  return out;
+}
+
 /** Regroupe les mots d'une page en lignes (tolérance verticale). */
 function grouperLignes(tokens: MotToken[]): { y: number; toks: MotToken[] }[] {
   const sorted = [...tokens].sort((a, b) => b.y - a.y || a.x - b.x);
@@ -205,58 +236,146 @@ function grouperLignes(tokens: MotToken[]): { y: number; toks: MotToken[] }[] {
 }
 
 /* -------------------------------------------------------------------------- *
- * Détection des colonnes (ancrée sur l'en-tête « N° DÉSIGNATION QTÉ … »)
- * -------------------------------------------------------------------------- */
+ * Détection des colonnes — PILOTÉE PAR LES DONNÉES, agnostique au logiciel
+ * -------------------------------------------------------------------------- *
+ * L'en-tête (« … DÉSIGNATION … TOTAL HT ») donne la SÉMANTIQUE et l'ORDRE des
+ * colonnes de valeurs ; leurs positions RÉELLES sont apprises des données (les
+ * montants sont cadrés à droite, leur bord gauche varie selon le nombre de
+ * chiffres). On regroupe les mots « valeurs » des lignes de prestation en
+ * grappes (séparées par les plus grands écarts horizontaux), reliées aux
+ * colonnes de l'en-tête dans l'ordre des x. La DÉSIGNATION est tout ce qui est à
+ * GAUCHE de la première colonne de valeurs ; le NUMÉRO (optionnel) est détecté
+ * par motif, pas par position. Fonctionne pour Phenix-amo/Renovely (Qté U Prix
+ * TVA Total), les bons de commande SANS numéro, et les devis à colonnes
+ * réordonnées (TVA avant Qté), sans règle calée sur un logiciel donné.
+ */
+type ColKey = 'qte' | 'unite' | 'prix' | 'tva' | 'total';
+interface ColonneValeur {
+  col: ColKey;
+  min: number;
+  max: number;
+  center: number;
+}
 interface Colonnes {
-  /** Bord droit de la colonne « N° » (au-delà : désignation). */
-  numMax: number;
-  /** Bord droit de la désignation (au-delà : zone des valeurs). */
-  desMax: number;
-  /** Ancres (x gauche) des colonnes de valeurs, pour l'assignation au plus proche. */
-  ancres: { col: keyof CellulesLigne; x: number }[];
+  /** Bord gauche de la zone des valeurs (à gauche = désignation). */
+  valueLeft: number;
+  cols: ColonneValeur[];
 }
 
 const RE_DESIGNATION = /d[eé]signation/i;
 const RE_TOTAL_HT = /total\s*ht/i;
+/**
+ * Un mot est-il une VALEUR (montant/quantité/taux/unité) — motif ANCRÉ, pas un
+ * simple « contient un chiffre » : une désignation comme « classe P3, 7.5 » ou
+ * « doublage BA13 » ne doit PAS être prise pour une valeur (sinon la reconstruction
+ * des colonnes avale la désignation).
+ */
+const UNITE_RE = /^(u|u\.|ml|m2|m²|m3|m³|ens\.?|forfait|ff|f|pce|pcs|pc|lot|kg|g|l|h|j)$/i;
+const RE_MONTANT_TOK = /^\d[\d\s ]*([.,]\d{1,3})?\s*€?$/;
+const RE_TAUX_TOK = /^\d{1,3}([.,]\d+)?\s*%$/;
+const estValeur = (s: string): boolean =>
+  RE_MONTANT_TOK.test(s) || RE_TAUX_TOK.test(s) || UNITE_RE.test(s);
+/** Un mot finit-il une ligne par un MONTANT (« 1 234,56 € ») ? */
+const finitParMontant = (s: string): boolean => /\d[\d\s]*,\d{2}\s*€?$/.test(s);
 
-/** Trouve l'en-tête du tableau et en déduit les frontières de colonnes. */
+/** Colonnes sémantiques de l'en-tête, dans l'ordre des x (num/désignation exclues). */
+function colonnesEntete(toks: MotToken[]): { col: ColKey; x: number }[] {
+  const desX = toks.find((t) => RE_DESIGNATION.test(t.str))?.x ?? -1;
+  const out: { col: ColKey; x: number }[] = [];
+  const seen = new Set<ColKey>();
+  for (const t of [...toks].sort((a, b) => a.x - b.x)) {
+    if (t.x <= desX) continue;
+    let col: ColKey | undefined;
+    if (/^(qt|quantit)/i.test(t.str)) col = 'qte';
+    else if (/^(u\.?$|unit)/i.test(t.str)) col = 'unite';
+    else if (/prix/i.test(t.str)) col = 'prix';
+    else if (/^tva/i.test(t.str)) col = 'tva';
+    else if (/^total/i.test(t.str)) col = 'total';
+    if (col && !seen.has(col)) {
+      seen.add(col);
+      out.push({ col, x: t.x });
+    }
+  }
+  return out;
+}
+
+/** Détecte l'en-tête, puis apprend les colonnes de valeurs à partir des données. */
 function detecterColonnes(pages: PageGeom[]): Colonnes | undefined {
+  let headerToks: MotToken[] | undefined;
   for (const pg of pages) {
     for (const row of grouperLignes(pg.tokens)) {
       const brut = norm(row.toks.map((t) => t.str).join(' '));
-      if (!RE_DESIGNATION.test(brut) || !RE_TOTAL_HT.test(brut)) continue;
-      // Ancres sur les intitulés de colonnes (x gauche de chaque en-tête).
-      const at = (re: RegExp): number | undefined => row.toks.find((t) => re.test(t.str))?.x;
-      const num = at(/^N/);
-      const des = row.toks.find((t) => RE_DESIGNATION.test(t.str))?.x;
-      const qte = at(/^Q/i);
-      const uni = at(/^U/i);
-      const prix = row.toks.find((t) => /prix/i.test(t.str))?.x;
-      const tva = at(/^TVA/i);
-      const total = row.toks.find((t) => RE_TOTAL_HT.test(t.str))?.x;
-      if (des == null || qte == null || total == null) continue;
-      const ancres: { col: keyof CellulesLigne; x: number }[] = [];
-      if (qte != null) ancres.push({ col: 'qte', x: qte });
-      if (uni != null) ancres.push({ col: 'unite', x: uni });
-      if (prix != null) ancres.push({ col: 'prix', x: prix });
-      if (tva != null) ancres.push({ col: 'tva', x: tva });
-      ancres.push({ col: 'total', x: total });
-      return {
-        numMax: num != null ? (num + des) / 2 : des - 12,
-        // La désignation s'arrête AVANT la colonne QTÉ. Les valeurs de QTÉ sont
-        // cadrées à droite : selon le nombre de chiffres, leur bord GAUCHE varie
-        // (« 1,00 » plus à droite que « 140,00 »). On place donc la frontière
-        // assez à gauche de l'ancre d'en-tête pour capter aussi les quantités
-        // longues, sans mordre sur la désignation (qui reste nettement à gauche).
-        desMax: qte - 20,
-        ancres,
-      };
+      if (RE_DESIGNATION.test(brut) && RE_TOTAL_HT.test(brut)) {
+        headerToks = row.toks;
+        break;
+      }
+    }
+    if (headerToks) break;
+  }
+  if (!headerToks) return undefined;
+  const entete = colonnesEntete(headerToks);
+  if (entete.length < 2) return undefined;
+
+  // Apprentissage : centres des mots-valeurs des lignes de PRESTATION (finissant
+  // par un montant). On privilégie les lignes à NUMÉRO de tête (vraies lignes du
+  // tableau) : cela écarte les blocs de fin de page (acompte, ventilation TVA) qui
+  // finissent aussi par un montant. À défaut de numérotation (bons de commande),
+  // on retombe sur toutes les lignes finissant par un montant.
+  type Span = { c: number; left: number; right: number };
+  const spansNum: Span[] = [];
+  const spansAll: Span[] = [];
+  for (const pg of pages) {
+    for (const row of grouperLignes(pg.tokens)) {
+      const toks = fusionnerMilliers(row.toks);
+      const last = toks[toks.length - 1];
+      if (!last || !finitParMontant(last.str)) continue;
+      let i = toks.length - 1;
+      while (i >= 0 && estValeur(toks[i]!.str)) i -= 1;
+      const vals = toks.slice(i + 1);
+      if (vals.length < 2) continue; // au moins prix + total
+      const cible = /^\d/.test(toks[0]!.str) ? spansNum : spansAll;
+      for (const t of vals) cible.push({ c: t.x + t.w / 2, left: t.x, right: t.x + t.w });
     }
   }
-  return undefined;
+  const K = entete.length;
+  const spans = spansNum.length >= K ? spansNum : [...spansNum, ...spansAll];
+  if (spans.length < K) return undefined;
+
+  // Grappes par écarts : K colonnes → K-1 plus grands écarts entre centres triés.
+  const sorted = [...spans.map((s) => s.c)].sort((a, b) => a - b);
+  const cuts = sorted
+    .slice(1)
+    .map((v, i) => ({ gap: v - sorted[i]!, at: i }))
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, K - 1)
+    .map((g) => g.at)
+    .sort((a, b) => a - b);
+  const bornes = cuts.map((cut) => (sorted[cut]! + sorted[cut + 1]!) / 2);
+  const clusterOf = (c: number): number => {
+    let k = 0;
+    while (k < bornes.length && c >= bornes[k]!) k += 1;
+    return k;
+  };
+  const agg = Array.from({ length: K }, () => ({ min: Infinity, max: -Infinity, sum: 0, n: 0 }));
+  for (const s of spans) {
+    const a = agg[clusterOf(s.c)]!;
+    a.min = Math.min(a.min, s.left);
+    a.max = Math.max(a.max, s.right);
+    a.sum += s.c;
+    a.n += 1;
+  }
+  // Relie chaque grappe (ordre x) à sa colonne sémantique (en-tête, ordre x).
+  const cols: ColonneValeur[] = [];
+  for (let k = 0; k < K; k += 1) {
+    const a = agg[k]!;
+    if (a.n === 0) continue;
+    cols.push({ col: entete[k]!.col, min: a.min, max: a.max, center: a.sum / a.n });
+  }
+  if (cols.length === 0) return undefined;
+  return { valueLeft: Math.min(...cols.map((c) => c.min)), cols };
 }
 
-/** Assigne les mots d'une ligne à leurs colonnes selon la géométrie détectée. */
+/** Assigne les mots d'une ligne à leurs colonnes (désignation = à gauche des valeurs). */
 function cellulesDeLigne(toks: MotToken[], col: Colonnes): CellulesLigne {
   const cells: CellulesLigne = {
     num: '',
@@ -270,15 +389,38 @@ function cellulesDeLigne(toks: MotToken[], col: Colonnes): CellulesLigne {
   const push = (k: keyof CellulesLigne, s: string): void => {
     cells[k] = cells[k] ? `${cells[k]} ${s}` : s;
   };
-  for (const t of toks) {
-    if (t.x < col.numMax) push('num', t.str);
-    else if (t.x < col.desMax) push('designation', t.str);
-    else {
-      // Zone des valeurs : colonne dont l'ancre est la plus proche du bord gauche.
-      let best = col.ancres[0]!;
-      for (const a of col.ancres) if (Math.abs(a.x - t.x) < Math.abs(best.x - t.x)) best = a;
-      push(best.col, t.str);
+  // Dé-doublonnage du texte rendu DEUX FOIS (même mot, position quasi identique).
+  const dedup: MotToken[] = [];
+  for (const t of fusionnerMilliers(toks)) {
+    const prev = dedup[dedup.length - 1];
+    if (prev && prev.str === t.str && Math.abs(prev.x - t.x) <= 2) continue;
+    dedup.push(t);
+  }
+  // Numéro de tête (optionnel), détecté PAR MOTIF (« 1 », « 1.1 », « 2.1.1 »).
+  let rest = dedup;
+  const first = dedup[0];
+  if (
+    first &&
+    first.x + first.w / 2 < col.valueLeft &&
+    /^\d{1,2}(\.\d{1,2}){0,3}\.?$/.test(first.str)
+  ) {
+    cells.num = first.str.replace(/\.$/, '');
+    rest = dedup.slice(1);
+  }
+  for (const t of rest) {
+    const c = t.x + t.w / 2;
+    if (c < col.valueLeft) {
+      push('designation', t.str);
+      continue;
     }
+    let best = col.cols[0]!;
+    for (const cc of col.cols) {
+      const inCc = c >= cc.min && c <= cc.max;
+      const inBest = c >= best.min && c <= best.max;
+      if (inCc && !inBest) best = cc;
+      else if (inCc === inBest && Math.abs(cc.center - c) < Math.abs(best.center - c)) best = cc;
+    }
+    push(best.col, t.str);
   }
   for (const k of Object.keys(cells) as (keyof CellulesLigne)[]) cells[k] = norm(cells[k]);
   return cells;
@@ -287,13 +429,14 @@ function cellulesDeLigne(toks: MotToken[], col: Colonnes): CellulesLigne {
 /* -------------------------------------------------------------------------- *
  * Classification des blocs
  * -------------------------------------------------------------------------- */
-const RE_NUM_POSTE = /^\d{1,2}\.\d{1,2}$/;
-const RE_NUM_LOT = /^\d{1,2}\.?$/;
 const RE_MONTANT = /\d[\d\s]*,\d{2}/;
-const RE_PIED = /(RCS|Page\s+\d+\s+sur\s+\d+|Tél\s*:|Email\s*:|SASU|SIRET)/i;
+const RE_PIED =
+  /(RCS|Page\s+\d+\s+sur\s+\d+|\d+\s*\/\s*\d+\s*$|Tél\s*:|Email\s*:|SASU|SIRET|APE\s|scannez\s+le\s+code|retrouver\s+ce\s+(?:bon|devis))/i;
 const RE_EXCLUSION =
   /(ATTENTION\s*:|n['’]est\s+pas\s+inclus|non\s+inclus|hors\s+devis|à\s+la\s+charge\s+du\s+client|non\s+compris(?:e)?\s+dans)/i;
-const RE_OPTION = /(\boption\b|en\s+option|\bvariante\b|plus-value|à\s+titre\s+indicatif)/i;
+// « plus-value » est un SUPPLÉMENT ferme (pas une option) : on ne le capte PAS ici.
+const RE_OPTION =
+  /(\ben\s+option\b|option\s*:|\bvariante\b|à\s+titre\s+indicatif|pour\s+information)/i;
 const RE_TOTAL_GEN = /(total\s+net\s+ht|total\s+ttc|net\s+à\s+payer|\btva\b\s+\d)/i;
 const RE_VENTIL_TVA = /(taux\s+tva|base\s+ht)/i;
 const RE_ACOMPTE = /(acompte|reste\s+à\s+facturer|arrhes)/i;
@@ -314,51 +457,67 @@ const aValeurs = (c: CellulesLigne): boolean =>
   RE_MONTANT.test(c.total) || RE_MONTANT.test(c.prix) || RE_MONTANT.test(c.qte);
 
 /**
- * Classe UNE ligne reconstruite en l'un des ~25 types de blocs. L'ordre des tests
- * vaut priorité (le plus spécifique d'abord) : pied de page, en-tête, prestation/
- * lot (colonne « N° » numérotée), puis blocs de fin de document (totaux, TVA,
- * acompte, mentions…), puis compléments/matériaux, enfin `indetermine` (repli).
+ * Classe UNE ligne reconstruite en l'un des ~25 types de blocs. STRUCTUREL (le
+ * numéro est optionnel) : une PRESTATION = désignation + valeurs (total + prix ou
+ * quantité) ; un LOT/section = désignation sans prix ni quantité. L'ordre vaut
+ * priorité : pied de page, en-tête, blocs de fin de document (par mot-clé, robuste
+ * à la zone), puis prestation, exclusion, lot/section, sous-total, matériau, et
+ * enfin `indetermine` (repli — JAMAIS une prestation). Le contexte (lot courant,
+ * prestation en cours, dans/hors tableau) est tranché dans la boucle de construction.
  */
 function classerLigne(c: CellulesLigne, brut: string): BlocType {
   if (RE_PIED.test(brut)) return 'pied_de_page';
   if (RE_DESIGNATION.test(brut) && RE_TOTAL_HT.test(brut)) return 'entete_tableau';
 
-  // Prestation ou lot : la colonne « N° » porte un numéro.
-  if (RE_NUM_POSTE.test(c.num)) {
-    if (RE_EXCLUSION.test(c.designation)) return 'exclusion';
-    if (RE_OPTION.test(c.designation)) return 'option';
-    return 'prestation';
-  }
-  if (RE_NUM_LOT.test(c.num) && c.designation && RE_MONTANT.test(c.total) && !c.prix && !c.qte) {
-    return 'lot';
-  }
-
-  // Ligne de DONNÉES de la ventilation TVA (« 5,5 % <base HT> <TVA> ») : un taux
-  // en tête de colonne « valeurs », sans n° ni désignation → jamais une prestation.
-  if (!c.num && !c.designation && /^\d{1,2}([.,]\d+)?\s*%$/.test(c.qte)) return 'ventilation_tva';
-
-  // Blocs de fin de document (hors tableau des prestations).
+  // Blocs de fin de document reconnus par MOT-CLÉ (robustes à la colonne/zone).
   if (RE_VENTIL_TVA.test(brut)) return 'ventilation_tva';
+  if (!c.num && !c.designation && /^\d{1,2}([.,]\d+)?\s*%$/.test(c.qte)) return 'ventilation_tva';
   if (RE_TOTAL_GEN.test(brut)) return 'total_general';
   if (RE_ACOMPTE.test(brut)) return 'acompte';
   if (RE_ECHEANCE.test(brut)) return 'echeancier';
   if (RE_PAIEMENT.test(brut)) return 'conditions_paiement';
   if (RE_DECHETS.test(brut)) return 'gestion_dechets';
   if (RE_SIGN.test(brut)) return 'signature';
-  if (RE_NOTES.test(brut)) return 'notes';
   if (RE_MENTIONS.test(brut)) return 'mentions_legales';
   if (RE_GARANTIE.test(brut)) return 'garantie';
   if (RE_REMISE.test(brut)) return 'remise';
   if (RE_DELAI.test(brut)) return 'delai';
+  if (RE_NOTES.test(brut)) return 'notes';
 
-  // Rattachable à une prestation en cours : complément ou matériau.
-  if (c.designation && !c.num && !aValeurs(c)) {
-    return /^[-•·]/.test(c.designation) ? 'materiau' : 'description_complement';
+  const hasTotal = RE_MONTANT.test(c.total);
+  const hasPrix = c.prix !== '';
+  const hasQte = c.qte !== '';
+  const numSimple = /^\d{1,2}$/.test(c.num);
+  const numMulti = /^\d{1,2}(\.\d{1,2}){1,3}$/.test(c.num);
+
+  // PRESTATION : désignation + valeurs (total + prix OU quantité). Numéro optionnel.
+  if (c.designation && hasTotal && (hasPrix || hasQte)) {
+    if (RE_EXCLUSION.test(c.designation)) return 'exclusion';
+    if (RE_OPTION.test(c.designation)) return 'option';
+    return 'prestation';
   }
-  // Ligne de valeurs orpheline (num vide mais montants présents).
-  if (!c.num && aValeurs(c)) return 'prestation_valeurs';
+  // EXCLUSION explicite (« … N'EST PAS INCLUSE »), même sans valeurs exploitables.
+  if (c.designation && RE_EXCLUSION.test(c.designation)) return 'exclusion';
+
+  // LOT / SECTION : désignation sans prix ni quantité (total = sous-total éventuel).
+  if (c.designation && !hasPrix && !hasQte) {
+    if (numSimple) return 'lot'; // lot numéroté (« 1 INSTALLATION »)
+    if (numMulti) return 'sous_total_lot'; // sous-section numérotée (« 2.1 »)
+    if (/^[-•·]/.test(brut.trim())) return 'materiau'; // puce matériau
+    // Sans numéro : continuation d'un libellé OU intitulé de section → décidé au contexte.
+    return 'description_complement';
+  }
+  // Sous-total « <libellé> : <montant> » sans désignation (en zone valeurs).
+  if (!c.designation && hasTotal) return 'sous_total_lot';
+  // Ligne de valeurs orpheline (montants présents, ni désignation ni numéro).
+  if (!c.designation && aValeurs(c)) return 'prestation_valeurs';
 
   return 'indetermine';
+}
+
+/** Un texte court ressemble-t-il à un INTITULÉ DE SECTION (bon de commande sans n°) ? */
+function estIntituleSection(txt: string): boolean {
+  return txt.length > 0 && txt.length <= 40 && !/[.;]/.test(txt) && txt.split(/\s+/).length <= 5;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -427,7 +586,18 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
   let current: { poste: DevisPoste; complements: string[] } | null = null;
   let seq = 0;
   let lignesNumerotees = 0;
+  // On ne crée lots/prestations qu'À L'INTÉRIEUR du tableau (entre l'en-tête et le
+  // bloc des totaux) : les intitulés courts des mentions de fin ne deviennent pas
+  // des lots. Un devis mono-page sans en-tête distinct reste couvert (repli texte).
+  let dansTableau = false;
   const orphelins: LigneClasse[] = [];
+
+  const ouvrirLot = (id: string, label: string): DevisLot => {
+    finaliser();
+    const lot: DevisLot = { id, label: nettoyerLabel(label), postes: [], statut: 'brouillon' };
+    lots.push(lot);
+    return lot;
+  };
 
   const finaliser = (): void => {
     if (!current) return;
@@ -439,30 +609,56 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
     current = null;
   };
 
-  for (const l of lignes) {
+  // La prochaine ligne « de contenu » (prestation/exclusion/lot) est-elle une
+  // PRESTATION ? Sert à trancher intitulé de section (bon de commande) vs simple
+  // continuation de libellé : une section est suivie de prestations, pas d'un lot.
+  const prestationSuit = (idx: number): boolean => {
+    for (let j = idx + 1; j < lignes.length; j += 1) {
+      const t = lignes[j]!.type;
+      if (t === 'lot') return false;
+      if (t === 'prestation' || t === 'option') return true;
+      // 'exclusion' et blocs neutres : on continue de chercher une vraie prestation.
+    }
+    return false;
+  };
+  let lastExclusion: ExclusionDetectee | null = null;
+
+  for (let idx = 0; idx < lignes.length; idx += 1) {
+    const l = lignes[idx]!;
     const c = l.cells;
     switch (l.type) {
-      case 'lot': {
+      case 'entete_tableau': {
+        dansTableau = true;
+        break;
+      }
+      case 'total_general':
+      case 'ventilation_tva': {
+        // Fin du tableau : au-delà, les intitulés ne créent plus de lots.
         finaliser();
-        const lot: DevisLot = {
-          id: `lot-${c.num.replace(/\.$/, '')}`,
-          label: nettoyerLabel(c.designation.replace(/^\d{1,2}\.\s*/, '')),
-          postes: [],
-          statut: 'brouillon',
-        };
-        lots.push(lot);
-        currentLot = lot;
+        lastExclusion = null;
+        dansTableau = false;
+        break;
+      }
+      case 'lot': {
+        dansTableau = true;
+        lastExclusion = null;
+        currentLot = ouvrirLot(
+          `lot-${c.num.replace(/\.$/, '')}`,
+          c.designation.replace(/^\d{1,2}\.\s*/, ''),
+        );
         break;
       }
       case 'exclusion': {
         finaliser();
         lignesNumerotees += 1;
-        exclusions.push({ page: l.page, texte: norm(c.designation) });
+        lastExclusion = { page: l.page, texte: norm(c.designation) };
+        exclusions.push(lastExclusion);
         break;
       }
       case 'option':
       case 'prestation': {
         finaliser();
+        lastExclusion = null;
         lignesNumerotees += 1;
         if (!currentLot) {
           orphelins.push(l);
@@ -494,7 +690,44 @@ export function analyserDevisGeo(pages: PageGeom[]): DevisAnalyseGeo {
         break;
       }
       case 'description_complement': {
-        if (current) current.complements.push(norm(c.designation));
+        const txt = norm(c.designation);
+        // Un intitulé de SECTION est court, commence par une majuscule ET est suivi
+        // de prestations (≠ continuation de libellé, qui précède un lot).
+        const sectionLike =
+          dansTableau && estIntituleSection(txt) && /^[A-ZÀ-Þ]/.test(txt) && prestationSuit(idx);
+
+        if (current) {
+          // 1ʳᵉ ligne de description d'une prestation à libellé COURT (« Faïence »
+          // + « Dépose et évacuation de faïence » en dessous) : toujours rattachée.
+          const besoinDescription =
+            current.complements.length === 0 && current.poste.label.length < 22;
+          if (besoinDescription || !sectionLike) {
+            current.complements.push(txt);
+            break;
+          }
+          // Sinon (libellé déjà complet + intitulé de section) : nouvelle section.
+        } else if (lastExclusion && !sectionLike) {
+          // Continuation d'une EXCLUSION multi-lignes (« … N'EST PAS / INCLUSE… »).
+          lastExclusion.texte = norm(`${lastExclusion.texte} ${txt}`);
+          break;
+        }
+        if (!dansTableau) break; // hors tableau : mention, jamais un lot
+        // Suite du LIBELLÉ d'un lot fraîchement ouvert (titre sur plusieurs lignes) —
+        // prioritaire sur la détection de section quand le lot n'a pas encore de poste.
+        if (
+          !current &&
+          currentLot &&
+          currentLot.postes.length === 0 &&
+          currentLot.label.length < 60
+        ) {
+          currentLot.label = nettoyerLabel(`${currentLot.label} ${txt}`);
+          break;
+        }
+        // Sinon, INTITULÉ DE SECTION sans numéro (bon de commande) → nouveau lot.
+        if (sectionLike) {
+          lastExclusion = null;
+          currentLot = ouvrirLot(`lot-s${lots.length + 1}`, txt);
+        }
         break;
       }
       case 'prestation_valeurs': {
@@ -569,7 +802,21 @@ function declaredTotalsFrom(lignes: LigneClasse[]): { ht?: number; ttc?: number 
     .filter((l) => l.type === 'total_general' || l.type === 'ventilation_tva')
     .map((l) => l.brut)
     .join('\n');
-  return extractDeclaredTotals(blob);
+  // On accepte « Total net HT » ET « Total HT … <montant> » (bons de commande) —
+  // le lecteur texte (extractDeclaredTotals) reste strict pour ne pas changer son
+  // comportement. La recherche « Total HT » balaie TOUTES les lignes (sans changer
+  // la classification ni la fin de tableau) et exige un montant à la suite.
+  const declared = extractDeclaredTotals(blob);
+  if (declared.ht == null) {
+    for (const l of lignes) {
+      const m = l.brut.match(new RegExp(String.raw`Total\s+HT\s+(\d[\d\s .]*,\d{2})`, 'i'));
+      if (m) {
+        declared.ht = parseMontantFr(m[1]!);
+        break;
+      }
+    }
+  }
+  return declared;
 }
 
 /* -------------------------------------------------------------------------- *

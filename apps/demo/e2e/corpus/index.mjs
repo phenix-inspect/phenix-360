@@ -70,9 +70,90 @@ export const CORPUS = [
       ],
     },
   },
-  // ⬇️ Ajouter ici chaque devis réel anonymisé (Obat, Tolteck, Excel→PDF,
-  //    Word→PDF, logiciel artisan, forfaitaire, multi-TVA, options, avenants,
-  //    natifs ET scannés). Cf. README.md.
+  {
+    id: 'phenix-agencement-027',
+    geomPath: '../fixtures/corpus/phenix-agencement-027.geom.json',
+    truth: {
+      source: 'Phenix-amo (devis mono-poste / forfait)',
+      type: 'natif',
+      critique: true,
+      lots: 1,
+      prestations: 1,
+      exclusions: 0,
+      options: 0,
+      totalHT: 4166.66,
+      totalTTC: 4999.99,
+      attendus: [{ cle: 'agencement', montantHT: 4166.66, doitContenir: 'clé en main' }],
+    },
+  },
+  {
+    id: 'renovely-ventilation-028',
+    geomPath: '../fixtures/corpus/renovely-ventilation-028.geom.json',
+    truth: {
+      source: 'Renovely (autre logiciel, multi-TVA 10/20 %)',
+      type: 'natif',
+      critique: true,
+      lots: 5,
+      prestations: 8,
+      exclusions: 0,
+      options: 0,
+      totalHT: 2624.83,
+      totalTTC: 2902.31,
+      attendus: [
+        { cle: 'Installation de chantier', montantHT: 190 },
+        { cle: "groupe d'extraction", montantHT: 659.83 },
+        { cle: 'ligne electrique', montantHT: 430 },
+        { cle: 'thermostat connecté', montantHT: 543 },
+        { cle: 'grilles de ventilation', montantHT: 360 },
+        { cle: 'Dépose grille', montantHT: 202 },
+        { cle: 'Nettoyage de fin de chantier', montantHT: 90 },
+        { cle: 'Frais de services', montantHT: 150 },
+      ],
+    },
+  },
+  {
+    id: 'bon-commande-martos',
+    geomPath: '../fixtures/corpus/bon-commande-martos.geom.json',
+    truth: {
+      source: 'Bon de commande (sections SANS numéro, sous-totaux par section)',
+      type: 'natif',
+      critique: true,
+      lots: 10,
+      prestations: 34,
+      exclusions: 0,
+      options: 0,
+      totalHT: 25014,
+      totalTTC: 27408.9,
+      // Contrôles ponctuels (les montants globaux sont garantis par la réconciliation).
+      attendus: [
+        { cle: 'Dépose et évacuation de poste salle de bain', montantHT: 200 },
+        { cle: "Ouverture mur extérieur (1,7", montantHT: 400 },
+        { cle: 'Coffrage et bétonnage linteau', montantHT: 300 },
+        { cle: 'Nettoyage complet de fin de chantier', montantHT: 100 },
+        { cle: 'carrelage', montantHT: 3735 },
+      ],
+    },
+  },
+  {
+    id: 'revel-multitrade-decroix',
+    geomPath: '../fixtures/corpus/revel-multitrade-decroix.geom.json',
+    truth: {
+      source: 'Revel (devis 18 pages, multi-corps d’état, numérotation à 3 niveaux)',
+      type: 'natif',
+      critique: false, // CAS DUR partiellement traité — vérité attendue à établir à la main
+      // prestations: null → le harnais imprime les métriques sans les asserter :
+      // la numérotation profonde (1 / 2.1 / 2.1.1) et la TVA héritée par section
+      // restent à qualifier document en main avant de le passer « critique ».
+      prestations: null,
+      lots: null,
+      exclusions: 0,
+      options: 0,
+      totalHT: null,
+      totalTTC: null,
+    },
+  },
+  // ⬇️ Ajouter ici les FAMILLES MANQUANTES (Obat, Tolteck, Excel→PDF, Word→PDF,
+  //    devis avec options/avenants, PDF SCANNÉS). Cf. README.md.
 ];
 
 /** Les 12 familles de mise en page à couvrir avant tout verdict « opérationnel ». */

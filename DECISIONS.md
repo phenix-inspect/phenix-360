@@ -2990,3 +2990,36 @@ Fiable · À vérifier · Incertain. Écran de vérification enrichi (contrôles
 attendue sur le vrai devis anonymisé + cas synthétiques (colonnes, multi-lignes, exclusion, option,
 ventilation TVA, pied de page, repli texte). Léon et la pré-réception restent branchés sur
 `validatedDevis` (rien d'exploité sans validation). Gate complète verte. VISION Art. 8, 9, 11.
+
+---
+
+12/07/2026
+Décision : Qualification du moteur natif sur un CORPUS RÉEL hétérogène + robustesse
+générique multi-logiciels (détection de colonnes pilotée par les données).
+Pourquoi : Cinq devis réels anonymisés ont révélé que le moteur, calé sur la mise en
+page Phenix-amo, échouait sur d'autres logiciels : (a) bon de commande SANS numéro de
+ligne (sections nommées « Démolition », « Gros œuvre »…) → 0 prestation ; (b) devis
+« Revel » 18 pages à numérotation 3 niveaux (2.1.1) et colonnes réordonnées (TVA avant
+Qté), désignation cadrée loin de son en-tête, texte rendu deux fois, milliers coupés
+(« 1 127,50 » en « 1 » + « 127,50 ») → 0 prestation. Corrections GÉNÉRIQUES (jamais
+calées sur un devis) : détection de colonnes désormais PILOTÉE PAR LES DONNÉES
+(sémantique + ordre depuis l'en-tête, positions apprises des lignes de prestation par
+grappes d'écarts) ; classification STRUCTURELLE (une prestation = désignation + valeurs,
+le NUMÉRO devient optionnel) ; désignation = tout ce qui est à gauche de la 1ʳᵉ colonne
+de valeurs ; fusion des milliers ; sections nommées reconnues par contexte (intitulé
+court + majuscule + suivi de prestations) ; continuation d'exclusion et de libellé de lot
+distinguées de l'ouverture de section ; « Total HT » (bon de commande) lu en plus de
+« Total net HT » côté géométrie uniquement (le lecteur texte reste strict).
+Alternatives rejetées : (a) rustines par logiciel → non générique, masque les erreurs ;
+(b) assignation des valeurs par plus proche ancre d'en-tête → échoue sur colonnes cadrées
+à droite (Revel) ; (c) découpage désignation/valeurs par simple « contient un chiffre »
+→ avale les désignations (« classe P3, 7.5 »).
+Impact : Corpus de qualification `apps/demo/e2e/corpus/` (manifeste + vérité attendue à la
+main + `build-fixture.mjs` + harnais de métriques). 4 documents CRITIQUES tous verts
+(réconciliation exacte, comptage exact, 0 inventée, totaux lus = vérité) : Phenix-amo
+(réf. 13 lots/21 postes), Phenix mono-poste, Renovely multi-TVA, bon de commande Martos
+(10 sections/34 postes, HT 25 014 = déclaré). Le devis Revel (18 pages) est LARGEMENT lu
+(41 sections, ~83 prestations, Σ 33 811) mais reste `critique:false` — vérité à établir
+document en main (numérotation profonde, TVA héritée par section). Verdict de readiness
+HONNÊTE : « OPÉRATIONNEL : NON » — 5/15 docs, 0 scanné, OCR local à venir. Devis026/027/028
+inchangés. Gate complète verte. VISION Art. 8, 9, 11.
