@@ -207,6 +207,28 @@ for (const { entry, m, analyse } of mesures.filter((x) => x.entry.truth.critique
   });
 }
 
+/* ---- MÉTRIQUES GLOBALES DU CORPUS OBAT (obligatoires) ----------------------- */
+const obat = mesures.filter((x) => x.entry.truth.logiciel === 'obat');
+const sum = (f) => obat.reduce((a, x) => a + f(x), 0);
+const attenduesObat = sum((x) => x.m.attendues ?? 0);
+const detecteesObat = sum((x) => x.m.detectees);
+const pagesObat = obat.reduce(
+  (a, x) => a + JSON.parse(readFileSync(join(here, 'corpus', x.entry.geomPath), 'utf8')).length,
+  0,
+);
+const spotTotal = sum((x) => (x.entry.truth.attendus ?? []).length);
+const spotOk = spotTotal - sum((x) => x.m.spotManquants.length + x.m.montantsIncorrects.length);
+console.log('\n===== MÉTRIQUES GLOBALES CORPUS OBAT =====');
+console.log(`  Devis OBAT                  : ${obat.length}`);
+console.log(`  Pages OBAT                  : ${pagesObat}`);
+console.log(`  Reconnaissance OBAT         : ${obat.filter((x) => x.analyse.detection.estObat).length}/${obat.length}`);
+console.log(`  Prestations attendues/détect: ${attenduesObat} / ${detecteesObat}`);
+console.log(`  Lignes oubliées / inventées : ${sum((x) => x.m.oublieesN ?? 0)} / ${sum((x) => x.m.inventeesN ?? 0)}`);
+console.log(`  Contrôles ponctuels OK      : ${spotOk}/${spotTotal} (libellés + montants + troncature)`);
+console.log(`  Totaux réconciliés          : ${obat.filter((x) => x.m.coherent).length}/${obat.length}`);
+console.log(`  Descriptions tronquées      : ${sum((x) => x.m.tronquees.length)}`);
+console.log(`  Docs à vérifier (humain)    : ${obat.filter((x) => x.m.incertaines > 0).length}`);
+
 /* ---- VERDICT DE READINESS (honnête, non asserté) ---------------------------- */
 const critiques = mesures.filter((x) => x.entry.truth.critique);
 const natifs = mesures.filter((x) => x.entry.truth.type === 'natif').length;

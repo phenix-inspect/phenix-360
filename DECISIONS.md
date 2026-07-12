@@ -3061,3 +3061,40 @@ de qualification élargi (63/63), profil affiché au conducteur (« Format OBAT 
 Verdict de readiness HONNÊTE inchangé : OPÉRATIONNEL : NON (8/15 docs, 0 scanné ; OCR
 local à venir). Non-régression : générique, synthétique (14/14), lecteur texte (13/13),
 Playwright complet. VISION Art. 8, 9, 11.
+
+---
+
+12/07/2026
+Décision : ENTRAÎNEMENT INTENSIF OBAT — remise/moins-value, double vérification,
+sous-profils, test en aveugle. Le profil OBAT devient un moteur contractuel expert.
+Pourquoi : 4 nouveaux devis OBAT (dont 1 gardé en TEST EN AVEUGLE). Anomalies révélées,
+corrigées de façon générique (jamais par fichier) : (a) REMISE négative « 10.2 Remise
+commerciale exceptionnelle -1 200,00 € » ignorée → écart de +1 200 € : le montant
+négatif était rejeté (parseAmount) ET la ligne prise pour une note (mot-clé « remise »
+testé avant la structure de prestation) ; (b) sur-segmentation des devis PLATS OBAT :
+des lignes de description en MAJUSCULES (« POSE … », « NUMERO 6 », référence produit
+« Apollo ou equivalent ») prises pour des sections → lots fantômes.
+Corrections : (1) montants NÉGATIFS acceptés (remise/moins-value) ; `evaluerVerification`
+distingue « montant 0 = non lu » d'un « négatif = remise délibérée » ; (2) classification
+STRUCTURELLE réordonnée : une ligne NUMÉROTÉE + valeurs est une prestation AVANT les
+mots-clés (remise 10.2), les mots-clés ne s'appliquent qu'aux lignes sans numéro de
+tableau (acompte, ventilation TVA) — les prestations SANS numéro (bons de commande)
+restent gérées après ; (3) règle de sous-profil : « les lots OBAT sont TOUJOURS
+numérotés » → plus de promotion en section des intitulés non numérotés (le générique la
+garde pour les bons de commande). Confirmé par le COMPTAGE DOCUMENTAIRE indépendant
+(034 : 12 lots/27 postes ; 036 : 11/37 ; 038 plat : 1 lot/8 postes).
+Nouveau : CONTRÔLEUR SECONDAIRE (double vérification) indépendant du moteur géométrique
+— vérifie numérotation (sauts), libellés (troncature → rétrograde à « à vérifier »),
+prestations sans montant, total non rapproché. Angle différent, jamais d'invention.
+Sous-profils OBAT documentés (structuré par lots / plat / avec liste de prix).
+Alternatives rejetées : mot-clé « remise » avant la structure (masquait la ligne) ;
+coordonnées figées (fragile) ; garder le test en aveugle non corrigé (le gap trouvé
+était générique et réel — corrigé, puis vérifié en non-régression sur les 9 autres OBAT
+et par comptage documentaire). Recommandation : garder un NOUVEAU devis en aveugle au
+prochain lot.
+Impact : MÉTRIQUES GLOBALES CORPUS OBAT (10 devis, 65 pages) : reconnaissance 10/10,
+prestations 155/155, 0 oubliée, 0 inventée, contrôles ponctuels 57/57, totaux réconciliés
+10/10, descriptions tronquées 0. Test en aveugle 038 : prestations/montants/option
+corrects, réconcilié — a révélé (puis validé le correctif de) la sur-segmentation plate.
+Harnais 99/99. Générique (bon de commande, Revel) inchangé. Verdict honnête : OPÉRATIONNEL
+NON (10/15 docs, 0 scanné ; OCR local à venir). Gate complète verte. VISION Art. 8, 9, 11.

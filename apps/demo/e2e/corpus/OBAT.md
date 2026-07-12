@@ -61,6 +61,32 @@ vaciller.
 - **liste de prix** « prestations supplémentaires » (options à 0 €) ;
 - exclusion ; observations ; frais annexes (« Frais … »).
 
+## Sous-profils OBAT (choisis automatiquement par le dispatcher)
+
+- **OBAT structuré par lots** : en-têtes de lots numérotés (`1 … <sous-total>`,
+  `LOT 01 – …`), prestations `N.M`. La majorité des devis.
+- **OBAT plat** : pas de lots — prestations numérotées `1, 2, 3…` directement → un
+  **lot implicite « Prestations »**. Les lots OBAT étant toujours numérotés, une ligne
+  courte en MAJUSCULES (référence produit, « NUMERO 6 ») n'est **jamais** une section.
+- **OBAT avec liste de prix** : bloc `Transparence des prix / prestations
+supplémentaires` → **options** à la carte (quantité 0), jamais intégrées.
+
+## Variantes contractuelles gérées
+
+- **Remise / moins-value** : ligne numérotée à **montant négatif** (`10.2 Remise
+commerciale exceptionnelle -1 200,00 €`) — comptée dans le total (réconciliation), pas
+  prise pour une note.
+- **Ligne à 0 € / prestation offerte** (`… (OFFERT)`, 0,00 €) : conservée, signalée
+  « à vérifier » (montant nul → contrôle humain).
+- **Option** (`OPTION : …`, quantité 0) : jamais intégrée sans validation.
+
+## Double vérification (contrôleur secondaire)
+
+Un **contrôleur indépendant** inspecte la transcription sous un autre angle (numéros,
+libellés, montants, totaux) et signale : saut de numérotation (prestation retirée),
+description probablement tronquée (→ rétrogradée « à vérifier »), prestation sans montant,
+total non rapproché. En cas de doute : « à vérifier », jamais d'invention.
+
 ## Objectif de précision (atteint sur le corpus OBAT)
 
 100 % des prestations détectées · 0 inventée · 0 exclusion prise pour une prestation ·

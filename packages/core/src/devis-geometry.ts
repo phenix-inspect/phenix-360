@@ -520,10 +520,31 @@ function classerLigne(c: CellulesLigne, brut: string): BlocType {
   // Liste de prix à la carte (add-ons non contractuels) : ouvre une zone d'options.
   if (RE_LISTE_PRIX.test(brut)) return 'liste_prix';
 
-  // Blocs de fin de document reconnus par MOT-CLÉ (robustes à la colonne/zone).
+  // Blocs de fin STRUCTURELS (colonnes de valeurs) : à écarter avant la prestation.
   if (RE_VENTIL_TVA.test(brut)) return 'ventilation_tva';
   if (!c.num && !c.designation && /^\d{1,2}([.,]\d+)?\s*%$/.test(c.qte)) return 'ventilation_tva';
   if (RE_TOTAL_GEN.test(brut)) return 'total_general';
+
+  const hasTotal = RE_MONTANT.test(c.total);
+  const hasPrix = c.prix !== '';
+  const hasQte = c.qte !== '';
+  const numSimple = /^\d{1,2}$/.test(c.num);
+  const numMulti = /^\d{1,2}(\.\d{1,2}){1,3}$/.test(c.num);
+
+  const estPrestation = c.designation !== '' && hasTotal && (hasPrix || hasQte);
+  const classerPrestation = (): BlocType => {
+    if (RE_EXCLUSION.test(c.designation)) return 'exclusion';
+    if (RE_OPTION.test(c.designation)) return 'option';
+    return 'prestation';
+  };
+
+  // PRESTATION NUMÉROTÉE — prioritaire sur les mots-clés : une ligne chiffrée
+  // « 10.2 Remise commerciale exceptionnelle -1 200,00 € » est une PRESTATION
+  // (remise / moins-value), pas une note. Le NUMÉRO distingue une vraie ligne du
+  // tableau d'un bloc de fin (acompte, ventilation TVA) qui, lui, n'en a pas.
+  if ((numSimple || numMulti) && estPrestation) return classerPrestation();
+
+  // Blocs de fin de document reconnus par MOT-CLÉ (lignes SANS numéro de tableau).
   if (RE_ACOMPTE.test(brut)) return 'acompte';
   if (RE_ECHEANCE.test(brut)) return 'echeancier';
   if (RE_PAIEMENT.test(brut)) return 'conditions_paiement';
@@ -535,18 +556,8 @@ function classerLigne(c: CellulesLigne, brut: string): BlocType {
   if (RE_DELAI.test(brut)) return 'delai';
   if (RE_NOTES.test(brut)) return 'notes';
 
-  const hasTotal = RE_MONTANT.test(c.total);
-  const hasPrix = c.prix !== '';
-  const hasQte = c.qte !== '';
-  const numSimple = /^\d{1,2}$/.test(c.num);
-  const numMulti = /^\d{1,2}(\.\d{1,2}){1,3}$/.test(c.num);
-
-  // PRESTATION : désignation + valeurs (total + prix OU quantité). Numéro optionnel.
-  if (c.designation && hasTotal && (hasPrix || hasQte)) {
-    if (RE_EXCLUSION.test(c.designation)) return 'exclusion';
-    if (RE_OPTION.test(c.designation)) return 'option';
-    return 'prestation';
-  }
+  // PRESTATION NON NUMÉROTÉE (bons de commande sans numéro), après les mots-clés.
+  if (estPrestation) return classerPrestation();
   // EXCLUSION explicite (« … N'EST PAS INCLUSE »), même sans valeurs exploitables.
   if (c.designation && RE_EXCLUSION.test(c.designation)) return 'exclusion';
 
@@ -652,6 +663,11 @@ export function analyserDevisGeo(
   // bloc des totaux) : les intitulés courts des mentions de fin ne deviennent pas
   // des lots. Un devis mono-page sans en-tête distinct reste couvert (repli texte).
   let dansTableau = false;
+  // Profil OBAT : les lots sont TOUJOURS numérotés. On désactive donc la promotion
+  // en section des intitulés NON numérotés (une ligne courte en majuscules dans une
+  // description — « POSE … », « NUMERO 6 », une référence produit — n'est pas un lot).
+  // Le moteur générique (bons de commande sans numéro) garde cette promotion.
+  const sectionsAutorisees = profil !== 'obat';
   // Après une « Transparence des prix » / « prestations supplémentaires » : les
   // lignes chiffrées sont des OPTIONS à la carte (jamais intégrées sans validation).
   let apresListePrix = false;
@@ -768,6 +784,7 @@ export function analyserDevisGeo(
         // Un intitulé de SECTION est court, commence par une majuscule ET est suivi
         // de prestations (≠ continuation de libellé, qui précède un lot).
         const sectionLike =
+          sectionsAutorisees &&
           dansTableau &&
           estIntituleSection(txt) &&
           /^[A-ZÀ-Þ]/.test(txt) &&
@@ -875,7 +892,7 @@ export function analyserDevisGeo(
     : undefined;
   const reconciliation = reconcileTotals(devisFerme, declared.ht, declared.ttc);
 
-  // 6) Contrôles de cohérence.
+  // 6) Contrôles de cohérence (moteur principal) + CONTRÔLEUR SECONDAIRE indépendant.
   const controles = controlesCoherence({
     devis,
     reconciliation,
@@ -885,6 +902,9 @@ export function analyserDevisGeo(
     options,
     declaredTTC: declared.ttc,
   });
+  // Double vérification : angle DIFFÉRENT (numéros, libellés, montants, totaux). En
+  // cas de doute il rétrograde la confiance de la ligne — jamais d'invention.
+  controles.push(...controleurSecondaire(devis, reconciliation));
 
   return {
     devis,
@@ -932,6 +952,82 @@ function declaredTotalsFrom(lignes: LigneClasse[]): { ht?: number; ttc?: number 
 /* -------------------------------------------------------------------------- *
  * Contrôles de cohérence (déterministes)
  * -------------------------------------------------------------------------- */
+/**
+ * CONTRÔLEUR SECONDAIRE (double vérification) — INDÉPENDANT du moteur géométrique.
+ * Il ne rejoue pas la reconstruction : il inspecte la TRANSCRIPTION déjà produite
+ * (numéros, libellés, montants, totaux) sous un autre angle et signale les
+ * incohérences. En cas de doute il rétrograde la confiance de la ligne à « à
+ * vérifier » — jamais d'invention, jamais de masquage.
+ */
+function controleurSecondaire(
+  devis: Devis | undefined,
+  reconciliation: TotalsReconciliation,
+): ControleCoherence[] {
+  const out: ControleCoherence[] = [];
+  if (!devis) return out;
+  const postes = devis.lots.flatMap((l) => l.postes);
+
+  // 1) Saut de NUMÉROTATION dans un lot (prestation retirée / non lue).
+  const sauts: string[] = [];
+  for (const lot of devis.lots) {
+    const nums = lot.postes
+      .filter((p) => !p.option) // les options (liste de prix) ont leur propre numérotation
+      .map((p) => p.sourceText?.match(/^\s*(\d+(?:\.\d+)*)/)?.[1])
+      .filter((n): n is string => n != null);
+    const feuilles = nums.map((n) => Number(n.split('.').pop()));
+    for (let i = 1; i < feuilles.length; i += 1) {
+      const a = feuilles[i - 1]!;
+      const b = feuilles[i]!;
+      if (Number.isFinite(a) && Number.isFinite(b) && b > a + 1)
+        sauts.push(`${nums[i - 1]}→${nums[i]}`);
+    }
+  }
+  if (sauts.length > 0)
+    out.push({
+      id: 'sec-numerotation',
+      libelle: 'Numérotation',
+      gravite: 'attention',
+      message: `Saut de numérotation (${sauts.join(', ')}) — une prestation a peut-être été retirée du devis.`,
+    });
+
+  // 2) Description probablement TRONQUÉE (finit par une conjonction/préposition ou
+  //    une virgule). On rétrograde la ligne à « à vérifier » (jamais silencieux).
+  const RE_TRONC =
+    /(\b(et|de|des|du|à|au|aux|pour|en|sur|avec|dans|par|sous|ou|le|la|les|un|une)|[,:]|d['’]|l['’])$/i;
+  const tronquees = postes.filter(
+    (p) => !p.option && p.montantHT !== 0 && RE_TRONC.test(p.label.trim()),
+  );
+  for (const p of tronquees) if (p.verification === 'verifie') p.verification = 'a_verifier';
+  if (tronquees.length > 0)
+    out.push({
+      id: 'sec-troncature',
+      libelle: 'Descriptions',
+      gravite: 'attention',
+      message: `${tronquees.length} description(s) finissent de façon suspecte (possible troncature) — passées « à vérifier ».`,
+    });
+
+  // 3) Prestation ferme SANS MONTANT lu (montant sans prestation = orphelin, déjà vu).
+  const sansMontant = postes.filter((p) => !p.option && p.montantHT === 0);
+  if (sansMontant.length > 0)
+    out.push({
+      id: 'sec-sans-montant',
+      libelle: 'Montant manquant',
+      gravite: 'attention',
+      message: `${sansMontant.length} prestation(s) sans montant lu — à saisir face au document.`,
+    });
+
+  // 4) Total NON RAPPROCHÉ — rappel du contrôleur indépendant (jamais masqué).
+  if (reconciliation.totalHTDeclare != null && !reconciliation.coherent)
+    out.push({
+      id: 'sec-total',
+      libelle: 'Réconciliation (2ᵉ moteur)',
+      gravite: 'bloquant',
+      message: `Écart de ${reconciliation.ecartHT} € non résorbé entre la somme des lignes et le total déclaré — vérification humaine requise.`,
+    });
+
+  return out;
+}
+
 function controlesCoherence(args: {
   devis?: Devis;
   reconciliation: TotalsReconciliation;

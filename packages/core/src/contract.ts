@@ -49,7 +49,9 @@ export const DEVIS_STATUT_LABEL: Record<DevisStatut, string> = {
  * Recalculé après chaque correction : corriger une ligne la fait passer au vert.
  */
 export function evaluerVerification(p: DevisPoste): VerificationNiveau {
-  if (!(p.montantHT > 0)) return 'non_compris';
+  // Montant NON LU (0) → non compris. Un montant NÉGATIF est une remise / moins-value
+  // DÉLIBÉRÉE (ligne pleinement chiffrée) : il ne doit pas être pris pour « non lu ».
+  if (p.montantHT === 0) return 'non_compris';
   if (p.unite === 'forfait' && p.quantite == null) return 'a_verifier';
   if (!(p.tva > 0)) return 'a_verifier';
   return 'verifie';
@@ -59,7 +61,7 @@ export function evaluerVerification(p: DevisPoste): VerificationNiveau {
 export function raisonVerification(p: DevisPoste): string | undefined {
   const niveau = p.verification ?? evaluerVerification(p);
   if (niveau === 'verifie') return undefined;
-  if (!(p.montantHT > 0)) return 'Montant non lu sur cette ligne — à saisir face au devis.';
+  if (p.montantHT === 0) return 'Montant non lu sur cette ligne — à saisir face au devis.';
   if (p.unite === 'forfait' && p.quantite == null)
     return 'Montant forfaitaire repris du total du lot — le détail par poste n’a pas été lu.';
   if (!(p.tva > 0)) return 'Taux de TVA non lu — à confirmer face au devis.';
@@ -99,7 +101,8 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 function parseAmount(raw: string): number | undefined {
   const s = raw.replace(/[\s €]/g, '').replace(/\.(?=\d{3}\b)/g, '');
   const n = Number(s.replace(',', '.'));
-  return Number.isFinite(n) && n >= 0 ? round2(n) : undefined;
+  // Les montants NÉGATIFS sont acceptés (remise / moins-value « -1 200,00 € »).
+  return Number.isFinite(n) ? round2(n) : undefined;
 }
 
 /** Convertit un taux (« 10,00 % » / « 5,5 ») en nombre. */

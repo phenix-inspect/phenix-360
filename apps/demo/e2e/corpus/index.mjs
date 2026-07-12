@@ -186,6 +186,95 @@ export const CORPUS = [
     },
   },
   {
+    id: 'obat-12lots-remise-none-033',
+    geomPath: '../fixtures/corpus/obat-12lots-remise-none-033.geom.json',
+    truth: {
+      source: 'OBAT (12 lots / 22 postes)',
+      logiciel: 'obat',
+      type: 'natif',
+      critique: true,
+      lots: 12,
+      prestations: 22,
+      exclusions: 0,
+      options: 0,
+      totalHT: 45656.06,
+      totalTTC: 50131.82,
+      attendus: [
+        { cle: 'Installation de chantier', montantHT: 850 },
+        { cle: 'Dépose cuisine existante', montantHT: 1500 },
+      ],
+    },
+  },
+  {
+    id: 'obat-remise-negative-034',
+    geomPath: '../fixtures/corpus/obat-remise-negative-034.geom.json',
+    truth: {
+      source: 'OBAT (14 en-têtes « LOT NN – », REMISE négative -1 200 €)',
+      logiciel: 'obat',
+      type: 'natif',
+      critique: true,
+      lots: 12,
+      prestations: 27, // dont la ligne de remise (montant négatif)
+      exclusions: 0,
+      options: 0,
+      totalHT: 22309.9,
+      totalTTC: 24856.09,
+      attendus: [
+        { cle: 'Amenée, repli, manutentions', montantHT: 920 },
+        { cle: 'Dépose complète des équipements', montantHT: 1600 },
+        { cle: 'Remise commerciale exceptionnelle', montantHT: -1200 },
+      ],
+    },
+  },
+  {
+    id: 'obat-37postes-036',
+    geomPath: '../fixtures/corpus/obat-37postes-036.geom.json',
+    truth: {
+      source: 'OBAT (11 lots / 37 postes, gros devis)',
+      logiciel: 'obat',
+      type: 'natif',
+      critique: true,
+      lots: 11,
+      prestations: 37,
+      exclusions: 0,
+      options: 0,
+      totalHT: 39075.25,
+      totalTTC: 43400.78,
+      attendus: [
+        { cle: 'Installation, préparation et organisation', montantHT: 510 },
+        { cle: 'Protection des sols et des ouvrages', montantHT: 720, doitContenir: 'conservés' },
+      ],
+    },
+  },
+  {
+    id: 'obat-blindtest-038',
+    geomPath: '../fixtures/corpus/obat-blindtest-038.geom.json',
+    // TEST EN AVEUGLE : non utilisé pendant les corrections. Vérité établie à la main
+    // depuis le PDF. Le moteur GÉNÉRALISE : 8 prestations fermes (dont 1 OFFERTE à 0 €),
+    // 1 option, HT réconcilié. Il a révélé la sur-segmentation des devis PLATS OBAT
+    // (descriptions en MAJUSCULES prises pour des sections) → règle générique « les
+    // lots OBAT sont toujours numérotés » ; corrigée et confirmée par le comptage
+    // documentaire (034/036).
+    truth: {
+      source: 'OBAT PLAT (blind test — clim, ligne à 0 € OFFERTE, option)',
+      logiciel: 'obat',
+      type: 'natif',
+      critique: true,
+      blind: true,
+      lots: 1, // devis plat → lot implicite
+      prestations: 8,
+      exclusions: 0,
+      options: 1,
+      totalHT: 2243,
+      totalTTC: 2467.3,
+      attendus: [
+        { cle: 'climatisation monobloc', montantHT: 1265 },
+        { cle: 'Raccordement électrique', montantHT: 310 },
+        { cle: "Étude d'implantation", montantHT: 0, doitContenir: 'OFFERT' },
+      ],
+    },
+  },
+  {
     id: 'bon-commande-martos',
     geomPath: '../fixtures/corpus/bon-commande-martos.geom.json',
     truth: {
