@@ -16,9 +16,7 @@ import {
   ORDER_STATUSES,
   buildClientDecisions,
   avenantImpact,
-  buildDecisionContent,
   consolidateDevis,
-  decisionVisibility,
   type Avenant,
   type AvenantImpact,
   type ClientDecisionStatus,
@@ -47,7 +45,6 @@ import { ContactPicker } from './contacts/ContactPicker';
 import { DevisBreakdown } from './DevisBreakdown';
 import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
-import { ProposalWorkshop } from './ProposalWorkshop';
 import { CoordonneesCard } from './prep/CoordonneesCard';
 import { PhotosAvantSection } from './prep/PrepDocuments';
 
@@ -83,60 +80,6 @@ export function DossierPanel({
     const o: Order = { id: crypto.randomUUID(), label: 'Nouvelle commande', statut: 'a_commander' };
     patch({ orders: [...dossier.orders, o] });
     setEditing(o);
-  };
-
-  // Le conducteur envoie (ou renvoie) les propositions au client.
-  const sendProposals = async (selId: string) => {
-    const sel = dossier.selections.find((s) => s.id === selId);
-    if (!sel) return;
-    const kind = sel.modificationRequested ? 'renvoyee' : 'envoyee';
-    patch({
-      selections: dossier.selections.map((s) =>
-        s.id === selId ? { ...s, statut: 'propose', modificationRequested: false } : s,
-      ),
-    });
-    const content = buildDecisionContent({
-      kind,
-      origin: 'conducteur',
-      selection: sel,
-      statutApres: 'propose',
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'decision',
-      visibility: decisionVisibility(kind),
-      state: 'publie',
-      content,
-    });
-  };
-
-  // Le client a délégué : le conducteur (sur recommandation de PHÉNIX) arbitre.
-  // On enregistre le choix final et on le trace au journal.
-  const confirmDelegation = async (selId: string, optionId: string) => {
-    const sel = dossier.selections.find((s) => s.id === selId);
-    if (!sel) return;
-    const opt = sel.options?.find((o) => o.id === optionId);
-    patch({
-      selections: dossier.selections.map((s) =>
-        s.id === selId ? { ...s, chosenOptionId: optionId, detail: opt?.title ?? s.detail } : s,
-      ),
-    });
-    const content = buildDecisionContent({
-      kind: 'reco_confirmee',
-      origin: 'phenix',
-      selection: sel,
-      statutApres: sel.statut,
-      optionId,
-    });
-    await demo.appendEvent({
-      projectId: project.id,
-      actor,
-      type: 'decision',
-      visibility: decisionVisibility('reco_confirmee'),
-      state: 'publie',
-      content,
-    });
   };
 
   // Déposer un avenant signé : un NOUVEAU devis signé est remis, PHÉNIX l'analyse
@@ -334,16 +277,10 @@ export function DossierPanel({
 
       <DecisionsSection dossier={dossier} />
 
-      {dossier.selections.some((s) => (s.options?.length ?? 0) > 0) && (
-        <Section icon={<Sparkles aria-hidden />} title="Propositions préparées par PHÉNIX">
-          <ProposalWorkshop
-            selections={dossier.selections}
-            onChange={(next) => patch({ selections: next })}
-            onSend={(selId) => void sendProposals(selId)}
-            onConfirmDelegation={(selId, optionId) => void confirmDelegation(selId, optionId)}
-          />
-        </Section>
-      )}
+      {/* La section « Propositions préparées par PHÉNIX » a été retirée (09/07/2026) :
+          une demande de choix se crée via « Nouvelle mission → Demander au client » et
+          se pilote EXCLUSIVEMENT dans « Demandes client » (Non lu / En attente / Répondu).
+          Préparation ne porte plus AUCUNE interaction client (aucun doublon). */}
 
       <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
 

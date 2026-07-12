@@ -51,6 +51,18 @@ try {
       await page.getByText(b, { exact: true }).first().waitFor({ state: 'visible', timeout: 4000 });
   });
 
+  await assert('Préparation ne gère PLUS les choix client (aucun doublon)', async () => {
+    // La demande de choix se pilote exclusivement dans « Demandes client ».
+    if ((await page.getByText('Propositions préparées par PHÉNIX').count()) > 0)
+      throw new Error('la section « Propositions préparées par PHÉNIX » subsiste en Préparation');
+    if (
+      (await page
+        .getByRole('button', { name: /Envoyer au client|Renvoyer les propositions|Redemander/ })
+        .count()) > 0
+    )
+      throw new Error('un bouton de gestion de choix client subsiste en Préparation');
+  });
+
   await assert('Budget sous l’engagé → ALERTE non bloquante (pas un blocage partage)', async () => {
     await setBudget(5000);
     await page

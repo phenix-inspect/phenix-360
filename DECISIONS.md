@@ -2762,3 +2762,30 @@ attente » (`PointDuSoir`) ; « réponses clients » → « réponses client » 
 retire la notification, la réactiver la ramène) ; `leon-intentions` étendu (62/62 : modification →
 escalade, envoyer-photo, todo compte les choix). Gate verte (typecheck, lint, prettier, build, e2e
 complet, zéro erreur console). VISION Art. 2, 4, 8, 9, 11.
+
+## 09/07/2026 — Suppression du doublon « Propositions préparées par PHÉNIX » (Préparation)
+
+**Décision produit validée :** une demande de choix est un objet UNIQUE, créé une seule fois
+(« Nouvelle mission → Demander au client → Demander une décision ») et piloté EXCLUSIVEMENT dans
+« Demandes client » (Non lu / En attente / Répondu). Il ne doit plus exister un second endroit pour
+gérer la même demande.
+
+**Fait :** retrait de la section **« Propositions préparées par PHÉNIX »** de l'onglet **Préparation**
+(`DossierPanel`) — cartes de choix + boutons « envoyer / renvoyer / confirmer la délégation ». Le
+composant `ProposalWorkshop` (seul consommateur) est **supprimé** ; les handlers devenus morts
+(`sendProposals`, `confirmDelegation`) et leurs imports (`buildDecisionContent`, `decisionVisibility`)
+sont retirés. La logique métier de création/validation reste intacte et centralisée
+(`createClientDecision`, `ClientDecisionComposer`, `ChoixClientCard`).
+
+**Préparation** ne porte désormais **AUCUNE interaction client** : cockpit, coordonnées, devis/avenants,
+budget, commandes, check-list, planning, dates, photos avant. « Décisions client à obtenir » y reste en
+LECTURE SEULE (information de préparation, aucun bouton). Toute interaction client vit dans
+« Demandes client » (conducteur), « Aujourd'hui », « Vos choix » (client).
+
+**Architecture réaffirmée :** Préparation = préparer le chantier · Demandes client = gérer les échanges
+client · Aujourd'hui = actions du jour. Une action = un seul écran.
+
+**Tests :** `preparation` gagne une garde négative (12/12 : la section « Propositions préparées » et tout
+bouton d'envoi de choix ont disparu) ; `choix-client-suivi` (12/12) confirme que les demandes de choix
+fonctionnent toujours de bout en bout depuis « Demandes client ». Gate verte (typecheck, lint, prettier,
+build, e2e complet, zéro erreur console). VISION Art. 4, 8, 9, 11.
