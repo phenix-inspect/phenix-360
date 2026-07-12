@@ -29,7 +29,14 @@ export const VERIFICATION_LABEL: Record<VerificationNiveau, string> = {
 /** Un POSTE du devis : une ligne chiffrée (fourniture et/ou pose). */
 export interface DevisPoste {
   id: string;
+  /** Libellé CONTRACTUEL exact (prose de désignation reconstruite du devis). */
   label: string;
+  /** Libellé COURT opérationnel (dérivé du libellé exact, pour l'action terrain). */
+  libelleCourt?: string;
+  /** Page source du document d'origine (traçabilité, futur surlignage PDF). */
+  sourcePage?: number;
+  /** Poste présenté en OPTION / variante : jamais intégré tant que non validé. */
+  option?: boolean;
   quantite?: number;
   /** Unité : « m² », « ml », « u », « ens. », « forfait »… */
   unite?: string;

@@ -19,6 +19,13 @@
 import type { Devis, DevisLot, DevisPoste, VerificationNiveau } from './devis.js';
 import { consolidateDevis, consolidatedTotals } from './devis.js';
 
+/**
+ * Version du MOTEUR d'analyse (tracée dans le journal de validation). À
+ * incrémenter à chaque évolution des règles de lecture, pour qu'une
+ * transcription validée sache par quelle version elle a été produite.
+ */
+export const MOTEUR_VERSION = 'devis-3.0-geometrie';
+
 /** Statut de validation d'un LOT (repris de `DevisLot.statut`). */
 export type LotStatut = 'brouillon' | 'valide';
 
@@ -336,3 +343,78 @@ export function validatedDevis(holder: ContractHolder | null | undefined): Devis
   const lots = devis.lots.filter((l) => lotValide(l, h));
   return lots.length > 0 ? { ...devis, lots } : undefined;
 }
+
+/* -------------------------------------------------------------------------- *
+ * Cycle de vie DOCUMENTAIRE (5 états) + journal d'audit de la validation
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Cycle de vie de la TRANSCRIPTION d'un devis, du dépôt au contrat opposable :
+ *  • `importe`               — document déposé, pas encore analysé ;
+ *  • `analyse_en_cours`      — lecture automatique en cours (état transitoire app) ;
+ *  • `analyse_a_verifier`    — analyse produite, des lots restent à valider ;
+ *  • `transcription_validee` — tous les lots validés par le conducteur ;
+ *  • `contrat_consolide`     — devis + avenants figés en un contrat versionné.
+ * Dérivé de l'unique source de vérité (statut par lot) — jamais un état parallèle.
+ */
+export type EtatTranscription =
+  | 'importe'
+  | 'analyse_en_cours'
+  | 'analyse_a_verifier'
+  | 'transcription_validee'
+  | 'contrat_consolide';
+
+export const ETAT_TRANSCRIPTION_LABEL: Record<EtatTranscription, string> = {
+  importe: 'Importé',
+  analyse_en_cours: 'Analyse en cours',
+  analyse_a_verifier: 'Analyse à vérifier',
+  transcription_validee: 'Transcription validée',
+  contrat_consolide: 'Contrat consolidé',
+};
+
+/**
+ * État documentaire DÉRIVÉ (au repos) : `importe` sans devis, sinon
+ * `contrat_consolide` si explicitement consolidé, `transcription_validee` quand
+ * tous les lots sont validés, `analyse_a_verifier` tant qu'il reste à vérifier.
+ * (`analyse_en_cours` est un état transitoire posé par l'application pendant la
+ * lecture — il n'est pas dérivable d'un dossier au repos.)
+ */
+export function etatTranscription(
+  holder: ContractHolder | null | undefined,
+  opts: { consolide?: boolean } = {},
+): EtatTranscription {
+  if (!holder?.devis || holder.devis.lots.length === 0) return 'importe';
+  if (opts.consolide) return 'contrat_consolide';
+  return contratValide(holder) ? 'transcription_validee' : 'analyse_a_verifier';
+}
+
+/**
+ * Une entrée du JOURNAL de validation (audit) : qui a fait quoi, quand, sur
+ * quelle version de document, avec quelle version de moteur. Append-only.
+ */
+export interface JournalEntry {
+  /** Horodatage ISO (fourni par l'appelant : le module core reste déterministe). */
+  horodatage: string;
+  /** Auteur de l'action (conducteur). */
+  auteur: string;
+  /** Action tracée : « import », « analyse », « validation lot », « consolidation »… */
+  action: string;
+  /** Numéro de version du document (devis initial = 1, puis avenants). */
+  versionDocument?: number;
+  /** Version du moteur d'analyse ayant produit/validé la transcription. */
+  versionMoteur: string;
+  /** Précision libre (ex. libellé du lot validé). */
+  detail?: string;
+}
+
+/** Ajoute une entrée au journal (append-only) — retourne un NOUVEau tableau. */
+export function appendJournal(
+  journal: JournalEntry[] | undefined,
+  entry: JournalEntry,
+): JournalEntry[] {
+  return [...(journal ?? []), entry];
+}
+
+/* Parsers de montants/taux français, réutilisables par le moteur géométrique. */
+export const parseMontantFr = parseAmount;
+export const parseTauxFr = parseRate;

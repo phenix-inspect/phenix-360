@@ -105,8 +105,8 @@ try {
     const values = await page.locator('input').evaluateAll((els) => els.map((e) => e.value));
     for (const p of [P1, P2, P3])
       if (!values.includes(p)) throw new Error(`prestation « ${p} » absente`);
-    if ((await page.getByText('Vérifié automatiquement').count()) === 0)
-      throw new Error('aucun état « vérifié automatiquement »');
+    if ((await page.getByText('Fiable').count()) === 0)
+      throw new Error('aucun état de confiance « Fiable »');
     await page.getByText('Vérification des totaux').waitFor({ state: 'visible' });
     if ((await page.getByText(/Écart de/).count()) > 0)
       throw new Error('un écart est signalé alors que le devis est cohérent');

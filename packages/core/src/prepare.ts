@@ -40,13 +40,16 @@ import {
   type DevisExtraction,
 } from './devis-extract.js';
 import {
+  MOTEUR_VERSION,
   contratValide,
   extractDevisContract,
   lotsValidesCount,
   validatedDevis,
+  type JournalEntry,
   type LotStatut,
   type TotalsReconciliation,
 } from './contract.js';
+import { analyserDevisGeo, type DevisAnalyseMeta, type PageGeom } from './devis-geometry.js';
 import {
   DEFAULT_CALENDAR,
   addCalendarDays,
@@ -600,6 +603,17 @@ export interface ProjectDossier {
   devisStatut?: LotStatut;
   /** Vérification des totaux du devis analysé (somme des lignes vs déclaré). */
   reconciliation?: TotalsReconciliation;
+  /**
+   * Méta d'analyse issue du moteur natif (géométrie) : contrôles de cohérence,
+   * exclusions retirées du contrat, options détectées, métriques, version moteur.
+   * Absente pour les devis lus par le lecteur texte (fallback) ou hérités.
+   */
+  analyse?: DevisAnalyseMeta;
+  /**
+   * Journal d'audit de la TRANSCRIPTION (append-only) : import, analyse,
+   * validation par lot, consolidation. Chaque entrée trace auteur/date/version.
+   */
+  journal?: JournalEntry[];
   /**
    * Avenants signés (append-only). Chacun est un nouveau devis lié à l'initial :
    * il ajoute des postes, peut en remplacer (le poste d'origine reste visible).
@@ -2050,6 +2064,11 @@ export interface AnalyzeFile {
   name: string;
   /** Texte extrait du document (PDF lisible). Absent si non extractible. */
   text?: string;
+  /**
+   * Géométrie du PDF (mots positionnés page par page) : matière première du
+   * moteur natif de lecture. Absente pour un collage texte ou un PDF non lu.
+   */
+  pages?: PageGeom[];
   /** PDF déposé dont AUCUN texte n'a pu être extrait (probable scan/image). */
   imagePdf?: boolean;
 }
@@ -2150,7 +2169,42 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   // ANALYSE STRUCTURÉE du contrat : lots → postes (jamais inventée). Chaque lot
   // démarre en BROUILLON (à vérifier) — non exploitable en aval tant que le
   // conducteur ne l'a pas validé (VISION Art. 9 : le conducteur contrôle).
-  const contract = extractDevisContract(fullText);
+  //
+  // Moteur NATIF (géométrie) en priorité quand un PDF colonné a été lu : il
+  // reconstruit les colonnes/descriptions, classe les blocs (~25 types) et écarte
+  // exclusions, totaux et ventilations TVA. À défaut de tableau exploitable, on
+  // retombe sur le lecteur TEXTE (`extractDevisContract`) — mêmes garanties.
+  const pages = files.flatMap((f) => f.pages ?? []);
+  const geo = pages.length > 0 ? analyserDevisGeo(pages) : undefined;
+  const useGeo = geo != null && !geo.fallbackTexte && geo.devis != null;
+  const contract = useGeo
+    ? { devis: geo!.devis, reconciliation: geo!.reconciliation }
+    : extractDevisContract(fullText);
+  const analyseMeta: DevisAnalyseMeta | undefined = useGeo
+    ? {
+        controles: geo!.controles,
+        exclusions: geo!.exclusions,
+        options: geo!.options,
+        metriques: geo!.metriques,
+        versionMoteur: geo!.versionMoteur,
+      }
+    : undefined;
+  // Journal d'audit : trace l'import + l'analyse (l'horodatage vient de l'app).
+  const journal: JournalEntry[] = contract.devis
+    ? [
+        {
+          horodatage: new Date().toISOString(),
+          auteur: 'PHÉNIX',
+          action: 'Analyse du devis',
+          versionDocument: 1,
+          versionMoteur: analyseMeta?.versionMoteur ?? MOTEUR_VERSION,
+          detail: `${contract.devis.lots.length} lot(s), ${contract.devis.lots.reduce(
+            (a, l) => a + l.postes.length,
+            0,
+          )} poste(s)`,
+        },
+      ]
+    : [];
 
   // Feuille de route DÉRIVÉE des lots réellement transcrits, sinon des lots
   // détectés par mots-clés. Jamais de feuille de route générique fabriquée.
@@ -2171,7 +2225,14 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
       infos,
       roadmap,
       // Les lots portent leur propre statut (`brouillon`) — pas de statut global.
-      ...(contract.devis ? { devis: contract.devis, reconciliation: contract.reconciliation } : {}),
+      ...(contract.devis
+        ? {
+            devis: contract.devis,
+            reconciliation: contract.reconciliation,
+            journal,
+            ...(analyseMeta ? { analyse: analyseMeta } : {}),
+          }
+        : {}),
     }),
     extraction: buildDevisExtraction(fields, chars, false),
   };

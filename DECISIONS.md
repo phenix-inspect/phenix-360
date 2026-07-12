@@ -2959,3 +2959,34 @@ tant qu'un lot reste à vérifier.
 (`contract-parser` 13/13, `contract-transcription` 11/11 — dont validation partielle et « Voir pourquoi »,
 `devis-lecture`/`devis-phenix` pour le nouveau libellé). Gate verte (typecheck, lint, prettier, build,
 Playwright complet, zéro erreur console). VISION Art. 8, 9, 11.
+
+---
+
+12/07/2026
+Décision : Moteur NATIF de lecture des devis fondé sur la GÉOMÉTRIE du PDF (pas le flux texte).
+Pourquoi : L'audit du vrai devis (9 pages, 13 lots) a révélé 3 défauts génériques du lecteur texte,
+qui ne lisait que la position verticale et jetait x/page : (1) descriptions tronquées à leur 1ʳᵉ ligne
+(le libellé contractuel exact était détruit) ; (2) l'exclusion « ATTENTION : LA PORTE D'ENTRÉE N'EST
+PAS INCLUSE » prise pour une prestation à 0 € ; (3) une ligne de la ventilation TVA (« 5,5 % 3 859,00 €
+212,25 € ») inventée en prestation du dernier lot. Cause commune : perte des colonnes et des pages,
+aucune classification de blocs. Correctifs GÉNÉRIQUES (jamais calés sur ce devis) : `packages/core/src/
+devis-geometry.ts` — pipeline explicite (reconstruction des lignes → détection des colonnes ancrée sur
+l'en-tête → retrait pieds de page → classification en ~25 types de blocs, « indéterminé » n'est JAMAIS
+une prestation → construction des prestations avec libellé contractuel exact + libellé court, page
+source, confiance, statut brouillon → contrôles de cohérence). `apps/demo/src/lib/pdf.ts` gagne
+`extractPdfGeometry`. L'analyseur préfère le moteur natif quand un tableau colonné est détecté, sinon
+retombe sur le lecteur texte (PDF non colonné, texte collé) — mêmes garanties.
+Alternatives rejetées : (a) rustines regex par cas → masque les erreurs, non générique ; (b) OCR /
+surlignage visuel PDF↔prestation → différés (périmètre « socle natif » validé), le socle géométrique les
+prépare (page source déjà tracée) ; (c) second moteur parallèle → dette : le texte et la géométrie
+partagent réconciliation, vérification et cycle de vie.
+Impact : Sur le devis réel — 13 lots, 21 prestations (0 inventée), 1 exclusion écartée, 0 orphelin,
+montants 100 % réconciliés (HT 39 773,03 = déclaré ; TTC 43 993,35 ; écart 0). Options détectées et
+JAMAIS intégrées sans validation (hors total ferme). Cycle de vie documentaire à 5 états (Importé ·
+Analyse en cours · Analyse à vérifier · Transcription validée · Contrat consolidé) DÉRIVÉ du statut par
+lot + journal d'audit (auteur/date/version doc/version moteur). Vocabulaire de confiance premium :
+Fiable · À vérifier · Incertain. Écran de vérification enrichi (contrôles de cohérence, exclusions
+écartées, page source, libellé court). Corpus de fiabilisation `devis-geometry.test.mjs` (14/14) : vérité
+attendue sur le vrai devis anonymisé + cas synthétiques (colonnes, multi-lignes, exclusion, option,
+ventilation TVA, pied de page, repli texte). Léon et la pré-réception restent branchés sur
+`validatedDevis` (rien d'exploité sans validation). Gate complète verte. VISION Art. 8, 9, 11.

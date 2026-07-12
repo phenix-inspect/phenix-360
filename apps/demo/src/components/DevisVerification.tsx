@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import {
-  VERIFICATION_LABEL,
+  CONFIANCE_LABEL,
   consolidateDevis,
   consolidatedTotals,
   evaluerVerification,
@@ -10,6 +10,7 @@ import {
   type Devis,
   type DevisLot,
   type DevisPoste,
+  type GraviteControle,
   type Project,
   type ProjectDossier,
   type VerificationNiveau,
@@ -232,6 +233,45 @@ export function DevisVerification({
             )}
           </div>
 
+          {/* Contrôles de cohérence du moteur (montants, comptage, options…). */}
+          {dossier.analyse && dossier.analyse.controles.length > 0 && (
+            <div className="space-y-2 rounded-2xl border border-border bg-surface p-4">
+              <p className="text-sm font-medium text-foreground">Contrôles de cohérence</p>
+              <ul className="space-y-1.5">
+                {dossier.analyse.controles.map((c) => (
+                  <li key={c.id} className="flex items-start gap-2 text-sm">
+                    <ControleDot gravite={c.gravite} />
+                    <span className="text-foreground">
+                      <span className="font-medium">{c.libelle} — </span>
+                      <span className="text-muted-foreground">{c.message}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Exclusions / notes écartées du contrat (jamais des prestations). */}
+          {dossier.analyse && dossier.analyse.exclusions.length > 0 && (
+            <div className="space-y-1.5 rounded-2xl border border-border bg-paper-50 p-4">
+              <p className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4">
+                <AlertTriangle aria-hidden className="text-warning" />
+                {dossier.analyse.exclusions.length} exclusion(s) écartée(s) du contrat
+              </p>
+              <ul className="space-y-1 text-xs text-muted-foreground">
+                {dossier.analyse.exclusions.map((ex, i) => (
+                  <li key={i}>
+                    « {ex.texte} » <span className="opacity-70">— p. {ex.page}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[11px] text-muted-foreground">
+                Ces mentions ne sont pas des prestations : elles ne comptent ni au budget ni à la
+                pré-réception.
+              </p>
+            </div>
+          )}
+
           {/* Lots — validation indépendante. */}
           <div className="space-y-5">
             {lots.map((lot, li) => {
@@ -288,6 +328,26 @@ export function DevisVerification({
                               <Trash2 aria-hidden />
                             </button>
                           </div>
+                          {/* Traçabilité : libellé court opérationnel + page source. */}
+                          {(p.libelleCourt || p.sourcePage != null || p.option) && (
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                              {p.libelleCourt && p.libelleCourt !== p.label && (
+                                <span className="rounded bg-paper-50 px-1.5 py-0.5">
+                                  Libellé court : {p.libelleCourt}
+                                </span>
+                              )}
+                              {p.sourcePage != null && (
+                                <span className="inline-flex items-center gap-1 [&_svg]:size-3">
+                                  <FileText aria-hidden /> p. {p.sourcePage}
+                                </span>
+                              )}
+                              {p.option && (
+                                <span className="rounded-full bg-gold-100 px-2 py-0.5 font-medium text-gold-700">
+                                  Option — à valider
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="flex flex-wrap items-center gap-2">
                             <NumField
                               label="Qté"
@@ -404,7 +464,22 @@ function VerifBadge({ level }: { level: VerificationNiveau }): React.JSX.Element
       className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${VERIF_STYLE[level]}`}
     >
       <span aria-hidden>{VERIF_DOT[level]}</span>
-      {VERIFICATION_LABEL[level]}
+      {CONFIANCE_LABEL[level]}
+    </span>
+  );
+}
+
+const CONTROLE_DOT: Record<GraviteControle, string> = {
+  ok: '🟢',
+  info: '🔵',
+  attention: '🟠',
+  bloquant: '🔴',
+};
+
+function ControleDot({ gravite }: { gravite: GraviteControle }): React.JSX.Element {
+  return (
+    <span aria-hidden className="mt-0.5 text-[11px]">
+      {CONTROLE_DOT[gravite]}
     </span>
   );
 }

@@ -27,7 +27,7 @@ import {
 } from 'lucide-react';
 import { demo } from '../store';
 import { mediaUploader } from '../lib/media';
-import { extractPdfText } from '../lib/pdf';
+import { extractPdfGeometry, extractPdfText } from '../lib/pdf';
 import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
 
@@ -73,7 +73,11 @@ export function PhenixStart({
         const isPdf = /\.pdf$/i.test(f.name);
         if (!isPdf || !f.file) return { name: f.name };
         const { text, readable } = await extractPdfText(f.file);
-        return readable ? { name: f.name, text } : { name: f.name, imagePdf: true };
+        if (!readable) return { name: f.name, imagePdf: true };
+        // On fournit AUSSI la géométrie : le moteur natif s'en sert si le PDF est
+        // colonné ; sinon l'analyseur retombe sur le texte, sans surcoût visible.
+        const pages = await extractPdfGeometry(f.file);
+        return { name: f.name, text, pages };
       }),
     );
     const result = await demo.analyzeDossier({ files: analyzed });

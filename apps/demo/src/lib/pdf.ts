@@ -13,6 +13,7 @@
 // récentes des builds modernes de pdf.js).
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
 import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url';
+import type { PageGeom } from '@phenix360/core';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -64,5 +65,48 @@ export async function extractPdfText(file: File): Promise<{ text: string; readab
     return { text: out, readable: cleaned.length >= MIN_CHARS };
   } catch {
     return { text: '', readable: false };
+  }
+}
+
+/**
+ * Extrait la GÉOMÉTRIE d'un PDF (mots positionnés page par page) : matière
+ * première du moteur natif de lecture des devis. Chaque mot connaît sa page, son
+ * x, son y (repère PDF) et sa largeur — ce qui permet de reconstruire colonnes,
+ * descriptions multi-lignes et de distinguer prestations, totaux et exclusions.
+ * Renvoie un tableau VIDE si rien d'exploitable (PDF image/scanné, erreur).
+ */
+export async function extractPdfGeometry(file: File): Promise<PageGeom[]> {
+  try {
+    const data = new Uint8Array(await file.arrayBuffer());
+    const doc = await pdfjs.getDocument({ data, disableFontFace: true, useSystemFonts: false })
+      .promise;
+    const pages: PageGeom[] = [];
+    for (let p = 1; p <= doc.numPages; p += 1) {
+      const page = await doc.getPage(p);
+      const viewport = page.getViewport({ scale: 1 });
+      const content = await page.getTextContent();
+      const tokens = [];
+      for (const raw of content.items) {
+        const it = raw as TextItemLike & { width?: number };
+        if (typeof it.str !== 'string' || !it.str.trim()) continue;
+        tokens.push({
+          x: Math.round(it.transform?.[4] ?? 0),
+          y: Math.round(it.transform?.[5] ?? 0),
+          w: Math.round(it.width ?? 0),
+          str: it.str,
+        });
+      }
+      pages.push({
+        page: p,
+        width: Math.round(viewport.width),
+        height: Math.round(viewport.height),
+        tokens,
+      });
+    }
+    const destroy = (doc as unknown as { destroy?: () => Promise<void> }).destroy;
+    if (typeof destroy === 'function') await destroy.call(doc);
+    return pages;
+  } catch {
+    return [];
   }
 }
