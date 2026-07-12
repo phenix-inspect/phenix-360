@@ -11,16 +11,19 @@
  */
 
 /**
- * Niveau de confiance d'une donnée transcrite depuis le document. Une
- * transcription incertaine ne doit JAMAIS être présentée comme un fait certain :
- * l'écran de vérification met en évidence ce qui reste à contrôler.
+ * État de VÉRIFICATION d'une ligne lue automatiquement, en langage de chantier :
+ *  • `verifie`      🟢 vérifié automatiquement (ligne pleinement chiffrée) ;
+ *  • `a_verifier`   🟠 à vérifier (donnée partielle, ex. forfait / TVA absente) ;
+ *  • `non_compris`  🔴 non compris (montant non lu — PHÉNIX n'invente pas).
+ * Une ligne non 🟢 ne doit JAMAIS être présentée comme un fait certain :
+ * l'écran de vérification l'affiche et explique « pourquoi ».
  */
-export type ConfidenceLevel = 'eleve' | 'moyen' | 'faible';
+export type VerificationNiveau = 'verifie' | 'a_verifier' | 'non_compris';
 
-export const CONFIDENCE_LABEL: Record<ConfidenceLevel, string> = {
-  eleve: 'Confiance élevée',
-  moyen: 'À vérifier',
-  faible: 'Incertain',
+export const VERIFICATION_LABEL: Record<VerificationNiveau, string> = {
+  verifie: 'Vérifié automatiquement',
+  a_verifier: 'À vérifier',
+  non_compris: 'Non compris',
 };
 
 /** Un POSTE du devis : une ligne chiffrée (fourniture et/ou pose). */
@@ -39,11 +42,11 @@ export interface DevisPoste {
   /** Poste (du devis initial ou d'un avenant précédent) que ce poste remplace. */
   remplacePosteId?: string;
   /**
-   * Confiance de la TRANSCRIPTION (issu de l'extraction automatique). Absent ⇒
-   * donnée saisie/validée à la main (certaine). Une transcription à faible
-   * confiance doit être vérifiée avant de valider le contrat.
+   * Résultat de la LECTURE automatique (issu de l'analyse). Absent ⇒ donnée
+   * saisie/validée à la main (certaine). Une ligne non `verifie` doit être
+   * contrôlée avant de valider son lot.
    */
-  confidence?: ConfidenceLevel;
+  verification?: VerificationNiveau;
   /** Extrait de texte source (traçabilité : comparer au document original). */
   sourceText?: string;
 }
@@ -61,6 +64,13 @@ export interface DevisLot {
   selectionIds?: string[];
   /** Documents nécessaires pour ce lot (ids de ProjectDocument). */
   documentIds?: string[];
+  /**
+   * Statut de VALIDATION du lot : `brouillon` = lu automatiquement, pas encore
+   * vérifié → NON exploitable en aval ; `valide` = contrôlé par le conducteur →
+   * exploitable (Préparation, pré-réception, budget). Chaque lot se valide
+   * indépendamment. Absent ⇒ donnée historique/démo (voir `lotValide`).
+   */
+  statut?: 'brouillon' | 'valide';
 }
 
 /** Le devis signé, lu et structuré. */

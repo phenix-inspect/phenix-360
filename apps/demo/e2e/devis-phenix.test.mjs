@@ -51,7 +51,7 @@ try {
     };
     for (const [k, re] of Object.entries(checks))
       if (!(await seen(re))) throw new Error(`champ non extrait : ${k}`);
-    await page.getByText(/Confiance 100\s*%/).waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByText(/100\s*% des repères/).waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('Le chantier lu se crée avec le bon client et persiste', async () => {

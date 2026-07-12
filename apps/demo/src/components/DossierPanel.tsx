@@ -17,8 +17,10 @@ import {
   buildClientDecisions,
   avenantImpact,
   consolidateDevis,
-  contratEnBrouillon,
-  contratValide,
+  devisAVerifier,
+  devisAvecLotsExploitables,
+  lotsValidesCount,
+  validatedDevis,
   type Avenant,
   type AvenantImpact,
   type ClientDecisionStatus,
@@ -46,7 +48,7 @@ import {
 import { demo, useDemo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { ContactPicker } from './contacts/ContactPicker';
-import { ContractReview } from './ContractReview';
+import { DevisVerification } from './DevisVerification';
 import { DevisBreakdown } from './DevisBreakdown';
 import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
@@ -69,7 +71,7 @@ export function DossierPanel({
   // Le détail du devis (poste par poste) est une RÉFÉRENCE, consultée rarement en
   // semaine : replié par défaut pour ne pas alourdir la lecture (règle des 5 s).
   const [showDevis, setShowDevis] = useState(false);
-  // Écran « Vérifier la transcription du devis » (validation humaine du contrat).
+  // Écran « Vérification du devis » (validation humaine, lot par lot).
   const [reviewContract, setReviewContract] = useState(false);
 
   const patch = (next: Partial<ProjectDossier>) =>
@@ -198,20 +200,23 @@ export function DossierPanel({
 
       <CoordonneesCard project={project} dossier={dossier} patch={patch} />
 
-      {/* Transcription EN BROUILLON : rien n'est contractuel tant que le
-          conducteur n'a pas vérifié et validé le devis face à l'original. */}
-      {contratEnBrouillon(dossier) && (
+      {/* Lots à vérifier : rien n'est contractuel tant que le conducteur n'a pas
+          vérifié et validé chaque lot face à l'original. Bannière de progression. */}
+      {devisAVerifier(dossier) && (
         <ContractDraftBanner
+          valides={lotsValidesCount(dossier).valides}
+          total={lotsValidesCount(dossier).total}
           reconciliationCoherent={dossier.reconciliation?.coherent ?? true}
           onReview={() => setReviewContract(true)}
         />
       )}
 
-      {contratValide(dossier) && dossier.devis && (
+      {/* « Le devis » n'affiche QUE les lots validés (exploitables). */}
+      {devisAvecLotsExploitables(dossier) && dossier.devis && (
         <Section
           icon={<Receipt aria-hidden />}
           title="Le devis"
-          count={consolidateDevis(dossier.devis, dossier.avenants).lots.length}
+          count={consolidateDevis(validatedDevis(dossier), dossier.avenants).lots.length}
           action={
             <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
@@ -241,7 +246,7 @@ export function DossierPanel({
           )}
           {showDevis && (
             <DevisBreakdown
-              devis={dossier.devis}
+              devis={validatedDevis(dossier) ?? dossier.devis}
               avenants={dossier.avenants}
               dossier={dossier}
               onOpen={openAnchor}
@@ -311,7 +316,7 @@ export function DossierPanel({
       )}
 
       {reviewContract && (
-        <ContractReview
+        <DevisVerification
           project={project}
           dossier={dossier}
           onClose={() => setReviewContract(false)}
@@ -322,18 +327,23 @@ export function DossierPanel({
 }
 
 /**
- * Bannière « transcription à vérifier » : le devis a été transcrit mais reste en
- * BROUILLON. Tant qu'il n'est pas validé, aucune prestation n'est présentée comme
- * contractuelle (ni en Préparation, ni en pré-réception). Un clic ouvre l'écran
- * de vérification. Si les totaux ne se réconcilient pas, on le signale d'emblée.
+ * Bannière « devis à vérifier » : PHÉNIX a analysé le devis mais des lots restent
+ * à valider. Tant qu'un lot n'est pas validé, ses prestations ne sont présentées
+ * nulle part comme contractuelles. La bannière indique la progression
+ * (« X lots sur Y validés ») et ouvre l'écran de vérification.
  */
 function ContractDraftBanner({
+  valides,
+  total,
   reconciliationCoherent,
   onReview,
 }: {
+  valides: number;
+  total: number;
   reconciliationCoherent: boolean;
   onReview: () => void;
 }): React.JSX.Element {
+  const partiel = valides > 0;
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-warning bg-warning/10 p-4">
       <span className="grid size-10 shrink-0 place-items-center rounded-full bg-warning/20 text-warning [&_svg]:size-5">
@@ -341,16 +351,18 @@ function ContractDraftBanner({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-foreground">
-          Le devis doit être analysé et validé avant d’afficher les prestations du chantier.
+          {partiel
+            ? `${valides} lot${valides > 1 ? 's' : ''} sur ${total} validé${valides > 1 ? 's' : ''} — les autres restent à vérifier.`
+            : 'Le devis doit être analysé et validé avant d’afficher les prestations du chantier.'}
         </p>
         <p className="text-xs text-muted-foreground">
           {reconciliationCoherent
-            ? 'PHÉNIX a transcrit votre devis. Vérifiez-le face à l’original, puis validez.'
-            : 'Les totaux transcrits ne se réconcilient pas — un contrôle est nécessaire avant validation.'}
+            ? 'PHÉNIX a analysé votre devis. Vérifiez chaque lot face à l’original, puis validez-le.'
+            : 'Les totaux analysés ne se réconcilient pas — un contrôle est nécessaire avant validation.'}
         </p>
       </div>
       <Button size="sm" onClick={onReview}>
-        <ClipboardCheck aria-hidden /> Vérifier la transcription du devis
+        <ClipboardCheck aria-hidden /> Vérifier le devis
       </Button>
     </div>
   );

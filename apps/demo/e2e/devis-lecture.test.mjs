@@ -57,7 +57,7 @@ try {
   });
 
   await assert('Une confiance est affichée (lecture jugée fiable)', async () => {
-    await page.getByText(/Confiance 100\s*%/).waitFor({ state: 'visible', timeout: 5000 });
+    await page.getByText(/100\s*% des repères/).waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('PDF scanné / image → message clair, aucune invention', async () => {
@@ -79,7 +79,7 @@ try {
       'devis-vide.pdf',
     );
     await page.getByText('Lecture réelle du devis').waitFor({ state: 'visible', timeout: 12000 });
-    await page.getByText(/Confiance 0\s*%/).waitFor({ state: 'visible' });
+    await page.getByText(/0\s*% des repères/).waitFor({ state: 'visible' });
     await page.getByText(/Non détecté/).waitFor({ state: 'visible' });
     // On n'a rien inventé : pas de client fabriqué.
     if (await seen(/Mme Camille Martin/)) throw new Error('un client a été inventé');

@@ -233,6 +233,8 @@ function CompactBudget({
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(budget.previsionnel || ''));
+  // Validation partielle du devis : le budget ne porte que sur les lots validés.
+  const partiel = budget.lotsTotal > 0 && budget.lotsValides < budget.lotsTotal;
 
   const save = (): void => {
     const n = Number(value.replace(/[^0-9.]/g, ''));
@@ -295,13 +297,25 @@ function CompactBudget({
               saisi · revenir au devis
             </button>
           ) : budget.source === 'devis' ? (
-            'd’après le devis signé'
+            partiel ? (
+              <span className="font-medium text-warning">
+                budget partiel — {budget.lotsValides} lot{budget.lotsValides > 1 ? 's' : ''} sur{' '}
+                {budget.lotsTotal} validé{budget.lotsValides > 1 ? 's' : ''}
+              </span>
+            ) : (
+              'd’après le devis validé'
+            )
           ) : budget.source === 'infos' ? (
             'd’après le dossier'
           ) : (
             'à renseigner'
           )}
         </span>
+        {partiel && budget.montantDeclareTTC != null && (
+          <span className="text-[0.7rem] text-muted-foreground">
+            Montant déclaré au devis : {fmtMoney(budget.montantDeclareTTC)} (à fiabiliser)
+          </span>
+        )}
       </CardContent>
     </Card>
   );

@@ -6,8 +6,8 @@ import {
   RESERVE_RESPONSABLES,
   MAX_PRERECEPTION_PHOTOS,
   buildPrestationsAVerifier,
-  contratEnBrouillon,
-  contratValide,
+  devisAVerifier,
+  validatedDevis,
   originLabel,
   prereceptionComplete,
   prereceptionSynthese,
@@ -66,14 +66,13 @@ export function PrereceptionFlow({
   const [step, setStep] = useState<Step>('verifier');
   const [busy, setBusy] = useState(false);
   const [presents, setPresents] = useState<string[]>([]);
-  // On ne reprend QUE les prestations d'un contrat VALIDÉ. Une transcription en
-  // brouillon (non vérifiée) n'alimente jamais la pré-réception.
+  // On ne reprend QUE les prestations des lots VALIDÉS (validatedDevis). Un lot
+  // non vérifié n'alimente jamais la pré-réception.
   const [prestations, setPrestations] = useState<PrestationVerif[]>(() =>
-    contratValide(dossier)
-      ? buildPrestationsAVerifier(dossier?.devis, dossier?.avenants ?? [])
-      : [],
+    buildPrestationsAVerifier(validatedDevis(dossier), dossier?.avenants ?? []),
   );
-  const enBrouillon = contratEnBrouillon(dossier);
+  // Reste-t-il des lots à vérifier (devis présent mais pas entièrement validé) ?
+  const enBrouillon = devisAVerifier(dossier);
   const [commentaireGeneral, setCommentaireGeneral] = useState('');
   const [createdId, setCreatedId] = useState<string | null>(null);
 
@@ -178,7 +177,7 @@ export function PrereceptionFlow({
             {!hasContract ? (
               <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
                 {enBrouillon
-                  ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier la transcription du devis » depuis la Préparation.'
+                  ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier le devis » depuis la Préparation.'
                   : 'Aucune prestation au contrat : ajoutez d’abord le devis signé du chantier pour lancer la pré-réception.'}
               </div>
             ) : (

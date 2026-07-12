@@ -2915,3 +2915,47 @@ multi-pages, éditeur avancé (déplacer entre lots, fusionner/scinder, qualifie
 intent Léon lisant le contenu du contrat validé, et la batterie complète de documents réels hétérogènes.
 Les seams sont prêts (port `DossierAnalyzer` / `setDossierAnalyzer`, extraction binaire côté app).
 VISION Art. 8, 9, 11.
+
+## 12/07/2026 — Devis : vérification par lot, langage naturel, socle « cerveau du chantier »
+
+**Amélioration produit/UX de l'analyse du devis (sans refonte, données existantes préservées).**
+
+**1. État de lecture (fin de la « confiance »).** Le champ interne `confidence` (`eleve/moyen/faible`) est
+remplacé par `DevisPoste.verification` (`verifie` 🟢 / `a_verifier` 🟠 / `non_compris` 🔴), dérivé
+DÉTERMINISTE des champs (`evaluerVerification`) : corriger une ligne la fait passer au vert. Chaque ligne
+non verte propose **« Voir pourquoi »** → raison déterministe (`raisonVerification`) + extrait de texte
+analysé (`sourceText`) + ouverture du **document original**. `CONFIDENCE_LABEL` → `VERIFICATION_LABEL`
+(libellés naturels). La carte « Lecture réelle du devis » n'affiche plus « Confiance X% » mais
+« X% des repères lus ».
+
+**2. Validation PAR LOT + statut global strict.** `DevisLot.statut` (`brouillon`/`valide`) : chaque lot se
+valide indépendamment (« Valider ce lot » / « Tout valider »). Statut global **sans ambiguïté**
+(`devisStatutGlobal`) : `a_verifier` (aucun lot) → `partiellement_valide` (une partie) → `valide` (tous).
+`contratValide` = STRICT (tous les lots). `validatedDevis(dossier)` = **point de passage unique** des
+fonctions opérationnelles (Préparation, pré-réception, budget) : un lot non validé n'alimente JAMAIS
+silencieusement une fonctionnalité. Rétro-compatible : un devis hérité/démo (lots sans `statut`) reste
+exploitable ; un ancien brouillon global explicite reste en attente.
+
+**3. Budget sur lots validés.** Le budget opérationnel se base sur `validatedDevis` ; en validation
+partielle : « budget partiel — X lots sur Y validés » + montant TTC déclaré au devis affiché en
+information « à fiabiliser ». `PrepBudget` gagne `lotsValides` / `lotsTotal` / `montantDeclareTTC`.
+
+**4. Le devis, cerveau du chantier (points d'extension, PAS de moteur).** Nouveau
+`packages/core/src/contract-derivation.ts` : UNIQUEMENT les types de sortie (`ContractPlan` :
+commandes probables, métiers, réservations, vigilances, contrôles de réception, photos attendues,
+décisions client) + l'interface `ContractDeriver` + le point d'entrée documenté (le moteur lira
+`validatedDevis`). AUCUN sélecteur vide exposé : le vrai sélecteur naîtra avec la première dérivation utile.
+
+**5. Terminologie.** « Transcription » supprimé de l'interface ET des identifiants : `ContractReview` →
+`DevisVerification`, `saveContractTranscription` → `saveDevisAnalyse`, `validateContract` →
+`validateLot` / `validateAllLots`. Vocabulaire : Analyse du devis · Vérification du devis · Devis
+partiellement validé · Devis validé.
+
+**UX validation partielle.** Bannière de progression « X lots sur Y validés » ; la section « Le devis » et
+la pré-réception n'exploitent que les lots validés ; le devis global n'est jamais présenté comme validé
+tant qu'un lot reste à vérifier.
+
+**Compatibilité & tests.** Seed/démo (legacy = validé) inchangés. Suites mises à jour en verrou
+(`contract-parser` 13/13, `contract-transcription` 11/11 — dont validation partielle et « Voir pourquoi »,
+`devis-lecture`/`devis-phenix` pour le nouveau libellé). Gate verte (typecheck, lint, prettier, build,
+Playwright complet, zéro erreur console). VISION Art. 8, 9, 11.

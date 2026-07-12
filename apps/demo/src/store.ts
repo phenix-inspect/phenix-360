@@ -71,6 +71,7 @@ import {
   type PrereceptionData,
   prereceptionDocTitle,
   reconcileTotals,
+  evaluerVerification,
   type Devis,
   type Project,
   type ProjectDocument,
@@ -1383,35 +1384,57 @@ export const demo = {
   },
 
   /**
-   * Enregistre les CORRECTIONS de la transcription du devis (brouillon) et
-   * recalcule la réconciliation des totaux. Le statut reste `brouillon` : rien
-   * n'est contractuel tant que le conducteur n'a pas validé.
+   * Enregistre les CORRECTIONS de l'analyse du devis et recalcule l'état de
+   * lecture de chaque ligne (corriger une ligne la fait passer au vert) + la
+   * vérification des totaux. Le statut de validation de chaque lot est conservé.
    */
-  saveContractTranscription(projectId: ProjectId, devis: Devis): void {
+  saveDevisAnalyse(projectId: ProjectId, devis: Devis): void {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     const dossier = dossiers[projectId];
     if (!dossier) return;
+    const normalized: Devis = {
+      ...devis,
+      lots: devis.lots.map((l) => ({
+        ...l,
+        postes: l.postes.map((p) => ({ ...p, verification: evaluerVerification(p) })),
+      })),
+    };
     const reconciliation = reconcileTotals(
-      devis,
+      normalized,
       dossier.reconciliation?.totalHTDeclare,
       dossier.reconciliation?.totalTTCDeclare,
     );
-    dossiers[projectId] = { ...dossier, devis, devisStatut: 'brouillon', reconciliation };
+    dossiers[projectId] = { ...dossier, devis: normalized, reconciliation };
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
 
   /**
-   * VALIDE la transcription : le conducteur a vérifié le devis face à l'original.
-   * Le contrat devient exploitable en aval (prestations, pré-réception, budget,
-   * Léon). C'est une décision HUMAINE — aucune automatisation ne valide à sa place.
+   * VALIDE un LOT : le conducteur l'a vérifié face à l'original. Le lot devient
+   * exploitable en aval (prestations, pré-réception, budget) INDÉPENDAMMENT des
+   * autres. Décision HUMAINE — aucune automatisation ne valide à sa place.
    */
-  validateContract(projectId: ProjectId): void {
+  validateLot(projectId: ProjectId, lotId: string): void {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     const dossier = dossiers[projectId];
     if (!dossier?.devis) return;
-    dossiers[projectId] = { ...dossier, devisStatut: 'valide' };
+    const lots = dossier.devis.lots.map((l) =>
+      l.id === lotId ? { ...l, statut: 'valide' as const } : l,
+    );
+    dossiers[projectId] = { ...dossier, devis: { ...dossier.devis, lots } };
+    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+    broadcast();
+  },
+
+  /** VALIDE TOUS les lots d'un coup (« Tout valider »). */
+  validateAllLots(projectId: ProjectId): void {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[projectId];
+    if (!dossier?.devis) return;
+    const lots = dossier.devis.lots.map((l) => ({ ...l, statut: 'valide' as const }));
+    dossiers[projectId] = { ...dossier, devis: { ...dossier.devis, lots } };
     localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();

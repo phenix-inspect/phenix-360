@@ -22,6 +22,7 @@ export * from './calendar.js';
 export * from './devis.js';
 export * from './devis-extract.js';
 export * from './contract.js';
+export * from './contract-derivation.js';
 export * from './prereception.js';
 export * from './prepare.js';
 export * from './client-planning.js';

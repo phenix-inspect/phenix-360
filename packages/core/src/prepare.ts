@@ -42,7 +42,9 @@ import {
 import {
   contratValide,
   extractDevisContract,
-  type DevisStatut,
+  lotsValidesCount,
+  validatedDevis,
+  type LotStatut,
   type TotalsReconciliation,
 } from './contract.js';
 import {
@@ -590,14 +592,13 @@ export interface ProjectDossier {
   /** Lecture structurée du devis signé (lots, postes, montants, TVA). */
   devis?: Devis;
   /**
-   * Statut de la TRANSCRIPTION du devis : `brouillon` = extraite mais pas encore
-   * vérifiée/validée par le conducteur → NON exploitable en aval (pré-réception,
-   * prestations, budget « devis », Léon « certain »). `valide` = contrôlée par
-   * l'humain → contractuelle. Absent ⇒ donnée historique/démo, traitée comme
-   * validée (rétro-compatible). Voir `contratValide`.
+   * Statut global HÉRITÉ (avant la validation par lot) : `brouillon` / `valide`.
+   * La validation se fait désormais PAR LOT (`DevisLot.statut`) ; ce champ ne sert
+   * qu'à interpréter les lots dépourvus de statut (données historiques/démo). Voir
+   * `lotValide` / `devisStatutGlobal` / `contratValide`.
    */
-  devisStatut?: DevisStatut;
-  /** Réconciliation des totaux de la transcription (somme des lignes vs déclaré). */
+  devisStatut?: LotStatut;
+  /** Vérification des totaux du devis analysé (somme des lignes vs déclaré). */
   reconciliation?: TotalsReconciliation;
   /**
    * Avenants signés (append-only). Chacun est un nouveau devis lié à l'initial :
@@ -1797,10 +1798,19 @@ export interface PrepBudget {
   previsionnel: number;
   engage: number;
   restant: number;
+  /** TTC des lots VALIDÉS uniquement (budget opérationnel fiabilisé). */
   devisTTC: number;
   /** Engagé au-dessus du prévisionnel. */
   depasse: boolean;
   source: 'saisi' | 'devis' | 'infos' | 'aucun';
+  /** Nombre de lots validés / total (complétude de l'analyse du devis). */
+  lotsValides: number;
+  lotsTotal: number;
+  /**
+   * Montant TTC total DÉCLARÉ sur le document (information) — non présenté comme
+   * budget fiabilisé tant que tous les lots ne sont pas validés.
+   */
+  montantDeclareTTC?: number;
 }
 
 export interface ChecklistItem {
@@ -1844,8 +1854,14 @@ export function buildPreparation(
 ): PreparationSummary {
   const { orders, documents } = dossier;
 
-  // — Budget (déterministe, simple : engagé = commandes déjà passées) —
-  const devisTTC = buildDevisSummary(dossier.devis, dossier.avenants ?? []).totalTTC;
+  // — Budget (déterministe) : le budget opérationnel se base UNIQUEMENT sur les
+  // lots VALIDÉS. Le montant déclaré du document reste visible en information,
+  // jamais présenté comme fiabilisé tant que tous les lots ne sont pas validés.
+  const { valides: lotsValides, total: lotsTotal } = lotsValidesCount(dossier);
+  const devisTTC = buildDevisSummary(validatedDevis(dossier), dossier.avenants ?? []).totalTTC;
+  const montantDeclareTTC =
+    dossier.reconciliation?.totalTTCDeclare ??
+    (dossier.devis ? buildDevisSummary(dossier.devis, dossier.avenants ?? []).totalTTC : undefined);
   const source: PrepBudget['source'] =
     dossier.budgetPrevisionnel != null
       ? 'saisi'
@@ -1867,6 +1883,9 @@ export function buildPreparation(
     devisTTC,
     depasse,
     source,
+    lotsValides,
+    lotsTotal,
+    ...(montantDeclareTTC != null ? { montantDeclareTTC } : {}),
   };
 
   // — Décisions client (bloquantes si en retard) —
@@ -2128,9 +2147,9 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
   // la vraie date officielle de démarrage. On ne préremplit donc PAS
   // `infos.startDate` : le conducteur la saisit à la main (bloquant partage client).
 
-  // TRANSCRIPTION STRUCTURÉE du contrat : lots → postes (jamais inventée). Reste
-  // en BROUILLON jusqu'à la vérification/validation humaine — non exploitable en
-  // aval tant qu'elle n'est pas validée (VISION Art. 9 : le conducteur contrôle).
+  // ANALYSE STRUCTURÉE du contrat : lots → postes (jamais inventée). Chaque lot
+  // démarre en BROUILLON (à vérifier) — non exploitable en aval tant que le
+  // conducteur ne l'a pas validé (VISION Art. 9 : le conducteur contrôle).
   const contract = extractDevisContract(fullText);
 
   // Feuille de route DÉRIVÉE des lots réellement transcrits, sinon des lots
@@ -2151,13 +2170,8 @@ export const realAnalyzeDossier: DossierAnalyzer = ({ files }) => {
     dossier: baseDossier({
       infos,
       roadmap,
-      ...(contract.devis
-        ? {
-            devis: contract.devis,
-            devisStatut: 'brouillon',
-            reconciliation: contract.reconciliation,
-          }
-        : {}),
+      // Les lots portent leur propre statut (`brouillon`) — pas de statut global.
+      ...(contract.devis ? { devis: contract.devis, reconciliation: contract.reconciliation } : {}),
     }),
     extraction: buildDevisExtraction(fields, chars, false),
   };
