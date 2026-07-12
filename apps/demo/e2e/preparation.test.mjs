@@ -63,6 +63,35 @@ try {
       throw new Error('un bouton de gestion de choix client subsiste en Préparation');
   });
 
+  await assert(
+    'Assistant Chantier : PHÉNIX prépare (lecture seule, aucun envoi client)',
+    async () => {
+      await page
+        .getByText('PHÉNIX 360 a préparé votre chantier')
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // Le résumé « a préparé » : au moins les contrôles de pré-réception + documents.
+      await page
+        .getByText('contrôles de pré-réception')
+        .first()
+        .waitFor({ state: 'visible', timeout: 4000 });
+      // L'assistant PRÉPARE : il ne déclenche AUCUNE action (ni envoi client, ni commande).
+      if (
+        (await page
+          .getByRole('button', {
+            name: /Envoyer au client|Demander maintenant|Commander maintenant/,
+          })
+          .count()) > 0
+      )
+        throw new Error('l’assistant expose une action d’envoi/commande (interdit)');
+      // Une section « Documents à récupérer » est préparée (dérivée du contrat).
+      await page
+        .getByText('Documents à récupérer')
+        .first()
+        .waitFor({ state: 'visible', timeout: 4000 });
+    },
+  );
+
   await assert('Budget sous l’engagé → ALERTE non bloquante (pas un blocage partage)', async () => {
     await setBudget(5000);
     await page
@@ -126,7 +155,13 @@ try {
   await assert('Client-safe : la préparation ne fuit jamais côté client', async () => {
     await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
     await page.waitForTimeout(600);
-    for (const secret of ['Check-list de lancement', 'Clés récupérées', 'Points bloquants']) {
+    for (const secret of [
+      'Check-list de lancement',
+      'Clés récupérées',
+      'Points bloquants',
+      'PHÉNIX 360 a préparé votre chantier',
+      'Points de vigilance',
+    ]) {
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
     }

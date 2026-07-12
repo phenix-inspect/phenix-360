@@ -3,15 +3,17 @@
  * =============================================================================
  * La pré-réception n'est plus une liste de réserves : c'est le CONTRÔLE du
  * contrat. PHÉNIX reconstruit les prestations du devis signé + de tous les
- * avenants (postes actifs) ; le conducteur donne un statut par prestation
- * (🟢 Fait · 🟠 Réserve · 🟡 À faire · ⚫ Moins-value). Une seule saisie génère
- * deux documents (client / artisan) dérivés par destinataire — le client ne voit
- * JAMAIS le responsable, la date de reprise ni les motifs internes.
+ * avenants (postes actifs) ; le conducteur donne un statut PROFESSIONNEL par
+ * prestation (🟢 Réceptionné sans réserve · 🔴 Réceptionné avec réserve · 🟡 Non
+ * réceptionné — à réaliser · ⚫ Retiré du périmètre). Une seule saisie génère deux
+ * documents (client / artisan) dérivés par destinataire — le client ne voit JAMAIS
+ * le responsable, la date de reprise ni les motifs internes.
  *
- * Vérifie : fusion devis + avenants · toutes les prestations · les 4 statuts ·
- * champs conditionnels · 1 à 3 photos · document client · document artisan ·
- * étanchéité des données internes côté client · stockage Documents · Suivi ·
- * responsive · zéro erreur console.
+ * Vérifie : en-tête (chantier/conducteur/référence) · fusion devis + avenants ·
+ * les 4 statuts professionnels · réserve en rouge · champs conditionnels · 1 à 3
+ * photos · filigrane BROUILLON · encarts de signature · document client · document
+ * artisan · étanchéité des données internes · Documents · Suivi · responsive ·
+ * versionnement · zéro erreur console.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -89,9 +91,20 @@ try {
     },
   );
 
-  await assert('Chaque prestation propose les quatre statuts exclusifs', async () => {
+  await assert(
+    'En-tête : identité du chantier (Chantier, Conducteur, Référence stable PR-…)',
+    async () => {
+      for (const label of ['Chantier', 'Conducteur', 'Référence'])
+        if ((await page.getByText(label, { exact: true }).count()) === 0)
+          throw new Error(`en-tête sans « ${label} »`);
+      if ((await page.getByText(/PR-\d{8}-V\d/).count()) === 0)
+        throw new Error('référence PR-AAAAMMJJ-Vx absente de l’en-tête');
+    },
+  );
+
+  await assert('Chaque prestation propose les quatre statuts professionnels', async () => {
     const c = card(P_CARRELAGE);
-    for (const s of ['Fait', 'Réserve', 'À faire', 'Moins-value'])
+    for (const s of ['Sans réserve', 'Avec réserve', 'À réaliser', 'Retiré'])
       if ((await c.getByRole('button', { name: s, exact: true }).count()) === 0)
         throw new Error(`statut « ${s} » manquant`);
   });
@@ -99,16 +112,19 @@ try {
   await assert('Responsive : la vérification tient sur mobile (375 px)', async () => {
     await page.setViewportSize({ width: 375, height: 2400 });
     await card(P_WC)
-      .getByRole('button', { name: 'Fait', exact: true })
+      .getByRole('button', { name: 'Sans réserve', exact: true })
       .waitFor({ state: 'visible' });
     await page.setViewportSize({ width: 1180, height: 2400 });
   });
 
   await assert(
-    '🟠 Fait avec réserve → photos (1 à 3) + commentaire + responsable + reprise',
+    '🔴 Réceptionné avec réserve → photos (1 à 3) + commentaire + responsable + reprise (rouge)',
     async () => {
-      await setStatut(P_WC, 'Réserve');
+      await setStatut(P_WC, 'Avec réserve');
       const c = card(P_WC);
+      // Mise en évidence rouge : pictogramme d'alerte sur la prestation avec réserve.
+      if ((await c.getByText('⚠️').count()) === 0)
+        throw new Error('la réserve n’est pas mise en évidence (pictogramme d’alerte)');
       await c.getByText(/Photos \(0\/3\)/).waitFor({ state: 'visible', timeout: 4000 });
       // 1 à 3 photos : on en ajoute deux.
       await c.locator('input[type=file]').setInputFiles([photo(1), photo(2)]);
@@ -121,13 +137,13 @@ try {
     },
   );
 
-  await assert('🟡 Non fait, à faire → commentaire obligatoire', async () => {
-    await setStatut(P_FAIENCE, 'À faire');
+  await assert('🟡 Non réceptionné — à réaliser → commentaire obligatoire', async () => {
+    await setStatut(P_FAIENCE, 'À réaliser');
     await card(P_FAIENCE).locator('textarea').fill(NONFAIT_COMMENT);
   });
 
-  await assert('⚫ Plus à faire → motif obligatoire (déduit de la facture)', async () => {
-    await setStatut(P_ETANCHEITE, 'Moins-value');
+  await assert('⚫ Retiré du périmètre → motif obligatoire (déduit de la facture)', async () => {
+    await setStatut(P_ETANCHEITE, 'Retiré');
     await card(P_ETANCHEITE).getByRole('button', { name: MOTIF, exact: true }).click();
     await card(P_ETANCHEITE)
       .getByText(/déduite de la facture finale/)
@@ -139,7 +155,12 @@ try {
     await page
       .getByText('Synthèse de la pré-réception')
       .waitFor({ state: 'visible', timeout: 6000 });
-    for (const t of ['Conformes', 'Avec réserve', 'Restant à réaliser', 'Supprimées'])
+    for (const t of [
+      'Réceptionnées sans réserve',
+      'Réceptionnées avec réserve',
+      'Non réceptionnées',
+      'Retirées du périmètre',
+    ])
       await page.getByText(t, { exact: true }).first().waitFor({ state: 'visible' });
     await page.getByPlaceholder(/La pré-réception s.est déroulée/).fill(MOT_GENERAL);
   });
@@ -160,7 +181,7 @@ try {
   });
 
   await assert(
-    'Prévisualisation ARTISAN : tout l’opérationnel (responsable, reprise, motif, commentaires)',
+    'Prévisualisation ARTISAN : opérationnel + en-tête + signatures + filigrane BROUILLON',
     async () => {
       const text = await openedDocText(() => previewBtn(1).click());
       if (!/Version artisan/i.test(text)) throw new Error('doc non marqué « Version artisan »');
@@ -171,18 +192,26 @@ try {
         MOTIF,
         'Responsable',
         'PHÉNIX 360',
+        'Réceptionné avec réserve', // statut professionnel
+        'BROUILLON', // filigrane tant que non validé
       ])
         if (!text.includes(must)) throw new Error(`le document artisan omet « ${must} »`);
+      // Deux encarts de signature (h2 en majuscules CSS → comparaison insensible).
+      if (!/signatures/i.test(text) || !/client ou son repr/i.test(text))
+        throw new Error('encarts de signature (PHÉNIX + Client) absents');
       if (!/Reprise/.test(text)) throw new Error('la date de reprise manque côté artisan');
+      if (!/PR-\d{8}-V\d/.test(text)) throw new Error('référence PR-… absente du document');
     },
   );
 
   await assert('Prévisualisation CLIENT : aucune donnée interne ne fuite', async () => {
     const text = await openedDocText(() => previewBtn(0).click());
     if (!/Version client/i.test(text)) throw new Error('doc non marqué « Version client »');
-    // Ce que le client DOIT voir : prestations, statuts, la réserve (commentaire).
-    for (const must of [P_WC, RESERVE_COMMENT, 'Fait sans réserve'])
+    // Ce que le client DOIT voir : prestations, statuts professionnels, la réserve.
+    for (const must of [P_WC, RESERVE_COMMENT, 'Réceptionné sans réserve', 'BROUILLON'])
       if (!text.includes(must)) throw new Error(`le document client omet « ${must} »`);
+    if (!/signatures/i.test(text))
+      throw new Error('encarts de signature absents du document client');
     // Ce que le client ne doit JAMAIS voir : responsable, reprise, motifs, notes internes.
     for (const leak of ['Responsable', 'Reprise', MOTIF, NONFAIT_COMMENT, 'déduite de la facture'])
       if (text.includes(leak))
@@ -266,6 +295,9 @@ try {
           .click(),
       );
       if (!text.includes(RESERVE_COMMENT)) throw new Error('la réserve n’apparaît pas côté client');
+      // Document VALIDÉ : le filigrane BROUILLON a disparu (document définitif).
+      if (text.includes('BROUILLON'))
+        throw new Error('le document validé porte encore le filigrane BROUILLON');
       for (const leak of ['Responsable', MOTIF, NONFAIT_COMMENT])
         if (text.includes(leak))
           throw new Error(`fuite interne dans l’espace client : « ${leak} »`);

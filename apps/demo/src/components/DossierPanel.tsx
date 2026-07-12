@@ -54,6 +54,7 @@ import { PreparationCockpit } from './PreparationCockpit';
 import { SmartPlanningView } from './SmartPlanningView';
 import { CoordonneesCard } from './prep/CoordonneesCard';
 import { PhotosAvantSection } from './prep/PrepDocuments';
+import { AssistantChantier } from './AssistantChantier';
 
 /** Vue « Préparation » : tout ce que PHÉNIX a préparé pour le chantier. */
 export function DossierPanel({
@@ -298,10 +299,12 @@ export function DossierPanel({
 
       <DecisionsSection dossier={dossier} />
 
-      {/* La section « Propositions préparées par PHÉNIX » a été retirée (09/07/2026) :
-          une demande de choix se crée via « Nouvelle mission → Demander au client » et
-          se pilote EXCLUSIVEMENT dans « Demandes client » (Non lu / En attente / Répondu).
-          Préparation ne porte plus AUCUNE interaction client (aucun doublon). */}
+      {/* La section « Propositions préparées par PHÉNIX » (interaction client directe) a
+          été retirée (09/07/2026). L'Assistant Chantier ci-dessous est un copilote
+          INTERNE en lecture seule : il PRÉPARE des brouillons (matériel, commandes,
+          choix, check-list, vigilances, documents, photos) mais n'envoie rien — les
+          actions passent par les points d'entrée officiels après validation. */}
+      <AssistantChantier dossier={dossier} />
 
       <PhotosAvantSection project={project} dossier={dossier} patch={patch} />
 

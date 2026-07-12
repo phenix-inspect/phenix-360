@@ -26,23 +26,51 @@ import { deriverDetailsPoste, type DetailTechnique } from './details-techniques.
 export const PRESTATION_STATUTS = ['fait', 'reserve', 'non_fait', 'moins_value'] as const;
 export type PrestationStatut = (typeof PRESTATION_STATUTS)[number];
 
-/** Libellé COMPLET (conducteur / artisan). */
+/**
+ * Libellé COMPLET, PROFESSIONNEL (conducteur / artisan). Vocabulaire de réception
+ * de chantier — source unique consommée par l'écran, la synthèse et les documents.
+ */
 export const PRESTATION_STATUT_LABEL: Record<PrestationStatut, string> = {
-  fait: 'Fait sans réserve',
-  reserve: 'Fait avec réserve',
-  non_fait: 'Non fait, à faire',
-  moins_value: 'Plus à faire (moins-value)',
+  fait: 'Réceptionné sans réserve',
+  reserve: 'Réceptionné avec réserve',
+  non_fait: 'Non réceptionné — à réaliser',
+  moins_value: 'Retiré du périmètre — moins-value à prévoir',
 };
 
 /**
- * Libellé CLIENT (rassurant, sans notion interne de moins-value / de « à faire »
- * chiffré). Le client voit un statut clair, jamais l'organisation du chantier.
+ * Libellé CLIENT (clair, factuel, sans notion interne de moins-value). Le client
+ * voit un statut professionnel, jamais l'organisation ni la facturation interne.
  */
 export const PRESTATION_STATUT_LABEL_CLIENT: Record<PrestationStatut, string> = {
-  fait: 'Fait sans réserve',
-  reserve: 'Fait avec réserve',
-  non_fait: 'Non fait',
-  moins_value: 'Plus à faire',
+  fait: 'Réceptionné sans réserve',
+  reserve: 'Réceptionné avec réserve',
+  non_fait: 'Non réceptionné',
+  moins_value: 'Retiré du périmètre',
+};
+
+/** Libellé COURT pour les boutons de sélection (tient sur mobile). */
+export const PRESTATION_STATUT_SHORT: Record<PrestationStatut, string> = {
+  fait: 'Sans réserve',
+  reserve: 'Avec réserve',
+  non_fait: 'À réaliser',
+  moins_value: 'Retiré',
+};
+
+/** Tonalité visuelle d'un statut (la réserve seule est mise en évidence en rouge). */
+export type StatutTon = 'ok' | 'reserve' | 'todo' | 'retire';
+export const PRESTATION_STATUT_TON: Record<PrestationStatut, StatutTon> = {
+  fait: 'ok',
+  reserve: 'reserve',
+  non_fait: 'todo',
+  moins_value: 'retire',
+};
+
+/** Pastille de statut (repère visuel discret, cohérent écran ↔ document). */
+export const PRESTATION_STATUT_DOT: Record<PrestationStatut, string> = {
+  fait: '🟢',
+  reserve: '🔴',
+  non_fait: '🟡',
+  moins_value: '⚫',
 };
 
 /* -------------------------------------------------------------------------- *
@@ -137,6 +165,51 @@ export interface PrereceptionData {
 export function prereceptionDocTitle(version = 1): string {
   return version > 1 ? `Pré-réception V${version}` : 'Pré-réception';
 }
+
+/**
+ * Référence STABLE et lisible de la pré-réception (en-tête & documents) :
+ * « PR-AAAAMMJJ-V1 ». Dérivée de la date de validation et de la version — jamais
+ * saisie à la main. `dateISO` absent ⇒ référence sans date (préparation).
+ */
+export function prereceptionReference(dateISO?: string, version = 1): string {
+  const d = dateISO ? dateISO.slice(0, 10).replace(/-/g, '') : '';
+  return d ? `PR-${d}-V${version}` : `PR-V${version}`;
+}
+
+/**
+ * EN-TÊTE d'une pré-réception (mission & documents) : identité complète du
+ * chantier, horodatée AUTOMATIQUEMENT. Le conducteur ne saisit ni la date ni
+ * l'heure. `présents` reste optionnel.
+ */
+export interface PrereceptionEntete {
+  /** Nom / référence du chantier. */
+  chantier: string;
+  /** Adresse complète du chantier (si connue). */
+  adresse?: string;
+  /** Nom du client. */
+  client?: string;
+  /** Conducteur PHÉNIX (auteur). */
+  conducteur?: string;
+  /** Date + heure ISO (horodatage automatique). */
+  dateISO: string;
+  /** Intervenants présents (optionnel). */
+  presents: string[];
+  /** Version du document (1, 2, 3…). */
+  version: number;
+  /** Référence stable dérivée (PR-AAAAMMJJ-Vx). */
+  reference: string;
+}
+
+/** Libellés PROFESSIONNELS de la synthèse (cohérents écran ↔ document). */
+export const PRERECEPTION_SYNTHESE_LABEL: Record<
+  keyof Omit<PrereceptionSynthese, 'total'>,
+  string
+> = {
+  conformes: 'Réceptionnées sans réserve',
+  avecReserve: 'Réceptionnées avec réserve',
+  restantes: 'Non réceptionnées',
+  supprimees: 'Retirées du périmètre',
+};
 
 /* -------------------------------------------------------------------------- *
  * Motifs proposés pour une moins-value (« Plus à faire »)

@@ -1,12 +1,16 @@
 import {
   DIFFUSION_LABEL,
+  PRERECEPTION_SYNTHESE_LABEL,
+  PRESTATION_STATUT_DOT,
   PRESTATION_STATUT_LABEL,
   PRESTATION_STATUT_LABEL_CLIENT,
   PROJECT_STEP_LABEL,
   RESERVE_RESPONSABLE_LABEL,
   ROLE_LABEL,
+  isDraft,
   pointPhotos,
   pointsPourAudience,
+  prereceptionReference,
   prereceptionSynthese,
   type CrAudience,
   type DocumentEvent,
@@ -21,6 +25,10 @@ import { fmtDate } from './format';
 export interface DocumentContext {
   projectName: string;
   authorName: string;
+  /** Adresse complète du chantier (en-tête du PV). */
+  address?: string;
+  /** Nom du client (en-tête du PV). */
+  clientName?: string;
 }
 
 /** Échappement HTML (le contenu métier est saisi par l'utilisateur). */
@@ -109,28 +117,25 @@ function compteRenduPointsBody(
 
 /* -------------------------- PRÉ-RÉCEPTION -------------------------------- */
 
-const STATUT_DOT: Record<PrestationVerif['statut'], string> = {
-  fait: '🟢',
-  reserve: '🟠',
-  non_fait: '🟡',
-  moins_value: '⚫',
-};
-
 /**
  * Une prestation vérifiée, rendue selon le destinataire. Le CLIENT ne voit
  * JAMAIS le responsable, la date de reprise, ni les remarques internes (non fait
  * / motif de moins-value) : il voit le statut et, s'il y a une réserve, ses
  * photos et son commentaire. L'artisan (et le conducteur) voient tout.
+ * Une prestation « Réceptionné avec réserve » est mise en évidence en ROUGE
+ * (bordure, pastille d'alerte, commentaire) — seules les réserves le sont.
  */
 function prestationRow(p: PrestationVerif, audience: CrAudience): string {
   const isClient = audience === 'client';
   const statutLabel = (isClient ? PRESTATION_STATUT_LABEL_CLIENT : PRESTATION_STATUT_LABEL)[
     p.statut
   ];
+  const estReserve = p.statut === 'reserve';
   const details: string[] = [];
-  if (p.statut === 'reserve' && p.reserve) {
+  if (estReserve && p.reserve) {
     const r = p.reserve;
-    if (r.commentaire.trim()) details.push(`<p class="pv-comment">${esc(r.commentaire)}</p>`);
+    if (r.commentaire.trim())
+      details.push(`<p class="pv-comment pv-reserve-comment">⚠️ ${esc(r.commentaire)}</p>`);
     const photos = r.photos.filter((ph) => ph.imageUrl);
     if (photos.length > 0)
       details.push(
@@ -154,22 +159,37 @@ function prestationRow(p: PrestationVerif, audience: CrAudience): string {
       `<p class="pv-meta">${esc(`Motif : ${p.motifMoinsValue ?? ''} · À déduire de la facture finale`)}</p>`,
     );
   }
-  return `<article class="pv-item">
-    <div class="pv-head"><span class="pv-dot">${STATUT_DOT[p.statut]}</span><span class="pv-plabel">${esc(
+  return `<article class="pv-item${estReserve ? ' pv-reserve' : ''}">
+    <div class="pv-head"><span class="pv-dot">${PRESTATION_STATUT_DOT[p.statut]}</span><span class="pv-plabel">${esc(
       p.label,
-    )}</span><span class="pv-statut">${esc(statutLabel)}</span></div>
+    )}</span><span class="pv-statut${estReserve ? ' pv-statut-reserve' : ''}">${esc(statutLabel)}</span></div>
     ${details.join('')}
   </article>`;
+}
+
+/** Deux encarts de signature (PHÉNIX + client), prêts pour la signature en ligne. */
+function signatureBlocks(): string {
+  const bloc = (titre: string, roleLabel: string): string => `<div class="sign-box">
+    <div class="sign-title">${esc(titre)}</div>
+    <div class="sign-field"><span>Nom</span><span class="sign-line"></span></div>
+    <div class="sign-field"><span>${esc(roleLabel)}</span><span class="sign-line"></span></div>
+    <div class="sign-field"><span>Date</span><span class="sign-line"></span></div>
+    <div class="sign-sign"><span>Signature</span><div class="sign-zone"></div></div>
+  </div>`;
+  return `<section class="signatures"><h2>Signatures</h2><div class="sign-grid">
+    ${bloc('PHÉNIX', 'Qualité')}
+    ${bloc('Client ou son représentant', 'Qualité / représentation')}
+  </div></section>`;
 }
 
 /** Corps d'une pré-réception : synthèse + prestations (groupées par lot) + mot. */
 function prereceptionBody(data: PrereceptionData, audience: CrAudience): string {
   const s = prereceptionSynthese(data.prestations);
-  const synth = `<section><h2>Synthèse</h2><div class="pv-synth">
-    <div><b>${s.conformes}</b><span>Conformes</span></div>
-    <div><b>${s.avecReserve}</b><span>Avec réserve</span></div>
-    <div><b>${s.restantes}</b><span>Restant à réaliser</span></div>
-    <div><b>${s.supprimees}</b><span>Supprimées</span></div>
+  const synth = `<section><h2>Synthèse de la pré-réception</h2><div class="pv-synth">
+    <div><b>${s.conformes}</b><span>${esc(PRERECEPTION_SYNTHESE_LABEL.conformes)}</span></div>
+    <div class="pv-synth-reserve"><b>${s.avecReserve}</b><span>${esc(PRERECEPTION_SYNTHESE_LABEL.avecReserve)}</span></div>
+    <div><b>${s.restantes}</b><span>${esc(PRERECEPTION_SYNTHESE_LABEL.restantes)}</span></div>
+    <div><b>${s.supprimees}</b><span>${esc(PRERECEPTION_SYNTHESE_LABEL.supprimees)}</span></div>
   </div></section>`;
 
   // Regroupement par lot (corps d'état), dans l'ordre d'apparition.
@@ -192,10 +212,10 @@ function prereceptionBody(data: PrereceptionData, audience: CrAudience): string 
     .join('');
 
   const mot = data.commentaireGeneral.trim()
-    ? `<section><h2>Commentaire général</h2>${paragraphs(data.commentaireGeneral)}</section>`
+    ? `<section><h2>Commentaire général de pré-réception</h2>${paragraphs(data.commentaireGeneral)}</section>`
     : '';
 
-  return `${synth}${prestations}${mot}`;
+  return `${synth}${prestations}${mot}${signatureBlocks()}`;
 }
 
 /** Corps d'un document de référence sans fichier joint (fiche de couverture). */
@@ -238,6 +258,11 @@ export function buildDocumentHtml(
       ? event.content.presents.join(', ')
       : undefined;
   const categorie = event.type === 'document' ? event.content.categorie : undefined;
+  // Pré-réception : référence stable + version (en-tête & documents).
+  const prVersion = isPrereception ? (event.content.prereception?.version ?? 1) : 1;
+  const reference = isPrereception ? prereceptionReference(event.createdAt, prVersion) : undefined;
+  // Filigrane BROUILLON tant que le document n'est pas validé (aperçu conducteur).
+  const brouillon = isPrereception && isDraft(event);
   const body =
     event.type === 'compte_rendu'
       ? event.content.prereception
@@ -280,31 +305,54 @@ export function buildDocumentHtml(
   .pv-synth > div { border: 1px solid #ece3d2; border-radius: 12px; padding: 12px; text-align: center; background: #fffaf0; }
   .pv-synth b { display: block; font-size: 24px; color: #221c12; }
   .pv-synth span { font-size: 12px; color: #8a8069; }
+  .pv-synth-reserve { border-color: #d9c3c0 !important; background: #fdf2f1 !important; }
+  .pv-synth-reserve b { color: #a12b1e !important; }
   .pv-item { padding: 12px 0; border-bottom: 1px solid #f0e9da; page-break-inside: avoid; }
   .pv-item:last-child { border-bottom: none; }
+  .pv-reserve { border-left: 3px solid #c0392b; padding-left: 12px; background: #fdf3f2; border-radius: 0 8px 8px 0; }
   .pv-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
   .pv-dot { font-size: 13px; }
   .pv-plabel { font-weight: 600; color: #221c12; }
   .pv-statut { margin-left: auto; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
+  .pv-statut-reserve { color: #c0392b; font-weight: 700; }
   .pv-comment { margin: 8px 0 6px; }
+  .pv-reserve-comment { color: #a12b1e; font-weight: 600; }
   .pv-meta { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; color: #8a8069; margin: 0 0 4px; }
   .pv-album { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
   .pv-photo { width: 150px; height: 112px; object-fit: cover; border-radius: 10px; border: 1px solid #e7dfce; }
+  .signatures { page-break-inside: avoid; margin-top: 30px; }
+  .sign-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .sign-box { border: 1px solid #e0d6c2; border-radius: 12px; padding: 16px; page-break-inside: avoid; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .sign-title { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9803a; font-weight: 700; margin-bottom: 12px; }
+  .sign-field { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; font-size: 13px; }
+  .sign-field > span:first-child { min-width: 120px; color: #8a8069; }
+  .sign-line { flex: 1; border-bottom: 1px dotted #c8bda3; height: 16px; }
+  .sign-sign > span { font-size: 13px; color: #8a8069; }
+  .sign-zone { margin-top: 6px; height: 84px; border: 1px dashed #c8bda3; border-radius: 8px; }
+  .watermark { position: fixed; top: 42%; left: 0; right: 0; text-align: center; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 120px; font-weight: 800; letter-spacing: 0.1em; color: rgba(192,57,43,0.10); transform: rotate(-24deg); pointer-events: none; z-index: 0; }
+  .is-draft .sheet { position: relative; }
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece3d2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
-  @media print { body { background: #fff; } .sheet { border: none; box-shadow: none; margin: 0; } }
+  @media print { body { background: #fff; } .sheet { border: none; box-shadow: none; margin: 0; } .watermark { position: absolute; } }
 </style></head>
-<body><article class="sheet">
+<body${brouillon ? ' class="is-draft"' : ''}><article class="sheet">
+  ${brouillon ? '<div class="watermark">BROUILLON</div>' : ''}
   <div class="brand">PHÉNIX 360${audienceLabel ? ` · ${esc(audienceLabel)}` : ''}</div>
   <h1>${esc(title)}</h1>
   <div class="metas">
     ${line('Chantier', ctx.projectName)}
+    ${line('Adresse', ctx.address)}
+    ${line('Client', ctx.clientName)}
+    ${line('Référence', reference)}
     ${line('Date', fmtDate(event.createdAt))}
-    ${line('Rédigé par', `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`)}
+    ${line('Conducteur', isPrereception ? ctx.authorName : undefined)}
+    ${line('Rédigé par', isPrereception ? undefined : `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`)}
     ${line('Étape', step)}
     ${line('Présents', presents)}
     ${line('Catégorie', categorie)}
   </div>
   ${body}
-  <footer>Document généré par PHÉNIX 360 — consultable à tout moment.</footer>
+  <footer>Document généré par PHÉNIX 360 — consultable à tout moment.${
+    reference ? ` · ${esc(reference)}` : ''
+  }</footer>
 </article></body></html>`;
 }

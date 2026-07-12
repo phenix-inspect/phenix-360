@@ -95,7 +95,11 @@ import {
   openHtmlDocument,
   openUnavailableDocument,
 } from './lib/document';
-import { buildDocumentHtml, generatedDocumentTitle } from './lib/generatedDocument';
+import {
+  buildDocumentHtml,
+  generatedDocumentTitle,
+  type DocumentContext,
+} from './lib/generatedDocument';
 import { readDocumentAttachment } from './lib/upload';
 
 const STATE_KEY = 'phenix-demo:state:v1';
@@ -591,17 +595,7 @@ export const demo = {
       else openUnavailableDocument();
       return;
     }
-    const project = snapshot.projects.find((p) => p.id === event.projectId);
-    openHtmlDocument(
-      buildDocumentHtml(
-        event,
-        {
-          projectName: project?.name ?? 'Chantier',
-          authorName: nameOf(snapshot, event.actor.userId),
-        },
-        audience,
-      ),
-    );
+    openHtmlDocument(buildDocumentHtml(event, docContextFor(snapshot, event), audience));
   },
 
   /**
@@ -615,16 +609,8 @@ export const demo = {
       else openUnavailableDocument();
       return;
     }
-    const project = snapshot.projects.find((p) => p.id === event.projectId);
     downloadHtmlDocument(
-      buildDocumentHtml(
-        event,
-        {
-          projectName: project?.name ?? 'Chantier',
-          authorName: nameOf(snapshot, event.actor.userId),
-        },
-        audience,
-      ),
+      buildDocumentHtml(event, docContextFor(snapshot, event), audience),
       generatedDocumentTitle(event),
     );
   },
@@ -1976,7 +1962,6 @@ export const demo = {
     data: PrereceptionData,
     audience: CrAudience,
   ): void {
-    const project = snapshot.projects.find((p) => p.id === projectId);
     const presents = data.presents.map((s) => s.trim()).filter(Boolean);
     const now = new Date().toISOString();
     // Événement SYNTHÉTIQUE (jamais journalisé) : seul le rendu nous intéresse.
@@ -2000,14 +1985,7 @@ export const demo = {
       },
     } as Event;
     openHtmlDocument(
-      buildDocumentHtml(
-        preview,
-        {
-          projectName: project?.name ?? 'Chantier',
-          authorName: nameOf(snapshot, actor.userId),
-        },
-        audience,
-      ),
+      buildDocumentHtml(preview, docContextFor(snapshot, preview, actor.userId), audience),
     );
   },
 
@@ -2356,6 +2334,26 @@ export function useDemo(): DemoSnapshot {
 export function nameOf(snap: DemoSnapshot, userId: string | null | undefined): string {
   if (!userId) return 'PHÉNIX';
   return snap.people[userId] ?? 'PHÉNIX';
+}
+
+/**
+ * Contexte d'en-tête d'un document généré : identité complète du chantier
+ * (nom, adresse, client) + auteur. L'adresse et le client alimentent l'en-tête
+ * du PV de pré-réception (traçabilité contractuelle).
+ */
+function docContextFor(
+  snap: DemoSnapshot,
+  event: Event,
+  authorUserId?: string | null,
+): DocumentContext {
+  const project = snap.projects.find((p) => p.id === event.projectId);
+  const clientName = project?.clientId ? snap.people[project.clientId] : undefined;
+  return {
+    projectName: project?.name ?? 'Chantier',
+    authorName: nameOf(snap, authorUserId ?? event.actor.userId),
+    ...(project?.address ? { address: project.address } : {}),
+    ...(clientName ? { clientName } : {}),
+  };
 }
 
 /** Dossier préparé d'un projet (s'il a été créé via PHÉNIX Start). */

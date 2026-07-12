@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import {
   MOINS_VALUE_MOTIFS,
+  PRERECEPTION_SYNTHESE_LABEL,
+  PRESTATION_STATUT_DOT,
+  PRESTATION_STATUT_SHORT,
   RESERVE_RESPONSABLE_LABEL,
   RESERVE_RESPONSABLES,
   MAX_PRERECEPTION_PHOTOS,
@@ -10,8 +13,10 @@ import {
   validatedDevis,
   originLabel,
   prereceptionComplete,
+  prereceptionReference,
   prereceptionSynthese,
   prestationComplete,
+  type DetailTechnique,
   type EventActor,
   type PrereceptionData,
   type PrestationStatut,
@@ -33,18 +38,19 @@ import {
   ShieldCheck,
   X,
 } from 'lucide-react';
-import { demo, dossierOf } from '../../store';
+import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
 
-/** Les quatre statuts, dans l'ordre, avec leur pastille de couleur. */
-const STATUTS: { statut: PrestationStatut; dot: string; short: string }[] = [
-  { statut: 'fait', dot: '🟢', short: 'Fait' },
-  { statut: 'reserve', dot: '🟠', short: 'Réserve' },
-  { statut: 'non_fait', dot: '🟡', short: 'À faire' },
-  { statut: 'moins_value', dot: '⚫', short: 'Moins-value' },
-];
+/** Les quatre statuts PROFESSIONNELS, dans l'ordre (libellés & pastilles du cœur). */
+const STATUTS: { statut: PrestationStatut; dot: string; short: string }[] = (
+  ['fait', 'reserve', 'non_fait', 'moins_value'] as const
+).map((statut) => ({
+  statut,
+  dot: PRESTATION_STATUT_DOT[statut],
+  short: PRESTATION_STATUT_SHORT[statut],
+}));
 
 /**
  * PRÉ-RÉCEPTION — vérifier l'exécution du contrat (VISION Art. 8). PHÉNIX
@@ -85,6 +91,16 @@ export function PrereceptionFlow({
   });
   const heureStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
+  // En-tête d'identité du chantier (adresse, client, conducteur, référence, version).
+  const snap = demo.getSnapshot();
+  const clientName = project.clientId ? nameOf(snap, project.clientId) : undefined;
+  const conducteur = nameOf(snap, actor.userId);
+  const nextVersion =
+    snap.events.filter(
+      (e) => e.projectId === project.id && e.type === 'compte_rendu' && !!e.content.prereception,
+    ).length + 1;
+  const reference = prereceptionReference(now.toISOString(), nextVersion);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key !== 'Escape') return;
@@ -101,13 +117,16 @@ export function PrereceptionFlow({
       ps.map((p) => {
         if (p.posteId !== posteId) return p;
         // On repart d'un objet propre : changer de statut vide les champs devenus
-        // sans objet (une réserve n'existe que pour « Fait avec réserve »…).
+        // sans objet (une réserve n'existe que pour « Réceptionné avec réserve »…).
+        // On CONSERVE la traçabilité contractuelle : page source + détails techniques.
         const next: PrestationVerif = {
           posteId: p.posteId,
           lotLabel: p.lotLabel,
           label: p.label,
           origin: p.origin,
           statut,
+          ...(p.sourcePage != null ? { sourcePage: p.sourcePage } : {}),
+          ...(p.detailsTechniques ? { detailsTechniques: p.detailsTechniques } : {}),
         };
         if (statut === 'reserve')
           next.reserve = p.reserve ?? { photos: [], commentaire: '', responsable: 'artisan' };
@@ -168,6 +187,12 @@ export function PrereceptionFlow({
         {step === 'verifier' && (
           <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
             <EnteteMission
+              chantier={project.name}
+              adresse={project.address}
+              client={clientName}
+              conducteur={conducteur}
+              reference={reference}
+              version={nextVersion}
               dateStr={dateStr}
               heureStr={heureStr}
               presents={presents}
@@ -307,11 +332,23 @@ export function PrereceptionFlow({
 /* ------------------------------ En-tête ----------------------------------- */
 
 function EnteteMission({
+  chantier,
+  adresse,
+  client,
+  conducteur,
+  reference,
+  version,
   dateStr,
   heureStr,
   presents,
   onPresents,
 }: {
+  chantier: string;
+  adresse?: string;
+  client?: string;
+  conducteur: string;
+  reference: string;
+  version: number;
   dateStr: string;
   heureStr: string;
   presents: string[];
@@ -327,6 +364,12 @@ function EnteteMission({
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-surface p-5">
       <div className="flex flex-wrap gap-x-8 gap-y-2">
+        <Meta label="Chantier" value={chantier} />
+        {adresse && <Meta label="Adresse" value={adresse} />}
+        {client && <Meta label="Client" value={client} />}
+        <Meta label="Conducteur" value={conducteur} />
+        <Meta label="Référence" value={reference} />
+        {version > 1 && <Meta label="Version" value={`V${version}`} />}
         <Meta label="Date" value={cap(dateStr)} />
         <Meta label="Heure" value={heureStr} />
       </div>
@@ -450,13 +493,23 @@ function PrestationCard({
   onPatch: (posteId: string, patch: Partial<PrestationVerif>) => void;
 }): React.JSX.Element {
   const incomplete = !prestationComplete(p);
+  const estReserve = p.statut === 'reserve';
   return (
     <div
       className={`rounded-xl border bg-surface p-3.5 ${
-        incomplete ? 'border-warning' : 'border-border'
+        estReserve
+          ? 'border-destructive border-l-4 border-l-destructive bg-destructive/5'
+          : incomplete
+            ? 'border-warning'
+            : 'border-border'
       }`}
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        {estReserve && (
+          <span aria-hidden className="text-destructive">
+            ⚠️
+          </span>
+        )}
         <span className="text-sm font-medium text-foreground">{p.label}</span>
         {p.origin.kind === 'avenant' && (
           <span className="rounded-full bg-gold-100 px-2 py-0.5 text-[11px] font-medium text-gold-700">
@@ -464,6 +517,10 @@ function PrestationCard({
           </span>
         )}
       </div>
+
+      {p.detailsTechniques && p.detailsTechniques.length > 0 && (
+        <DetailsTechniquesAide details={p.detailsTechniques} />
+      )}
 
       <div className="mt-2.5 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
         {STATUTS.map((s) => {
@@ -507,7 +564,63 @@ function PrestationCard({
   );
 }
 
-/* ------------------------- Cas « Fait avec réserve » ---------------------- */
+/* -------------------- Détails techniques (AIDE AU CONTRÔLE) ---------------- */
+
+/**
+ * Repères techniques DÉRIVÉS du devis, affichés sous la prestation en AIDE AU
+ * CONTRÔLE (« 18 prises ? », « receveur 800×800 ? »). Ils ne créent JAMAIS de
+ * prestation ; toute donnée incertaine est signalée « À vérifier ».
+ */
+function DetailsTechniquesAide({ details }: { details: DetailTechnique[] }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const utiles = details.filter(
+    (d) => d.type === 'équipement' || d.type === 'matériau' || d.dimensions,
+  );
+  const affichés = open ? utiles : utiles.slice(0, 4);
+  if (utiles.length === 0) return <></>;
+  const attr = (d: DetailTechnique): string =>
+    [
+      d.quantité != null ? `${d.quantité}${d.unité ? ` ${d.unité}` : ''}` : null,
+      d.dimensions,
+      d.couleur,
+      d.marque,
+      d.référence,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+  return (
+    <div className="mt-2 rounded-lg border border-dashed border-border bg-paper-50 px-3 py-2">
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Aide au contrôle — détails techniques du devis
+      </p>
+      <ul className="space-y-0.5">
+        {affichés.map((d, i) => (
+          <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-xs text-foreground">
+            <span className="text-muted-foreground">•</span>
+            <span>{d.libellé}</span>
+            {attr(d) && <span className="text-muted-foreground">({attr(d)})</span>}
+            {d.niveauConfiance === 'À vérifier' && (
+              <span className="rounded-full bg-warning/15 px-1.5 text-[10px] font-medium text-warning">
+                À vérifier
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {utiles.length > 4 && (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="mt-1 text-[11px] font-medium text-gold-700 hover:underline"
+        >
+          {open ? 'Réduire' : `Voir les ${utiles.length} détails`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ------------------------- Cas « Réceptionné avec réserve » --------------- */
 
 function ReserveFields({
   prestation: p,
@@ -682,17 +795,43 @@ function SyntheseTiles({
 }: {
   synthese: ReturnType<typeof prereceptionSynthese>;
 }): React.JSX.Element {
-  const tiles: { dot: string; n: number; label: string }[] = [
-    { dot: '🟢', n: synthese.conformes, label: 'Conformes' },
-    { dot: '🟠', n: synthese.avecReserve, label: 'Avec réserve' },
-    { dot: '🟡', n: synthese.restantes, label: 'Restant à réaliser' },
-    { dot: '⚫', n: synthese.supprimees, label: 'Supprimées' },
+  const tiles: { dot: string; n: number; label: string; reserve?: boolean }[] = [
+    {
+      dot: PRESTATION_STATUT_DOT.fait,
+      n: synthese.conformes,
+      label: PRERECEPTION_SYNTHESE_LABEL.conformes,
+    },
+    {
+      dot: PRESTATION_STATUT_DOT.reserve,
+      n: synthese.avecReserve,
+      label: PRERECEPTION_SYNTHESE_LABEL.avecReserve,
+      reserve: true,
+    },
+    {
+      dot: PRESTATION_STATUT_DOT.non_fait,
+      n: synthese.restantes,
+      label: PRERECEPTION_SYNTHESE_LABEL.restantes,
+    },
+    {
+      dot: PRESTATION_STATUT_DOT.moins_value,
+      n: synthese.supprimees,
+      label: PRERECEPTION_SYNTHESE_LABEL.supprimees,
+    },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {tiles.map((t) => (
-        <div key={t.label} className="rounded-2xl border border-border bg-surface p-4 text-center">
-          <div className="text-2xl font-semibold text-foreground">
+        <div
+          key={t.label}
+          className={`rounded-2xl border bg-surface p-4 text-center ${
+            t.reserve && t.n > 0 ? 'border-destructive bg-destructive/5' : 'border-border'
+          }`}
+        >
+          <div
+            className={`text-2xl font-semibold ${
+              t.reserve && t.n > 0 ? 'text-destructive' : 'text-foreground'
+            }`}
+          >
             <span className="mr-1 align-middle text-base" aria-hidden>
               {t.dot}
             </span>
