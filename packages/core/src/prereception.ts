@@ -97,6 +97,8 @@ export interface PrestationVerif {
   label: string;
   /** Origine : devis initial ou avenant n°X. */
   origin: PosteOrigin;
+  /** Page du PDF d'origine (traçabilité jusqu'au document signé). */
+  sourcePage?: number;
   /** Statut vérifié par le conducteur. */
   statut: PrestationStatut;
   /** Réserve rattachée (présente SI statut === 'reserve'). */
@@ -165,6 +167,7 @@ export function buildPrestationsAVerifier(
         lotLabel: lot.label,
         label: cp.poste.label,
         origin: cp.origin,
+        ...(cp.poste.sourcePage != null ? { sourcePage: cp.poste.sourcePage } : {}),
         statut: 'fait',
       });
     }

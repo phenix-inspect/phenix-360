@@ -3098,3 +3098,32 @@ prestations 155/155, 0 oubliée, 0 inventée, contrôles ponctuels 57/57, totaux
 corrects, réconcilié — a révélé (puis validé le correctif de) la sur-segmentation plate.
 Harnais 99/99. Générique (bon de commande, Revel) inchangé. Verdict honnête : OPÉRATIONNEL
 NON (10/15 docs, 0 scanné ; OCR local à venir). Gate complète verte. VISION Art. 8, 9, 11.
+
+---
+
+12/07/2026
+Décision : Le CONTRAT VALIDÉ devient la SOURCE UNIQUE DE VÉRITÉ — audit + Léon conducteur.
+Pourquoi : Prouver que `validatedDevis(dossier)` pilote toute l'application, sans
+duplication ni donnée inventée. Audit feature par feature (Préparation, pré-réception,
+réception/réserves, Léon, documents, choix client, budget, facture, suivi) : toutes
+dérivent déjà du contrat validé via `validatedDevis` (+ avenants / `consolidateDevis`).
+Corrections : (1) LÉON CONDUCTEUR — nouveau `packages/core/src/contract-qa.ts`
+(`answerContractQuestion`) + `demo.askContrat` : répond EXCLUSIVEMENT depuis le contrat
+validé (prestations, lots, montants, TVA, avenants, exclusions), dit « je ne trouve pas »
+sinon, n'invente JAMAIS, propose d'ouvrir le devis, trace chaque réponse (lot, page
+source). Appariement par MOT ENTIER (évite « porte » dans « porteuses ») + racine
+singulier/pluriel ; les EXCLUSIONS sont annoncées « exclu » (jamais « prévu »).
+(2) TRAÇABILITÉ — `sourcePage` ajouté à `PrestationVerif` (pré-réception) : remonte au
+PDF signé. (3) DONNÉES FICTIVES — `mockAnalyzeDossier` (~380 lignes de dossier scénarisé)
+SUPPRIMÉ (code mort ; défaut = `realAnalyzeDossier`, lecture réelle) ; commentaires
+obsolètes corrigés.
+Alternatives rejetées : LLM pour Léon (risque d'hallucination — on veut du déterministe,
+tracé, prouvable) ; appariement par sous-chaîne (faux positifs « porteuses ») ; garder le
+mock (donnée inventée, dette).
+Impact : STRESS TEST LÉON `leon-contrat-stress.test.mjs` — 110+ questions (simples,
+ambiguës, pièges) : exactes 75/75, incomplètes 0, HALLUCINATIONS 0 ; refus propre sans
+contrat validé. Audit livré `apps/demo/e2e/corpus/AUDIT-CERVEAU.md`. Verdict : OUI, le
+contrat validé est la source unique de vérité. Restes non bloquants : dériveurs
+`ContractDeriver` (commandes, choix client…), lecture des sous-listes de matériaux.
+Gate complète verte (typecheck, lint, prettier, build, lecteur, corpus OBAT, métier,
+Playwright 71/71, zéro erreur console). VISION Art. 8, 9, 11.

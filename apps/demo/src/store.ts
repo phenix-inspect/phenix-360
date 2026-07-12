@@ -17,6 +17,8 @@ import {
   SHARED_AUDIENCE,
   InMemoryBackend,
   PROJECT_STATUS_LABEL,
+  answerContractQuestion,
+  type ContractAnswer,
   askPhenix as corePhenix,
   attachmentId as toAttachmentId,
   buildDecisionContent,
@@ -831,8 +833,9 @@ export const demo = {
    * est persisté à part (hors colonne vertébrale).
    */
   /**
-   * PORT D'ANALYSE unique : la démo utilise `mockAnalyzeDossier` (déterministe),
-   * remplaçable par un vrai LLM via `setDossierAnalyzer` sans changer les écrans.
+   * PORT D'ANALYSE unique : LECTURE RÉELLE du devis (`realAnalyzeDossier`), aucune
+   * donnée inventée ; remplaçable par un vrai LLM/OCR via `setDossierAnalyzer` sans
+   * changer les écrans.
    */
   analyzeDossier(input: AnalyzeInput): Promise<ProjectProposal> {
     return Promise.resolve(dossierAnalyzer(input));
@@ -2109,6 +2112,22 @@ export const demo = {
    * escalade en créant une demande (`destinataire: 'phenix'`) au Journal, qui
    * remonte côté conducteur (« Répondre au client » / le radar).
    */
+  /**
+   * LÉON CÔTÉ CONDUCTEUR : répond aux questions sur le chantier À PARTIR DU CONTRAT
+   * VALIDÉ uniquement (`validatedDevis` + avenants + exclusions). Déterministe, ne
+   * s'appuie sur aucune autre source, n'invente jamais. La seule source de vérité.
+   */
+  askContrat(projectId: ProjectId, question: string): ContractAnswer {
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    const dossier = dossiers[projectId];
+    return answerContractQuestion(
+      dossier,
+      question,
+      dossier?.avenants ?? [],
+      dossier?.analyse?.exclusions ?? [],
+    );
+  },
+
   async askPhenix(
     projectId: ProjectId,
     actor: EventActor,
