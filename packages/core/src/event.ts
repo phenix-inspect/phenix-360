@@ -20,6 +20,7 @@ import type { CaptureId, EventId, IsoDateTime, ProjectId, UserId } from './ids.j
 import type { EventActor } from './actor.js';
 import type { EventAttachment } from './attachment.js';
 import type { ProjectStep } from './project.js';
+import type { PrereceptionData } from './prereception.js';
 
 /* -------------------------------------------------------------------------- *
  * Énumérations d'enveloppe
@@ -221,6 +222,13 @@ export interface CompteRenduContent {
    * que les points qui lui sont destinés, l'export PDF est filtré par destinataire.
    */
   points?: CompteRenduPoint[];
+  /**
+   * Pré-réception : vérification de l'exécution du contrat (devis + avenants),
+   * prestation par prestation. Présent sur les CR issus de la mission
+   * « Pré-réception ». La saisie est UNIQUE ; les documents client / artisan sont
+   * dérivés par destinataire (le client ne voit jamais responsable / reprise).
+   */
+  prereception?: PrereceptionData;
 }
 
 export interface PhotoContent {

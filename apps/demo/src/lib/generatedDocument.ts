@@ -1,12 +1,18 @@
 import {
   DIFFUSION_LABEL,
+  PRESTATION_STATUT_LABEL,
+  PRESTATION_STATUT_LABEL_CLIENT,
   PROJECT_STEP_LABEL,
+  RESERVE_RESPONSABLE_LABEL,
   ROLE_LABEL,
   pointPhotos,
   pointsPourAudience,
+  prereceptionSynthese,
   type CrAudience,
   type DocumentEvent,
   type Event,
+  type PrereceptionData,
+  type PrestationVerif,
 } from '@phenix360/core';
 import { eventTitle } from './eventText';
 import { fmtDate } from './format';
@@ -101,6 +107,97 @@ function compteRenduPointsBody(
     .join('')}</section>`;
 }
 
+/* -------------------------- PRÉ-RÉCEPTION -------------------------------- */
+
+const STATUT_DOT: Record<PrestationVerif['statut'], string> = {
+  fait: '🟢',
+  reserve: '🟠',
+  non_fait: '🟡',
+  moins_value: '⚫',
+};
+
+/**
+ * Une prestation vérifiée, rendue selon le destinataire. Le CLIENT ne voit
+ * JAMAIS le responsable, la date de reprise, ni les remarques internes (non fait
+ * / motif de moins-value) : il voit le statut et, s'il y a une réserve, ses
+ * photos et son commentaire. L'artisan (et le conducteur) voient tout.
+ */
+function prestationRow(p: PrestationVerif, audience: CrAudience): string {
+  const isClient = audience === 'client';
+  const statutLabel = (isClient ? PRESTATION_STATUT_LABEL_CLIENT : PRESTATION_STATUT_LABEL)[
+    p.statut
+  ];
+  const details: string[] = [];
+  if (p.statut === 'reserve' && p.reserve) {
+    const r = p.reserve;
+    if (r.commentaire.trim()) details.push(`<p class="pv-comment">${esc(r.commentaire)}</p>`);
+    const photos = r.photos.filter((ph) => ph.imageUrl);
+    if (photos.length > 0)
+      details.push(
+        `<div class="pv-album">${photos
+          .map((ph) => `<img class="pv-photo" src="${ph.imageUrl}" alt="Réserve"/>`)
+          .join('')}</div>`,
+      );
+    if (!isClient) {
+      const meta = [
+        `Responsable : ${RESERVE_RESPONSABLE_LABEL[r.responsable]}`,
+        r.dateReprise ? `Reprise prévue : ${fmtDate(r.dateReprise)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ');
+      if (meta) details.push(`<p class="pv-meta">${esc(meta)}</p>`);
+    }
+  } else if (p.statut === 'non_fait' && !isClient && (p.commentaireNonFait ?? '').trim()) {
+    details.push(`<p class="pv-comment">${esc(p.commentaireNonFait ?? '')}</p>`);
+  } else if (p.statut === 'moins_value' && !isClient && (p.motifMoinsValue ?? '').trim()) {
+    details.push(
+      `<p class="pv-meta">${esc(`Motif : ${p.motifMoinsValue ?? ''} · À déduire de la facture finale`)}</p>`,
+    );
+  }
+  return `<article class="pv-item">
+    <div class="pv-head"><span class="pv-dot">${STATUT_DOT[p.statut]}</span><span class="pv-plabel">${esc(
+      p.label,
+    )}</span><span class="pv-statut">${esc(statutLabel)}</span></div>
+    ${details.join('')}
+  </article>`;
+}
+
+/** Corps d'une pré-réception : synthèse + prestations (groupées par lot) + mot. */
+function prereceptionBody(data: PrereceptionData, audience: CrAudience): string {
+  const s = prereceptionSynthese(data.prestations);
+  const synth = `<section><h2>Synthèse</h2><div class="pv-synth">
+    <div><b>${s.conformes}</b><span>Conformes</span></div>
+    <div><b>${s.avecReserve}</b><span>Avec réserve</span></div>
+    <div><b>${s.restantes}</b><span>Restant à réaliser</span></div>
+    <div><b>${s.supprimees}</b><span>Supprimées</span></div>
+  </div></section>`;
+
+  // Regroupement par lot (corps d'état), dans l'ordre d'apparition.
+  const order: string[] = [];
+  const byLot = new Map<string, PrestationVerif[]>();
+  for (const p of data.prestations) {
+    if (!byLot.has(p.lotLabel)) {
+      byLot.set(p.lotLabel, []);
+      order.push(p.lotLabel);
+    }
+    byLot.get(p.lotLabel)?.push(p);
+  }
+  const prestations = order
+    .map(
+      (lot) =>
+        `<section><h2>${esc(lot)}</h2>${(byLot.get(lot) ?? [])
+          .map((p) => prestationRow(p, audience))
+          .join('')}</section>`,
+    )
+    .join('');
+
+  const mot = data.commentaireGeneral.trim()
+    ? `<section><h2>Commentaire général</h2>${paragraphs(data.commentaireGeneral)}</section>`
+    : '';
+
+  return `${synth}${prestations}${mot}`;
+}
+
 /** Corps d'un document de référence sans fichier joint (fiche de couverture). */
 function documentBody(event: DocumentEvent): string {
   const att = event.content.attachment;
@@ -121,14 +218,15 @@ export function buildDocumentHtml(
   audience: CrAudience = 'conducteur',
 ): string {
   const title = generatedDocumentTitle(event);
-  // Le libellé « Version client / artisan » ne concerne QUE les comptes rendus à
-  // points (jamais un devis ou une facture).
+  // Le libellé « Version client / artisan » concerne les documents à double
+  // destinataire : comptes rendus à points ET pré-réceptions (jamais un devis).
   const isCrPoints =
     event.type === 'compte_rendu' && !!event.content.points && event.content.points.length > 0;
+  const isPrereception = event.type === 'compte_rendu' && !!event.content.prereception;
   const audienceLabel =
-    isCrPoints && audience === 'client'
+    (isCrPoints || isPrereception) && audience === 'client'
       ? 'Version client'
-      : isCrPoints && audience === 'artisan'
+      : (isCrPoints || isPrereception) && audience === 'artisan'
         ? 'Version artisan'
         : '';
   const step =
@@ -142,9 +240,11 @@ export function buildDocumentHtml(
   const categorie = event.type === 'document' ? event.content.categorie : undefined;
   const body =
     event.type === 'compte_rendu'
-      ? event.content.points && event.content.points.length > 0
-        ? compteRenduPointsBody(event, audience)
-        : compteRenduBody(event)
+      ? event.content.prereception
+        ? prereceptionBody(event.content.prereception, audience)
+        : event.content.points && event.content.points.length > 0
+          ? compteRenduPointsBody(event, audience)
+          : compteRenduBody(event)
       : event.type === 'document'
         ? documentBody(event)
         : '';
@@ -176,6 +276,20 @@ export function buildDocumentHtml(
   .point-body { min-width: 0; }
   .point-comment { font-size: 17px; margin: 0 0 8px; }
   .badge { display: inline-block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: #a9803a; background: #f6edda; border-radius: 999px; padding: 3px 10px; }
+  .pv-synth { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; font-family: ui-sans-serif, system-ui, sans-serif; margin: 4px 0 8px; }
+  .pv-synth > div { border: 1px solid #ece3d2; border-radius: 12px; padding: 12px; text-align: center; background: #fffaf0; }
+  .pv-synth b { display: block; font-size: 24px; color: #221c12; }
+  .pv-synth span { font-size: 12px; color: #8a8069; }
+  .pv-item { padding: 12px 0; border-bottom: 1px solid #f0e9da; page-break-inside: avoid; }
+  .pv-item:last-child { border-bottom: none; }
+  .pv-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .pv-dot { font-size: 13px; }
+  .pv-plabel { font-weight: 600; color: #221c12; }
+  .pv-statut { margin-left: auto; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
+  .pv-comment { margin: 8px 0 6px; }
+  .pv-meta { font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; color: #8a8069; margin: 0 0 4px; }
+  .pv-album { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+  .pv-photo { width: 150px; height: 112px; object-fit: cover; border-radius: 10px; border: 1px solid #e7dfce; }
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece3d2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
   @media print { body { background: #fff; } .sheet { border: none; box-shadow: none; margin: 0; } }
 </style></head>

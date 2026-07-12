@@ -70,6 +70,7 @@ import {
   type PhenixSource,
   type PhenixTodo,
   type PrepDocCategory,
+  type PrereceptionData,
   type Project,
   type ProjectDocument,
   type ProjectDossier,
@@ -1898,6 +1899,40 @@ export const demo = {
     refresh();
     broadcast();
     return { compteRenduId: ev.id };
+  },
+
+  /**
+   * PRÉ-RÉCEPTION — vérification de l'exécution du contrat signé (devis +
+   * avenants). UNE seule saisie produit UN événement (compte rendu structuré),
+   * visible du client, d'où sont DÉRIVÉS les deux documents (client / artisan)
+   * par destinataire — aucune double saisie (VISION Art. 8). La saisie porte les
+   * données INTERNES (responsable, date de reprise, motifs) ; le rendu client les
+   * masque à la source (`buildDocumentHtml(..., 'client')`). La pré-réception
+   * apparaît aussitôt dans le Suivi et dans Documents (famille « Pré-réceptions »).
+   */
+  async createPrereception(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: PrereceptionData,
+  ): Promise<{ prereceptionId: string }> {
+    const presents = input.presents.map((s) => s.trim()).filter(Boolean);
+    const ev = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'compte_rendu',
+      visibility: 'client',
+      state: 'publie',
+      content: {
+        texte: '',
+        missionKind: 'prereception',
+        docTitre: 'Pré-réception',
+        ...(presents.length ? { presents } : {}),
+        prereception: { ...input, presents },
+      },
+    });
+    refresh();
+    broadcast();
+    return { prereceptionId: ev.id };
   },
 
   /**

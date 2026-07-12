@@ -58,6 +58,7 @@ import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
 import { MissionPicker } from '../components/mission/MissionPicker';
 import { CompteRenduFlow } from '../components/mission/CompteRenduFlow';
 import { MissionFlow } from '../components/mission/MissionFlow';
+import { PrereceptionFlow } from '../components/mission/PrereceptionFlow';
 import { DeleteChantierButton } from '../components/DeleteChantierButton';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -259,7 +260,10 @@ export function CompagnonView({
       {missionKind === 'compte_rendu' && (
         <CompteRenduFlow project={project} actor={actor} onClose={() => setMissionKind(null)} />
       )}
-      {missionKind && missionKind !== 'compte_rendu' && (
+      {missionKind === 'prereception' && (
+        <PrereceptionFlow project={project} actor={actor} onClose={() => setMissionKind(null)} />
+      )}
+      {missionKind && missionKind !== 'compte_rendu' && missionKind !== 'prereception' && (
         <MissionFlow
           kind={missionKind}
           project={project}
@@ -365,6 +369,8 @@ function SuiviTab({
                 const openableDoc = e.type === 'document' || e.type === 'compte_rendu';
                 const crPoints = e.type === 'compte_rendu' ? e.content.points : undefined;
                 const isCrPoints = (crPoints?.length ?? 0) > 0;
+                // Pré-réception : une saisie, deux documents dérivés par destinataire.
+                const isPrereceptionDoc = e.type === 'compte_rendu' && !!e.content.prereception;
                 // Demande du client : le Suivi ne conserve que la TRACE OFFICIELLE
                 // une fois RÉPONDUE (lecture seule). Le pilotage et la réponse se
                 // font dans l'onglet « Demandes client » — le Suivi n'est pas un
@@ -441,6 +447,24 @@ function SuiviTab({
                           >
                             <FileText aria-hidden /> PDF artisan
                           </button>
+                        )}
+                        {isPrereceptionDoc && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => demo.openDocument(e, 'client')}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-3.5"
+                            >
+                              <FileText aria-hidden /> Version client
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => demo.openDocument(e, 'artisan')}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-xs font-medium text-foreground transition-colors duration-base hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-3.5"
+                            >
+                              <FileText aria-hidden /> Version artisan
+                            </button>
+                          </>
                         )}
                       </span>
                     )}

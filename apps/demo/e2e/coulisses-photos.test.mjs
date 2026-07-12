@@ -28,7 +28,6 @@ const TWELVE = Array.from({ length: 12 }, (_, i) => photo(i));
 
 const ALBUM_TITLE = 'Avancement en images de la cuisine';
 const DOC_LIBELLE = 'Plan technique interne partage';
-const PRERECEPTION_OBS = 'Point de pre-reception : reprise du joint et retouche peinture.';
 
 const openCoulisses = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
@@ -54,24 +53,17 @@ const openAlbumComposer = async () => {
     .waitFor({ state: 'visible', timeout: 6000 });
 };
 
-/** Déroule une mission (capture → PHÉNIX comprend → valider → terminer). */
-const runMission = async (missionLabel, observation) => {
+/** Déroule une PRÉ-RÉCEPTION (flux dédié : contrôle du contrat, tout conforme). */
+const runPrereception = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
   await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-  await page.getByRole('button', { name: new RegExp(`^${missionLabel}`) }).click();
-  const draft = page.getByPlaceholder(/Dites ce qu/);
-  await draft.waitFor({ state: 'visible', timeout: 6000 });
-  await draft.fill(observation);
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-  await page.getByRole('button', { name: /J.ai terminé/ }).click();
+  await page.getByRole('dialog').getByText('Pré-réception', { exact: true }).click();
   await page
-    .getByRole('button', { name: /^Valider$/ })
-    .waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByRole('button', { name: /^Valider$/ }).click();
-  await page
-    .getByRole('button', { name: /Terminer|Partager/ })
-    .first()
+    .getByText('Vérifiez chaque prestation vendue')
     .waitFor({ state: 'visible', timeout: 8000 });
+  await page.getByRole('button', { name: 'Voir la synthèse' }).click();
+  await page.getByRole('button', { name: /Générer les documents/ }).click();
+  await page.getByText('Pré-réception enregistrée').waitFor({ state: 'visible', timeout: 8000 });
   await page.getByRole('button', { name: /^Terminer$/ }).click();
   await page
     .getByRole('heading', { name: /Appartement Lyon 6e/ })
@@ -114,12 +106,10 @@ try {
 
   // ---- Une pré-réception générée → Suivi, PAS les coulisses ---------------
   await assert('Pré-réception générée (compte rendu) → pas dans les coulisses', async () => {
-    await runMission('Pré-réception', PRERECEPTION_OBS);
+    await runPrereception();
     await openCoulisses();
-    if ((await page.getByText(PRERECEPTION_OBS).count()) > 0)
+    if ((await page.locator('#section-fil').getByText('Pré-réception').count()) > 0)
       throw new Error('la pré-réception apparaît dans les coulisses');
-    if ((await page.getByText('Liste des points à reprendre').count()) > 0)
-      throw new Error('le PV de pré-réception apparaît dans les coulisses');
   });
 
   // ---- Publication via Nouvelle mission UNIQUEMENT (jamais le sous-menu) --
@@ -208,7 +198,7 @@ try {
   await assert('Client-safe : ni document interne, ni PV, ni CR dans les coulisses', async () => {
     await page.waitForTimeout(300);
     const fil = page.locator('#section-fil');
-    for (const secret of [PRERECEPTION_OBS, 'Liste des points à reprendre', DOC_LIBELLE])
+    for (const secret of ['Pré-réception', DOC_LIBELLE])
       if ((await fil.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite dans les coulisses : « ${secret} »`);
   });

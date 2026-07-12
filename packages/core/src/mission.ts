@@ -47,7 +47,11 @@ export const MISSIONS: MissionDef[] = [
     label: 'Compte rendu de chantier',
     description: 'Photographier, commenter, diffuser — point par point',
   },
-  { kind: 'prereception', label: 'Pré-réception', description: 'Lister les points à reprendre' },
+  {
+    kind: 'prereception',
+    label: 'Pré-réception',
+    description: 'Vérifier l’exécution du contrat signé',
+  },
   { kind: 'reception', label: 'Réception', description: 'Clôturer le chantier proprement' },
   // « SAV » et « Note / observation » RETIRÉES du menu (V1) — logique conservée
   // (type + labels + `prepareMission`), il suffit de ré-ajouter leur entrée ici :
@@ -68,7 +72,7 @@ export const MISSION_LABEL: Record<MissionKind, string> = {
 export const MISSION_DOC_TITLE: Record<MissionKind, string> = {
   compte_rendu: 'Compte rendu de chantier',
   livraison: 'Contrôle de livraison',
-  prereception: 'Liste des points à reprendre',
+  prereception: 'Pré-réception',
   reception: 'PV de réception',
   sav: 'Fiche SAV',
   note: 'Note de chantier',

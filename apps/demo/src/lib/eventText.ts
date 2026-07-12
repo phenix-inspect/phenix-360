@@ -26,6 +26,7 @@ const COMM_CANAL_LABEL: Record<CommCanal, string> = {
 export function eventTitle(e: Event): string {
   switch (e.type) {
     case 'compte_rendu':
+      if (e.content.prereception) return 'Pré-réception';
       return e.content.etapeConfirmee
         ? `Compte rendu · ${PROJECT_STEP_LABEL[e.content.etapeConfirmee]}`
         : 'Compte rendu';

@@ -43,7 +43,9 @@ try {
   );
 
   await assert('Capture : on dicte/écrit une observation', async () => {
-    await page.getByRole('dialog').getByText('Pré-réception').click();
+    // La Pré-réception a désormais son propre flux dédié ; on exerce le parcours
+    // signature générique (capture → comprend → partager) via « Réception ».
+    await page.getByRole('dialog').getByText('Réception', { exact: true }).click();
     const draft = page.getByPlaceholder(/Dites ce qu/);
     await draft.waitFor({ state: 'visible', timeout: 5000 });
     await draft.fill('Coulage de la dalle terminé, séchage en cours côté séjour.');

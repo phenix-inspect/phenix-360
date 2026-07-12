@@ -40,7 +40,9 @@ try {
 
   await assert('Nouvelle mission → AJOUTER DES PHOTOS (capture)', async () => {
     await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-    await page.getByRole('dialog').getByText('Pré-réception').click();
+    // La Pré-réception a son propre flux dédié ; on exerce le parcours de capture
+    // générique (photos + observation) via « Réception ».
+    await page.getByRole('dialog').getByText('Réception', { exact: true }).click();
     await page.getByPlaceholder(/Dites ce qu/).waitFor({ state: 'visible', timeout: 5000 });
     // La photo se joint dans l'étape de capture (input image du plein écran).
     await page.locator('input[type="file"][accept="image/*"]').first().setInputFiles(PHOTO);

@@ -69,6 +69,24 @@ const runMission = async (missionLabel, observation) => {
     .waitFor({ state: 'visible', timeout: 6000 });
 };
 
+/** Déroule une PRÉ-RÉCEPTION (flux dédié : contrôle du contrat, tout conforme). */
+const runPrereception = async () => {
+  await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+  await page.getByRole('button', { name: /Nouvelle mission/ }).click();
+  await page.getByRole('dialog').getByText('Pré-réception', { exact: true }).click();
+  await page
+    .getByText('Vérifiez chaque prestation vendue')
+    .waitFor({ state: 'visible', timeout: 8000 });
+  await page.getByRole('button', { name: 'Voir la synthèse' }).click();
+  await page.getByRole('button', { name: /Générer les documents/ }).click();
+  await page.getByText('Pré-réception enregistrée').waitFor({ state: 'visible', timeout: 8000 });
+  await page.getByRole('button', { name: /^Terminer$/ }).click();
+  await page
+    .getByRole('heading', { name: /Appartement Lyon 6e/ })
+    .first()
+    .waitFor({ state: 'visible', timeout: 6000 });
+};
+
 try {
   await openDemo(page);
 
@@ -97,14 +115,14 @@ try {
     );
   });
 
-  // ---- Pré-réception (mission → « Liste des points à reprendre ») ----------
+  // ---- Pré-réception (flux dédié : vérification du contrat) ----------------
   await assert('Ouverture d’une PRÉ-RÉCEPTION → document généré', async () => {
-    await runMission('Pré-réception', 'Pré-réception : quelques points à reprendre avant la fin.');
+    await runPrereception();
     await openSuivi();
     const title = await openAndTitle(
-      page.getByRole('button', { name: 'Consulter le compte rendu' }).first(),
+      journalRow('Pré-réception').getByRole('button', { name: 'Consulter le compte rendu' }),
     );
-    if (!/points à reprendre/i.test(title)) throw new Error(`titre inattendu : ${title}`);
+    if (!/Pré-réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
   // ---- Réception (mission → « PV de réception ») --------------------------
@@ -132,7 +150,9 @@ try {
   await assert('Client-safe : les documents internes ne fuient pas', async () => {
     await openClientTab(page, 'Documents');
     await page.waitForTimeout(300);
-    for (const secret of ['Contrat sous-traitant', 'PV de réception', 'points à reprendre'])
+    // La pré-réception est désormais CLIENT-VISIBLE (« Pré-réception ») : elle
+    // n'est plus un secret. Restent internes : le contrat interne et le PV de réception.
+    for (const secret of ['Contrat sous-traitant', 'PV de réception'])
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
   });

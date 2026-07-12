@@ -2789,3 +2789,46 @@ client · Aujourd'hui = actions du jour. Une action = un seul écran.
 bouton d'envoi de choix ont disparu) ; `choix-client-suivi` (12/12) confirme que les demandes de choix
 fonctionnent toujours de bout en bout depuis « Demandes client ». Gate verte (typecheck, lint, prettier,
 build, e2e complet, zéro erreur console). VISION Art. 4, 8, 9, 11.
+
+## 12/07/2026 — Refonte complète de la Pré-réception : vérifier l'exécution du contrat
+
+**Décision produit validée :** la Pré-réception n'est plus une liste de réserves saisie à la main.
+Elle devient la **vérification de l'exécution du contrat signé**. Le conducteur ne ressaisit jamais les
+prestations : PHÉNIX **reconstruit automatiquement** le chantier à partir du **devis signé + de tous les
+avenants validés** (vue consolidée, postes actifs — les postes remplacés par un avenant ne sont plus au
+contrat). Le conducteur **contrôle**, prestation par prestation, au lieu de créer une liste de défauts.
+
+**Modèle (core) :** nouveau `packages/core/src/prereception.ts` — quatre statuts exclusifs
+(🟢 `fait` · 🟠 `reserve` · 🟡 `non_fait` · ⚫ `moins_value`), `PrestationReserve` (1 à 3 photos +
+commentaire obligatoire + responsable PHÉNIX/Artisan/Fournisseur + date de reprise optionnelle),
+`PrestationVerif`, `PrereceptionData`. Sélecteurs PURS : `buildPrestationsAVerifier(devis, avenants)`
+(via `consolidateDevis`, postes actifs, statut initial « Fait »), `prereceptionSynthese`
+(conformes / avec réserve / restantes / supprimées), `prestationsADeduire` (les moins-values, réservées
+à la future facture finale), `prestationComplete` / `prereceptionComplete`. La saisie est portée par un
+champ additif `prereception?` du `CompteRenduContent` — **aucune double saisie** (VISION Art. 8).
+
+**Écran (dédié) :** `PrereceptionFlow` remplace le flux générique pour la mission `prereception`
+(routé dans `CompagnonView`). Trois temps : **vérifier** (date + heure automatiques, présents libres,
+puis les prestations groupées par lot — un statut par prestation, champs conditionnels : réserve
+(photos + commentaire + responsable + reprise) / commentaire « à faire » / motif de moins-value) →
+**synthèse** automatique + commentaire général → **génération**. UX pensée pour parcourir très vite :
+une prestation, un statut, éventuellement une réserve, puis la suivante.
+
+**Deux documents, une saisie :** `buildDocumentHtml` rend la pré-réception **filtrée par destinataire**.
+La **version client** ne montre JAMAIS le responsable, la date de reprise, le motif de moins-value ni les
+notes internes — seulement les prestations, leurs statuts, et, s'il y a réserve, ses photos + commentaire,
+puis le commentaire général. La **version artisan** porte tout l'opérationnel. Diffusion : version client
+→ Espace client · version artisan → conducteur (boutons « Version client / artisan » au Suivi). La
+pré-réception apparaît aussitôt dans **Documents** (famille « Pré-réceptions ») et dans le **Suivi**.
+
+**Store :** `createPrereception(projectId, actor, data)` émet UN `compte_rendu` (`visibility: 'client'`,
+`docTitre: 'Pré-réception'`). Les libellés `MISSION_DOC_TITLE.prereception` et la description du menu
+sont mis à jour (« Vérifier l'exécution du contrat signé »).
+
+**Tests :** nouveau `prereception` (16/16) — fusion devis + avenants (le poste remplacé disparaît,
+l'origine « Avenant n°1 » s'affiche), toutes les prestations, les quatre statuts, champs conditionnels,
+1 à 3 photos, génération des documents client ET artisan, **étanchéité des données internes côté client**,
+stockage Documents, Suivi, responsive (375 px). Suites adaptées au flux dédié : `mission`,
+`suivi-entree-unique`, `media-capture` (parcours de capture générique exercé via « Réception »),
+`coulisses-photos` et `documents-consultables` (nouveau flux). Gate verte (typecheck, lint, prettier,
+build, e2e complet 65/65, zéro erreur console). VISION Art. 5, 7, 8, 9, 11.

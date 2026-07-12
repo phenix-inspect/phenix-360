@@ -80,10 +80,10 @@ try {
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
   });
 
-  // ---- Mission : compte rendu / pré-réception / réception (même champ) ----
-  // Le champ de capture est PARTAGÉ par toutes les missions : le tester une fois
-  // couvre compte rendu, pré-réception ET réception.
-  for (const mission of ['Réception', 'Pré-réception']) {
+  // ---- Mission : capture générique (compte rendu / réception, même champ) --
+  // La Pré-réception a son propre flux (les photos y vivent dans les réserves) ;
+  // le champ de capture GÉNÉRIQUE est partagé par les autres missions.
+  for (const mission of ['Réception']) {
     await assert(`MISSION « ${mission} » — champ photo natif + ajout de photos`, async () => {
       await newMission(mission);
       const input = page.locator('input[type=file][accept="image/*"]').first();
