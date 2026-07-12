@@ -18,6 +18,7 @@
  * dupliquer la moindre règle métier.
  */
 import { consolidateDevis, type Avenant, type Devis, type PosteOrigin } from './devis.js';
+import { deriverDetailsPoste, type DetailTechnique } from './details-techniques.js';
 
 /* -------------------------------------------------------------------------- *
  * Statut d'une prestation — QUATRE choix exclusifs
@@ -107,6 +108,13 @@ export interface PrestationVerif {
   commentaireNonFait?: string;
   /** Motif OBLIGATOIRE si statut === 'moins_value' (demande client, erreur devis…). */
   motifMoinsValue?: string;
+  /**
+   * DÉTAILS TECHNIQUES dérivés du contrat (quantités, dimensions, références…),
+   * en AIDE AU CONTRÔLE uniquement. Ne crée JAMAIS de nouvelle prestation : ce
+   * sont des repères pour vérifier l'exécution de LA prestation (« receveur
+   * 800×800 posé ? », « 18 prises ? »). Absent si le poste n'a pas de sous-liste.
+   */
+  detailsTechniques?: DetailTechnique[];
 }
 
 /** La saisie complète d'une pré-réception (portée par l'événement compte rendu). */
@@ -162,6 +170,8 @@ export function buildPrestationsAVerifier(
     for (const cp of lot.postes) {
       // Un poste remplacé par un avenant n'est plus au contrat : on l'exclut.
       if (cp.replacedByNumero != null) continue;
+      // Aide au contrôle : détails techniques DÉRIVÉS (jamais une prestation de plus).
+      const details = deriverDetailsPoste(cp.poste, lot.label);
       out.push({
         posteId: cp.poste.id,
         lotLabel: lot.label,
@@ -169,6 +179,7 @@ export function buildPrestationsAVerifier(
         origin: cp.origin,
         ...(cp.poste.sourcePage != null ? { sourcePage: cp.poste.sourcePage } : {}),
         statut: 'fait',
+        ...(details.length > 0 ? { detailsTechniques: details } : {}),
       });
     }
   }

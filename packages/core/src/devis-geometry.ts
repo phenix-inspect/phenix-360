@@ -654,6 +654,8 @@ export function analyserDevisGeo(
   let current: {
     poste: DevisPoste;
     complements: string[];
+    /** Sous-listes de matériaux brutes (puces) — dérivées, jamais dans le libellé. */
+    materiaux: string[];
     dernierY: number;
     dernierPage: number;
   } | null = null;
@@ -682,11 +684,13 @@ export function analyserDevisGeo(
 
   const finaliser = (): void => {
     if (!current) return;
-    const { poste, complements } = current;
+    const { poste, complements, materiaux } = current;
     const exact = nettoyerLabel([poste.label, ...complements].join(' '));
     poste.label = exact;
     poste.libelleCourt = libelleCourt(exact);
     poste.verification = evaluerVerification(poste);
+    // Sous-listes de matériaux conservées BRUTES (dérivation technique, hors libellé).
+    if (materiaux.length > 0) poste.detailsSource = materiaux;
     current = null;
   };
 
@@ -776,7 +780,7 @@ export function analyserDevisGeo(
           options.push({ posteId: poste.id, label: poste.label });
         }
         currentLot.postes.push(poste);
-        current = { poste, complements: [], dernierY: l.y, dernierPage: l.page };
+        current = { poste, complements: [], materiaux: [], dernierY: l.y, dernierPage: l.page };
         break;
       }
       case 'description_complement': {
@@ -873,7 +877,19 @@ export function analyserDevisGeo(
         }
         break;
       }
-      // 'materiau' et tous les autres blocs non contractuels : ignorés du contrat.
+      case 'materiau': {
+        // Puce de MATÉRIAU sous le poste courant (« - Prise 2P+T (18 u) »…). On la
+        // CONSERVE brute, rattachée à la prestation en cours, pour la DÉRIVATION
+        // technique (details-techniques.ts). Elle n'entre JAMAIS dans le libellé
+        // contractuel. Hors contexte de poste (aucun `current`) : rien à rattacher.
+        if (current && c.designation) {
+          current.materiaux.push(norm(c.designation));
+          current.dernierY = l.y;
+          current.dernierPage = l.page;
+        }
+        break;
+      }
+      // Tous les autres blocs non contractuels : ignorés du contrat.
       default:
         break;
     }

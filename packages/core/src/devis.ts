@@ -56,6 +56,14 @@ export interface DevisPoste {
   verification?: VerificationNiveau;
   /** Extrait de texte source (traçabilité : comparer au document original). */
   sourceText?: string;
+  /**
+   * Sous-listes de MATÉRIAUX / détails techniques lues sous le poste (puces
+   * « - Prise de courant 2P+T (18 u) », « - Receveur douche 800 x 800 mm »…),
+   * conservées BRUTES. Ce n'est PAS le libellé contractuel (qui reste intact) :
+   * c'est la matière première d'une DÉRIVATION technique traçable (voir
+   * `details-techniques.ts`). Absente si le poste n'a pas de sous-liste.
+   */
+  detailsSource?: string[];
 }
 
 /** Un LOT du devis : un corps d'état regroupant des postes. */
