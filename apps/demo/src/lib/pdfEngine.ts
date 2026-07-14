@@ -424,12 +424,17 @@ function header(
   const categorie = event.type === 'document' ? event.content.categorie : undefined;
   const isPr = kind === 'prereception';
   const isRec = kind === 'reception';
+  // Le DOCUMENT CLIENT ne porte AUCUN code système interne (PR-…/REC-…) : ce sont
+  // des identifiants techniques de plomberie, sans valeur contractuelle pour le
+  // client. On conserve, côté client, les seules références utiles : n° de devis,
+  // avenants, adresse, dates. Les versions artisan / conducteur gardent tout.
+  const isClient = audience === 'client';
 
   const rows: [string, string | undefined][] = [
     ['Chantier', ctx.projectName],
     ['Adresse', ctx.address],
     ['Client', ctx.clientName],
-    ['Référence', isPr ? reference : undefined],
+    ['Référence', isPr && !isClient ? reference : undefined],
     ['Date', fmtDate(event.createdAt)],
     ['Conducteur', isPr || isRec ? ctx.authorName : undefined],
     ['N° du devis', reception?.devisRef],
@@ -439,8 +444,8 @@ function header(
         ? reception.avenants.map((n) => `n°${n}`).join(', ')
         : undefined,
     ],
-    ['Réf. Pré-réception', reception?.prereceptionRef],
-    ['Réf. Réception', isRec ? reference : undefined],
+    ['Réf. Pré-réception', isClient ? undefined : reception?.prereceptionRef],
+    ['Réf. Réception', isRec && !isClient ? reference : undefined],
     [
       'Rédigé par',
       isPr || isRec ? undefined : `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`,
@@ -731,5 +736,7 @@ export function buildDocumentPdf(
   else if (kind === 'cr-points') crPointsBody(pdf, event, audience);
   else if (kind === 'cr-text') crTextBody(pdf, event);
 
-  return pdf.finalize(reference);
+  // Le pied de page ne porte le code système (PR-…/REC-…) que pour les versions
+  // internes (artisan / conducteur). Le document CLIENT n'en montre aucun.
+  return pdf.finalize(audience === 'client' ? undefined : reference);
 }

@@ -36,6 +36,7 @@ import {
 import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 import { fmtDate } from '../../lib/format';
+import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
 type Step = 'lever' | 'valider' | 'termine';
 
@@ -84,6 +85,7 @@ export function ReceptionFlow({
   const [busy, setBusy] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [commentaireGeneral, setCommentaireGeneral] = useState('');
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const clientName = project.clientId ? nameOf(snap, project.clientId) : undefined;
   const conducteur = nameOf(snap, actor.userId);
@@ -108,15 +110,27 @@ export function ReceptionFlow({
     source && prereceptionData ? reservesDePrereception(prereceptionData, source.createdAt) : [],
   );
 
+  // PERTE DE SAISIE — la Réception est « en cours de saisie » dès qu'une levée a
+  // été amorcée (photo/commentaire) ou qu'un commentaire général est écrit. Tant
+  // que le chantier n'est pas clôturé, quitter effacerait ce travail : on prévient.
+  const dirty =
+    step !== 'termine' && (reserves.some((r) => !!r.levee) || commentaireGeneral.trim().length > 0);
+  useBeforeUnloadGuard(dirty);
+  const requestClose = (): void => {
+    if (dirty) setConfirmLeave(true);
+    else onClose();
+  };
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || confirmLeave) return;
       if (step === 'valider') setStep('lever');
-      else onClose();
+      else requestClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, dirty, confirmLeave]);
 
   const patchLevee = (posteId: string, patch: Partial<ReserveLevee>): void =>
     setReserves((rs) =>
@@ -204,11 +218,16 @@ export function ReceptionFlow({
 
   return (
     <Shell
-      onClose={onClose}
+      onClose={requestClose}
       sousTitre={
         step === 'lever' ? 'Levée des réserves' : step === 'valider' ? 'Validation' : 'Clôturé'
       }
     >
+      <LeaveConfirmDialog
+        open={confirmLeave}
+        onCancel={() => setConfirmLeave(false)}
+        onLeave={onClose}
+      />
       <div className="flex-1 overflow-y-auto">
         {step === 'lever' && (
           <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">

@@ -101,11 +101,45 @@ try {
     await tab.close();
   });
 
+  await assert(
+    'Diffusion : ANNULER laisse le document interne (rien ne part au client)',
+    async () => {
+      await openDocuments();
+      await row('Partage-interne')
+        .getByRole('button', { name: /Partager au client/ })
+        .click();
+      // Récapitulatif clair, nommant le document, avant toute diffusion.
+      await page
+        .getByRole('heading', { name: /Diffuser ce document au client/ })
+        .waitFor({ state: 'visible', timeout: 6000 });
+      if ((await page.getByText('Partage-interne').count()) === 0)
+        throw new Error('le récapitulatif ne nomme pas le document');
+      await page.getByRole('button', { name: 'Annuler' }).click();
+      await page
+        .getByRole('heading', { name: /Diffuser ce document au client/ })
+        .waitFor({ state: 'hidden', timeout: 6000 });
+      // Toujours interne (le bouton propose encore « Partager au client »)…
+      await row('Partage-interne')
+        .getByRole('button', { name: /Partager au client/ })
+        .waitFor({ state: 'visible', timeout: 4000 });
+      // …et le client ne le voit pas.
+      await openClientDocs();
+      await page.waitForTimeout(300);
+      if ((await page.getByText('Partage-interne', { exact: false }).count()) > 0)
+        throw new Error('document diffusé alors que la diffusion a été annulée');
+    },
+  );
+
   await assert('Changer un INTERNE → VISIBLE CLIENT met à jour l’espace client', async () => {
     await openDocuments();
     await row('Partage-interne')
       .getByRole('button', { name: /Partager au client/ })
       .click();
+    // Condition bêta #2 : la diffusion passe par un récapitulatif + confirmation.
+    await page
+      .getByRole('heading', { name: /Diffuser ce document au client/ })
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await page.getByRole('button', { name: /Confirmer la diffusion au client/ }).click();
     await openClientDocs();
     await clientCard('Partage-interne').waitFor({ state: 'visible', timeout: 6000 });
   });

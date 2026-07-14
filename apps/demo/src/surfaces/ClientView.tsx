@@ -7,6 +7,7 @@ import {
   buildDecisionContent,
   clientFeed,
   decisionVisibility,
+  deriveProjectStatus,
   isPhenixDelegate,
   pendingClientDecisions,
   userId,
@@ -53,6 +54,8 @@ export function ClientView({
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
   const dossier = dossierOf(snap, project.id);
+  // Statut RÉEL dérivé des faits (source unique) — jamais le champ manuel brut.
+  const status = deriveProjectStatus(project, events);
 
   // « Vos choix » : toutes les décisions demandées au client (dossier), avec leur
   // statut. Celles actionnables (une proposition à valider) sont aussi des ACTIONS
@@ -197,7 +200,7 @@ export function ClientView({
           <div className="space-y-6">
             {/* Rappel de la prochaine grande étape (si le client l'a laissé activé). */}
             {clientSettingsOf(snap, project.id).notifPrefs.rappelReception && (
-              <ClientProchaineEtape status={project.status} dossier={dossier} />
+              <ClientProchaineEtape status={status} dossier={dossier} />
             )}
 
             {hasNotifs || hasActions ? (
@@ -284,7 +287,7 @@ export function ClientView({
             )}
 
             {/* PLANNING DE VOTRE PROJET — les grandes étapes (lecture seule). */}
-            <ClientPlanningBlock status={project.status} dossier={dossier} />
+            <ClientPlanningBlock status={status} dossier={dossier} />
           </div>
         </TabsContent>
 

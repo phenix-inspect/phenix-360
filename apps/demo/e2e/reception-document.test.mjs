@@ -108,18 +108,22 @@ const ctx = {
 };
 const html = (state, reserves) => buildDocumentHtml(receptionEvent(state, reserves), ctx, 'client');
 
-/* -- 1. En-tête : devis + avenants + réf. Pré-réception + réf. Réception ----- */
-check('En-tête : n° devis, avenants intégrés, réf. Pré-réception, réf. Réception', () => {
+/* -- 1. En-tête CLIENT : références UTILES conservées, codes SYSTÈME masqués ---- */
+// Condition bêta #4 : le PV client garde le n° de devis, les avenants, le
+// conducteur (utiles, contractuels) mais JAMAIS les identifiants techniques
+// PR-…/REC-… ni les « Réf. Pré-réception / Réception » (plomberie interne).
+check('En-tête client : n° devis + avenants + conducteur (utiles), sans code système', () => {
   const doc = html('publie');
-  for (const attendu of [
-    'DEV-2026-014',
-    'n°1, n°2',
+  for (const attendu of ['DEV-2026-014', 'n°1, n°2', 'Conducteur', 'Léon'])
+    if (!doc.includes(attendu)) throw new Error(`en-tête sans « ${attendu} »`);
+  for (const interdit of [
     'PR-20260710-V1',
     'REC-20260714-V1',
-    'Conducteur',
-    'Léon',
+    'Réf. Pré-réception',
+    'Réf. Réception',
   ])
-    if (!doc.includes(attendu)) throw new Error(`en-tête sans « ${attendu} »`);
+    if (doc.includes(interdit))
+      throw new Error(`code système interne sur le PV client : « ${interdit} »`);
 });
 
 /* -- 2. Résumé : prestations / réserves créées / levées / restantes --------- */

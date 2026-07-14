@@ -20,7 +20,8 @@ import {
   isAwaitingClientDecision,
 } from './event.js';
 import type { LeveeEvent, ReserveEvent } from './event.js';
-import type { ProjectStep } from './project.js';
+import type { Project, ProjectStatus, ProjectStep } from './project.js';
+import { PROJECT_STATUS_ORDER } from './project.js';
 import type { ClientDecisionBanner, Decision } from './decision.js';
 import { toDecision } from './decision.js';
 
@@ -47,6 +48,51 @@ export function currentStep(events: Event[]): ProjectStep | null {
     (e) => e.content.etapeConfirmee != null,
   );
   return confirmed?.content.etapeConfirmee ?? null;
+}
+
+/**
+ * Une PRÉ-RÉCEPTION a-t-elle été VALIDÉE (compte rendu publié la portant) ? Seuls
+ * les documents publiés comptent : un brouillon n'est jamais une étape franchie.
+ */
+export function hasValidatedPrereception(events: Event[]): boolean {
+  return events.some((e) => isCompteRendu(e) && isPublished(e) && !!e.content.prereception);
+}
+
+/** Une RÉCEPTION a-t-elle été validée (compte rendu publié la portant) ? */
+export function hasValidatedReception(events: Event[]): boolean {
+  return events.some((e) => isCompteRendu(e) && isPublished(e) && !!e.content.reception);
+}
+
+/**
+ * STATUT RÉEL du chantier — SOURCE DE VÉRITÉ UNIQUE (Condition bêta #5).
+ * ---------------------------------------------------------------------------
+ * Le statut stocké (`project.status`) est saisi à la main ; les faits (le Journal)
+ * priment toujours. Cette fonction réconcilie les deux et INTERDIT les états
+ * impossibles :
+ *  • une RÉCEPTION validée ⇒ « Clôturé » (elle n'existe que toutes réserves levées,
+ *    donc jamais « Clôturé avec réserves ouvertes ») ;
+ *  • « Clôturé » sans réception validée est impossible → on redescend au fait justifié ;
+ *  • une PRÉ-RÉCEPTION validée fait passer AU MOINS en « Pré-réception » (un statut
+ *    manuel plus bas, ou un brouillon, ne peut pas la contredire).
+ * Toute lecture de statut pour AFFICHAGE ou LOGIQUE doit passer par ici.
+ */
+export function deriveProjectStatus(project: Project, events: Event[]): ProjectStatus {
+  if (hasValidatedReception(events)) return 'cloture';
+  const floor: ProjectStatus = hasValidatedPrereception(events) ? 'pre_reception' : 'pas_commence';
+  let s = project.status;
+  // « Clôturé » sans réception validée : impossible → on retombe sur le fait justifié.
+  if (s === 'cloture') s = hasValidatedPrereception(events) ? 'levee_reserves' : 'en_cours';
+  // On ne descend jamais SOUS le plancher imposé par les faits.
+  if (PROJECT_STATUS_ORDER[s] < PROJECT_STATUS_ORDER[floor]) s = floor;
+  return s;
+}
+
+/**
+ * Le statut est-il VERROUILLÉ par les faits (non modifiable à la main) ? Une
+ * réception validée fige le chantier à « Clôturé ».
+ */
+export function isProjectStatusLocked(events: Event[]): boolean {
+  return hasValidatedReception(events);
 }
 
 /** Galerie d'avancement — les photos (récentes d'abord). */

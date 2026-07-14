@@ -13,6 +13,7 @@ import { isAction, isCompteRendu, isDemande, isDocument, isLevee, isReserve } fr
 import type { ProjectDossier } from './prepare.js';
 import {
   currentStep,
+  deriveProjectStatus,
   pendingClientDecisions,
   questionsEnAttente,
   reservesOuvertes,
@@ -21,7 +22,7 @@ import {
 export interface ChantierResume {
   projectId: string;
   name: string;
-  /** Statut métier (saisi) — propriété unique, source de vérité. */
+  /** Statut métier RÉEL, dérivé des faits (`deriveProjectStatus`) — source unique. */
   status: ProjectStatus;
   step: ProjectStep | null;
   reserves: number;
@@ -76,7 +77,8 @@ export function buildDayBriefing(input: {
     return {
       projectId: p.id,
       name: p.name,
-      status: p.status,
+      // Statut RÉEL dérivé des faits (jamais le champ manuel brut) — source unique.
+      status: deriveProjectStatus(p, events),
       step: currentStep(events) ?? p.currentStep ?? null,
       reserves,
       decisions,

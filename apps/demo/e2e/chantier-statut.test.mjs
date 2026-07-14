@@ -59,10 +59,15 @@ try {
     await page.getByText('Appartement Lyon 6e').first().click();
     const select = page.getByLabel('Statut du chantier');
     await select.waitFor({ state: 'visible', timeout: 6000 });
-    await select.selectOption({ label: 'Clôturé' });
-    // Le héros du chantier reflète immédiatement le nouveau statut.
+    // Condition bêta #5 : « Clôturé » n'est JAMAIS choisi à la main — il découle
+    // d'une réception validée (source de vérité = les faits). L'option n'est pas offerte.
+    if ((await select.locator('option[value="cloture"]').count()) > 0)
+      throw new Error('« Clôturé » ne doit pas être proposé au choix manuel');
+    // Transition manuelle COHÉRENTE : ce chantier porte une réserve ouverte → on
+    // passe en « Levée des réserves ».
+    await select.selectOption({ label: 'Levée des réserves' });
     await page
-      .getByText('Clôturé', { exact: true })
+      .getByText('Levée des réserves', { exact: true })
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
   });
@@ -75,12 +80,11 @@ try {
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 5000 });
-    // Le badge de la carte Lyon est désormais « Clôturé »…
-    await page.getByText('Clôturé', { exact: true }).first().waitFor({ state: 'visible' });
-    // …et un filtre « Clôturés (1) » est apparu, tandis que « En cours » a disparu.
-    await statusChip(/^Clôturés \(1\)$/).waitFor({ state: 'visible', timeout: 5000 });
+    // Lyon est désormais « Levée des réserves » → le filtre « Réserves » compte 2
+    // (Lyon + Croix-Rousse), et « En cours » (Lyon seul) a disparu.
+    await statusChip(/^Réserves \(2\)$/).waitFor({ state: 'visible', timeout: 5000 });
     if ((await statusChip(/^En cours \(1\)$/).count()) > 0)
-      throw new Error('le filtre « En cours » persiste après passage à Clôturé');
+      throw new Error('le filtre « En cours » persiste après le changement de statut');
   });
 
   await assert('Aucun impact sur « Aujourd’hui » : la journée reste intègre', async () => {
@@ -98,8 +102,7 @@ try {
     await page
       .getByRole('heading', { name: /Bonjour Mickaël/ })
       .waitFor({ state: 'visible', timeout: 8000 });
-    await page.getByText('Clôturé', { exact: true }).first().waitFor({ state: 'visible' });
-    await statusChip(/^Clôturés \(1\)$/).waitFor({ state: 'visible', timeout: 5000 });
+    await statusChip(/^Réserves \(2\)$/).waitFor({ state: 'visible', timeout: 5000 });
   });
 
   await assert('Export : la sauvegarde porte le statut à jour', async () => {
@@ -107,8 +110,8 @@ try {
     const dl = page.waitForEvent('download', { timeout: 6000 });
     await page.getByRole('button', { name: /Exporter mes données/ }).click();
     const content = readFileSync(await (await dl).path(), 'utf8');
-    if (!content.includes('cloture'))
-      throw new Error('la sauvegarde exportée ne contient pas le statut « cloture »');
+    if (!content.includes('levee_reserves'))
+      throw new Error('la sauvegarde exportée ne porte pas le statut « levee_reserves »');
     await page.keyboard.press('Escape');
   });
 

@@ -388,6 +388,9 @@ export function buildDocumentHtml(
   const receptionRef = isReception ? receptionReference(event.createdAt, recVersion) : undefined;
   // Filigrane BROUILLON tant que le document n'est pas validé (aperçu conducteur).
   const brouillon = (isPrereception || isReception) && isDraft(event);
+  // Aucun code système interne (PR-…/REC-…) sur le document CLIENT : identifiants
+  // techniques sans valeur contractuelle. Miroir exact du moteur PDF.
+  const isClient = audience === 'client';
   const body =
     event.type === 'compte_rendu'
       ? event.content.reception
@@ -482,7 +485,7 @@ export function buildDocumentHtml(
     ${line('Chantier', ctx.projectName)}
     ${line('Adresse', ctx.address)}
     ${line('Client', ctx.clientName)}
-    ${line('Référence', reference)}
+    ${line('Référence', isClient ? undefined : reference)}
     ${line('Date', fmtDate(event.createdAt))}
     ${line('Conducteur', isPrereception || isReception ? ctx.authorName : undefined)}
     ${line('N° du devis', reception?.devisRef)}
@@ -492,8 +495,8 @@ export function buildDocumentHtml(
         ? reception.avenants.map((n) => `n°${n}`).join(', ')
         : undefined,
     )}
-    ${line('Réf. Pré-réception', reception?.prereceptionRef)}
-    ${line('Réf. Réception', receptionRef)}
+    ${line('Réf. Pré-réception', isClient ? undefined : reception?.prereceptionRef)}
+    ${line('Réf. Réception', isClient ? undefined : receptionRef)}
     ${line('Rédigé par', isPrereception || isReception ? undefined : `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`)}
     ${line('Étape', step)}
     ${line('Présents', presents)}
@@ -501,7 +504,7 @@ export function buildDocumentHtml(
   </div>
   ${body}
   <footer>Document généré par PHÉNIX 360 — consultable à tout moment.${
-    reference || receptionRef ? ` · ${esc(reference ?? receptionRef ?? '')}` : ''
+    !isClient && (reference || receptionRef) ? ` · ${esc(reference ?? receptionRef ?? '')}` : ''
   }</footer>
 </article></body></html>`;
 }

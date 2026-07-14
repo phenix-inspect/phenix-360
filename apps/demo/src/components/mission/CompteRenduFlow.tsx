@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import {
   DIFFUSION_LABEL,
@@ -14,6 +14,7 @@ import {
 import { Camera, Check, ImagePlus, Trash2, X } from 'lucide-react';
 import { demo } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
 interface DraftPoint {
   photos: UploadedMedia[];
@@ -48,6 +49,7 @@ export function CompteRenduFlow({
   const [busy, setBusy] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   const addPhotos = async (files: FileList | null): Promise<void> => {
@@ -105,12 +107,37 @@ export function CompteRenduFlow({
     }
   };
 
+  // Protection anti-perte : un point en cours (photos + commentaire) ou déjà
+  // ajouté = travail non enregistré. On confirme avant de quitter (jamais après
+  // publication, où tout est enregistré).
+  const dirty = !done && (points.length > 0 || photos.length > 0 || comment.trim().length > 0);
+  useBeforeUnloadGuard(dirty);
+  const requestClose = (): void => {
+    if (dirty) setConfirmLeave(true);
+    else onClose();
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      // Quand la confirmation est ouverte, Échap la referme (géré par le Dialog) —
+      // on ne réagit pas ici pour ne pas la rouvrir aussitôt.
+      if (e.key === 'Escape' && !confirmLeave) requestClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, confirmLeave]);
+
   return (
     <div className="fixed inset-0 z-modal flex flex-col bg-background">
+      <LeaveConfirmDialog
+        open={confirmLeave}
+        onCancel={() => setConfirmLeave(false)}
+        onLeave={onClose}
+      />
       <header className="flex items-center gap-3 border-b border-border px-5 py-4">
         <button
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label="Fermer"
           className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
         >

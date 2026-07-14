@@ -17,9 +17,13 @@ import {
   EVENT_TYPE_LABEL,
   PROJECT_STATUSES,
   PROJECT_STATUS_LABEL,
+  PROJECT_STATUS_ORDER,
   crADesPointsPour,
   demandeRepondue,
   demandesPourPhenix,
+  deriveProjectStatus,
+  hasValidatedPrereception,
+  isProjectStatusLocked,
   reserveStatut,
   sortByDate,
   userId,
@@ -82,6 +86,20 @@ export function CompagnonView({
   const actor = compagnonActor(snap, project);
   const events = sortByDate(snap.events.filter((e) => e.projectId === project.id));
   const dossier = dossierOf(snap, project.id);
+  // Statut RÉEL (dérivé des faits) + garde-fous de la saisie manuelle.
+  const derivedStatus = deriveProjectStatus(project, events);
+  const statusLocked = isProjectStatusLocked(events);
+  const statusFloor: ProjectStatus = hasValidatedPrereception(events)
+    ? 'pre_reception'
+    : 'pas_commence';
+  // Options manuelles PROPOSÉES : « Clôturé » n'est jamais choisi à la main (il
+  // découle d'une réception validée), et on ne redescend pas sous ce que les faits
+  // prouvent. Une fois verrouillé (réception validée), on affiche l'état figé.
+  const statusOptions = statusLocked
+    ? PROJECT_STATUSES
+    : PROJECT_STATUSES.filter(
+        (s) => s !== 'cloture' && PROJECT_STATUS_ORDER[s] >= PROJECT_STATUS_ORDER[statusFloor],
+      );
   const [composer, setComposer] = useState<ComposerKind | null>(null);
   const [missionPicker, setMissionPicker] = useState(false);
   const [missionKind, setMissionKind] = useState<MissionKind | null>(null);
@@ -141,32 +159,43 @@ export function CompagnonView({
             project={project}
             clientName={nameOf(snap, project.clientId)}
             compact
+            status={derivedStatus}
             className="min-w-0 flex-1"
           />
           <Button size="lg" className="shrink-0" onClick={() => setMissionPicker(true)}>
             <Plus aria-hidden /> Nouvelle mission
           </Button>
         </div>
-        {/* Statut métier — modifiable à la main (transitions manuelles, RC1) ;
-            à droite, la suppression protégée du chantier actif. */}
+        {/* Statut métier — SOURCE DE VÉRITÉ UNIQUE (Condition bêta #5). On affiche
+            le statut RÉEL dérivé des faits, jamais le champ manuel brut. Les
+            transitions manuelles restent possibles, mais ne peuvent PAS contredire
+            les événements : « Clôturé » n'est atteint que par une réception validée
+            (choix verrouillé ici), et on ne redescend pas sous ce que les faits
+            prouvent. Une réception validée fige le statut. */}
         <div className="flex flex-wrap items-center gap-2">
           <label className="flex flex-wrap items-center gap-2 text-sm">
             <span className="font-medium text-muted-foreground">Statut du chantier</span>
             <select
-              value={project.status}
+              value={derivedStatus}
+              disabled={statusLocked}
               onChange={(e) =>
                 void demo.updateProject(project.id, { status: e.target.value as ProjectStatus })
               }
               aria-label="Statut du chantier"
-              className="rounded-lg border border-input bg-surface px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+              className="rounded-lg border border-input bg-surface px-3 py-1.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-gold-400 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {PROJECT_STATUSES.map((s) => (
+              {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {PROJECT_STATUS_LABEL[s]}
                 </option>
               ))}
             </select>
           </label>
+          {statusLocked && (
+            <span className="text-xs text-muted-foreground">
+              Statut verrouillé par la réception validée.
+            </span>
+          )}
           <DeleteChantierButton projectId={project.id} name={project.name} className="ml-auto" />
         </div>
       </div>

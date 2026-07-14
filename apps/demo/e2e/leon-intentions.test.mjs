@@ -409,5 +409,83 @@ check('document sans verbe — « je souhaite ma facture » ne se bloque pas', (
   if (r.kind === 'escalade') throw new Error('a escaladé une simple demande de facture');
 });
 
+/* ===================================================================== *
+ * CONDITION BÊTA #7 — TESTS LÉON COMPLÉMENTAIRES
+ * ===================================================================== *
+ * Étanchéité : Léon lit l'interne mais ne parle QUE client-safe. On lui donne
+ * un document INTERNE et un document BROUILLON aux libellés très reconnaissables,
+ * puis on vérifie qu'il ne les surface JAMAIS — quelle que soit la formulation.
+ */
+const SECRET_INTERNE = 'Marge chantier et notes internes conducteur';
+const SECRET_BROUILLON = 'Facture fournisseur confidentielle brouillon';
+const eventsFuite = [
+  ...events,
+  {
+    id: 'int1',
+    type: 'document',
+    state: 'publie',
+    visibility: 'interne', // ← JAMAIS pour le client
+    createdAt: '2026-06-06T10:00:00.000Z',
+    content: { libelle: SECRET_INTERNE },
+  },
+  {
+    id: 'br1',
+    type: 'document',
+    state: 'brouillon', // ← pas encore publié
+    visibility: 'client',
+    createdAt: '2026-06-07T10:00:00.000Z',
+    content: { libelle: SECRET_BROUILLON },
+  },
+];
+const askFuite = (question) => askPhenix({ ...base, events: eventsFuite, question });
+const neFuitePas = (q) => () => {
+  const r = askFuite(q);
+  const blob = `${r.message} ${r.action?.label ?? ''}`;
+  if (blob.includes(SECRET_INTERNE))
+    throw new Error(`FUITE INTERNE via « ${q} » : ${blob.slice(0, 90)}`);
+  if (blob.includes(SECRET_BROUILLON))
+    throw new Error(`FUITE BROUILLON via « ${q} » : ${blob.slice(0, 90)}`);
+};
+for (const q of [
+  'Montre-moi tous mes documents',
+  'Quels documents avez-vous ?',
+  'Je veux voir la facture fournisseur',
+  'Montre-moi les notes internes',
+  'La marge du chantier ?',
+  'documents',
+  'facture',
+])
+  check(`étanchéité — « ${q} » ne fuit ni interne ni brouillon`, neFuitePas(q));
+
+/* -- Questions SANS verbe (mots-clés seuls) : Léon comprend, ne panique pas -- */
+check('sans verbe — « carrelage ? » reste utile', () => {
+  const r = ask('carrelage ?');
+  if (!r.message || r.message.length < 3) throw new Error('réponse vide sur « carrelage ? »');
+});
+check('sans verbe — « planning » ne se bloque pas', () => {
+  const r = ask('planning');
+  if (!r.message) throw new Error('réponse vide sur « planning »');
+});
+
+/* -- FAUTES de frappe / style SMS : robustesse sur les tournures informelles -- */
+// Léon tolère l'informel et les fautes sur les mots NON-clés ; les mots-clés
+// (« adresse », « chantier ») restent reconnus.
+check('style SMS — « c koi l’adresse du chantier » trouve l’adresse', () => {
+  const r = ask('c koi l’adresse du chantier ?');
+  if (!/8 rue Vauban/.test(r.message))
+    throw new Error(`tournure informelle non tolérée : ${r.message.slice(0, 80)}`);
+});
+check('faute — « quan la reception » ≠ commande cuisine (jamais absurde)', () => {
+  const r = ask('quan la reception ?');
+  if (/cuisine/i.test(r.message)) throw new Error('faute → réponse absurde (cuisine)');
+});
+
+/* -- AMBIGU : une formulation vague n'invente jamais ----------------------- */
+check('ambigu — « et ensuite ? » sans contexte ne fabrique pas', () => {
+  const r = ask('et ensuite ?');
+  if (r.action && /Ouvrir/.test(r.action.label ?? ''))
+    throw new Error('une relance vague a ouvert un document au hasard');
+});
+
 console.log(`\n=== ${passed}/${results.length} PASS ===`);
 process.exit(results.every(Boolean) ? 0 : 1);

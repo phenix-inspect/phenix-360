@@ -1,4 +1,9 @@
-import { PROJECT_STATUS_LABEL, PROJECT_STEP_LABEL, type Project } from '@phenix360/core';
+import {
+  PROJECT_STATUS_LABEL,
+  PROJECT_STEP_LABEL,
+  type Project,
+  type ProjectStatus,
+} from '@phenix360/core';
 import { Badge, cn } from '@phenix360/ui';
 import { MapPin } from 'lucide-react';
 import { PROJECT_STATUS_BADGE } from '../lib/status';
@@ -15,6 +20,7 @@ export function ProjectHero({
   clientName,
   compact = false,
   showStep = true,
+  status,
   className,
 }: {
   project: Project;
@@ -22,8 +28,15 @@ export function ProjectHero({
   compact?: boolean;
   /** Affiche le badge du LOT en cours. Interne conducteur — false côté client. */
   showStep?: boolean;
+  /**
+   * Statut RÉEL à afficher (dérivé des faits via `deriveProjectStatus`). Source de
+   * vérité unique — à fournir par l'appelant. À défaut, on retombe sur le champ
+   * stocké (compat), mais toute surface doit passer le statut dérivé.
+   */
+  status?: ProjectStatus;
   className?: string;
 }): React.JSX.Element {
+  const shownStatus = status ?? project.status;
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-x-6 gap-y-3', className)}>
       <div className="space-y-1">
@@ -44,8 +57,8 @@ export function ProjectHero({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2 pt-1">
-        <Badge variant={PROJECT_STATUS_BADGE[project.status]}>
-          {PROJECT_STATUS_LABEL[project.status]}
+        <Badge variant={PROJECT_STATUS_BADGE[shownStatus]}>
+          {PROJECT_STATUS_LABEL[shownStatus]}
         </Badge>
         {showStep && (
           <Badge variant="gold">

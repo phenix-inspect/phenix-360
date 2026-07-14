@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
 
@@ -108,6 +109,27 @@ export function PrereceptionFlow({
   const enBrouillon = devisAVerifier(dossier);
   const [commentaireGeneral, setCommentaireGeneral] = useState('');
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // PERTE DE SAISIE — une pré-réception est « en cours de saisie » dès qu'un
+  // contrôle a été posé (présents, statut modifié, réserve, commentaire). Tant
+  // qu'elle n'est pas envoyée, quitter effacerait ce travail : on prévient.
+  const dirty =
+    step !== 'envoye' &&
+    (presents.length > 0 ||
+      commentaireGeneral.trim().length > 0 ||
+      prestations.some(
+        (p) =>
+          p.statut !== 'fait' ||
+          !!p.reserve ||
+          !!(p.commentaireNonFait ?? '').trim() ||
+          !!(p.motifMoinsValue ?? '').trim(),
+      ));
+  useBeforeUnloadGuard(dirty);
+  const requestClose = (): void => {
+    if (dirty) setConfirmLeave(true);
+    else onClose();
+  };
 
   const now = useMemo(() => new Date(), []);
   const dateStr = now.toLocaleDateString('fr-FR', {
@@ -130,14 +152,15 @@ export function PrereceptionFlow({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return;
+      if (e.key !== 'Escape' || confirmLeave) return;
       if (step === 'valider') setStep('finaliser');
       else if (step === 'finaliser') setStep('verifier');
-      else onClose();
+      else requestClose();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [step, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, dirty, confirmLeave]);
 
   const setStatut = (posteId: string, statut: PrestationStatut): void =>
     setPrestations((ps) =>
@@ -267,7 +290,7 @@ export function PrereceptionFlow({
       <header className="flex items-center gap-3 border-b border-border px-5 py-4">
         <button
           type="button"
-          onClick={onClose}
+          onClick={requestClose}
           aria-label="Fermer"
           className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
         >
@@ -490,6 +513,12 @@ export function PrereceptionFlow({
           )}
         </div>
       </footer>
+
+      <LeaveConfirmDialog
+        open={confirmLeave}
+        onCancel={() => setConfirmLeave(false)}
+        onLeave={onClose}
+      />
     </div>
   );
 }

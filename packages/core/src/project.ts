@@ -55,6 +55,15 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   cloture: 'Clôturé',
 };
 
+/** Ordre de progression du statut (pour comparer / plafonner / plancher). */
+export const PROJECT_STATUS_ORDER: Record<ProjectStatus, number> = {
+  pas_commence: 0,
+  en_cours: 1,
+  pre_reception: 2,
+  levee_reserves: 3,
+  cloture: 4,
+};
+
 export interface Project {
   id: ProjectId;
   /** Titre du chantier. */

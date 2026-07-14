@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import {
   Button,
   Dialog,
@@ -29,6 +29,7 @@ import {
 import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment, readPhotoAttachment } from '../lib/upload';
 import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../lib/media';
+import { LeaveConfirmInline, useBeforeUnloadGuard } from './mission/LeaveGuard';
 
 export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande';
 
@@ -76,11 +77,25 @@ export function Composer({
   /** « Demander au client → Décision » ouvre le composer de décision structuré. */
   onEscalateDecision?: () => void;
 }): React.JSX.Element | null {
+  // PERTE DE SAISIE — l'état « en cours de saisie » vit dans CaptureForm ; on le
+  // remonte ici (où se trouve la fermeture du Dialog) pour intercepter Échap /
+  // clic hors modal / croix et proposer la confirmation avant d'abandonner.
+  // On lit la valeur via une ref mise à jour SYNCHRONEMENT au rendu de l'enfant :
+  // un « je tape puis Échap immédiat » ne doit jamais passer entre deux rendus.
+  const dirtyRef = useRef(false);
+  const [dirty, setDirty] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  useBeforeUnloadGuard(dirty);
+  const requestClose = (): void => {
+    if (dirtyRef.current) setConfirmLeave(true);
+    else onClose();
+  };
+
   if (kind === null) return null;
   const meta = TITLES[kind];
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
+    <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
+      <DialogContent className="relative">
         <DialogHeader>
           <DialogTitle>{meta.title}</DialogTitle>
           <DialogDescription>{meta.description}</DialogDescription>
@@ -90,7 +105,15 @@ export function Composer({
           project={project}
           actor={actor}
           onDone={onClose}
+          dirtyRef={dirtyRef}
+          onDirtyChange={setDirty}
           onEscalateDecision={onEscalateDecision}
+        />
+        {/* Confirmation EN LIGNE : même couche Radix, aucun conflit de focus. */}
+        <LeaveConfirmInline
+          open={confirmLeave}
+          onCancel={() => setConfirmLeave(false)}
+          onLeave={onClose}
         />
       </DialogContent>
     </Dialog>
@@ -102,12 +125,16 @@ function CaptureForm({
   project,
   actor,
   onDone,
+  dirtyRef,
+  onDirtyChange,
   onEscalateDecision,
 }: {
   kind: Exclude<ComposerKind, 'repondre'>;
   project: Project;
   actor: EventActor;
   onDone: () => void;
+  dirtyRef: MutableRefObject<boolean>;
+  onDirtyChange: (dirty: boolean) => void;
   onEscalateDecision?: () => void;
 }): React.JSX.Element {
   const [texte, setTexte] = useState('');
@@ -129,6 +156,25 @@ function CaptureForm({
   const [busy, setBusy] = useState(false);
   const photoInput = useRef<HTMLInputElement>(null);
   const docInput = useRef<HTMLInputElement>(null);
+
+  // « En cours de saisie » dès qu'un champ utile est renseigné (tous types
+  // confondus). Le menu « Demander au client » vide n'est pas considéré saisi.
+  const dirty =
+    texte.trim() !== '' ||
+    legende.trim() !== '' ||
+    piece.trim() !== '' ||
+    libelle.trim() !== '' ||
+    question.trim() !== '' ||
+    docLibelle.trim() !== '' ||
+    echeance !== '' ||
+    photos.length > 0 ||
+    doc !== null;
+  // Écriture SYNCHRONE (au rendu) : `requestClose` du parent lit toujours la
+  // dernière valeur, même si l'utilisateur ferme dans le même tick que sa frappe.
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
 
   const onPickPhotos = async (files: FileList | null): Promise<void> => {
     if (!files || files.length === 0) return;

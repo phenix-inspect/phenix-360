@@ -185,6 +185,13 @@ try {
       if (!/client ou son repr/i.test(text)) throw new Error('bloc de signature Client absent');
       if (/artisan ou son repr/i.test(text))
         throw new Error('un bloc ARTISAN apparaît sur le PV de réception');
+      // Condition bêta #4 : le PV client ne porte AUCUN code système interne
+      // (REC-…/PR-…), ni la « Réf. Pré-réception » — identifiants techniques. Il
+      // conserve le n° de devis (utile, contractuel), vérifié plus haut.
+      if (/REC-\d{8}-V\d/.test(text) || /PR-\d{8}-V\d/.test(text))
+        throw new Error('code système interne (REC-…/PR-…) présent sur le PV client');
+      if (/Réf\. (Pré-réception|Réception)/.test(text))
+        throw new Error('une référence système interne fuit sur le PV client');
     },
   );
 

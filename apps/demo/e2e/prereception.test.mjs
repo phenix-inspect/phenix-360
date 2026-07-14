@@ -225,6 +225,12 @@ try {
     for (const leak of ['Responsable', 'Reprise', MOTIF, NONFAIT_COMMENT, 'déduite de la facture'])
       if (text.includes(leak))
         throw new Error(`fuite interne dans le document client : « ${leak} »`);
+    // Condition bêta #4 : aucun code système interne (PR-…) ni libellé de plomberie
+    // sur le PV client — ce sont des identifiants techniques sans valeur contractuelle.
+    if (/PR-\d{8}-V\d/.test(text))
+      throw new Error('code système interne « PR-… » présent sur le document client');
+    if (/Réf\. Pré-réception/.test(text))
+      throw new Error('la « Réf. Pré-réception » interne fuit sur le document client');
   });
 
   await assert('« Modifier la Pré-réception » revient à la saisie sans rien perdre', async () => {

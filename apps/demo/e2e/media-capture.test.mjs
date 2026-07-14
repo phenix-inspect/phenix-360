@@ -97,7 +97,10 @@ try {
         .getByRole('button', { name: /Ajouter \(2\/3\)/ })
         .waitFor({ state: 'visible', timeout: 6000 });
       // On referme la mission sans la publier (on ne teste ici que l'acquisition).
+      // Des photos sont saisies → la protection anti-perte demande confirmation ;
+      // on choisit explicitement « Quitter sans enregistrer ».
       await page.getByRole('button', { name: 'Fermer' }).click();
+      await page.getByRole('button', { name: 'Quitter sans enregistrer' }).click();
     });
   }
 

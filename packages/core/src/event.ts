@@ -564,6 +564,40 @@ export function isVisibleToClient(e: Event): boolean {
   return e.state === 'publie';
 }
 
+/**
+ * Ce que voit un ARTISAN — le RÉCIT PARTAGÉ du chantier (comptes rendus & photos
+ * PUBLIÉS et partagés). Jamais l'interne (notes du conducteur), jamais les échanges
+ * PRIVÉS du client (demandes, décisions) : l'artisan n'est ni le conducteur ni le
+ * client. Ses tâches opérationnelles (réserves/actions assignées) sont servies à
+ * part (par responsable), pas par ce fil.
+ */
+export function isVisibleToArtisan(e: Event): boolean {
+  if (e.visibility !== 'client' || e.state !== 'publie') return false;
+  return e.type === 'compte_rendu' || e.type === 'photo';
+}
+
+/**
+ * MOTEUR DE VISIBILITÉ UNIQUE (Condition bêta #6). Une seule fonction décide, pour
+ * un événement et une AUDIENCE, ce qui est visible — toutes les surfaces (feeds,
+ * notifications, espace artisan, Léon…) doivent passer par ici, jamais par une
+ * règle recopiée à la main.
+ *  • `conducteur` (interne) : voit TOUT (le Journal complet) ;
+ *  • `client`    : `isVisibleToClient` (miroir RLS) ;
+ *  • `artisan`   : `isVisibleToArtisan` (récit partagé, sans interne ni privé client).
+ */
+export type Audience = 'conducteur' | 'client' | 'artisan';
+
+export function isVisibleTo(e: Event, audience: Audience): boolean {
+  switch (audience) {
+    case 'conducteur':
+      return true;
+    case 'client':
+      return isVisibleToClient(e);
+    case 'artisan':
+      return isVisibleToArtisan(e);
+  }
+}
+
 /** Une décision attend explicitement le client (pilote le bandeau d'accueil). */
 export function isAwaitingClientDecision(e: Event): e is DemandeEvent {
   return (

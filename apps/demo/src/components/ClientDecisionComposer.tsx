@@ -14,6 +14,7 @@ import type { SelectionOption } from '@phenix360/core';
 import { warmGradient } from './gradient';
 import { fileToImageUrl } from '../lib/image';
 import { ACCEPT_IMAGE } from '../lib/media';
+import { LeaveConfirmInline, useBeforeUnloadGuard } from './mission/LeaveGuard';
 
 const MAX_OPTIONS = 5;
 
@@ -50,6 +51,19 @@ export function ClientDecisionComposer({
     { id: crypto.randomUUID(), title: '', description: '' },
   ]);
   const [busy, setBusy] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+
+  // PERTE DE SAISIE — la demande est « en cours » dès qu'un champ est rempli.
+  const dirty =
+    titre.trim() !== '' ||
+    contexte.trim() !== '' ||
+    photos.length > 0 ||
+    options.some((o) => o.title.trim() !== '' || o.description.trim() !== '' || !!o.imageUrl);
+  useBeforeUnloadGuard(dirty);
+  const requestClose = (): void => {
+    if (dirty) setConfirmLeave(true);
+    else onClose();
+  };
 
   const setOption = (id: string, patch: Partial<DraftOption>): void =>
     setOptions((os) => os.map((o) => (o.id === id ? { ...o, ...patch } : o)));
@@ -89,8 +103,8 @@ export function ClientDecisionComposer({
   };
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+    <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
+      <DialogContent className="relative max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Demander une décision au client</DialogTitle>
           <DialogDescription>
@@ -263,7 +277,7 @@ export function ClientDecisionComposer({
           </p>
 
           <div className="flex justify-end gap-2 border-t border-border pt-4">
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={requestClose}>
               Annuler
             </Button>
             <Button disabled={!canSubmit} onClick={() => void submit()}>
@@ -272,6 +286,12 @@ export function ClientDecisionComposer({
             </Button>
           </div>
         </div>
+        {/* Confirmation EN LIGNE : même couche Radix, aucun conflit de focus. */}
+        <LeaveConfirmInline
+          open={confirmLeave}
+          onCancel={() => setConfirmLeave(false)}
+          onLeave={onClose}
+        />
       </DialogContent>
     </Dialog>
   );

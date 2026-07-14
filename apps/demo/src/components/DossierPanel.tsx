@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   Input,
@@ -24,8 +25,11 @@ import {
   type Avenant,
   type AvenantImpact,
   type ClientDecisionStatus,
+  type Devis,
+  type DevisLot,
   type DevisPoste,
   type EventActor,
+  type EventAttachment,
   type Order,
   type OrderStatus,
   type Project,
@@ -35,18 +39,28 @@ import {
 import {
   Banknote,
   CalendarDays,
+  Check,
   ChevronDown,
+  Eye,
+  FileText,
+  Loader2,
   MessageSquareWarning,
   Pencil,
   Plus,
   Receipt,
   Sparkles,
+  Trash2,
+  Upload,
   X,
   AlertTriangle,
   ClipboardCheck,
 } from 'lucide-react';
 import { demo, useDemo } from '../store';
 import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
+import { openAttachment } from '../lib/document';
+import { readDocumentAttachment, MAX_DOC_MB } from '../lib/upload';
+import { ACCEPT_DOCUMENT } from '../lib/media';
+import { LeaveConfirmInline } from './mission/LeaveGuard';
 import { ContactPicker } from './contacts/ContactPicker';
 import { DevisVerification } from './DevisVerification';
 import { DevisBreakdown } from './DevisBreakdown';
@@ -67,8 +81,10 @@ export function DossierPanel({
   actor: EventActor;
 }): React.JSX.Element {
   const [editing, setEditing] = useState<Order | null>(null);
-  // Avenant fraîchement déposé → PHÉNIX affiche sa mini-note d'intégration.
+  // Avenant fraîchement VALIDÉ → PHÉNIX affiche sa mini-note d'intégration.
   const [integratedNumero, setIntegratedNumero] = useState<number | null>(null);
+  // Dialogue « Déposer un avenant signé » (dépôt + saisie des postes réels).
+  const [depositing, setDepositing] = useState(false);
   // Le détail du devis (poste par poste) est une RÉFÉRENCE, consultée rarement en
   // semaine : replié par défaut pour ne pas alourdir la lecture (règle des 5 s).
   const [showDevis, setShowDevis] = useState(false);
@@ -92,68 +108,45 @@ export function DossierPanel({
     setEditing(o);
   };
 
-  // Déposer un avenant signé : un NOUVEAU devis signé est remis, PHÉNIX l'analyse
-  // et l'INTÈGRE au chantier (jamais une modification du devis initial). Pour la
-  // démo, le « fichier déposé » est scénarisé : montée en gamme du poste le plus
-  // structurant + travaux supplémentaires. PHÉNIX recalcule alors les impacts
-  // (commandes, choix, documents, planning, budget, vigilances) et trace tout au
-  // journal. Append-only : on ajoute, on ne réécrit jamais.
-  const addAvenant = async () => {
+  // Avenants en attente de validation (déposés, PAS ENCORE intégrés au contrat).
+  const brouillons = dossier.avenantsBrouillon ?? [];
+
+  // Enregistrer un avenant DÉPOSÉ en BROUILLON. PHÉNIX ne fabrique rien et
+  // n'intègre rien : le brouillon reste à l'écart du contrat (il ne nourrit ni
+  // Léon, ni la Préparation, ni la Pré-réception, ni le budget) jusqu'à validation.
+  const saveBrouillon = (avenant: Avenant): void => {
+    patch({ avenantsBrouillon: [...brouillons, avenant] });
+    setDepositing(false);
+  };
+
+  const deleteBrouillon = (id: string): void => {
+    patch({ avenantsBrouillon: brouillons.filter((a) => a.id !== id) });
+  };
+
+  // VALIDATION HUMAINE : le conducteur a relu les impacts proposés et confirme
+  // l'intégration. L'avenant reçoit alors son numéro DÉFINITIF, quitte le brouillon
+  // et rejoint `avenants` (source unique du contrat consolidé). On trace au journal
+  // interne. Append-only : rien n'est réécrit, le devis initial reste intact.
+  const validateAvenant = async (brouillon: Avenant): Promise<void> => {
     if (!dossier.devis) return;
-    const existing = dossier.avenants ?? [];
-    const numero = existing.length + 1;
-
-    // Poste actif le plus cher → candidat à une montée en gamme (remplacement).
-    const consolidated = consolidateDevis(dossier.devis, existing);
-    let target: { lotLabel: string; poste: DevisPoste } | null = null;
-    for (const lot of consolidated.lots) {
-      for (const cp of lot.postes) {
-        if (cp.replacedByNumero != null) continue;
-        if (!target || cp.poste.montantHT > target.poste.montantHT) {
-          target = { lotLabel: lot.label, poste: cp.poste };
-        }
-      }
-    }
-    if (!target) return;
-
-    const upgraded: DevisPoste = {
-      id: `p-av${numero}-up`,
-      label: `${target.poste.label} — montée en gamme`,
-      ...(target.poste.unite ? { unite: target.poste.unite } : {}),
-      ...(target.poste.quantite != null ? { quantite: target.poste.quantite } : {}),
-      ...(target.poste.materiau ? { materiau: target.poste.materiau } : {}),
-      montantHT: Math.round(target.poste.montantHT * 1.15),
-      tva: target.poste.tva,
-      remplacePosteId: target.poste.id,
-    };
-    const added: DevisPoste = {
-      id: `p-av${numero}-add`,
-      label: 'Travaux supplémentaires demandés par le client',
-      unite: 'forfait',
-      montantHT: 1500,
-      tva: 10,
-    };
-    const avenant: Avenant = {
-      id: `av-${numero}`,
+    const validated = dossier.avenants ?? [];
+    const numero = validated.length + 1;
+    const finalAvenant: Avenant = {
+      ...brouillon,
       numero,
-      reference: `AV-${new Date().getFullYear()}-${String(numero).padStart(2, '0')}`,
-      date: new Date().toISOString().slice(0, 10),
-      label: `Montée en gamme « ${target.lotLabel} » + travaux supplémentaires`,
-      lots: [
-        { id: `lot-av${numero}-a`, label: target.lotLabel, postes: [upgraded] },
-        { id: `lot-av${numero}-b`, label: 'Travaux supplémentaires', postes: [added] },
-      ],
+      reference:
+        brouillon.reference ?? `AV-${new Date().getFullYear()}-${String(numero).padStart(2, '0')}`,
     };
-
-    patch({ avenants: [...existing, avenant] });
+    patch({
+      avenants: [...validated, finalAvenant],
+      avenantsBrouillon: brouillons.filter((a) => a.id !== brouillon.id),
+    });
     setIntegratedNumero(numero);
 
-    // PHÉNIX recalcule les impacts de l'avenant (source unique : même sélecteur
-    // que la mini-note affichée à l'écran).
-    const impact = avenantImpact(dossier.devis, existing, avenant);
+    const impact = avenantImpact(dossier.devis, validated, finalAvenant);
     const sign = impact.deltaHT >= 0 ? '+' : '−';
     const lines = [
-      `Avenant n°${numero} déposé et intégré par PHÉNIX (le devis initial reste intact).`,
+      `Avenant n°${numero} validé et intégré au contrat (le devis initial reste intact).`,
       `• ${impact.postesRemplaces} poste(s) remplacé(s), ${impact.postesAjoutes} poste(s) ajouté(s).`,
       `• Budget : ${sign}${fmtMoney(Math.abs(impact.deltaHT))} HT.`,
       impact.commandesAMettreAJour > 0
@@ -220,7 +213,7 @@ export function DossierPanel({
           count={consolidateDevis(validatedDevis(dossier), dossier.avenants).lots.length}
           action={
             <div className="flex items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => void addAvenant()}>
+              <Button size="sm" variant="outline" onClick={() => setDepositing(true)}>
                 <Plus aria-hidden /> Déposer un avenant signé
               </Button>
               <Button
@@ -244,6 +237,19 @@ export function DossierPanel({
               )}
               onClose={() => setIntegratedNumero(null)}
             />
+          )}
+          {brouillons.length > 0 && dossier.devis && (
+            <div className="mb-3 space-y-3">
+              {brouillons.map((b) => (
+                <AvenantBrouillonCard
+                  key={b.id}
+                  brouillon={b}
+                  impact={avenantImpact(dossier.devis!, dossier.avenants ?? [], b)}
+                  onValidate={() => void validateAvenant(b)}
+                  onDelete={() => deleteBrouillon(b.id)}
+                />
+              ))}
+            </div>
           )}
           {showDevis && (
             <DevisBreakdown
@@ -323,6 +329,16 @@ export function DossierPanel({
           project={project}
           dossier={dossier}
           onClose={() => setReviewContract(false)}
+        />
+      )}
+
+      {depositing && dossier.devis && (
+        <AvenantDepositDialog
+          projectId={project.id}
+          devis={dossier.devis}
+          validatedAvenants={dossier.avenants ?? []}
+          onSave={saveBrouillon}
+          onClose={() => setDepositing(false)}
         />
       )}
     </div>
@@ -745,6 +761,426 @@ function AvenantIntegrationNote({
         Le devis initial reste intact — l'avenant s'ajoute, rien n'est réécrit.
       </p>
     </div>
+  );
+}
+
+/**
+ * Carte d'un avenant DÉPOSÉ mais NON VALIDÉ. Elle affiche clairement l'état
+ * « brouillon » (rien n'est intégré), le document réellement déposé, et les
+ * IMPACTS PROPOSÉS calculés par PHÉNIX (sélecteur `avenantImpact`) — à relire avant
+ * la validation humaine. Aucune donnée contractuelle n'est active tant que le
+ * conducteur n'a pas cliqué « Valider et intégrer ».
+ */
+function AvenantBrouillonCard({
+  brouillon,
+  impact,
+  onValidate,
+  onDelete,
+}: {
+  brouillon: Avenant;
+  impact: AvenantImpact;
+  onValidate: () => void;
+  onDelete: () => void;
+}): React.JSX.Element {
+  const sign = impact.deltaHT >= 0 ? '+' : '−';
+  const plural = (n: number): string => (n > 1 ? 's' : '');
+  const lines: string[] = [
+    `${impact.postesRemplaces} poste${plural(impact.postesRemplaces)} remplacé${plural(impact.postesRemplaces)}`,
+    `${impact.postesAjoutes} poste${plural(impact.postesAjoutes)} ajouté${plural(impact.postesAjoutes)}`,
+    `budget ${sign}${fmtMoney(Math.abs(impact.deltaHT))} HT`,
+  ];
+  if (impact.commandesAMettreAJour > 0)
+    lines.push(
+      `${impact.commandesAMettreAJour} commande${plural(impact.commandesAMettreAJour)} à mettre à jour`,
+    );
+  if (impact.choixAObtenir > 0) lines.push(`${impact.choixAObtenir} choix client à obtenir`);
+  if (impact.vigilances > 0)
+    lines.push(`${impact.vigilances} vigilance${plural(impact.vigilances)} à lever`);
+  if (impact.impactPlanning) lines.push('impact planning à vérifier');
+
+  return (
+    <div className="rounded-xl border border-warning bg-warning/10 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Badge variant="warning">Brouillon — non intégré</Badge>
+            {brouillon.reference ?? 'Avenant déposé'}
+          </p>
+          {brouillon.label && (
+            <p className="mt-0.5 text-xs text-muted-foreground">{brouillon.label}</p>
+          )}
+        </div>
+        {brouillon.sourceAttachment && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openAttachment(brouillon.sourceAttachment!)}
+          >
+            <Eye aria-hidden /> Document déposé
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          Impacts proposés (à relire avant validation)
+        </p>
+        <ul className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground">
+          {lines.map((l) => (
+            <li key={l} className="flex items-center gap-1.5">
+              <span className="size-1 shrink-0 rounded-full bg-gold-600" />
+              {l}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <p className="mt-2 text-xs text-muted-foreground">
+        Tant qu’il n’est pas validé, cet avenant ne modifie ni le devis, ni le budget, ni la
+        Préparation, ni la Pré-réception, et Léon l’ignore.
+      </p>
+
+      <div className="mt-3 flex flex-wrap justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onDelete}>
+          <Trash2 aria-hidden /> Supprimer le brouillon
+        </Button>
+        <Button size="sm" onClick={onValidate}>
+          <Check aria-hidden /> Valider et intégrer l’avenant
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Ligne d'avenant saisie par le conducteur (jamais fabriquée par PHÉNIX). */
+interface AvenantLine {
+  id: string;
+  label: string;
+  montantHT: string;
+  tva: number;
+  remplacePosteId: string;
+}
+
+const TVA_OPTIONS = [20, 10, 5.5] as const;
+
+/**
+ * Dépôt d'un avenant signé — le FLUX HONNÊTE (Condition bêta #3). PHÉNIX ne
+ * fabrique aucune donnée : le conducteur DÉPOSE le document réellement signé, puis
+ * saisit les postes que l'avenant modifie (nouveaux postes / remplacements). PHÉNIX
+ * calcule et affiche les IMPACTS PROPOSÉS en direct. À l'enregistrement, l'avenant
+ * part en BROUILLON (non intégré) : la validation, elle, se fait sur la carte.
+ */
+function AvenantDepositDialog({
+  projectId,
+  devis,
+  validatedAvenants,
+  onSave,
+  onClose,
+}: {
+  projectId: string;
+  devis: Devis;
+  validatedAvenants: Avenant[];
+  onSave: (avenant: Avenant) => void;
+  onClose: () => void;
+}): React.JSX.Element {
+  const [attachment, setAttachment] = useState<EventAttachment | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [reference, setReference] = useState('');
+  const [label, setLabel] = useState('');
+  const [lines, setLines] = useState<AvenantLine[]>([
+    { id: crypto.randomUUID(), label: '', montantHT: '', tva: 20, remplacePosteId: '' },
+  ]);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  // Postes ACTIFS du contrat consolidé (pour cibler un remplacement).
+  const consolidated = consolidateDevis(devis, validatedAvenants);
+  const activePostes = consolidated.lots.flatMap((lot) =>
+    lot.postes
+      .filter((cp) => cp.replacedByNumero == null)
+      .map((cp) => ({ id: cp.poste.id, label: cp.poste.label, lotLabel: lot.label })),
+  );
+
+  const setLine = (id: string, patch: Partial<AvenantLine>): void =>
+    setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+  const addLine = (): void =>
+    setLines((ls) => [
+      ...ls,
+      { id: crypto.randomUUID(), label: '', montantHT: '', tva: 20, remplacePosteId: '' },
+    ]);
+  const removeLine = (id: string): void => setLines((ls) => ls.filter((l) => l.id !== id));
+
+  const onPick = async (file: File | undefined): Promise<void> => {
+    if (!file) return;
+    setBusy(true);
+    setUploadError(null);
+    try {
+      const res = await readDocumentAttachment(projectId, file);
+      if (!res.ok) {
+        setUploadError(res.error);
+        return;
+      }
+      setAttachment(res.value);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const validLines = lines.filter((l) => l.label.trim() !== '' && Number(l.montantHT) > 0);
+  const provisionalNumero = validatedAvenants.length + 1;
+
+  // Avenant PROVISOIRE (pour l'aperçu d'impact), construit des lignes valides.
+  const buildAvenant = (): Avenant => {
+    const byLot = new Map<string, DevisPoste[]>();
+    validLines.forEach((line) => {
+      const replaced = line.remplacePosteId
+        ? activePostes.find((p) => p.id === line.remplacePosteId)
+        : undefined;
+      const lotLabel = replaced ? replaced.lotLabel : 'Travaux supplémentaires';
+      const poste: DevisPoste = {
+        id: `p-avb-${line.id}`,
+        label: line.label.trim(),
+        montantHT: Number(line.montantHT),
+        tva: line.tva,
+        ...(line.remplacePosteId ? { remplacePosteId: line.remplacePosteId } : {}),
+      };
+      if (!byLot.has(lotLabel)) byLot.set(lotLabel, []);
+      byLot.get(lotLabel)!.push(poste);
+    });
+    const lots: DevisLot[] = [...byLot].map(([lab, postes], i) => ({
+      id: `lot-avb-${i}`,
+      label: lab,
+      postes,
+    }));
+    return {
+      id: `avb-${crypto.randomUUID()}`,
+      numero: provisionalNumero,
+      reference:
+        reference.trim() ||
+        `AV-${new Date().getFullYear()}-${String(provisionalNumero).padStart(2, '0')}`,
+      date: new Date().toISOString().slice(0, 10),
+      label: label.trim() || `Avenant n°${provisionalNumero}`,
+      lots,
+      ...(attachment ? { sourceAttachment: attachment } : {}),
+    };
+  };
+
+  const preview =
+    validLines.length > 0 ? avenantImpact(devis, validatedAvenants, buildAvenant()) : null;
+  const canSave = attachment !== null && validLines.length > 0 && !busy;
+
+  const dirty =
+    attachment !== null ||
+    reference.trim() !== '' ||
+    label.trim() !== '' ||
+    lines.some(
+      (l) => l.label.trim() !== '' || l.montantHT.trim() !== '' || l.remplacePosteId !== '',
+    );
+  const requestClose = (): void => {
+    if (dirty) setConfirmLeave(true);
+    else onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
+      <DialogContent className="relative max-h-[88vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Déposer un avenant signé</DialogTitle>
+          <DialogDescription>
+            Déposez le document réellement signé, puis saisissez ce que l’avenant modifie. PHÉNIX
+            n’invente rien : il calcule les impacts à partir de ce que vous entrez.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-5">
+          {/* 1. Le document signé (obligatoire). */}
+          <div className="space-y-2">
+            <input
+              ref={fileRef}
+              type="file"
+              accept={ACCEPT_DOCUMENT}
+              className="hidden"
+              onChange={(e) => {
+                void onPick(e.target.files?.[0]);
+                e.target.value = '';
+              }}
+            />
+            {attachment ? (
+              <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-sm">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-gold-100 text-gold-700 [&_svg]:size-5">
+                  <FileText aria-hidden />
+                </span>
+                <span className="min-w-0 flex-1 truncate text-foreground">
+                  {attachment.fileName}
+                </span>
+                <button
+                  type="button"
+                  aria-label="Retirer le document"
+                  onClick={() => setAttachment(null)}
+                  className="text-muted-foreground hover:text-foreground [&_svg]:size-4"
+                >
+                  <X aria-hidden />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted-foreground transition-colors hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-6 [&_svg]:text-gold-600"
+              >
+                {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />}
+                Déposer l’avenant signé (PDF ou image, max {MAX_DOC_MB} Mo)
+              </button>
+            )}
+            {uploadError && (
+              <p role="alert" className="text-sm text-destructive">
+                {uploadError}
+              </p>
+            )}
+          </div>
+
+          {/* 2. Références (facultatives). */}
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-muted-foreground">Référence (facultatif)</span>
+              <Input
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+                placeholder={`AV-${new Date().getFullYear()}-${String(provisionalNumero).padStart(2, '0')}`}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="text-muted-foreground">Intitulé (facultatif)</span>
+              <Input
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="Ex. Montée en gamme cuisine + travaux supplémentaires"
+              />
+            </label>
+          </div>
+
+          {/* 3. Postes de l'avenant (saisis, jamais inventés). */}
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-foreground">Ce que l’avenant modifie</p>
+            <ul className="space-y-3">
+              {lines.map((line, i) => {
+                const replaced = line.remplacePosteId
+                  ? activePostes.find((p) => p.id === line.remplacePosteId)
+                  : undefined;
+                return (
+                  <li key={line.id} className="space-y-2 rounded-xl border border-border p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Poste {i + 1}
+                      </span>
+                      {lines.length > 1 && (
+                        <button
+                          type="button"
+                          aria-label={`Retirer le poste ${i + 1}`}
+                          onClick={() => removeLine(line.id)}
+                          className="ml-auto text-muted-foreground hover:text-destructive [&_svg]:size-4"
+                        >
+                          <Trash2 aria-hidden />
+                        </button>
+                      )}
+                    </div>
+                    <Input
+                      value={line.label}
+                      onChange={(e) => setLine(line.id, { label: e.target.value })}
+                      placeholder="Désignation du poste (ex. Plan de travail quartz)"
+                    />
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Montant HT (€)
+                        <Input
+                          type="number"
+                          value={line.montantHT}
+                          onChange={(e) => setLine(line.id, { montantHT: e.target.value })}
+                          placeholder="0"
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        TVA
+                        <select
+                          value={line.tva}
+                          onChange={(e) => setLine(line.id, { tva: Number(e.target.value) })}
+                          className="h-10 rounded-lg border border-input bg-surface px-3 text-sm text-foreground"
+                        >
+                          {TVA_OPTIONS.map((t) => (
+                            <option key={t} value={t}>
+                              {String(t).replace('.', ',')} %
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        Remplace un poste ?
+                        <select
+                          value={line.remplacePosteId}
+                          onChange={(e) => setLine(line.id, { remplacePosteId: e.target.value })}
+                          className="h-10 rounded-lg border border-input bg-surface px-2 text-sm text-foreground"
+                        >
+                          <option value="">Nouveau poste</option>
+                          {activePostes.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.label.length > 40 ? `${p.label.slice(0, 40)}…` : p.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    {replaced && (
+                      <p className="text-xs text-muted-foreground">
+                        Remplace « {replaced.label} » ({replaced.lotLabel}).
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <Button size="sm" variant="outline" onClick={addLine}>
+              <Plus aria-hidden /> Ajouter un poste
+            </Button>
+          </div>
+
+          {/* 4. Impacts proposés (aperçu, calculés en direct). */}
+          {preview && (
+            <div className="rounded-xl border border-gold-200 bg-gold-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Impacts proposés
+              </p>
+              <p className="mt-1 text-sm text-foreground">
+                {preview.postesRemplaces} remplacé(s), {preview.postesAjoutes} ajouté(s) · budget{' '}
+                {preview.deltaHT >= 0 ? '+' : '−'}
+                {fmtMoney(Math.abs(preview.deltaHT))} HT
+                {preview.commandesAMettreAJour > 0
+                  ? ` · ${preview.commandesAMettreAJour} commande(s) à revoir`
+                  : ''}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Rien n’est intégré maintenant : vous validerez l’avenant ensuite, après relecture.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={requestClose}>
+            Annuler
+          </Button>
+          <Button disabled={!canSave} onClick={() => onSave(buildAvenant())}>
+            <Check aria-hidden /> Enregistrer le brouillon
+          </Button>
+        </DialogFooter>
+
+        <LeaveConfirmInline
+          open={confirmLeave}
+          onCancel={() => setConfirmLeave(false)}
+          onLeave={onClose}
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 

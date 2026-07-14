@@ -621,6 +621,15 @@ export interface ProjectDossier {
    * On ne modifie JAMAIS le devis initial.
    */
   avenants?: Avenant[];
+  /**
+   * Avenants DÉPOSÉS mais PAS ENCORE VALIDÉS (brouillons). Ils ne nourrissent RIEN
+   * (ni le devis consolidé, ni Léon, ni la Préparation, ni la Pré-réception, ni le
+   * budget) : PHÉNIX les tient à l'écart tant que le conducteur n'a pas relu les
+   * impacts proposés et validé l'intégration. À la validation, ils passent dans
+   * `avenants` (source unique du contrat). Aucune donnée contractuelle n'est
+   * fabriquée ni intégrée automatiquement.
+   */
+  avenantsBrouillon?: Avenant[];
   /** Noms des fichiers déposés (traçabilité de l'analyse). */
   sources: string[];
   createdAt: IsoDateTime;

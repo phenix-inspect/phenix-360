@@ -3,6 +3,7 @@ import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/
 import {
   isAction,
   isCompteRendu,
+  isVisibleTo,
   reserveEvents,
   reserveStatut,
   userId,
@@ -141,9 +142,9 @@ export function ArtisanView({
 
   const infos = events
     .filter(isCompteRendu)
-    // Le récit PARTAGÉ du chantier — pas les notes internes du conducteur, qui
-    // ne sont pas destinées à l'artisan (VISION Art. 9).
-    .filter((e) => e.state === 'publie' && e.visibility === 'client')
+    // Le récit PARTAGÉ du chantier via le MOTEUR DE VISIBILITÉ unique (audience
+    // artisan) — jamais les notes internes du conducteur ni le privé client.
+    .filter((e) => isVisibleTo(e, 'artisan'))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     .slice(0, 3);
 

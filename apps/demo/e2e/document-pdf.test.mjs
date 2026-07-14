@@ -180,6 +180,9 @@ await check('Réception → vrai PDF (%PDF-) + contenu (devis, conclusion, signa
     if (!text.includes(must)) throw new Error(`le PDF omet « ${must} »`);
   if (!/client ou son repr/i.test(text)) throw new Error('bloc de signature Client absent');
   if (/artisan ou son repr/i.test(text)) throw new Error('bloc ARTISAN sur le PV de réception');
+  // Condition bêta #4 : aucun code système interne sur le PV client (PDF).
+  if (/REC-\d{8}-V\d/.test(text) || /PR-\d{8}-V\d/.test(text))
+    throw new Error('code système interne (REC-…/PR-…) présent sur le PV client (PDF)');
 });
 
 /* -- 2. Filigrane BROUILLON avant validation, absent après ------------------ */

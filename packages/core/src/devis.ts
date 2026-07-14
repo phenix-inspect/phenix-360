@@ -10,6 +10,8 @@
  * derrière le port `DossierAnalyzer` SANS changer ce modèle ni les écrans.
  */
 
+import type { EventAttachment } from './attachment.js';
+
 /**
  * État de VÉRIFICATION d'une ligne lue automatiquement, en langage de chantier :
  *  • `verifie`      🟢 vérifié automatiquement (ligne pleinement chiffrée) ;
@@ -115,6 +117,12 @@ export interface Avenant {
    * déterministe du briefing, sans changer la structure (cf. describeAvenantImpact).
    */
   impactNote?: string;
+  /**
+   * Document signé RÉELLEMENT déposé (preuve contractuelle). PHÉNIX n'invente
+   * jamais un avenant : il part d'un fichier remis par le client / l'artisan. Un
+   * avenant sans document déposé n'existe pas.
+   */
+  sourceAttachment?: EventAttachment;
 }
 
 /* --------------------- consolidation devis + avenants ---------------------- */

@@ -17,6 +17,7 @@ import {
   SHARED_AUDIENCE,
   InMemoryBackend,
   PROJECT_STATUS_LABEL,
+  deriveProjectStatus,
   answerContractQuestion,
   type ContractAnswer,
   askPhenix as corePhenix,
@@ -28,6 +29,7 @@ import {
   defaultLaunchChecklist,
   eventId as toEventId,
   estMomentCoulisses,
+  isVisibleToClient,
   MAX_ALBUM_PHOTOS,
   realAnalyzeDossier,
   type AnalyzeInput,
@@ -2089,7 +2091,9 @@ export const demo = {
     const project = snapshot.projects.find((p) => p.id === projectId);
     const chantierAddress = project?.address ?? null;
     const chantierName = project?.name ?? null;
-    const statutLabel = project ? PROJECT_STATUS_LABEL[project.status] : null;
+    // Statut RÉEL dérivé des faits (source unique) — Léon ne cite jamais un statut
+    // manuel qui contredirait les événements du chantier.
+    const statutLabel = project ? PROJECT_STATUS_LABEL[deriveProjectStatus(project, events)] : null;
     const clientName =
       snapshot.contacts.find((c) => c.role === 'client' && c.projectIds.includes(projectId))?.nom ??
       null;
@@ -2665,7 +2669,8 @@ export function clientNotifications(
         });
 
   for (const e of snap.events) {
-    if (e.projectId !== projectId || e.visibility !== 'client' || e.state !== 'publie') continue;
+    // Visibilité CLIENT via le moteur unique (jamais une règle recopiée).
+    if (e.projectId !== projectId || !isVisibleToClient(e)) continue;
     if (e.createdAt <= base || seen[e.id]) continue;
     // 💬 Nouveau compte rendu de l'équipe → il vit dans l'onglet DOCUMENTS.
     if (e.type === 'compte_rendu' && allow('documents'))

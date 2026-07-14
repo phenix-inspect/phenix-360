@@ -12,7 +12,8 @@ import { Camera, ChevronDown, Eye, EyeOff, FileText, ImagePlus, X } from 'lucide
 import { DocumentStatusBadge } from '../DocumentStatusBadge';
 import { DocumentButton } from '../DocumentButton';
 import { DocumentLink } from '../DocumentLink';
-import { demo, useDemo } from '../../store';
+import { DiffusionConfirmDialog } from '../DiffusionConfirmDialog';
+import { demo, nameOf, useDemo } from '../../store';
 import { readPhotoAttachment } from '../../lib/upload';
 import { ACCEPT_IMAGE } from '../../lib/media';
 
@@ -46,6 +47,22 @@ export function PrepDocumentsSection({
 
   const remove = (id: string): void =>
     patch({ documents: dossier.documents.filter((d) => d.id !== id) });
+
+  // Diffusion client sous confirmation explicite (Condition bêta #2) : rendre un
+  // document visible au client passe par un récapitulatif, jamais un simple clic.
+  const clientName = project.clientId ? nameOf(snap, project.clientId) : undefined;
+  const [diffuseDoc, setDiffuseDoc] = useState<ProjectDocument | null>(null);
+  const [diffusing, setDiffusing] = useState(false);
+  const confirmDiffusion = async (): Promise<void> => {
+    if (!diffuseDoc || diffusing) return;
+    setDiffusing(true);
+    try {
+      await demo.setPrepDocumentVisibility(project.id, diffuseDoc.id, 'client');
+      setDiffuseDoc(null);
+    } finally {
+      setDiffusing(false);
+    }
+  };
 
   return (
     <Card>
@@ -98,13 +115,13 @@ export function PrepDocumentsSection({
                           ? `Rendre interne : ${d.label}`
                           : `Rendre visible au client : ${d.label}`
                       }
-                      onClick={() =>
-                        void demo.setPrepDocumentVisibility(
-                          project.id,
-                          d.id,
-                          shared ? 'interne' : 'client',
-                        )
-                      }
+                      onClick={() => {
+                        // interne → client = DIFFUSION : confirmation explicite.
+                        // client → interne = masquer : direct (rien ne part au client).
+                        if (shared)
+                          void demo.setPrepDocumentVisibility(project.id, d.id, 'interne');
+                        else setDiffuseDoc(d);
+                      }}
                     >
                       {shared ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
                       {shared ? 'Visible client' : 'Interne'}
@@ -124,6 +141,15 @@ export function PrepDocumentsSection({
           </ul>
         )}
       </CardContent>
+
+      <DiffusionConfirmDialog
+        open={diffuseDoc !== null}
+        documentLabel={diffuseDoc?.label ?? ''}
+        clientName={clientName}
+        busy={diffusing}
+        onCancel={() => setDiffuseDoc(null)}
+        onConfirm={() => void confirmDiffusion()}
+      />
     </Card>
   );
 }

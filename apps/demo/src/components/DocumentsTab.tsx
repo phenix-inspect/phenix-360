@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Badge, Button, Card, CardContent } from '@phenix360/ui';
 import { Download, Eye, EyeOff, FileText, Library, MailQuestion } from 'lucide-react';
 import { sortByDate, type Event, type Project, type ProjectDossier } from '@phenix360/core';
-import { demo } from '../store';
+import { demo, nameOf } from '../store';
 import { DocumentButton } from './DocumentButton';
 import { DocumentFilterBar } from './DocumentFilterBar';
 import { PrepDocumentsSection } from './prep/PrepDocuments';
+import { DiffusionConfirmDialog } from './DiffusionConfirmDialog';
 import { filterDocuments, type DocFilter } from '../lib/documentFilter';
 import { generatedDocumentTitle } from '../lib/generatedDocument';
 import { fmtDate } from '../lib/format';
@@ -38,6 +39,24 @@ export function DocumentsTab({
   );
   const [filter, setFilter] = useState<DocFilter>('tous');
   const shown = filterDocuments(library, filter);
+
+  // Diffusion client sous confirmation explicite (Condition bêta #2). Un document
+  // interne ne devient JAMAIS visible du client sur un simple clic : récapitulatif
+  // puis « Confirmer la diffusion au client ». Le repli interne (masquer) reste direct.
+  const snap = demo.getSnapshot();
+  const clientName = project.clientId ? nameOf(snap, project.clientId) : undefined;
+  const [diffuseDoc, setDiffuseDoc] = useState<Extract<Event, { type: 'document' }> | null>(null);
+  const [diffusing, setDiffusing] = useState(false);
+  const confirmDiffusion = async (): Promise<void> => {
+    if (!diffuseDoc || diffusing) return;
+    setDiffusing(true);
+    try {
+      await demo.setDocumentVisibility(diffuseDoc.id, 'client');
+      setDiffuseDoc(null);
+    } finally {
+      setDiffusing(false);
+    }
+  };
 
   // Suivi des documents DEMANDÉS au client (créés via « Nouvelle mission »). Le
   // clic n'agit pas : c'est un tableau de bord de consultation (En attente / Reçu).
@@ -198,12 +217,13 @@ export function DocumentsTab({
                           ? `Rendre interne : ${e.content.libelle}`
                           : `Partager au client : ${e.content.libelle}`
                       }
-                      onClick={() =>
-                        void demo.setDocumentVisibility(
-                          e.id,
-                          e.visibility === 'client' ? 'interne' : 'client',
-                        )
-                      }
+                      onClick={() => {
+                        // interne → client = DIFFUSION : passe par la confirmation.
+                        // client → interne = masquer : action directe (rien ne part au client).
+                        if (e.visibility === 'client')
+                          void demo.setDocumentVisibility(e.id, 'interne');
+                        else setDiffuseDoc(e);
+                      }}
                     >
                       {e.visibility === 'client' ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
                       {e.visibility === 'client' ? 'Visible client' : 'Partager'}
@@ -215,6 +235,15 @@ export function DocumentsTab({
           )}
         </CardContent>
       </Card>
+
+      <DiffusionConfirmDialog
+        open={diffuseDoc !== null}
+        documentLabel={diffuseDoc?.content.libelle ?? ''}
+        clientName={clientName}
+        busy={diffusing}
+        onCancel={() => setDiffuseDoc(null)}
+        onConfirm={() => void confirmDiffusion()}
+      />
     </div>
   );
 }
