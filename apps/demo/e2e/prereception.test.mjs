@@ -196,9 +196,12 @@ try {
         'BROUILLON', // filigrane tant que non validé
       ])
         if (!text.includes(must)) throw new Error(`le document artisan omet « ${must} »`);
-      // Deux encarts de signature (h2 en majuscules CSS → comparaison insensible).
-      if (!/signatures/i.test(text) || !/client ou son repr/i.test(text))
-        throw new Error('encarts de signature (PHÉNIX + Client) absents');
+      // Signataires PROPRES à l'artisan : PHÉNIX + « Artisan ou son représentant »,
+      // JAMAIS le bloc client (h2/titres en majuscules CSS → comparaison insensible).
+      if (!/signatures/i.test(text) || !/artisan ou son repr/i.test(text))
+        throw new Error('bloc de signature « Artisan ou son représentant » absent');
+      if (/client ou son repr/i.test(text))
+        throw new Error('le bloc CLIENT ne doit pas apparaître sur la version artisan');
       if (!/Reprise/.test(text)) throw new Error('la date de reprise manque côté artisan');
       if (!/PR-\d{8}-V\d/.test(text)) throw new Error('référence PR-… absente du document');
     },
@@ -210,8 +213,12 @@ try {
     // Ce que le client DOIT voir : prestations, statuts professionnels, la réserve.
     for (const must of [P_WC, RESERVE_COMMENT, 'Réceptionné sans réserve', 'BROUILLON'])
       if (!text.includes(must)) throw new Error(`le document client omet « ${must} »`);
-    if (!/signatures/i.test(text))
-      throw new Error('encarts de signature absents du document client');
+    // Signataires PROPRES au client : PHÉNIX + « Client ou son représentant »,
+    // JAMAIS le bloc artisan.
+    if (!/signatures/i.test(text) || !/client ou son repr/i.test(text))
+      throw new Error('bloc de signature « Client ou son représentant » absent');
+    if (/artisan ou son repr/i.test(text))
+      throw new Error('le bloc ARTISAN ne doit pas apparaître sur la version client');
     // Ce que le client ne doit JAMAIS voir : responsable, reprise, motifs, notes internes.
     for (const leak of ['Responsable', 'Reprise', MOTIF, NONFAIT_COMMENT, 'déduite de la facture'])
       if (text.includes(leak))

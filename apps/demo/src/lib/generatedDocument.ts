@@ -21,6 +21,17 @@ import {
 import { eventTitle } from './eventText';
 import { fmtDate } from './format';
 
+/**
+ * Identité (optionnelle) d'un artisan destinataire d'une version Artisan. Sert à
+ * PRÉREMPLIR son bloc de signature — jamais à inventer une identité manquante :
+ * un champ absent reste vide (ligne à signer à la main / en ligne).
+ */
+export interface ArtisanSignataire {
+  entreprise?: string;
+  lot?: string;
+  nom?: string;
+}
+
 /** Contexte de rendu d'un document (résolu depuis le snapshot par le store). */
 export interface DocumentContext {
   projectName: string;
@@ -29,6 +40,8 @@ export interface DocumentContext {
   address?: string;
   /** Nom du client (en-tête du PV). */
   clientName?: string;
+  /** Artisan destinataire (version Artisan) — préremplit son bloc de signature. */
+  artisan?: ArtisanSignataire;
 }
 
 /** Échappement HTML (le contenu métier est saisi par l'utilisateur). */
@@ -167,23 +180,53 @@ function prestationRow(p: PrestationVerif, audience: CrAudience): string {
   </article>`;
 }
 
-/** Deux encarts de signature (PHÉNIX + client), prêts pour la signature en ligne. */
-function signatureBlocks(): string {
-  const bloc = (titre: string, roleLabel: string): string => `<div class="sign-box">
-    <div class="sign-title">${esc(titre)}</div>
-    <div class="sign-field"><span>Nom</span><span class="sign-line"></span></div>
-    <div class="sign-field"><span>${esc(roleLabel)}</span><span class="sign-line"></span></div>
-    <div class="sign-field"><span>Date</span><span class="sign-line"></span></div>
-    <div class="sign-sign"><span>Signature</span><div class="sign-zone"></div></div>
-  </div>`;
-  return `<section class="signatures"><h2>Signatures</h2><div class="sign-grid">
-    ${bloc('PHÉNIX', 'Qualité')}
-    ${bloc('Client ou son représentant', 'Qualité / représentation')}
-  </div></section>`;
+/** Un encart de signature : champs (préremplis si connus) + zone de signature. */
+function blocSignature(titre: string, champs: { label: string; value?: string }[]): string {
+  const rows = champs
+    .map((c) =>
+      c.value
+        ? `<div class="sign-field"><span>${esc(c.label)}</span><b class="sign-prefill">${esc(c.value)}</b></div>`
+        : `<div class="sign-field"><span>${esc(c.label)}</span><span class="sign-line"></span></div>`,
+    )
+    .join('');
+  return `<div class="sign-box"><div class="sign-title">${esc(titre)}</div>${rows}<div class="sign-sign"><span>Signature</span><div class="sign-zone"></div></div></div>`;
+}
+
+/**
+ * Encarts de signature PROPRES AU DESTINATAIRE : PHÉNIX (toujours) + le second
+ * signataire. Version CLIENT → « Client ou son représentant ». Version ARTISAN →
+ * « Artisan ou son représentant » (entreprise / lot préremplis si connus, jamais
+ * inventés). Le bloc client n'apparaît JAMAIS sur la version artisan, ni l'inverse.
+ */
+function signatureBlocks(audience: CrAudience, artisan?: ArtisanSignataire): string {
+  const phenix = blocSignature('PHÉNIX', [
+    { label: 'Nom' },
+    { label: 'Qualité' },
+    { label: 'Date' },
+  ]);
+  const client = blocSignature('Client ou son représentant', [
+    { label: 'Nom' },
+    { label: 'Qualité / représentation' },
+    { label: 'Date' },
+  ]);
+  const artisanBloc = blocSignature('Artisan ou son représentant', [
+    { label: 'Entreprise', value: artisan?.entreprise },
+    { label: 'Lot', value: artisan?.lot },
+    { label: 'Nom du signataire', value: artisan?.nom },
+    { label: 'Qualité / représentation' },
+    { label: 'Date' },
+  ]);
+  // Client → bloc client ; artisan (et vue conducteur interne) → bloc artisan.
+  const second = audience === 'client' ? client : artisanBloc;
+  return `<section class="signatures"><h2>Signatures</h2><div class="sign-grid">${phenix}${second}</div></section>`;
 }
 
 /** Corps d'une pré-réception : synthèse + prestations (groupées par lot) + mot. */
-function prereceptionBody(data: PrereceptionData, audience: CrAudience): string {
+function prereceptionBody(
+  data: PrereceptionData,
+  audience: CrAudience,
+  artisan?: ArtisanSignataire,
+): string {
   const s = prereceptionSynthese(data.prestations);
   const synth = `<section><h2>Synthèse de la pré-réception</h2><div class="pv-synth">
     <div><b>${s.conformes}</b><span>${esc(PRERECEPTION_SYNTHESE_LABEL.conformes)}</span></div>
@@ -215,7 +258,7 @@ function prereceptionBody(data: PrereceptionData, audience: CrAudience): string 
     ? `<section><h2>Commentaire général de pré-réception</h2>${paragraphs(data.commentaireGeneral)}</section>`
     : '';
 
-  return `${synth}${prestations}${mot}${signatureBlocks()}`;
+  return `${synth}${prestations}${mot}${signatureBlocks(audience, artisan)}`;
 }
 
 /** Corps d'un document de référence sans fichier joint (fiche de couverture). */
@@ -266,7 +309,7 @@ export function buildDocumentHtml(
   const body =
     event.type === 'compte_rendu'
       ? event.content.prereception
-        ? prereceptionBody(event.content.prereception, audience)
+        ? prereceptionBody(event.content.prereception, audience, ctx.artisan)
         : event.content.points && event.content.points.length > 0
           ? compteRenduPointsBody(event, audience)
           : compteRenduBody(event)
@@ -326,6 +369,7 @@ export function buildDocumentHtml(
   .sign-title { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #a9803a; font-weight: 700; margin-bottom: 12px; }
   .sign-field { display: flex; align-items: flex-end; gap: 8px; margin-bottom: 12px; font-size: 13px; }
   .sign-field > span:first-child { min-width: 120px; color: #8a8069; }
+  .sign-prefill { flex: 1; color: #2a2620; font-weight: 600; border-bottom: 1px solid #e0d6c2; }
   .sign-line { flex: 1; border-bottom: 1px dotted #c8bda3; height: 16px; }
   .sign-sign > span { font-size: 13px; color: #8a8069; }
   .sign-zone { margin-top: 6px; height: 84px; border: 1px dashed #c8bda3; border-radius: 8px; }
