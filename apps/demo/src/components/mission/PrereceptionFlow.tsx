@@ -25,6 +25,8 @@ import {
   type ReserveResponsableKind,
 } from '@phenix360/core';
 import {
+  ArrowLeft,
+  ArrowRight,
   Camera,
   Check,
   ClipboardCheck,
@@ -42,6 +44,31 @@ import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
+
+/** Champ obligatoire manquant d'une prestation (pour le raccourci « compléter »). */
+type ChampManquant = { champ: 'reserve' | 'nonfait' | 'motif'; label: string; court: string };
+
+/**
+ * Le premier champ obligatoire MANQUANT d'une prestation (aligné sur
+ * `prestationComplete`). `null` si la prestation est complète.
+ */
+function champManquant(p: PrestationVerif): ChampManquant | null {
+  if (p.statut === 'reserve' && !(p.reserve && p.reserve.commentaire.trim()))
+    return { champ: 'reserve', label: 'commentaire de réserve', court: 'commentaire' };
+  if (p.statut === 'non_fait' && !(p.commentaireNonFait ?? '').trim())
+    return { champ: 'nonfait', label: 'commentaire', court: 'commentaire' };
+  if (p.statut === 'moins_value' && !(p.motifMoinsValue ?? '').trim())
+    return { champ: 'motif', label: 'motif', court: 'motif' };
+  return null;
+}
+
+/** Tronque un libellé pour l'affichage compact (le libellé complet reste ailleurs). */
+function courtLabel(s: string, n = 40): string {
+  const t = s.trim();
+  return t.length <= n
+    ? t
+    : `${t.slice(0, t.lastIndexOf(' ', n) > 0 ? t.lastIndexOf(' ', n) : n)}…`;
+}
 
 /** Les quatre statuts PROFESSIONNELS, dans l'ordre (libellés & pastilles du cœur). */
 const STATUTS: { statut: PrestationStatut; dot: string; short: string }[] = (
@@ -136,8 +163,82 @@ export function PrereceptionFlow({
       }),
     );
 
-  const patchPrestation = (posteId: string, patch: Partial<PrestationVerif>): void =>
+  const patchPrestation = (posteId: string, patch: Partial<PrestationVerif>): void => {
     setPrestations((ps) => ps.map((p) => (p.posteId === posteId ? { ...p, ...patch } : p)));
+    // Le conducteur saisit dans la carte mise en évidence → on retire l'accent.
+    setHighlightId((h) => (h === posteId ? null : h));
+  };
+
+  /* --- Raccourci « compléter » : cibler la prestation incomplète et son champ --- */
+  // Prestations incomplètes, dans l'ordre du contrat, avec leur champ manquant.
+  const incompletsListe = useMemo(
+    () =>
+      prestations
+        .map((p) => ({ p, manque: champManquant(p) }))
+        .filter((x): x is { p: PrestationVerif; manque: ChampManquant } => x.manque !== null),
+    [prestations],
+  );
+  const incompletsIds = incompletsListe.map((x) => x.p.posteId);
+
+  // Prestation actuellement ciblée (scroll + focus + mise en évidence).
+  const [cibleId, setCibleId] = useState<string | null>(null);
+  // Navigation « erreur X sur N » active (déclenchée par le raccourci de synthèse).
+  const [navMode, setNavMode] = useState(false);
+  // Carte mise en évidence temporairement (accent + message local).
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  // Liste compacte des incomplets dépliée ?
+  const [showAllInc, setShowAllInc] = useState(false);
+
+  /** Saute vers une prestation incomplète : revient à la vérification et la cible. */
+  const allerVers = (posteId: string): void => {
+    setNavMode(true);
+    setCibleId(posteId);
+    setStep('verifier');
+  };
+
+  /** Navigation Précédent / Suivant entre les prestations incomplètes. */
+  const navErreur = (delta: number): void => {
+    const ids = incompletsIds;
+    if (ids.length === 0) return;
+    const i = Math.max(0, ids.indexOf(cibleId ?? ''));
+    setCibleId(ids[(i + delta + ids.length) % ids.length] ?? null);
+  };
+
+  // Arrivée sur la cible : défiler jusqu'à la carte, ouvrir le champ, y poser le focus.
+  useEffect(() => {
+    if (step !== 'verifier' || !cibleId) return;
+    const raf = requestAnimationFrame(() => {
+      document
+        .getElementById(`prestation-${cibleId}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Le focus est posé APRÈS le défilement (preventScroll : pas de saut brutal).
+      (document.getElementById(`champ-${cibleId}`) as HTMLElement | null)?.focus({
+        preventScroll: true,
+      });
+      setHighlightId(cibleId);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [step, cibleId]);
+
+  // La mise en évidence s'efface toute seule après quelques secondes.
+  useEffect(() => {
+    if (!highlightId) return;
+    const t = window.setTimeout(() => setHighlightId(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [highlightId]);
+
+  // Après correction : recalcul immédiat → on propose automatiquement la suivante,
+  // ou on sort du mode navigation quand tout est complet.
+  useEffect(() => {
+    if (!navMode) return;
+    const ids = prestations.filter((p) => champManquant(p)).map((p) => p.posteId);
+    if (ids.length === 0) {
+      setNavMode(false);
+      setCibleId(null);
+      return;
+    }
+    setCibleId((cur) => (cur && ids.includes(cur) ? cur : (ids[0] ?? null)));
+  }, [prestations, navMode]);
 
   // La saisie complète, prête à prévisualiser puis à valider. Tant qu'elle n'est
   // pas validée, RIEN n'est créé ni diffusé (le client ne voit rien).
@@ -157,8 +258,9 @@ export function PrereceptionFlow({
   };
 
   const synthese = prereceptionSynthese(prestations);
-  const incomplets = prestations.filter((p) => !prestationComplete(p)).length;
+  const incomplets = incompletsListe.length;
   const hasContract = prestations.length > 0;
+  const positionCible = Math.max(0, incompletsIds.indexOf(cibleId ?? '')) + 1;
 
   return (
     <div className="fixed inset-0 z-modal flex flex-col bg-background">
@@ -185,34 +287,52 @@ export function PrereceptionFlow({
 
       <div className="flex-1 overflow-y-auto">
         {step === 'verifier' && (
-          <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
-            <EnteteMission
-              chantier={project.name}
-              adresse={project.address}
-              client={clientName}
-              conducteur={conducteur}
-              reference={reference}
-              version={nextVersion}
-              dateStr={dateStr}
-              heureStr={heureStr}
-              presents={presents}
-              onPresents={setPresents}
-            />
-
-            {!hasContract ? (
-              <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
-                {enBrouillon
-                  ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier le devis » depuis la Préparation.'
-                  : 'Aucune prestation au contrat : ajoutez d’abord le devis signé du chantier pour lancer la pré-réception.'}
+          <>
+            {navMode && incompletsIds.length > 1 && (
+              <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-warning bg-warning/10 px-5 py-2.5">
+                <span className="text-xs font-medium text-foreground">
+                  Élément incomplet {positionCible} sur {incompletsIds.length}
+                </span>
+                <div className="ml-auto flex gap-1.5">
+                  <Button size="sm" variant="outline" onClick={() => navErreur(-1)}>
+                    <ArrowLeft aria-hidden /> Précédent
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => navErreur(1)}>
+                    Suivant <ArrowRight aria-hidden />
+                  </Button>
+                </div>
               </div>
-            ) : (
-              <PrestationsListe
-                prestations={prestations}
-                onStatut={setStatut}
-                onPatch={patchPrestation}
-              />
             )}
-          </div>
+            <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
+              <EnteteMission
+                chantier={project.name}
+                adresse={project.address}
+                client={clientName}
+                conducteur={conducteur}
+                reference={reference}
+                version={nextVersion}
+                dateStr={dateStr}
+                heureStr={heureStr}
+                presents={presents}
+                onPresents={setPresents}
+              />
+
+              {!hasContract ? (
+                <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
+                  {enBrouillon
+                    ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier le devis » depuis la Préparation.'
+                    : 'Aucune prestation au contrat : ajoutez d’abord le devis signé du chantier pour lancer la pré-réception.'}
+                </div>
+              ) : (
+                <PrestationsListe
+                  prestations={prestations}
+                  onStatut={setStatut}
+                  onPatch={patchPrestation}
+                  highlightId={highlightId}
+                />
+              )}
+            </div>
+          </>
         )}
 
         {step === 'finaliser' && (
@@ -228,16 +348,61 @@ export function PrereceptionFlow({
 
             <SyntheseTiles synthese={synthese} />
 
-            {incomplets > 0 && (
-              <button
-                type="button"
-                onClick={() => setStep('verifier')}
-                className="flex w-full items-center gap-2 rounded-xl border border-warning bg-warning/10 px-4 py-3 text-left text-sm text-foreground [&_svg]:size-4 [&_svg]:text-warning"
-              >
-                <ClipboardCheck aria-hidden />
-                {incomplets} prestation{incomplets > 1 ? 's' : ''} à compléter (commentaire ou motif
-                manquant) — revenir à la vérification.
-              </button>
+            {incomplets > 0 ? (
+              <div className="rounded-xl border border-warning bg-warning/10 p-3">
+                <button
+                  type="button"
+                  onClick={() => allerVers(incompletsListe[0]!.p.posteId)}
+                  className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-warning"
+                >
+                  <ClipboardCheck aria-hidden />
+                  {incomplets} prestation{incomplets > 1 ? 's' : ''} à compléter
+                  <ArrowRight aria-hidden className="ml-auto" />
+                </button>
+                {incomplets === 1 && (
+                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                    {courtLabel(incompletsListe[0]!.p.label, 44)} —{' '}
+                    {incompletsListe[0]!.manque.label} manquant
+                  </p>
+                )}
+                {incomplets > 1 && (
+                  <ul className="mt-2 space-y-0.5">
+                    {(showAllInc ? incompletsListe : incompletsListe.slice(0, 3)).map(
+                      ({ p, manque }) => (
+                        <li key={p.posteId}>
+                          <button
+                            type="button"
+                            onClick={() => allerVers(p.posteId)}
+                            className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-xs text-foreground hover:bg-warning/15 [&_svg]:size-3.5 [&_svg]:text-warning"
+                          >
+                            <ArrowRight aria-hidden />
+                            <span className="font-medium">{courtLabel(p.label, 34)}</span>
+                            <span className="text-muted-foreground">— {manque.court} manquant</span>
+                          </button>
+                        </li>
+                      ),
+                    )}
+                    {incompletsListe.length > 3 && (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => setShowAllInc((v) => !v)}
+                          className="pl-2 pt-0.5 text-xs font-medium text-gold-700 hover:underline"
+                        >
+                          {showAllInc
+                            ? 'Réduire'
+                            : `Voir les ${incompletsListe.length} prestations`}
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+                <ShieldCheck aria-hidden />
+                Toutes les prestations sont complètes. Les documents peuvent être vérifiés.
+              </div>
             )}
 
             <div className="space-y-2">
@@ -439,10 +604,12 @@ function PrestationsListe({
   prestations,
   onStatut,
   onPatch,
+  highlightId,
 }: {
   prestations: PrestationVerif[];
   onStatut: (posteId: string, statut: PrestationStatut) => void;
   onPatch: (posteId: string, patch: Partial<PrestationVerif>) => void;
+  highlightId: string | null;
 }): React.JSX.Element {
   // Regroupement par lot (corps d'état), dans l'ordre du contrat.
   const order: string[] = [];
@@ -473,7 +640,12 @@ function PrestationsListe({
           <ul className="space-y-2">
             {(byLot.get(lot) ?? []).map((p) => (
               <li key={p.posteId}>
-                <PrestationCard prestation={p} onStatut={onStatut} onPatch={onPatch} />
+                <PrestationCard
+                  prestation={p}
+                  onStatut={onStatut}
+                  onPatch={onPatch}
+                  highlight={p.posteId === highlightId}
+                />
               </li>
             ))}
           </ul>
@@ -487,16 +659,21 @@ function PrestationCard({
   prestation: p,
   onStatut,
   onPatch,
+  highlight,
 }: {
   prestation: PrestationVerif;
   onStatut: (posteId: string, statut: PrestationStatut) => void;
   onPatch: (posteId: string, patch: Partial<PrestationVerif>) => void;
+  highlight: boolean;
 }): React.JSX.Element {
   const incomplete = !prestationComplete(p);
   const estReserve = p.statut === 'reserve';
   return (
     <div
-      className={`rounded-xl border bg-surface p-3.5 ${
+      id={`prestation-${p.posteId}`}
+      className={`scroll-mt-24 rounded-xl border bg-surface p-3.5 transition-shadow ${
+        highlight ? 'ring-2 ring-warning ring-offset-2 ring-offset-background' : ''
+      } ${
         estReserve
           ? 'border-destructive border-l-4 border-l-destructive bg-destructive/5'
           : incomplete
@@ -504,6 +681,12 @@ function PrestationCard({
             : 'border-border'
       }`}
     >
+      {highlight && incomplete && (
+        <p className="mb-2 flex items-center gap-1.5 rounded-lg bg-warning/15 px-2 py-1 text-xs font-medium text-warning [&_svg]:size-3.5">
+          <ClipboardCheck aria-hidden />
+          Champ obligatoire à compléter
+        </p>
+      )}
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         {estReserve && (
           <span aria-hidden className="text-destructive">
@@ -550,6 +733,7 @@ function PrestationCard({
         <div className="mt-3">
           <FieldLabel>Commentaire (obligatoire)</FieldLabel>
           <textarea
+            id={`champ-${p.posteId}`}
             value={p.commentaireNonFait ?? ''}
             onChange={(e) => onPatch(p.posteId, { commentaireNonFait: e.target.value })}
             rows={2}
@@ -696,6 +880,7 @@ function ReserveFields({
       <div className="space-y-1.5">
         <FieldLabel>Commentaire (obligatoire)</FieldLabel>
         <textarea
+          id={`champ-${p.posteId}`}
           value={reserve.commentaire}
           onChange={(e) =>
             onPatch(p.posteId, { reserve: { ...reserve, commentaire: e.target.value } })
@@ -776,6 +961,7 @@ function MotifPicker({
         ))}
       </div>
       <input
+        id={`champ-${p.posteId}`}
         value={value}
         onChange={(e) => onPatch(p.posteId, { motifMoinsValue: e.target.value })}
         placeholder="Précisez le motif…"
