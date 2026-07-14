@@ -714,10 +714,18 @@ function ChantierCard({
       label: `${clientComments} commentaire${clientComments > 1 ? 's' : ''} client`,
       accent: true,
     });
-  if (c.decisions > 0) badges.push({ label: `${c.decisions} décision client`, accent: true });
+  if (c.decisions > 0)
+    badges.push({
+      label: `${c.decisions} décision${c.decisions > 1 ? 's' : ''} client`,
+      accent: true,
+    });
   if (c.actions > 0)
     badges.push({ label: `${c.actions} action${c.actions > 1 ? 's' : ''}`, accent: true });
-  if (c.questions > 0) badges.push({ label: `${c.questions} à répondre`, accent: true });
+  if (c.questions > 0)
+    badges.push({
+      label: `${c.questions} réponse${c.questions > 1 ? 's' : ''} à donner`,
+      accent: true,
+    });
   if (c.reserves > 0) badges.push({ label: `${c.reserves} réserve${c.reserves > 1 ? 's' : ''}` });
   if (c.livraisons > 0)
     badges.push({ label: `${c.livraisons} livraison${c.livraisons > 1 ? 's' : ''}` });

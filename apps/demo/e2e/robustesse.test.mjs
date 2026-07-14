@@ -170,6 +170,20 @@ try {
     await heading(/Mes chantiers \(3\)/).waitFor({ state: 'visible', timeout: 6000 });
   });
 
+  await assert('localStorage CORROMPU → l’app se relance (jamais de page blanche)', async () => {
+    // On empoisonne des clés d'espace de travail (dérive de schéma / valeur
+    // tronquée par un crash) et on recharge : le démarrage doit dégrader
+    // proprement vers la valeur par défaut, jamais lever et faire écran blanc.
+    await page.evaluate(() => {
+      localStorage.setItem('phenix-demo:dossiers:v1', '{ceci n’est pas du JSON');
+      localStorage.setItem('phenix-demo:fil-moments:v1', 'null}{cassé');
+    });
+    await page.reload({ waitUntil: 'networkidle' });
+    // L'accueil se rend normalement (les chantiers seedés sont toujours là).
+    await heading(/Bonjour Mickaël/).waitFor({ state: 'visible', timeout: 8000 });
+    await heading(/Mes chantiers \(\d+\)/).waitFor({ state: 'visible', timeout: 6000 });
+  });
+
   await assert('Zéro erreur console sur tout le parcours', async () => {
     if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 6).join(' | '));
   });

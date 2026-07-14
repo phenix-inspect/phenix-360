@@ -14,7 +14,7 @@ const SUGGESTIONS = [
   'Est-ce que je dois faire quelque chose ?',
   'Où en est le chantier ?',
   'Où est le devis signé ?',
-  'Quand est prévue la livraison ?',
+  'Quand est prévue la réception ?',
 ];
 
 /**
@@ -352,10 +352,10 @@ function MessageRow({
       )}
       {m.kind === 'escalade' &&
         (reponse ? (
-          <PhenixBubble text={reponse} highlight label="Réponse de l'équipe PHÉNIX" />
+          <PhenixBubble text={reponse} highlight label="Réponse de l’équipe PHÉNIX" />
         ) : (
           <span className="ml-1 inline-flex items-center gap-1.5 rounded-full bg-gold-100 px-2.5 py-1 text-xs font-medium text-gold-700">
-            En attente de l'équipe PHÉNIX
+            En attente de l’équipe PHÉNIX
           </span>
         ))}
     </div>

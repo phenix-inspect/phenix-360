@@ -564,11 +564,15 @@ function detectIntent(q: string): PhenixIntent {
   )
     return 'choix_valides';
 
-  // « Réception » comme QUESTION DE DATE (quand / prévue…), sinon c'est un
-  // document (PV de réception) → traité par l'intention 'document'.
+  // « Réception » / FIN DE CHANTIER comme QUESTION DE DATE (quand / prévue…),
+  // sinon « réception » seule est un document (PV) → traité par 'document'.
   if (
-    /(reception|réception)/.test(q) &&
-    /(\bquand\b|date|prevu|prévu|prochaine|c'est quand|ce sera quand|prevoir|prévoir)/.test(q)
+    (/(reception|réception)/.test(q) &&
+      /(\bquand\b|date|prevu|prévu|prochaine|c'est quand|ce sera quand|prevoir|prévoir)/.test(q)) ||
+    (/\bquand\b/.test(q) &&
+      /(termin|fini|finit|fin du chantier|fin des travaux|\bbout\b|remise des cle|remise des clé|\bcles?\b|\bclés?\b|\bpret\b|\bprêt\b|emmenag|emménag|\bfini\b)/.test(
+        q,
+      ))
   )
     return 'reception';
 
@@ -604,7 +608,8 @@ function detectIntent(q: string): PhenixIntent {
   )
     return 'avancement';
 
-  if (/\bquand\b/.test(q)) return 'commande';
+  // Un « quand » restant, sans aucun repère (ni réception, ni livraison, ni
+  // étape, ni fin de chantier) : on n'INVENTE pas une échéance — on transmet.
   return 'none';
 }
 
@@ -744,12 +749,24 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   // décision humaine → conducteur. « je voudrais VOIR le devis » reste traité seul.
   // Les intentions d'INFORMATION DIRECTE (coordonnées, adresse, artisans…) ne sont
   // jamais escaladées, même formulées en requête (« puis-je avoir votre numéro ? »).
+  // Toute intention d'INFORMATION que Léon sait servir (un document, une date, une
+  // photo, l'avancement…) ne s'escalade JAMAIS, même formulée en requête polie
+  // sans verbe (« je voudrais le devis », « je souhaite ma facture »). Seules les
+  // demandes d'ACTION (rendez-vous, changement) sans repère info partent au conducteur.
   const DIRECT_INFO =
     intent === 'contact' ||
     intent === 'phenix_infos' ||
     intent === 'adresse' ||
     intent === 'conducteur' ||
-    intent === 'artisans';
+    intent === 'artisans' ||
+    intent === 'document' ||
+    intent === 'reception' ||
+    intent === 'commande' ||
+    intent === 'photo' ||
+    intent === 'reserve' ||
+    intent === 'planning' ||
+    intent === 'avancement' ||
+    intent === 'choix_valides';
   if (!DIRECT_INFO && REQUEST_RX.test(q) && !INFO_VERB_RX.test(q)) return escalate();
   // Garde-fou MONTANT : jamais de prix, de calcul ni d'estimation → on transmet.
   if (PRICE_RX.test(q)) return escalate();
@@ -1069,9 +1086,11 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       if (orders.length === 0) return escalate();
       const o = matchOrder(q, orders);
       if (o) return reply(commandeAnswer(o), 'vos commandes');
-      // Générique (« quand la livraison ») : première commande datée.
-      const dated = orders.find((x) => x.dateLivraisonReelle || x.dateLivraisonEstimee);
-      if (dated) return reply(commandeAnswer(dated), 'vos commandes');
+      // Générique (« quand la livraison ? ») : on ne répond avec certitude QUE s'il
+      // n'y a qu'une seule livraison datée. Plusieurs livraisons → on ne devine pas
+      // laquelle : on transmet plutôt que de citer une commande au hasard.
+      const dated = orders.filter((x) => x.dateLivraisonReelle || x.dateLivraisonEstimee);
+      if (dated.length === 1) return reply(commandeAnswer(dated[0]!), 'vos commandes');
       return escalate();
     }
 
@@ -1104,9 +1123,13 @@ export function askPhenix(input: PhenixInput): PhenixReply {
         );
       // Document précis introuvable : on l'explique, PUIS on propose de transmettre
       // (jamais d'escalade silencieuse — le chat reste ouvert et clair).
+      // Élision « de/d' » selon l'initiale (voyelle ou h muet) + tournure neutre en
+      // genre (« faire la demande ») : « d'assurance », « de facture », jamais « de assurance ».
+      const deElide = (w: string): string =>
+        /^[aâäàeéèêëhiîïoôöuùûü]/i.test(w) ? `d'${w}` : `de ${w}`;
       const notFound = (label: string): PhenixReply =>
         reply(
-          `Je ne trouve pas de ${label} dans votre espace pour le moment. Voulez-vous que je le demande à votre conducteur ?`,
+          `Je ne trouve pas ${deElide(label)} dans votre espace pour le moment. Voulez-vous que je fasse la demande à votre conducteur ?`,
           'vos documents',
           false,
         );
@@ -1161,17 +1184,27 @@ export function askPhenix(input: PhenixInput): PhenixReply {
 
     case 'reserve': {
       const reserves = reserveEvents(events);
-      const levees = reserves.filter((r) => leveeDeReserve(r, events));
-      if (levees.length > 0)
+      const sujet = 'le suivi qualité de votre chantier';
+      if (reserves.length === 0)
+        return reply("Aucun point de reprise n'est en attente sur votre chantier.", sujet);
+      // On NE dit JAMAIS « tout est réglé » s'il reste des reprises ouvertes : on
+      // distingue les reprises levées des reprises encore en cours.
+      const levees = reserves.filter((r) => leveeDeReserve(r, events)).length;
+      const ouvertes = reserves.length - levees;
+      if (ouvertes === 0)
         return reply(
-          empathie + 'Bonne nouvelle : la reprise concernée a été réalisée et validée.',
-          'le suivi qualité de votre chantier',
+          empathie + 'Bonne nouvelle : toutes les reprises ont été réalisées et validées.',
+          sujet,
         );
-      if (reserves.length > 0) return escalate();
-      return reply(
-        "Aucun point de reprise n'est en attente sur votre chantier.",
-        'le suivi qualité de votre chantier',
-      );
+      if (levees > 0)
+        return reply(
+          empathie +
+            `${levees} reprise${levees > 1 ? 's' : ''} déjà réalisée${levees > 1 ? 's' : ''} et ` +
+            `validée${levees > 1 ? 's' : ''} ; ${ouvertes} encore en cours. Votre conducteur suit ` +
+            `${ouvertes > 1 ? 'ces points' : 'ce point'} de près.`,
+          sujet,
+        );
+      return escalate();
     }
 
     case 'photo': {

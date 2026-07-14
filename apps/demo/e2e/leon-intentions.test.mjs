@@ -229,7 +229,7 @@ check('DPE absent → ne crée pas de bouton', () => {
 });
 check(
   'assurance absente → « je ne trouve pas »',
-  say('Je voudrais voir l’attestation d’assurance', /ne trouve pas de assurance/i),
+  say('Je voudrais voir l’attestation d’assurance', /ne trouve pas d['’]assurance/i),
 );
 
 /* -------------------------------- PLANNING ------------------------------- */
@@ -381,6 +381,32 @@ check('mémoire — « et l’avenant ? » suit « montre le devis »', () => {
 check('photo jointe → transmise au conducteur (jamais à l’aveugle)', () => {
   const r = askPhenix({ ...base, question: 'Voici une photo du salon', hasPhotos: true });
   if (r.kind !== 'escalade') throw new Error('une photo jointe doit être transmise au conducteur');
+});
+
+/* ------- Anti-régression QA « NASA » : réponses absurdes corrigées -------- */
+// « Quand se termine le chantier ? » ne doit JAMAIS répondre à propos de la
+// cuisine (ancienne fallback « première commande datée » = réponse absurde).
+check(
+  'fin de chantier — « quand se termine le chantier ? » ≠ commande cuisine',
+  notSay('Quand se termine le chantier ?', /cuisine|commande/i),
+);
+check(
+  'fin de chantier — répond depuis la réception planifiée',
+  say('Quand se termine le chantier ?', /réception.*(prévue|planifiée) autour du/i),
+);
+check(
+  'clés — « quand aurai-je les clés ? » ≠ commande cuisine',
+  notSay('Quand aurai-je les clés ?', /cuisine|commande/i),
+);
+// Demande de document SANS verbe (« je voudrais le devis ») : Léon SERT le
+// document (bouton d'ouverture), il n'escalade pas au conducteur.
+check('document sans verbe — « je voudrais le devis » sert, n’escalade pas', () => {
+  const r = ask('Je voudrais le devis');
+  if (r.kind === 'escalade') throw new Error('a escaladé une simple demande de devis');
+});
+check('document sans verbe — « je souhaite ma facture » ne se bloque pas', () => {
+  const r = ask('Je souhaite ma facture');
+  if (r.kind === 'escalade') throw new Error('a escaladé une simple demande de facture');
 });
 
 console.log(`\n=== ${passed}/${results.length} PASS ===`);

@@ -81,11 +81,14 @@ export function CompteRenduFlow({
   const removePoint = (i: number): void => setPoints((ps) => ps.filter((_, idx) => idx !== i));
 
   const publish = async (): Promise<void> => {
-    if (points.length === 0 || publishing) return;
+    // Ne JAMAIS perdre le point en cours : s'il est complet (photo + commentaire)
+    // mais pas encore ajouté, on l'intègre à la publication plutôt que le jeter.
+    const effectifs = canAdd ? [...points, { photos, comment: comment.trim(), diffusion }] : points;
+    if (effectifs.length === 0 || publishing) return;
     setPublishing(true);
     try {
       await demo.createCompteRendu(project.id, actor, {
-        points: points.map((p) => ({
+        points: effectifs.map((p) => ({
           photos: p.photos.map((ph) => ({
             imageUrl: ph.imageUrl,
             bucket: ph.bucket,
@@ -288,16 +291,23 @@ export function CompteRenduFlow({
           </div>
 
           <footer className="border-t border-border p-4">
-            <Button
-              size="lg"
-              className="w-full"
-              disabled={points.length === 0 || publishing}
-              onClick={() => void publish()}
-            >
-              {publishing
-                ? 'Publication…'
-                : `Publier le compte rendu${points.length > 0 ? ` (${points.length})` : ''}`}
-            </Button>
+            {(() => {
+              // Le point en cours complet compte dans le total publiable (il sera
+              // intégré à la publication) → le bouton reflète la réalité de l'écran.
+              const total = points.length + (canAdd ? 1 : 0);
+              return (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={total === 0 || publishing}
+                  onClick={() => void publish()}
+                >
+                  {publishing
+                    ? 'Publication…'
+                    : `Publier le compte rendu${total > 0 ? ` (${total})` : ''}`}
+                </Button>
+              );
+            })()}
           </footer>
         </>
       )}

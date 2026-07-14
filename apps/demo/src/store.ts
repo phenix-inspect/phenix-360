@@ -291,10 +291,25 @@ function clearMemMirror(): void {
   memMirror.clear();
 }
 
+/**
+ * Parse JSON TOLÉRANT : une clé corrompue (dérive de schéma, valeur tronquée par
+ * un crash, édition manuelle) ne doit JAMAIS faire écran blanc au démarrage — on
+ * dégrade proprement vers la valeur par défaut plutôt que de laisser `JSON.parse`
+ * lever pendant l'évaluation du module.
+ */
+function parseJsonSafe<T>(raw: string | null, fallback: T, key: string): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    console.warn(`PHÉNIX 360 — donnée « ${key} » illisible, ignorée (valeur par défaut).`);
+    return fallback;
+  }
+}
+
 class LocalStorageKeyValueStore implements KeyValueStore {
   load(): BackendState | null {
-    const raw = lsGet(STATE_KEY);
-    return raw ? (JSON.parse(raw) as BackendState) : null;
+    return parseJsonSafe<BackendState | null>(lsGet(STATE_KEY), null, STATE_KEY);
   }
   save(state: BackendState): void {
     safeSetItem(STATE_KEY, JSON.stringify(state));
@@ -302,8 +317,7 @@ class LocalStorageKeyValueStore implements KeyValueStore {
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  const raw = lsGet(key);
-  return raw ? (JSON.parse(raw) as T) : fallback;
+  return parseJsonSafe(lsGet(key), fallback, key);
 }
 
 /**
@@ -342,7 +356,7 @@ function upsertClientContact(input: {
       createdAt: new Date().toISOString(),
     });
   }
-  localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+  safeSetItem(CONTACTS_KEY, JSON.stringify(list));
 }
 
 /** Snapshot exposé à React (immuable entre deux changements). */
@@ -418,7 +432,7 @@ function migrateDossierChecklists(): void {
       changed = true;
     }
   }
-  if (changed) localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+  if (changed) safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
 }
 
 /**
@@ -429,7 +443,7 @@ function migrateDossierChecklists(): void {
 function ensureNotifBaseline(): void {
   if (typeof localStorage === 'undefined') return;
   if (localStorage.getItem(NOTIF_BASELINE_KEY) === null)
-    localStorage.setItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
+    safeSetItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
 }
 
 migrateDossierChecklists();
@@ -495,7 +509,7 @@ const BACKUP_VERSION = 1;
 /** Vide TOUT l'espace de travail (toutes les clés) et le marque initialisé. */
 function clearWorkspace(): void {
   for (const key of WORKSPACE_KEYS) lsRemove(key);
-  localStorage.setItem(SEEDED_KEY, '1');
+  safeSetItem(SEEDED_KEY, '1');
 }
 
 function refresh(): void {
@@ -534,12 +548,12 @@ export const demo = {
   setPerson(userId: UserId, name: string): void {
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[userId] = name;
-    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    safeSetItem(PEOPLE_KEY, JSON.stringify(people));
     refresh();
     broadcast();
   },
   setActiveProject(id: ProjectId | null): void {
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(id));
+    safeSetItem(ACTIVE_KEY, JSON.stringify(id));
     refresh();
     broadcast();
   },
@@ -659,7 +673,7 @@ export const demo = {
   markChoixTraite(decisionEventId: string): void {
     const map = readJson<Record<string, string>>(CHOIX_TRAITES_KEY, {});
     map[decisionEventId] = new Date().toISOString();
-    localStorage.setItem(CHOIX_TRAITES_KEY, JSON.stringify(map));
+    safeSetItem(CHOIX_TRAITES_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -726,7 +740,7 @@ export const demo = {
   /** Le client accepte les cookies nécessaires — le bandeau ne réapparaît plus. */
   acceptCookies(): void {
     if (typeof localStorage !== 'undefined')
-      localStorage.setItem(COOKIE_CONSENT_KEY, new Date().toISOString());
+      safeSetItem(COOKIE_CONSENT_KEY, new Date().toISOString());
     refresh();
     broadcast();
   },
@@ -851,7 +865,7 @@ export const demo = {
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';
     people[clientId] = proposal.dossier.infos.clientName ?? 'Client';
-    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    safeSetItem(PEOPLE_KEY, JSON.stringify(people));
     // Le client devient un CONTACT (source unique de ses coordonnées).
     upsertClientContact({
       projectId: project.id,
@@ -930,8 +944,8 @@ export const demo = {
 
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     dossiers[project.id] = proposal.dossier;
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(ACTIVE_KEY, JSON.stringify(project.id));
     // Photos déposées → un album « Avant travaux » dans les coulisses (partagé au
     // client) : l'état des lieux d'origine, en images. C'est un moment PHOTO
     // (type album par défaut), pas un moment de travail.
@@ -979,7 +993,7 @@ export const demo = {
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';
     people[clientId] = input.clientName?.trim() || 'Client';
-    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    safeSetItem(PEOPLE_KEY, JSON.stringify(people));
     // Le client devient un CONTACT (source unique de ses coordonnées).
     upsertClientContact({
       projectId: project.id,
@@ -987,7 +1001,7 @@ export const demo = {
       nom: input.clientName?.trim() || 'Client',
       ...(address ? { address } : {}),
     });
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(project.id));
+    safeSetItem(ACTIVE_KEY, JSON.stringify(project.id));
     refresh();
     broadcast();
     return project.id;
@@ -1009,7 +1023,7 @@ export const demo = {
       if (clientId) {
         const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
         people[clientId] = input.clientName.trim() || 'Client';
-        localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+        safeSetItem(PEOPLE_KEY, JSON.stringify(people));
         // Source unique : on synchronise le contact « client ».
         upsertClientContact({
           projectId,
@@ -1059,7 +1073,7 @@ export const demo = {
       const obj = readJson<Record<string, unknown>>(key, {});
       if (id in obj) {
         delete obj[id];
-        localStorage.setItem(key, JSON.stringify(obj));
+        safeSetItem(key, JSON.stringify(obj));
       }
     }
 
@@ -1071,7 +1085,7 @@ export const demo = {
         delete choix[k];
         choixChanged = true;
       }
-    if (choixChanged) localStorage.setItem(CHOIX_TRAITES_KEY, JSON.stringify(choix));
+    if (choixChanged) safeSetItem(CHOIX_TRAITES_KEY, JSON.stringify(choix));
 
     // 4) Accusés de lecture des Moments (par rôle) pour les Moments du projet.
     const seen = readJson<SeenState>(SEEN_KEY, {});
@@ -1094,7 +1108,7 @@ export const demo = {
         delete people[uid];
         peopleChanged = true;
       }
-    if (peopleChanged) localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+    if (peopleChanged) safeSetItem(PEOPLE_KEY, JSON.stringify(people));
 
     // 6) Contacts : on retire le LIEN vers ce chantier ; on ne supprime le
     // contact que s'il n'est plus rattaché à aucun autre chantier (jamais un
@@ -1105,13 +1119,13 @@ export const demo = {
       const projectIds = c.projectIds.filter((pid) => pid !== id);
       return projectIds.length > 0 ? [{ ...c, projectIds }] : [];
     });
-    localStorage.setItem(CONTACTS_KEY, JSON.stringify(nextContacts));
+    safeSetItem(CONTACTS_KEY, JSON.stringify(nextContacts));
 
     // 7) Chantier actif : bascule vers un autre chantier, ou l'état vide.
     const active = readJson<ProjectId | null>(ACTIVE_KEY, null);
     if (active === id) {
       const next = after.projects[0]?.id ?? null;
-      localStorage.setItem(ACTIVE_KEY, JSON.stringify(next));
+      safeSetItem(ACTIVE_KEY, JSON.stringify(next));
     }
 
     refresh();
@@ -1146,7 +1160,7 @@ export const demo = {
       sources: [],
       createdAt: new Date().toISOString(),
     };
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1186,7 +1200,7 @@ export const demo = {
     const idx = list.findIndex((c) => c.id === contact.id);
     if (idx >= 0) list[idx] = contact;
     else list.push(contact);
-    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    safeSetItem(CONTACTS_KEY, JSON.stringify(list));
     // Le contact est la SOURCE UNIQUE : on rafraîchit les instantanés dénormalisés
     // qui le référencent (nom de fournisseur mis en cache sur les commandes du
     // dossier — mutable). Les événements (réserves) sont append-only : leur nom
@@ -1201,14 +1215,14 @@ export const demo = {
         }
       }
     }
-    if (touched) localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    if (touched) safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     // Si ce contact incarne le client d'un chantier, on tient à jour son nom
     // affichable (people) — un seul endroit d'édition (VISION Art. 6).
     if (contact.userId) {
       const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
       if (people[contact.userId] !== contact.nom) {
         people[contact.userId] = contact.nom;
-        localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
+        safeSetItem(PEOPLE_KEY, JSON.stringify(people));
       }
     }
     refresh();
@@ -1218,7 +1232,7 @@ export const demo = {
   /** Supprime un contact de l'annuaire. */
   deleteContact(id: string): void {
     const list = readJson<Contact[]>(CONTACTS_KEY, []).filter((c) => c.id !== id);
-    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    safeSetItem(CONTACTS_KEY, JSON.stringify(list));
     refresh();
     broadcast();
   },
@@ -1235,7 +1249,7 @@ export const demo = {
           : [...c.projectIds, projectId],
       };
     });
-    localStorage.setItem(CONTACTS_KEY, JSON.stringify(list));
+    safeSetItem(CONTACTS_KEY, JSON.stringify(list));
     refresh();
     broadcast();
   },
@@ -1341,7 +1355,7 @@ export const demo = {
     };
     dossier.documents = [...dossier.documents, doc];
     dossiers[projectId] = dossier;
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1369,7 +1383,7 @@ export const demo = {
   saveDossier(projectId: ProjectId, dossier: ProjectDossier): void {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     dossiers[projectId] = dossier;
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1396,7 +1410,7 @@ export const demo = {
       dossier.reconciliation?.totalTTCDeclare,
     );
     dossiers[projectId] = { ...dossier, devis: normalized, reconciliation };
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1414,7 +1428,7 @@ export const demo = {
       l.id === lotId ? { ...l, statut: 'valide' as const } : l,
     );
     dossiers[projectId] = { ...dossier, devis: { ...dossier.devis, lots } };
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1426,7 +1440,7 @@ export const demo = {
     if (!dossier?.devis) return;
     const lots = dossier.devis.lots.map((l) => ({ ...l, statut: 'valide' as const }));
     dossiers[projectId] = { ...dossier, devis: { ...dossier.devis, lots } };
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     refresh();
     broadcast();
   },
@@ -1457,7 +1471,7 @@ export const demo = {
       options: input.options,
     };
     dossiers[project.id] = { ...dossier, selections: [...dossier.selections, selection] };
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
     const content = buildDecisionContent({
       kind: 'envoyee',
       origin: 'conducteur',
@@ -1538,7 +1552,7 @@ export const demo = {
     };
     const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
     map[input.projectId] = [...(map[input.projectId] ?? []), moment];
-    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    safeSetItem(FIL_MOMENTS_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -1553,7 +1567,7 @@ export const demo = {
     map[projectId] = (map[projectId] ?? []).map((m) =>
       m.id === momentId ? { ...m, visibleTo: shared ? SHARED_AUDIENCE : INTERNAL_AUDIENCE } : m,
     );
-    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    safeSetItem(FIL_MOMENTS_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -1562,7 +1576,7 @@ export const demo = {
   deleteMoment(projectId: ProjectId, momentId: string): void {
     const map = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
     map[projectId] = (map[projectId] ?? []).filter((m) => m.id !== momentId);
-    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(map));
+    safeSetItem(FIL_MOMENTS_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -1584,7 +1598,7 @@ export const demo = {
             createdAt: new Date().toISOString(),
           },
         ];
-    localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(map));
+    safeSetItem(FIL_COUPS_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -1614,7 +1628,7 @@ export const demo = {
       createdAt: new Date().toISOString(),
     };
     map[projectId] = [...(map[projectId] ?? []), message];
-    localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(map));
+    safeSetItem(FIL_MESSAGES_KEY, JSON.stringify(map));
     refresh();
     broadcast();
   },
@@ -2022,7 +2036,7 @@ export const demo = {
         at: new Date().toISOString(),
       },
     ];
-    localStorage.setItem(SHARES_KEY, JSON.stringify(shares));
+    safeSetItem(SHARES_KEY, JSON.stringify(shares));
     refresh();
     broadcast();
   },
@@ -2163,20 +2177,20 @@ export const demo = {
   loadDemo(): void {
     const { state, people, activeProjectId, dossiers, contacts, fil } = buildDemoSeed();
     kv.save(state);
-    localStorage.setItem(PEOPLE_KEY, JSON.stringify(people));
-    localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
-    localStorage.setItem(DOSSIERS_KEY, JSON.stringify(dossiers));
-    localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
-    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(fil.moments));
-    localStorage.setItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
-    localStorage.setItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
-    localStorage.setItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
+    safeSetItem(PEOPLE_KEY, JSON.stringify(people));
+    safeSetItem(ACTIVE_KEY, JSON.stringify(activeProjectId));
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    safeSetItem(CONTACTS_KEY, JSON.stringify(contacts));
+    safeSetItem(FIL_MOMENTS_KEY, JSON.stringify(fil.moments));
+    safeSetItem(FIL_COUPS_KEY, JSON.stringify(fil.coups));
+    safeSetItem(FIL_MESSAGES_KEY, JSON.stringify(fil.messages));
+    safeSetItem(FIL_ZONES_KEY, JSON.stringify(fil.zones));
     lsRemove(PHENIX_CONV_KEY);
     lsRemove(SHARES_KEY);
     // Nouvelle démo = ardoise de notifications propre : l'historique seedé ne
     // notifie pas ; seules les actions à venir le feront.
-    localStorage.setItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
-    localStorage.setItem(SEEDED_KEY, '1');
+    safeSetItem(NOTIF_BASELINE_KEY, JSON.stringify(new Date().toISOString()));
+    safeSetItem(SEEDED_KEY, '1');
     refresh();
     broadcast();
   },
@@ -2255,7 +2269,7 @@ export const demo = {
         lsRemove(key);
       }
     }
-    localStorage.setItem(SEEDED_KEY, '1');
+    safeSetItem(SEEDED_KEY, '1');
     // Remplacement COMPLET : le miroir mémoire (états d'avant l'import) n'a plus
     // lieu d'être — on le vide pour que `build()` relise la sauvegarde restaurée.
     clearMemMirror();

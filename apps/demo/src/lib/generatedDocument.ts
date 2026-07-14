@@ -343,7 +343,7 @@ function documentBody(event: DocumentEvent): string {
   const att = event.content.attachment;
   return `<section><p>Ce document a été enregistré dans PHÉNIX${
     att?.fileName ? ` sous le nom <b>${esc(att.fileName)}</b>` : ''
-  }.</p><p class="muted">Document de référence généré par PHÉNIX — 100 % hors-ligne, aucune donnée transmise.</p></section>`;
+  }.</p><p class="muted">Document officiel généré par PHÉNIX, conservé dans votre espace.</p></section>`;
 }
 
 /**

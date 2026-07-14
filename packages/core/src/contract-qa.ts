@@ -158,7 +158,15 @@ export function answerContractQuestion(
   const rawPostes = devis.lots.flatMap((l) => l.postes.filter((p) => !p.option));
 
   // 1) MONTANTS / TVA -------------------------------------------------------
-  if (/(montant|total|combien.*(cout|coute|coutent)|prix|budget|ht|ttc|tva|taux)/.test(q)) {
+  // « total » et « ht » ne sont PAS des mots-clés de prix par simple sous-chaîne :
+  // « combien de prises au total » est une question de COMPTAGE, pas de montant.
+  const estComptage = /\bcombien\s+d/.test(q); // « combien de… », « combien d… »
+  const estPrix =
+    /(montant|prix|budget|cout|coute|\bht\b|\bttc\b|\btva\b|\btaux\b|toutes taxes|combien (ca|cela) coute|combien coute)/.test(
+      q,
+    ) ||
+    (/\btotal\b/.test(q) && !estComptage);
+  if (estPrix) {
     const t = devisTotals(devis);
     if (/\bttc\b|toutes taxes/.test(q))
       return fait(
@@ -167,7 +175,10 @@ export function answerContractQuestion(
       );
     if (/tva|taux/.test(q)) {
       const detail = t.parTaux
-        .map((r) => `${r.taux} % sur ${money(r.ht)} (soit ${money(r.tva)})`)
+        // Décimale française : « 5,5 % », jamais « 5.5 % ».
+        .map(
+          (r) => `${String(r.taux).replace('.', ',')} % sur ${money(r.ht)} (soit ${money(r.tva)})`,
+        )
         .join(' · ');
       return fait(`TVA du contrat validé : ${detail}. Total TVA ${money(t.tva)}.`, []);
     }
@@ -218,14 +229,28 @@ export function answerContractQuestion(
   }
 
   // 5) EXCLUSIONS -----------------------------------------------------------
+  // Question générale « qu'est-ce qui est exclu / pas compris / hors devis ? ».
+  // On LIT réellement les exclusions du devis (on ne prétend jamais « aucune »
+  // sans avoir vérifié). Les questions ciblées (« la porte est-elle comprise ? »)
+  // passent, elles, par la recherche par entité (elles ne portent pas ces mots).
   if (
-    /(exclu|pas inclus|hors devis|n est pas compris|pas compris|pas prevu)/.test(q) &&
-    !aEntiteForte(q)
+    /(exclu|exclus|exclusion|pas inclus|non inclus|hors devis|hors contrat|n est pas compris|pas compris|pas prevu|pas prévu)/.test(
+      q,
+    )
   ) {
+    if (exclusions.length > 0) {
+      const liste = exclusions.map((e) => court(e.texte, 90)).join(' · ');
+      return {
+        found: true,
+        answer: `Le devis mentionne ${exclusions.length} exclusion(s), non comprise(s) dans le contrat : ${liste}.`,
+        postes: [],
+        ouvrirDevis: true,
+      };
+    }
     return {
       found: true,
       answer:
-        "Le contrat validé ne liste pas d'exclusion parmi les lots validés. Les mentions « non incluses » du devis sont écartées du contrat — je peux ouvrir le devis pour les revoir.",
+        'Le contrat validé ne mentionne aucune exclusion. Je peux ouvrir le devis pour vérifier les mentions « non incluses ».',
       postes: [],
       ouvrirDevis: true,
     };
@@ -305,11 +330,6 @@ const introuvable = (question: string): ContractAnswer => ({
   postes: [],
   ouvrirDevis: true,
 });
-
-/** Une entité « forte » est présente (nom de prestation) → on ne répond pas générique. */
-function aEntiteForte(q: string): boolean {
-  return entites(q).length > 0;
-}
 
 /* ========================================================================== *
  * QUESTIONS TECHNIQUES — réponses DÉRIVÉES du contrat (details-techniques)

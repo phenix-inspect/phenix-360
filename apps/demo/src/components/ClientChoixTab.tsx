@@ -60,7 +60,7 @@ export function ClientChoixTab({
       {visibles.length === 0 ? (
         <EmptyState
           icon={<Palette aria-hidden />}
-          title="Aucun choix"
+          title="Rien à choisir pour l’instant"
           description={
             filtre === 'tous'
               ? 'Les décisions que PHÉNIX vous demandera apparaîtront ici.'

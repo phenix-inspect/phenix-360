@@ -40,7 +40,7 @@ export function PointDuSoirView({
     { icon: <ListChecks aria-hidden />, n: review.actions, label: 'actions à suivre' },
     { icon: <Flag aria-hidden />, n: review.reserves, label: 'réserves à lever' },
     { icon: <HelpCircle aria-hidden />, n: review.decisions, label: 'décisions client en attente' },
-    { icon: <MessageSquare aria-hidden />, n: review.questions, label: 'clients à répondre' },
+    { icon: <MessageSquare aria-hidden />, n: review.questions, label: 'réponses à donner' },
   ].filter((x) => x.n > 0);
 
   return (

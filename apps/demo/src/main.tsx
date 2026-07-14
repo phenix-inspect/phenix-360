@@ -5,11 +5,14 @@ import '@phenix360/ui/tokens.css';
 import './index.css';
 import { App } from './App';
 import { PasswordGate } from './PasswordGate';
+import { ErrorBoundary } from './ErrorBoundary';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <PasswordGate>
-      <App />
-    </PasswordGate>
+    <ErrorBoundary>
+      <PasswordGate>
+        <App />
+      </PasswordGate>
+    </ErrorBoundary>
   </StrictMode>,
 );

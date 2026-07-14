@@ -264,28 +264,36 @@ function Accordion({
   children: React.ReactNode;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
+  // Section vide : on affiche une ligne claire « Aucun » plutôt qu'un bouton
+  // grisé désactivé (qui donne l'impression d'un élément cassé).
+  if (count === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:text-muted-foreground">
+        {icon}
+        {title}
+        <span className="ml-auto text-xs">Aucun pour le moment</span>
+      </div>
+    );
+  }
   return (
     <div className="rounded-xl border border-border bg-surface">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        disabled={count === 0}
-        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-foreground disabled:opacity-50 [&_svg]:size-4 [&_svg]:text-gold-600"
+        className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600"
       >
         {icon}
         {title}
         <span className="rounded-full bg-paper-50 px-1.5 text-xs text-muted-foreground">
           {count}
         </span>
-        {count > 0 && (
-          <ChevronDown
-            aria-hidden
-            className={`ml-auto !size-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
-          />
-        )}
+        <ChevronDown
+          aria-hidden
+          className={`ml-auto !size-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
-      {open && count > 0 && <div className="border-t border-border px-3.5 py-2.5">{children}</div>}
+      {open && <div className="border-t border-border px-3.5 py-2.5">{children}</div>}
     </div>
   );
 }

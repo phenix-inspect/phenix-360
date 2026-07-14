@@ -24,7 +24,14 @@ const ESBUILD = join(pnpmDir, esbuildPkg, 'node_modules/esbuild/bin/esbuild');
 const outFile = join(mkdtempSync(join(tmpdir(), 'leon-')), 'core.mjs');
 execFileSync(
   ESBUILD,
-  [join(root, 'packages/core/src/index.ts'), '--bundle', '--format=esm', '--platform=node', `--outfile=${outFile}`, '--log-level=error'],
+  [
+    join(root, 'packages/core/src/index.ts'),
+    '--bundle',
+    '--format=esm',
+    '--platform=node',
+    `--outfile=${outFile}`,
+    '--log-level=error',
+  ],
   { cwd: root },
 );
 const { analyserDevis, answerContractQuestion } = await import(outFile);
@@ -55,15 +62,48 @@ const check = (label, fn) => {
 
 // Prestations RÉELLEMENT présentes au contrat de référence (mots-clés).
 const PRESENTES = [
-  'cuisine', 'peinture', 'carrelage', 'faïence', 'terrasse', 'électrique', 'électricité',
-  'plomberie', 'agencement', 'cloison', 'isolation', 'ventilation', 'chauffe-eau', 'plinthe',
-  'ragréage', 'doublage', 'installation', 'démolition', 'dépose', 'lame', 'douche', 'wc',
-  'salle d\'eau', 'sols', 'sanitaire',
+  'cuisine',
+  'peinture',
+  'carrelage',
+  'faïence',
+  'terrasse',
+  'électrique',
+  'électricité',
+  'plomberie',
+  'agencement',
+  'cloison',
+  'isolation',
+  'ventilation',
+  'chauffe-eau',
+  'plinthe',
+  'ragréage',
+  'doublage',
+  'installation',
+  'démolition',
+  'dépose',
+  'lame',
+  'douche',
+  'wc',
+  "salle d'eau",
+  'sols',
+  'sanitaire',
 ];
 // Prestations ABSENTES (pièges : ne JAMAIS répondre « oui, c'est prévu »).
 const ABSENTES = [
-  'jacuzzi', 'piscine', 'véranda', 'spa', 'sauna', 'climatisation', 'pergola', 'portail',
-  'ascenseur', 'panneaux solaires', 'garage', 'toiture', 'charpente', 'ravalement',
+  'jacuzzi',
+  'piscine',
+  'véranda',
+  'spa',
+  'sauna',
+  'climatisation',
+  'pergola',
+  'portail',
+  'ascenseur',
+  'panneaux solaires',
+  'garage',
+  'toiture',
+  'charpente',
+  'ravalement',
 ];
 
 let exactes = 0;
@@ -103,7 +143,7 @@ check('Avenants : aucun', () => {
 });
 
 /* -- 2. Exclusion (piège) : porte d'entrée -------------------------------- */
-check('Exclusion : porte d\'entrée = EXCLUE (jamais « prévue »)', () => {
+check("Exclusion : porte d'entrée = EXCLUE (jamais « prévue »)", () => {
   const r = ask("la porte d'entrée est-elle comprise ?");
   if (!/exclu/i.test(r.answer)) throw new Error(`porte d'entrée mal classée: ${r.answer}`);
   if (/mentionne « porte/i.test(r.answer)) throw new Error('présentée comme prestation !');
@@ -156,6 +196,31 @@ check('Sans lot validé → Léon ne répond pas depuis le vide', () => {
   const r = answerContractQuestion(brouillon, 'quel est le montant HT ?', [], exclusions);
   if (r.found) throw new Error('a répondu sans contrat validé');
   exactes += 1;
+});
+
+/* -- 6. Anti-régression QA « NASA » (bugs de routage corrigés) ------------- */
+// Exclusions : une question GÉNÉRALE « qu'est-ce qui est exclu ? » doit LISTER les
+// exclusions réelles du devis, jamais prétendre « aucune » ni « je ne trouve pas ».
+check('Exclusions — « qu’est-ce qui est exclu du devis ? » liste les exclusions', () => {
+  const r = ask('Qu’est-ce qui est exclu du devis ?');
+  if (!r.found) throw new Error(`n'a pas surfacé les exclusions : ${r.answer.slice(0, 80)}`);
+  if (/ne mentionne aucune exclusion/.test(r.answer))
+    throw new Error('prétend « aucune exclusion » alors que le devis en liste');
+});
+check('Exclusions — « qu’est-ce qui n’est pas inclus ? » aussi', () => {
+  const r = ask('Qu’est-ce qui n’est pas inclus dans le contrat ?');
+  if (!r.found) throw new Error('question d’exclusion non traitée');
+});
+// Comptage ≠ prix : « combien de … au total » ne doit PAS renvoyer le montant HT.
+check('Comptage — « combien de prises au total ? » n’est pas une réponse de PRIX', () => {
+  const r = ask('Combien de prises au total ?');
+  if (/€ HT, soit .* € TTC/.test(r.answer))
+    throw new Error(`détourné vers le montant : ${r.answer.slice(0, 80)}`);
+});
+// Décimale française : jamais « 5.5 % » (point anglais) dans la TVA.
+check('TVA — décimale française (« 5,5 % », jamais « 5.5 % »)', () => {
+  const r = ask('Quel est le taux de TVA ?');
+  if (/\d\.\d/.test(r.answer)) throw new Error(`décimale anglaise dans la TVA : ${r.answer}`);
 });
 
 const passed = results.filter(Boolean).length;
