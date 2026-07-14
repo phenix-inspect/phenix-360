@@ -46,8 +46,10 @@ const card = (label) => page.locator('li').filter({ hasText: label }).first();
 const setStatut = async (label, name) => {
   await card(label).getByRole('button', { name, exact: true }).click();
 };
-/** Boutons « Prévisualiser » de l'écran de validation : 0 = client, 1 = artisan. */
-const previewBtn = (i) => page.getByRole('button', { name: 'Prévisualiser' }).nth(i);
+/** Boutons « Prévisualiser » de l'écran de validation : 0 = client, 1 = artisan.
+ *  Scopé à la mission active (le fond peut porter d'autres « Prévisualiser »). */
+const previewBtn = (i) =>
+  page.locator('.z-modal').last().getByRole('button', { name: 'Prévisualiser' }).nth(i);
 
 /** Ouvre le document généré (popup blob) et renvoie son texte. */
 const openedDocText = async (action) => {

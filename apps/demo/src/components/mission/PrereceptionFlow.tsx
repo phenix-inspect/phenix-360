@@ -1203,10 +1203,10 @@ function DocCard({
       <p className="flex-1 text-xs text-muted-foreground">{description}</p>
       <div className="flex gap-2">
         <Button size="sm" onClick={onOpen}>
-          <FileText aria-hidden /> Ouvrir
+          <Eye aria-hidden /> Prévisualiser
         </Button>
         <Button size="sm" variant="outline" onClick={onDownload}>
-          <Download aria-hidden /> Télécharger
+          <Download aria-hidden /> Télécharger en PDF
         </Button>
       </div>
     </div>

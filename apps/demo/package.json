@@ -14,6 +14,7 @@
   "dependencies": {
     "@phenix360/core": "workspace:*",
     "@phenix360/ui": "workspace:*",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.475.0",
     "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",

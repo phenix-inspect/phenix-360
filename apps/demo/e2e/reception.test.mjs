@@ -169,7 +169,7 @@ try {
         .getByRole('heading', { name: 'Validation avant envoi' })
         .waitFor({ state: 'visible', timeout: 6000 });
       const text = await openedDocText(() =>
-        page.getByRole('button', { name: 'Prévisualiser' }).click(),
+        page.locator('.z-modal').last().getByRole('button', { name: 'Prévisualiser' }).click(),
       );
       for (const must of [
         'DEV-2024-0188',

@@ -115,7 +115,7 @@ export function DocumentsTab({
                         aria-label={`Télécharger : ${generatedDocumentTitle(docEv)}`}
                         onClick={() => demo.downloadDocument(docEv)}
                       >
-                        <Download aria-hidden /> Télécharger
+                        <Download aria-hidden /> Télécharger le fichier
                       </Button>
                     )}
                   </li>
@@ -186,7 +186,8 @@ export function DocumentsTab({
                     aria-label={`Télécharger : ${generatedDocumentTitle(e)}`}
                     onClick={() => demo.downloadDocument(e)}
                   >
-                    <Download aria-hidden /> Télécharger
+                    <Download aria-hidden />{' '}
+                    {e.type === 'document' ? 'Télécharger le fichier' : 'Télécharger en PDF'}
                   </Button>
                   {e.type === 'document' && (
                     <Button

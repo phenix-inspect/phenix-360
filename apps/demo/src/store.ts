@@ -90,7 +90,7 @@ import {
 import { buildDemoSeed } from './seed';
 import {
   downloadAttachment,
-  downloadHtmlDocument,
+  downloadPdfDocument,
   openAttachment,
   openHtmlDocument,
   openUnavailableDocument,
@@ -100,6 +100,7 @@ import {
   generatedDocumentTitle,
   type DocumentContext,
 } from './lib/generatedDocument';
+import { buildDocumentPdf } from './lib/pdfEngine';
 import { readDocumentAttachment } from './lib/upload';
 
 const STATE_KEY = 'phenix-demo:state:v1';
@@ -601,7 +602,7 @@ export const demo = {
   /**
    * TÉLÉCHARGE un document (symétrique de `openDocument`) : un document IMPORTÉ →
    * le fichier d'origine (ou message clair s'il a disparu) ; un document GÉNÉRÉ par
-   * PHÉNIX → sa page HTML autonome.
+   * PHÉNIX → un VRAI PDF (moteur PDF unique, `application/pdf`) — jamais du HTML.
    */
   downloadDocument(event: Event, audience: CrAudience = 'conducteur'): void {
     if (event.type === 'document') {
@@ -609,8 +610,9 @@ export const demo = {
       else openUnavailableDocument();
       return;
     }
-    downloadHtmlDocument(
-      buildDocumentHtml(event, docContextFor(snapshot, event), audience),
+    // Document GÉNÉRÉ → VRAI PDF (moteur unique), jamais du HTML.
+    downloadPdfDocument(
+      buildDocumentPdf(event, docContextFor(snapshot, event), audience),
       generatedDocumentTitle(event),
     );
   },

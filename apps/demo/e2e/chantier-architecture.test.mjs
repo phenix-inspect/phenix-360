@@ -75,9 +75,7 @@ try {
       await libraryHeading().waitFor({ state: 'visible', timeout: 6000 });
       await page.getByText('Devis plomberie').first().waitFor({ state: 'visible', timeout: 5000 });
       if (
-        (await page
-          .getByRole('button', { name: /Ouvrir le document|Consulter le compte rendu/ })
-          .count()) === 0
+        (await page.getByRole('button', { name: /Ouvrir le document|Prévisualiser/ }).count()) === 0
       )
         throw new Error('aucun document ouvrable dans la bibliothèque');
       if ((await page.getByRole('button', { name: /Télécharger/ }).count()) === 0)

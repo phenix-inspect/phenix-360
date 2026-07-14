@@ -95,7 +95,7 @@ try {
   await assert('Ouverture d’un COMPTE RENDU → document généré par PHÉNIX', async () => {
     await openSuivi();
     const title = await openAndTitle(
-      journalRow('Compte rendu').getByRole('button', { name: 'Consulter le compte rendu' }),
+      journalRow('Compte rendu').getByRole('button', { name: 'Prévisualiser' }),
     );
     if (!/Compte rendu/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
@@ -121,7 +121,7 @@ try {
     await runPrereception();
     await openSuivi();
     const title = await openAndTitle(
-      journalRow('Pré-réception').getByRole('button', { name: 'Consulter le compte rendu' }),
+      journalRow('Pré-réception').getByRole('button', { name: 'Prévisualiser' }),
     );
     if (!/Pré-réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
@@ -131,9 +131,7 @@ try {
     await runReception();
     await openSuivi();
     // La réception est le compte rendu le plus récent : premier de la liste.
-    const title = await openAndTitle(
-      page.getByRole('button', { name: 'Consulter le compte rendu' }).first(),
-    );
+    const title = await openAndTitle(page.getByRole('button', { name: 'Prévisualiser' }).first());
     if (!/^Réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 

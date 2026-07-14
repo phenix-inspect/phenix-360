@@ -18,7 +18,8 @@ export function DocumentButton({
   /** Version du compte rendu à ouvrir (filtrage des points par destinataire). */
   audience?: CrAudience;
 }): React.JSX.Element {
-  const label = event.type === 'compte_rendu' ? 'Consulter le compte rendu' : 'Ouvrir le document';
+  // Document généré → « Prévisualiser » (aperçu à l'écran) ; import → « Ouvrir le document ».
+  const label = event.type === 'compte_rendu' ? 'Prévisualiser' : 'Ouvrir le document';
   return (
     <button
       type="button"

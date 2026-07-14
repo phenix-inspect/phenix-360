@@ -695,14 +695,14 @@ function TermineStep({
           </div>
           <div className="flex gap-2">
             <Button size="sm" onClick={() => demo.openDocument(event, 'client')}>
-              <FileText aria-hidden /> Ouvrir
+              <Eye aria-hidden /> Prévisualiser
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => demo.downloadDocument(event, 'client')}
             >
-              <Download aria-hidden /> Télécharger
+              <Download aria-hidden /> Télécharger en PDF
             </Button>
           </div>
         </div>

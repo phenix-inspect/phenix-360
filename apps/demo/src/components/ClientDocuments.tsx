@@ -83,7 +83,8 @@ export function ClientDocuments({
                 aria-label={`Télécharger : ${generatedDocumentTitle(e)}`}
                 onClick={() => demo.downloadDocument(e, audience)}
               >
-                <Download aria-hidden /> Télécharger
+                <Download aria-hidden />{' '}
+                {e.type === 'document' ? 'Télécharger le fichier' : 'Télécharger en PDF'}
               </Button>
             </li>
           ))}

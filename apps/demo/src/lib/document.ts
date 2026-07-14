@@ -108,7 +108,15 @@ export function downloadAttachment(attachment: EventAttachment): void {
   }
 }
 
-/** Télécharge un document GÉNÉRÉ (HTML autonome) sous « <titre>.html ». */
-export function downloadHtmlDocument(html: string, title: string): void {
-  downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeName(title)}.html`);
+/**
+ * Télécharge un document GÉNÉRÉ par PHÉNIX en VRAI PDF (« <titre>.pdf », MIME
+ * `application/pdf`, octets `%PDF-`). Produit par le moteur PDF unique — jamais
+ * de HTML. RÉSERVÉ aux documents générés (un import télécharge son fichier).
+ */
+export function downloadPdfDocument(bytes: Uint8Array, title: string): void {
+  const buf = bytes.buffer.slice(
+    bytes.byteOffset,
+    bytes.byteOffset + bytes.byteLength,
+  ) as ArrayBuffer;
+  downloadBlob(new Blob([buf], { type: 'application/pdf' }), `${safeName(title)}.pdf`);
 }
