@@ -9,6 +9,16 @@ const browser = await launch();
 const { page, consoleErrors } = await session(browser, { height: 2400 });
 const { assert, summary } = harness();
 
+// PNG 1×1 valide (un point de compte rendu exige au moins une photo).
+const PHOTO = {
+  name: 'chantier.png',
+  mimeType: 'image/png',
+  buffer: Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  ),
+};
+
 try {
   await openDemo(page);
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
@@ -42,39 +52,28 @@ try {
     },
   );
 
-  await assert('Capture : on dicte/écrit une observation', async () => {
-    // La Pré-réception a désormais son propre flux dédié ; on exerce le parcours
-    // signature générique (capture → comprend → partager) via « Réception ».
-    await page.getByRole('dialog').getByText('Réception', { exact: true }).click();
-    const draft = page.getByPlaceholder(/Dites ce qu/);
-    await draft.waitFor({ state: 'visible', timeout: 5000 });
+  await assert('Capture : une photo + une observation forment un point', async () => {
+    // Pré-réception et Réception ont leur flux dédié ; le parcours signature
+    // générique (capturer → PHÉNIX structure → publier) vit dans « Compte rendu ».
+    await page.getByRole('dialog').getByText('Compte rendu de chantier', { exact: true }).click();
+    const draft = page.getByPlaceholder(/Décrivez ce point/);
+    await draft.waitFor({ state: 'visible', timeout: 6000 });
+    await page.locator('input[type=file][accept="image/*"]').first().setInputFiles(PHOTO);
     await draft.fill('Coulage de la dalle terminé, séchage en cours côté séjour.');
-    await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-  });
-
-  await assert('« J’ai terminé » → PHÉNIX travaille puis COMPREND', async () => {
-    await page.getByRole('button', { name: /J.ai terminé/ }).click();
-    // On arrive à l'étape « comprend » : le bouton « Valider » apparaît.
-    await page
-      .getByRole('button', { name: /^Valider$/ })
-      .waitFor({ state: 'visible', timeout: 12000 });
-    // PHÉNIX a bien pris en compte l'observation dictée.
+    await page.getByRole('button', { name: /Ajouter ce point/ }).click();
+    // Le point rejoint la liste (l'observation est reprise telle quelle).
     await page
       .getByText(/dalle terminé/)
       .first()
       .waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await assert('Valider → étape de partage', async () => {
-    await page.getByRole('button', { name: /^Valider$/ }).click();
-    // L'étape partage propose de terminer ou de partager.
+  await assert('Publier → compte rendu publié', async () => {
+    await page.getByRole('button', { name: /Publier le compte rendu/ }).click();
     await page
-      .getByRole('button', { name: /Terminer|Partager/ })
+      .getByText('Compte rendu publié')
       .first()
-      .waitFor({
-        state: 'visible',
-        timeout: 8000,
-      });
+      .waitFor({ state: 'visible', timeout: 8000 });
   });
 
   await assert('Terminer referme la mission sans erreur', async () => {

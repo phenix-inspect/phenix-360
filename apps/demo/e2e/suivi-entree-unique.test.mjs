@@ -3,7 +3,8 @@
  * ===========================================================================
  * Une action = un seul point d'entrée. « Nouveau compte rendu » et « Ajouter des
  * photos » disparaissent du Suivi : c'est « Nouvelle mission » qui couvre les deux
- * (photos + compte rendu, cf. createMission). Aucune fonctionnalité perdue.
+ * (photos + compte rendu, via le flux « Compte rendu de chantier »). Aucune
+ * fonctionnalité perdue.
  */
 import { launch, session, harness, openDemo } from './harness.mjs';
 
@@ -40,24 +41,25 @@ try {
 
   await assert('Nouvelle mission → AJOUTER DES PHOTOS (capture)', async () => {
     await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-    // La Pré-réception a son propre flux dédié ; on exerce le parcours de capture
-    // générique (photos + observation) via « Réception ».
-    await page.getByRole('dialog').getByText('Réception', { exact: true }).click();
-    await page.getByPlaceholder(/Dites ce qu/).waitFor({ state: 'visible', timeout: 5000 });
-    // La photo se joint dans l'étape de capture (input image du plein écran).
+    // Pré-réception et Réception ont leur flux dédié ; le parcours générique
+    // (photos + observation → Journal) vit dans « Compte rendu de chantier ».
+    await page.getByRole('dialog').getByText('Compte rendu de chantier', { exact: true }).click();
+    await page.getByPlaceholder(/Décrivez ce point/).waitFor({ state: 'visible', timeout: 6000 });
+    // La photo se joint dans le point en cours (input image du plein écran).
     await page.locator('input[type="file"][accept="image/*"]').first().setInputFiles(PHOTO);
-    await page.getByText(/1 photo/).waitFor({ state: 'visible', timeout: 6000 });
+    await page
+      .getByRole('button', { name: /Ajouter \(1\/3\)/ })
+      .waitFor({ state: 'visible', timeout: 6000 });
   });
 
   await assert('Nouvelle mission → CRÉER UN COMPTE RENDU (observation + validation)', async () => {
-    const draft = page.getByPlaceholder(/Dites ce qu/);
-    await draft.fill(OBS);
-    await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-    await page.getByRole('button', { name: /J.ai terminé/ }).click();
+    await page.getByPlaceholder(/Décrivez ce point/).fill(OBS);
+    await page.getByRole('button', { name: /Ajouter ce point/ }).click();
+    await page.getByRole('button', { name: /Publier le compte rendu/ }).click();
     await page
-      .getByRole('button', { name: /^Valider$/ })
-      .waitFor({ state: 'visible', timeout: 12000 });
-    await page.getByRole('button', { name: /^Valider$/ }).click();
+      .getByText('Compte rendu publié')
+      .first()
+      .waitFor({ state: 'visible', timeout: 8000 });
     await page.getByRole('button', { name: /^Terminer$/ }).click();
     await page
       .getByRole('heading', { name: /Appartement Lyon 6e/ })

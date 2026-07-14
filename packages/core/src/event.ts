@@ -21,6 +21,7 @@ import type { EventActor } from './actor.js';
 import type { EventAttachment } from './attachment.js';
 import type { ProjectStep } from './project.js';
 import type { PrereceptionData } from './prereception.js';
+import type { ReceptionData } from './reception.js';
 
 /* -------------------------------------------------------------------------- *
  * Énumérations d'enveloppe
@@ -229,6 +230,13 @@ export interface CompteRenduContent {
    * dérivés par destinataire (le client ne voit jamais responsable / reprise).
    */
   prereception?: PrereceptionData;
+  /**
+   * Réception : levée des réserves émises en Pré-réception (dernière étape
+   * contractuelle). La Réception ne recrée aucune prestation — elle vérifie que
+   * TOUTES les réserves ont été levées (commentaire + photos avant/après) puis
+   * clôture le chantier. Présent sur les CR issus de la mission « Réception ».
+   */
+  reception?: ReceptionData;
 }
 
 export interface PhotoContent {

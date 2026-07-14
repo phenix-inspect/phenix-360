@@ -80,10 +80,11 @@ try {
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
   });
 
-  // ---- Mission : capture générique (compte rendu / réception, même champ) --
-  // La Pré-réception a son propre flux (les photos y vivent dans les réserves) ;
-  // le champ de capture GÉNÉRIQUE est partagé par les autres missions.
-  for (const mission of ['Réception']) {
+  // ---- Mission : capture des photos d'un point de compte rendu -------------
+  // La Pré-réception et la Réception ont chacune leur flux dédié (les photos y
+  // vivent dans les réserves / la levée) ; le champ de capture d'un POINT de
+  // compte rendu de chantier utilise le même sélecteur natif.
+  for (const mission of ['Compte rendu de chantier']) {
     await assert(`MISSION « ${mission} » — champ photo natif + ajout de photos`, async () => {
       await newMission(mission);
       const input = page.locator('input[type=file][accept="image/*"]').first();
@@ -91,8 +92,9 @@ try {
       await expectNative(input, { album: true });
       // Ajout réel de photos (comme le renverrait le sélecteur natif).
       await input.setInputFiles([photo(4), photo(5)]);
+      // Les deux photos rejoignent le mini-album du point en cours.
       await page
-        .getByRole('button', { name: /J.ai terminé/ })
+        .getByRole('button', { name: /Ajouter \(2\/3\)/ })
         .waitFor({ state: 'visible', timeout: 6000 });
       // On referme la mission sans la publier (on ne teste ici que l'acquisition).
       await page.getByRole('button', { name: 'Fermer' }).click();

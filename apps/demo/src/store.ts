@@ -59,8 +59,6 @@ import {
   type FilPhoto,
   type KeyValueStore,
   type Message,
-  type MissionKind,
-  type MissionPreparation,
   type Moment,
   type MomentType,
   type NewEvent,
@@ -72,6 +70,8 @@ import {
   type PrepDocCategory,
   type PrereceptionData,
   prereceptionDocTitle,
+  type ReceptionData,
+  receptionDocTitle,
   reconcileTotals,
   evaluerVerification,
   type Devis,
@@ -1771,136 +1771,6 @@ export const demo = {
   /* ------------------------- Gestion du chantier ------------------------- */
 
   /**
-   * Crée une MISSION (le geste unique du conducteur). Le contexte = un Moment
-   * (type = mission), INTERNE par défaut. PHÉNIX a préparé (`prepared`) ; on
-   * matérialise les FAITS dans le Journal (append-only) : 1 `compte_rendu` (le
-   * fait de la mission, avec sa structure) + N `reserve` (points à reprendre).
-   * Aucune donnée n'atteint le client tant qu'on ne partage pas.
-   */
-  async createMission(
-    projectId: ProjectId,
-    actor: EventActor,
-    input: {
-      kind: MissionKind;
-      medias: UploadedMedia[];
-      recit: string;
-      presents: string[];
-      zoneId?: ZoneId;
-      prepared: MissionPreparation;
-    },
-  ): Promise<{ missionEventId: string; momentId: string }> {
-    const now = new Date().toISOString();
-    const momentId = toMomentId(crypto.randomUUID());
-
-    // 1) Le contexte : un Moment interne (photos + récit + présents).
-    const photos: FilPhoto[] = input.medias.map((m, i) => ({
-      id: toFilPhotoId(crypto.randomUUID()),
-      imageUrl: m.imageUrl,
-      bucket: m.bucket,
-      storagePath: m.storagePath,
-      mimeType: m.mimeType,
-      width: m.width,
-      height: m.height,
-      ordre: i,
-      createdAt: now,
-    }));
-    const recit = input.recit.trim();
-    const presents = input.prepared.presents;
-    const moment: Moment = {
-      id: momentId,
-      projectId,
-      authorId: actor.userId,
-      authorRole: actor.role,
-      createdAt: now,
-      publishedAt: now,
-      state: 'publie',
-      type: input.kind,
-      title: input.prepared.docTitre,
-      visibleTo: INTERNAL_AUDIENCE,
-      photos,
-      ...(photos[0] ? { coverPhotoId: photos[0].id } : {}),
-      ...(recit ? { observations: recit } : {}),
-      ...(presents.length ? { intervenants: presents } : {}),
-      ...(input.zoneId ? { zoneId: input.zoneId } : {}),
-    };
-    const momentsMap = readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {});
-    momentsMap[projectId] = [...(momentsMap[projectId] ?? []), moment];
-    localStorage.setItem(FIL_MOMENTS_KEY, JSON.stringify(momentsMap));
-
-    // 2) Le fait « compte rendu » de la mission (interne).
-    const crEvent = await backend.appendEvent({
-      projectId,
-      actor,
-      type: 'compte_rendu',
-      visibility: 'interne',
-      state: 'publie',
-      content: {
-        texte: input.prepared.corps,
-        missionKind: input.kind,
-        docTitre: input.prepared.docTitre,
-        momentId,
-        ...(presents.length ? { presents } : {}),
-        ...(input.prepared.decisions.length ? { decisions: input.prepared.decisions } : {}),
-        ...(input.prepared.actions.length ? { actions: input.prepared.actions } : {}),
-        ...(input.prepared.questionsClient.length
-          ? { questionsClient: input.prepared.questionsClient }
-          : {}),
-        ...(input.prepared.manquants.length ? { manquants: input.prepared.manquants } : {}),
-        texteClient: input.prepared.texteClient,
-      },
-    });
-
-    // 3) Les faits « réserve » (append-only, numérotés, avec responsable/échéance).
-    let numero = nextReserveNumero(snapshot.events.filter((e) => e.projectId === projectId));
-    for (const r of input.prepared.reserves) {
-      await backend.appendEvent({
-        projectId,
-        actor,
-        type: 'reserve',
-        visibility: 'interne',
-        state: 'ouverte',
-        content: {
-          numero,
-          libelle: r.libelle,
-          ...(r.responsable ? { responsable: r.responsable } : {}),
-          ...(r.echeance ? { echeance: r.echeance } : {}),
-          source: {
-            kind: 'fil',
-            momentId,
-            ...(r.photoId ? { photoId: r.photoId } : {}),
-          },
-        },
-      });
-      numero += 1;
-    }
-
-    // 4) Les faits « action » — les engagements nés de la mission (« PHÉNIX ne
-    //    lâche rien »). Interne, à faire, rattachés à la mission.
-    for (const a of input.prepared.actions) {
-      await backend.appendEvent({
-        projectId,
-        actor,
-        type: 'action',
-        visibility: 'interne',
-        state: 'publie',
-        content: {
-          libelle: a.label,
-          statut: 'a_faire',
-          ...(a.responsable ? { responsable: a.responsable } : {}),
-          ...(a.echeance ? { echeance: a.echeance } : {}),
-          ...(a.priorite ? { priorite: a.priorite } : {}),
-          ...(a.commentaire ? { commentaire: a.commentaire } : {}),
-          source: { kind: 'fil', momentId },
-        },
-      });
-    }
-
-    refresh();
-    broadcast();
-    return { missionEventId: crEvent.id, momentId };
-  },
-
-  /**
    * COMPTE RENDU DE CHANTIER (mission fusionnée visite + réunion, 09/07/2026).
    * Une suite de POINTS : chaque point = 1 photo + 1 commentaire + 1 cible de
    * diffusion (client / artisan / les deux). La visibilité de l'événement est
@@ -2030,6 +1900,77 @@ export const demo = {
     refresh();
     broadcast();
     return { prereceptionId: ev.id, version };
+  },
+
+  /**
+   * PRÉVISUALISER une réception (brouillon) — rend le PV EXACTEMENT tel que le
+   * client le recevra, SANS rien persister ni diffuser. Le conducteur vérifie le
+   * document avant de valider. Aucun événement n'est créé.
+   */
+  previewReception(projectId: ProjectId, actor: EventActor, data: ReceptionData): void {
+    const now = new Date().toISOString();
+    const preview = {
+      id: toEventId('preview'),
+      projectId,
+      type: 'compte_rendu',
+      actor,
+      visibility: 'client',
+      state: 'brouillon',
+      captureId: null,
+      createdAt: now,
+      publishedBy: null,
+      publishedAt: null,
+      content: {
+        texte: '',
+        missionKind: 'reception',
+        docTitre: receptionDocTitle(data.version),
+        reception: data,
+      },
+    } as Event;
+    openHtmlDocument(
+      buildDocumentHtml(preview, docContextFor(snapshot, preview, actor.userId), 'client'),
+    );
+  },
+
+  /**
+   * VALIDER ET DIFFUSER une RÉCEPTION (dernière étape contractuelle). La Réception
+   * repart de la Pré-réception validée : elle ne recrée aucune prestation, elle
+   * atteste que TOUTES les réserves ont été levées. À la validation : on émet UN
+   * événement `compte_rendu` PUBLIÉ (visible du client, notifié), on confirme
+   * l'étape « Réception », et le chantier passe automatiquement en CLÔTURÉ
+   * (archivable). Le document publié est APPEND-ONLY — une correction crée une
+   * nouvelle version.
+   */
+  async createReception(
+    projectId: ProjectId,
+    actor: EventActor,
+    input: ReceptionData,
+  ): Promise<{ receptionId: string; version: number }> {
+    // Version = nombre de réceptions déjà validées pour ce chantier + 1.
+    const version =
+      snapshot.events.filter(
+        (e) =>
+          e.projectId === projectId && e.type === 'compte_rendu' && Boolean(e.content.reception),
+      ).length + 1;
+    const ev = await backend.appendEvent({
+      projectId,
+      actor,
+      type: 'compte_rendu',
+      visibility: 'client',
+      state: 'publie',
+      content: {
+        texte: '',
+        missionKind: 'reception',
+        docTitre: receptionDocTitle(version),
+        etapeConfirmee: 'reception',
+        reception: { ...input, version },
+      },
+    });
+    // Clôture automatique : une réception validée termine le chantier (archivable).
+    await backend.updateProject(projectId, { status: 'cloture' });
+    refresh();
+    broadcast();
+    return { receptionId: ev.id, version };
   },
 
   /**
@@ -2715,9 +2656,11 @@ export function clientNotifications(
       out.push({
         id: `cr-${e.id}`,
         icon: '💬',
-        text: e.content.prereception
-          ? `Votre pré-réception est disponible`
-          : `Nouveau compte rendu de votre équipe`,
+        text: e.content.reception
+          ? `Votre réception de chantier est disponible`
+          : e.content.prereception
+            ? `Votre pré-réception est disponible`
+            : `Nouveau compte rendu de votre équipe`,
         createdAt: e.createdAt,
         seenKeys: [e.id],
         projectId,

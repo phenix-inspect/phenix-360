@@ -41,26 +41,24 @@ const openSuivi = async () => {
 /** Ligne du Journal (ActivityItem = <li>) portant un libellé donné. */
 const journalRow = (text) => page.locator('li').filter({ hasText: text }).first();
 
-/** Déroule une mission (capture → PHÉNIX comprend → valider → terminer). */
-const runMission = async (missionLabel, observation) => {
+/**
+ * Déroule une RÉCEPTION (flux dédié). Suppose qu'une Pré-réception a déjà été
+ * validée (source unique). Sans réserve à lever, la réception est validable
+ * d'emblée : on diffuse le PV au client puis on clôture le chantier.
+ */
+const runReception = async () => {
   await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
   await page.getByRole('button', { name: /Nouvelle mission/ }).click();
-  // La carte mission est un bouton « <Label> <description> » — on l'ancre au début
-  // du libellé (« Pré-réception » ne doit pas matcher « Réception », ni l'option
-  // de statut du chantier qui porte le même texte).
-  await page.getByRole('button', { name: new RegExp(`^${missionLabel}`) }).click();
-  const draft = page.getByPlaceholder(/Dites ce qu/);
-  await draft.waitFor({ state: 'visible', timeout: 6000 });
-  await draft.fill(observation);
-  await page.getByRole('button', { name: 'Ajouter', exact: true }).click();
-  await page.getByRole('button', { name: /J.ai terminé/ }).click();
+  await page.getByRole('dialog').getByText('Réception', { exact: true }).click();
+  const valider = page.getByRole('button', { name: /Valider la Réception/ });
+  await valider.waitFor({ state: 'visible', timeout: 6000 });
+  await valider.click();
   await page
-    .getByRole('button', { name: /^Valider$/ })
-    .waitFor({ state: 'visible', timeout: 15000 });
-  await page.getByRole('button', { name: /^Valider$/ }).click();
+    .getByRole('heading', { name: 'Validation avant envoi' })
+    .waitFor({ state: 'visible', timeout: 6000 });
+  await page.getByRole('button', { name: /Diffuser au client/ }).click();
   await page
-    .getByRole('button', { name: /Terminer|Partager/ })
-    .first()
+    .getByText(/Réception validée — chantier clôturé/)
     .waitFor({ state: 'visible', timeout: 8000 });
   await page.getByRole('button', { name: /^Terminer$/ }).click();
   await page
@@ -128,14 +126,15 @@ try {
     if (!/Pré-réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
-  // ---- Réception (mission → « PV de réception ») --------------------------
-  await assert('Ouverture d’une RÉCEPTION → PV de réception généré', async () => {
-    await runMission('Réception', 'Réception réalisée, chantier conforme, clôture en cours.');
+  // ---- Réception (flux dédié → document « Réception » diffusé au client) ---
+  await assert('Ouverture d’une RÉCEPTION → document de réception généré', async () => {
+    await runReception();
     await openSuivi();
+    // La réception est le compte rendu le plus récent : premier de la liste.
     const title = await openAndTitle(
       page.getByRole('button', { name: 'Consulter le compte rendu' }).first(),
     );
-    if (!/PV de réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
+    if (!/^Réception/i.test(title)) throw new Error(`titre inattendu : ${title}`);
   });
 
   // ---- Document PARTAGÉ côté client (vrai fichier → ouverture du fichier) --
@@ -153,11 +152,14 @@ try {
   await assert('Client-safe : les documents internes ne fuient pas', async () => {
     await openClientTab(page, 'Documents');
     await page.waitForTimeout(300);
-    // La pré-réception est désormais CLIENT-VISIBLE (« Pré-réception ») : elle
-    // n'est plus un secret. Restent internes : le contrat interne et le PV de réception.
-    for (const secret of ['Contrat sous-traitant', 'PV de réception'])
+    // La pré-réception et la réception sont CLIENT-VISIBLES (documents contractuels
+    // diffusés) : elles ne sont plus des secrets. Reste interne : le contrat interne.
+    for (const secret of ['Contrat sous-traitant'])
       if ((await page.getByText(secret, { exact: false }).count()) > 0)
         throw new Error(`fuite côté client : « ${secret} »`);
+    // La réception, elle, DOIT être visible côté client (PV contractuel diffusé).
+    if ((await page.getByText('Réception', { exact: false }).count()) === 0)
+      throw new Error('la réception diffusée devrait être visible dans l’espace client');
   });
 
   await assert('Zéro erreur console', async () => {

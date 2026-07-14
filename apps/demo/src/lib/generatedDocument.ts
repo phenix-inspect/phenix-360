@@ -12,11 +12,19 @@ import {
   pointsPourAudience,
   prereceptionReference,
   prereceptionSynthese,
+  receptionReference,
+  receptionSynthese,
+  RECEPTION_CONCLUSION_AUCUNE,
+  RECEPTION_CONCLUSION_FINALE,
+  RECEPTION_CONCLUSION_LEVEES,
   type CrAudience,
   type DocumentEvent,
   type Event,
   type PrereceptionData,
+  type PrereceptionPhoto,
   type PrestationVerif,
+  type ReceptionData,
+  type ReceptionReserve,
 } from '@phenix360/core';
 import { eventTitle } from './eventText';
 import { fmtDate } from './format';
@@ -261,6 +269,75 @@ function prereceptionBody(
   return `${synth}${prestations}${mot}${signatureBlocks(audience, artisan)}`;
 }
 
+/* ---------------------------- RÉCEPTION --------------------------------- */
+
+/** Une bande de photos (avant / après) — vide, un message discret le signale. */
+function photosStrip(photos: PrereceptionPhoto[], legende: string): string {
+  const imgs = photos.filter((ph) => ph.imageUrl);
+  const body =
+    imgs.length > 0
+      ? `<div class="pv-album">${imgs
+          .map((ph) => `<img class="pv-photo" src="${ph.imageUrl}" alt="${esc(legende)}"/>`)
+          .join('')}</div>`
+      : `<p class="muted">Aucune photo.</p>`;
+  return `<div class="rec-photos-col"><span class="rec-lbl">${esc(legende)}</span>${body}</div>`;
+}
+
+/** Un encart de réserve levée : commentaire initial / de levée + photos avant / après. */
+function receptionReserveBlock(r: ReceptionReserve): string {
+  return `<article class="rec-reserve">
+    <div class="rec-reserve-head"><span class="rec-num">Réserve n°${r.numero}</span><span class="rec-lot">${esc(
+      r.lotLabel,
+    )}</span></div>
+    <p class="rec-prestation">${esc(r.prestationLabel)}</p>
+    <div class="rec-block"><span class="rec-lbl">Commentaire initial</span><p>${esc(
+      r.commentaireInitial,
+    )}</p></div>
+    <div class="rec-block"><span class="rec-lbl">Commentaire de levée</span><p>${esc(
+      r.levee?.commentaire ?? '',
+    )}</p></div>
+    <div class="rec-photos">${photosStrip(r.photosAvant, 'Photo avant')}${photosStrip(
+      r.levee?.photos ?? [],
+      'Photo après',
+    )}</div>
+  </article>`;
+}
+
+/**
+ * Corps d'un PV de RÉCEPTION : résumé de la Pré-réception + levée de chaque réserve
+ * (commentaire initial / de levée, photos avant / après) + conclusion + signatures
+ * (PHÉNIX + CLIENT uniquement — jamais de version artisan).
+ */
+function receptionBody(data: ReceptionData): string {
+  const s = receptionSynthese(data);
+  const resume = `<section><h2>Résumé — Pré-réception</h2><div class="pv-synth">
+    <div><b>${s.prestationsTotal}</b><span>Prestations</span></div>
+    <div><b>${s.reservesCreees}</b><span>Réserves créées</span></div>
+    <div><b>${s.reservesLevees}</b><span>Réserves levées</span></div>
+    <div><b>${s.reservesRestantes}</b><span>Réserves restantes</span></div>
+  </div></section>`;
+
+  const reserves =
+    data.reserves.length > 0
+      ? `<section><h2>Levée des réserves</h2>${data.reserves
+          .map(receptionReserveBlock)
+          .join('')}</section>`
+      : '';
+
+  const intro =
+    data.reserves.length > 0 ? RECEPTION_CONCLUSION_LEVEES : RECEPTION_CONCLUSION_AUCUNE;
+  const conclusion = `<section class="rec-conclusion"><h2>Conclusion</h2><p>${esc(
+    intro,
+  )}</p><p class="rec-final">${esc(RECEPTION_CONCLUSION_FINALE)}</p></section>`;
+
+  const mot = (data.commentaireGeneral ?? '').trim()
+    ? `<section><h2>Commentaire général</h2>${paragraphs(data.commentaireGeneral ?? '')}</section>`
+    : '';
+
+  // Réception : signataires PHÉNIX + CLIENT uniquement (jamais de version artisan).
+  return `${resume}${reserves}${mot}${conclusion}${signatureBlocks('client')}`;
+}
+
 /** Corps d'un document de référence sans fichier joint (fiche de couverture). */
 function documentBody(event: DocumentEvent): string {
   const att = event.content.attachment;
@@ -286,6 +363,8 @@ export function buildDocumentHtml(
   const isCrPoints =
     event.type === 'compte_rendu' && !!event.content.points && event.content.points.length > 0;
   const isPrereception = event.type === 'compte_rendu' && !!event.content.prereception;
+  const isReception = event.type === 'compte_rendu' && !!event.content.reception;
+  const reception = event.type === 'compte_rendu' ? event.content.reception : undefined;
   const audienceLabel =
     (isCrPoints || isPrereception) && audience === 'client'
       ? 'Version client'
@@ -304,15 +383,20 @@ export function buildDocumentHtml(
   // Pré-réception : référence stable + version (en-tête & documents).
   const prVersion = isPrereception ? (event.content.prereception?.version ?? 1) : 1;
   const reference = isPrereception ? prereceptionReference(event.createdAt, prVersion) : undefined;
+  // Réception : référence propre + rappel de la référence de Pré-réception.
+  const recVersion = isReception ? (reception?.version ?? 1) : 1;
+  const receptionRef = isReception ? receptionReference(event.createdAt, recVersion) : undefined;
   // Filigrane BROUILLON tant que le document n'est pas validé (aperçu conducteur).
-  const brouillon = isPrereception && isDraft(event);
+  const brouillon = (isPrereception || isReception) && isDraft(event);
   const body =
     event.type === 'compte_rendu'
-      ? event.content.prereception
-        ? prereceptionBody(event.content.prereception, audience, ctx.artisan)
-        : event.content.points && event.content.points.length > 0
-          ? compteRenduPointsBody(event, audience)
-          : compteRenduBody(event)
+      ? event.content.reception
+        ? receptionBody(event.content.reception)
+        : event.content.prereception
+          ? prereceptionBody(event.content.prereception, audience, ctx.artisan)
+          : event.content.points && event.content.points.length > 0
+            ? compteRenduPointsBody(event, audience)
+            : compteRenduBody(event)
       : event.type === 'document'
         ? documentBody(event)
         : '';
@@ -373,6 +457,18 @@ export function buildDocumentHtml(
   .sign-line { flex: 1; border-bottom: 1px dotted #c8bda3; height: 16px; }
   .sign-sign > span { font-size: 13px; color: #8a8069; }
   .sign-zone { margin-top: 6px; height: 84px; border: 1px dashed #c8bda3; border-radius: 8px; }
+  .rec-reserve { padding: 16px; margin: 12px 0; border: 1px solid #ece3d2; border-left: 3px solid #a9803a; border-radius: 0 10px 10px 0; background: #fffaf0; page-break-inside: avoid; }
+  .rec-reserve-head { display: flex; align-items: baseline; gap: 10px; font-family: ui-sans-serif, system-ui, sans-serif; }
+  .rec-num { font-size: 13px; font-weight: 700; color: #a9803a; letter-spacing: 0.04em; }
+  .rec-lot { font-size: 12px; color: #8a8069; }
+  .rec-prestation { font-weight: 600; color: #221c12; margin: 6px 0 10px; }
+  .rec-block { margin: 8px 0; }
+  .rec-lbl { display: block; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #8a8069; margin-bottom: 3px; }
+  .rec-block p { margin: 0; }
+  .rec-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
+  .rec-photos-col { min-width: 0; }
+  .rec-conclusion { margin-top: 26px; }
+  .rec-final { font-weight: 700; color: #221c12; font-size: 17px; }
   .watermark { position: fixed; top: 42%; left: 0; right: 0; text-align: center; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 120px; font-weight: 800; letter-spacing: 0.1em; color: rgba(192,57,43,0.10); transform: rotate(-24deg); pointer-events: none; z-index: 0; }
   .is-draft .sheet { position: relative; }
   footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ece3d2; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; color: #8a8069; }
@@ -388,15 +484,24 @@ export function buildDocumentHtml(
     ${line('Client', ctx.clientName)}
     ${line('Référence', reference)}
     ${line('Date', fmtDate(event.createdAt))}
-    ${line('Conducteur', isPrereception ? ctx.authorName : undefined)}
-    ${line('Rédigé par', isPrereception ? undefined : `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`)}
+    ${line('Conducteur', isPrereception || isReception ? ctx.authorName : undefined)}
+    ${line('N° du devis', reception?.devisRef)}
+    ${line(
+      'Avenants intégrés',
+      reception && reception.avenants.length > 0
+        ? reception.avenants.map((n) => `n°${n}`).join(', ')
+        : undefined,
+    )}
+    ${line('Réf. Pré-réception', reception?.prereceptionRef)}
+    ${line('Réf. Réception', receptionRef)}
+    ${line('Rédigé par', isPrereception || isReception ? undefined : `${ctx.authorName} · ${ROLE_LABEL[event.actor.role]}`)}
     ${line('Étape', step)}
     ${line('Présents', presents)}
     ${line('Catégorie', categorie)}
   </div>
   ${body}
   <footer>Document généré par PHÉNIX 360 — consultable à tout moment.${
-    reference ? ` · ${esc(reference)}` : ''
+    reference || receptionRef ? ` · ${esc(reference ?? receptionRef ?? '')}` : ''
   }</footer>
 </article></body></html>`;
 }

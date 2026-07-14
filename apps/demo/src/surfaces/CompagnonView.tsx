@@ -57,8 +57,8 @@ import { Composer, type ComposerKind } from '../components/Composer';
 import { ClientDecisionComposer } from '../components/ClientDecisionComposer';
 import { MissionPicker } from '../components/mission/MissionPicker';
 import { CompteRenduFlow } from '../components/mission/CompteRenduFlow';
-import { MissionFlow } from '../components/mission/MissionFlow';
 import { PrereceptionFlow } from '../components/mission/PrereceptionFlow';
+import { ReceptionFlow } from '../components/mission/ReceptionFlow';
 import { DeleteChantierButton } from '../components/DeleteChantierButton';
 
 function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
@@ -263,13 +263,8 @@ export function CompagnonView({
       {missionKind === 'prereception' && (
         <PrereceptionFlow project={project} actor={actor} onClose={() => setMissionKind(null)} />
       )}
-      {missionKind && missionKind !== 'compte_rendu' && missionKind !== 'prereception' && (
-        <MissionFlow
-          kind={missionKind}
-          project={project}
-          actor={actor}
-          onClose={() => setMissionKind(null)}
-        />
+      {missionKind === 'reception' && (
+        <ReceptionFlow project={project} actor={actor} onClose={() => setMissionKind(null)} />
       )}
     </div>
   );

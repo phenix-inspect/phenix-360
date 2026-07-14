@@ -30,6 +30,7 @@ export * from './details-techniques.js';
 export * from './assistant-chantier.js';
 export * from './contract-derivation.js';
 export * from './prereception.js';
+export * from './reception.js';
 export * from './prepare.js';
 export * from './client-planning.js';
 export * from './fil.js';
