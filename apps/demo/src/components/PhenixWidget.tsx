@@ -5,7 +5,7 @@ import { isDemande, type EventActor, type Project, type UploadedMedia } from '@p
 import type { PhenixAction } from '@phenix360/core';
 import { ArrowRight, ImagePlus, Send, X } from 'lucide-react';
 import { conversationOf, demo, type DemoSnapshot, type PhenixMessage } from '../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../lib/media';
 import { LeonAvatar } from './LeonAvatar';
 
 const MAX_PHOTOS = 3;
@@ -37,6 +37,7 @@ export function PhenixWidget({
   const [draft, setDraft] = useState('');
   const [photos, setPhotos] = useState<UploadedMedia[]>([]);
   const [attaching, setAttaching] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -123,9 +124,9 @@ export function PhenixWidget({
     if (room <= 0) return;
     setAttaching(true);
     try {
-      const chosen = Array.from(files).slice(0, room);
-      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
-      setPhotos((prev) => [...prev, ...uploaded].slice(0, MAX_PHOTOS));
+      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      setPhotoError(error);
+      setPhotos((prev) => [...prev, ...media].slice(0, MAX_PHOTOS));
     } finally {
       setAttaching(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -272,6 +273,11 @@ export function PhenixWidget({
                 <Send aria-hidden />
               </Button>
             </div>
+            {photoError && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {photoError}
+              </p>
+            )}
           </footer>
         </div>
       )}

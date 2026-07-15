@@ -32,12 +32,6 @@ export type LotStatut = 'brouillon' | 'valide';
 /** Statut GLOBAL dérivé d'un devis, sans ambiguïté (jamais « à moitié validé »). */
 export type DevisStatut = 'a_verifier' | 'partiellement_valide' | 'valide';
 
-export const DEVIS_STATUT_LABEL: Record<DevisStatut, string> = {
-  a_verifier: 'À vérifier',
-  partiellement_valide: 'Partiellement validé',
-  valide: 'Validé',
-};
-
 /* -------------------------------------------------------------------------- *
  * Vérification d'une ligne (déterministe) + explication « pourquoi »
  * -------------------------------------------------------------------------- */
@@ -317,11 +311,6 @@ export function contratValide(holder: ContractHolder | null | undefined): boolea
   return devisStatutGlobal(holder) === 'valide';
 }
 
-/** Le devis est-il partiellement validé (au moins un lot validé, pas tous) ? */
-export function devisPartiellementValide(holder: ContractHolder | null | undefined): boolean {
-  return devisStatutGlobal(holder) === 'partiellement_valide';
-}
-
 /** Reste-t-il des lots à vérifier (devis non entièrement validé) ? */
 export function devisAVerifier(holder: ContractHolder | null | undefined): boolean {
   const s = devisStatutGlobal(holder);
@@ -367,30 +356,6 @@ export type EtatTranscription =
   | 'transcription_validee'
   | 'contrat_consolide';
 
-export const ETAT_TRANSCRIPTION_LABEL: Record<EtatTranscription, string> = {
-  importe: 'Importé',
-  analyse_en_cours: 'Analyse en cours',
-  analyse_a_verifier: 'Analyse à vérifier',
-  transcription_validee: 'Transcription validée',
-  contrat_consolide: 'Contrat consolidé',
-};
-
-/**
- * État documentaire DÉRIVÉ (au repos) : `importe` sans devis, sinon
- * `contrat_consolide` si explicitement consolidé, `transcription_validee` quand
- * tous les lots sont validés, `analyse_a_verifier` tant qu'il reste à vérifier.
- * (`analyse_en_cours` est un état transitoire posé par l'application pendant la
- * lecture — il n'est pas dérivable d'un dossier au repos.)
- */
-export function etatTranscription(
-  holder: ContractHolder | null | undefined,
-  opts: { consolide?: boolean } = {},
-): EtatTranscription {
-  if (!holder?.devis || holder.devis.lots.length === 0) return 'importe';
-  if (opts.consolide) return 'contrat_consolide';
-  return contratValide(holder) ? 'transcription_validee' : 'analyse_a_verifier';
-}
-
 /**
  * Une entrée du JOURNAL de validation (audit) : qui a fait quoi, quand, sur
  * quelle version de document, avec quelle version de moteur. Append-only.
@@ -408,14 +373,6 @@ export interface JournalEntry {
   versionMoteur: string;
   /** Précision libre (ex. libellé du lot validé). */
   detail?: string;
-}
-
-/** Ajoute une entrée au journal (append-only) — retourne un NOUVEau tableau. */
-export function appendJournal(
-  journal: JournalEntry[] | undefined,
-  entry: JournalEntry,
-): JournalEntry[] {
-  return [...(journal ?? []), entry];
 }
 
 /* Parsers de montants/taux français, réutilisables par le moteur géométrique. */

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Badge, Button, Card, CardContent, EmptyState, Input } from '@phenix360/ui';
 import {
   isAction,
@@ -8,7 +8,6 @@ import {
   reserveStatut,
   userId,
   type ActionPriorite,
-  type Event,
   type EventActor,
   type Project,
 } from '@phenix360/core';
@@ -84,6 +83,9 @@ export function ArtisanView({
     () => localStorage.getItem(storeKey) ?? artisans[0] ?? '',
   );
   const [signaled, setSignaled] = useState<Set<string>>(new Set());
+  // Verrou SYNCHRONE anti double-clic (l'état `signaled` ne bascule qu'après
+  // l'await : un double-clic rapide enverrait deux signalements sans lui).
+  const signaledRef = useRef(new Set<string>());
 
   const chooseArtisan = (name: string): void => {
     setSelected(name);
@@ -136,8 +138,10 @@ export function ArtisanView({
   ];
 
   const signal = async (it: Intervention): Promise<void> => {
-    await demo.artisanSignal(project.id, actor, it.signalText);
+    if (signaledRef.current.has(it.key)) return;
+    signaledRef.current.add(it.key);
     setSignaled((s) => new Set(s).add(it.key));
+    await demo.artisanSignal(project.id, actor, it.signalText);
   };
 
   const infos = events

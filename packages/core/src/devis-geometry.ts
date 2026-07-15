@@ -92,31 +92,6 @@ export type BlocType =
   | 'pied_de_page'
   | 'indetermine';
 
-/** L'ensemble des types qui NE produisent jamais de prestation contractuelle. */
-export const BLOCS_NON_CONTRACTUELS: ReadonlySet<BlocType> = new Set<BlocType>([
-  'entete_document',
-  'coordonnees_entreprise',
-  'coordonnees_client',
-  'entete_tableau',
-  'exclusion',
-  'sous_total_lot',
-  'total_general',
-  'ventilation_tva',
-  'acompte',
-  'echeancier',
-  'conditions_paiement',
-  'mentions_legales',
-  'gestion_dechets',
-  'signature',
-  'notes',
-  'garantie',
-  'delai',
-  'remise',
-  'liste_prix',
-  'pied_de_page',
-  'indetermine',
-]);
-
 /** Les cellules d'une ligne reconstruite, réparties par colonne. */
 export interface CellulesLigne {
   num: string;

@@ -11,7 +11,7 @@ import {
 import type { EventActor, ReserveEvent, UploadedMedia } from '@phenix360/core';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import { demo } from '../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../lib/media';
 
 /**
  * Lever une réserve — clôture PROPRE et append-only. On n'efface ni ne modifie
@@ -30,24 +30,36 @@ export function ReserveLeveeDialog({
   const [note, setNote] = useState('');
   const [preuve, setPreuve] = useState<UploadedMedia | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   const onPick = async (files: FileList | null): Promise<void> => {
     const file = files?.[0];
     if (!file) return;
     setBusy(true);
     try {
-      setPreuve(await mediaUploader(file));
+      // Validation type/taille + échec VISIBLE (jamais une rejection silencieuse).
+      const { media, error } = await loadPhotos([file]);
+      setPhotoError(error);
+      if (media[0]) setPreuve(media[0]);
     } finally {
       setBusy(false);
     }
   };
 
   const submit = async (): Promise<void> => {
-    await demo.leverReserve(reserve.projectId, reserve.id, actor, {
-      ...(note.trim() ? { note: note.trim() } : {}),
-      ...(preuve ? { preuve } : {}),
-    });
-    onClose();
+    // Verrou anti double-clic : « Lever la réserve » lance une mutation append-only.
+    // Sans ce garde, un double-clic créait DEUX événements de levée pour une réserve.
+    if (busy) return;
+    setBusy(true);
+    try {
+      await demo.leverReserve(reserve.projectId, reserve.id, actor, {
+        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(preuve ? { preuve } : {}),
+      });
+      onClose();
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -108,6 +120,11 @@ export function ReserveLeveeDialog({
                   )}
                 </span>
               </label>
+            )}
+            {photoError && (
+              <p role="alert" className="text-sm text-destructive">
+                {photoError}
+              </p>
             )}
           </div>
 

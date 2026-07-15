@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Button,
   Dialog,
@@ -16,7 +16,7 @@ import {
   type UploadedMedia,
 } from '@phenix360/core';
 import { demo } from '../../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 
 interface Pick {
   key: string;
@@ -45,6 +45,8 @@ export function MomentComposer({
   const [picks, setPicks] = useState<Pick[]>([]);
   const [coverKey, setCoverKey] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const submittedRef = useRef(false);
   // Un seul champ texte, LIBRE et OPTIONNEL : la légende (ex-« observations »).
   const [legende, setLegende] = useState('');
   const [zone, setZone] = useState('');
@@ -56,9 +58,9 @@ export function MomentComposer({
       // Un album = 10 photos MAXIMUM : on ne prend que ce qui reste de place.
       const remaining = MAX_ALBUM_PHOTOS - picks.length;
       if (remaining <= 0) return;
-      const chosen = Array.from(files).slice(0, remaining);
-      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
-      const next = uploaded.map((media) => ({ key: crypto.randomUUID(), media }));
+      const { media, error } = await loadPhotos(Array.from(files).slice(0, remaining));
+      setPhotoError(error);
+      const next = media.map((m) => ({ key: crypto.randomUUID(), media: m }));
       setPicks((p) => [...p, ...next]);
       setCoverKey((c) => c ?? next[0]?.key ?? null);
     } finally {
@@ -83,7 +85,10 @@ export function MomentComposer({
   };
 
   const create = (): void => {
-    if (picks.length === 0) return;
+    // Verrou anti double-clic (synchrone) : deux clics rapides sur « Créer le
+    // moment » ne doivent jamais publier deux albums identiques.
+    if (picks.length === 0 || submittedRef.current) return;
+    submittedRef.current = true;
     const coverIndex = Math.max(
       0,
       picks.findIndex((p) => p.key === coverKey),
@@ -214,6 +219,12 @@ export function MomentComposer({
                 )}
               </span>
             </label>
+          )}
+
+          {photoError && (
+            <p role="alert" className="text-sm text-destructive">
+              {photoError}
+            </p>
           )}
 
           <Field label="Légende (optionnelle)">

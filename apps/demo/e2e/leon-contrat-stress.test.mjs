@@ -222,6 +222,19 @@ check('TVA — décimale française (« 5,5 % », jamais « 5.5 % »)', () => {
   const r = ask('Quel est le taux de TVA ?');
   if (/\d\.\d/.test(r.answer)) throw new Error(`décimale anglaise dans la TVA : ${r.answer}`);
 });
+// Sur-affirmation composite (Mission G) : une entité à DEUX mots dont un seul
+// matche (« portail électrique » — le portail n'existe pas, seule une dépose élec
+// matche) ne doit JAMAIS faire dire au contrat qu'un « portail » est prévu.
+check('Composite — « portail électrique » ne prétend pas qu’un portail est prévu', () => {
+  const r = ask('portail électrique est-il prévu ?');
+  if (r.found && /portail/i.test(r.answer))
+    throw new Error(`sur-affirmation : « portail » cité comme prévu — ${r.answer.slice(0, 90)}`);
+});
+check('Composite — « véranda carrelage » ne prétend pas qu’une véranda est prévue', () => {
+  const r = ask('véranda carrelage est-elle prévue ?');
+  if (r.found && /véranda/i.test(r.answer))
+    throw new Error(`sur-affirmation : « véranda » citée comme prévue — ${r.answer.slice(0, 90)}`);
+});
 
 const passed = results.filter(Boolean).length;
 console.log(`\n=== STRESS LÉON — ${results.length} questions ===`);

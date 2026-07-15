@@ -13,7 +13,7 @@ import {
 } from '@phenix360/core';
 import { Camera, Check, ImagePlus, Trash2, X } from 'lucide-react';
 import { demo } from '../../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
 interface DraftPoint {
@@ -47,6 +47,7 @@ export function CompteRenduFlow({
   const [diffusion, setDiffusion] = useState<Diffusion>('client');
   const [etape, setEtape] = useState<ProjectStep | ''>('');
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -58,9 +59,9 @@ export function CompteRenduFlow({
     if (room <= 0) return;
     setBusy(true);
     try {
-      const chosen = Array.from(files).slice(0, room);
-      const uploaded = await Promise.all(chosen.map((f) => mediaUploader(f)));
-      setPhotos((ps) => [...ps, ...uploaded].slice(0, MAX_POINT_PHOTOS));
+      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      setPhotoError(error);
+      setPhotos((ps) => [...ps, ...media].slice(0, MAX_POINT_PHOTOS));
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -257,6 +258,11 @@ export function CompteRenduFlow({
                   </button>
                 )}
               </div>
+              {photoError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {photoError}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 1 à {MAX_POINT_PHOTOS} photos — prise directe ou choix dans la galerie. Le
                 commentaire concerne l’ensemble des photos.

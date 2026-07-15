@@ -370,7 +370,9 @@ function ManageDialog({
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    // Révocation DIFFÉRÉE : révoquer immédiatement après `click()` peut annuler le
+    // téléchargement dans certains navigateurs (mêmes 60 s que lib/document.ts).
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   const onFilePicked = async (file: File | undefined): Promise<void> => {

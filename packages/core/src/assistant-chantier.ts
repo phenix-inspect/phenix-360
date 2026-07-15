@@ -238,21 +238,6 @@ function preparerCommandes(materiels: MaterielDetecte[]): LigneCommande[] {
   });
 }
 
-/** Regroupe des lignes de commande par critère (aide à l'organisation). */
-export function regrouperCommandes(
-  lignes: LigneCommande[],
-  par: 'lot' | 'pièce' | 'statut',
-): Map<string, LigneCommande[]> {
-  const map = new Map<string, LigneCommande[]>();
-  for (const l of lignes) {
-    const clé = par === 'lot' ? l.lot : par === 'pièce' ? (l.pièce ?? 'Non localisé') : l.statut;
-    const arr = map.get(clé);
-    if (arr) arr.push(l);
-    else map.set(clé, [l]);
-  }
-  return map;
-}
-
 /* -------------------------------------------------------------------------- *
  * 3) CHOIX À DEMANDER AU CLIENT (Mission 15)
  * -------------------------------------------------------------------------- */
@@ -266,16 +251,6 @@ export const CHOIX_STATUTS = [
   'sans_objet',
 ] as const;
 export type ChoixStatut = (typeof CHOIX_STATUTS)[number];
-
-export const CHOIX_STATUT_LABEL: Record<ChoixStatut, string> = {
-  a_analyser: 'À analyser',
-  choix_necessaire: 'Choix nécessaire',
-  deja_defini: 'Déjà défini dans le devis',
-  a_demander: 'À demander au client',
-  demande_envoyee: 'Demande envoyée',
-  reponse_recue: 'Réponse reçue',
-  sans_objet: 'Sans objet',
-};
 
 export type ChoixType = 'couleur' | 'référence' | 'dimension' | 'gamme' | 'modèle' | 'finition';
 

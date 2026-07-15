@@ -14,7 +14,6 @@ import {
   devisTotals,
   originLabel,
   type Avenant,
-  type Devis,
   type DevisPoste,
 } from './devis.js';
 import { validatedDevis, type ContractHolder } from './contract.js';
@@ -291,7 +290,18 @@ export function answerContractQuestion(
       const pts = trouves
         .map((id) => postes.find((x) => x.posteId === id))
         .filter((x): x is PosteTrouve => x != null);
-      const sujet = mots.join(' ');
+      // On ne cite QUE les mots réellement présents dans les postes trouvés. Sinon,
+      // « portail électrique » (seul « électrique » matche une dépose élec) ferait
+      // dire au contrat qu'un « portail » est prévu → sur-affirmation / invention.
+      const trouvesSet = new Set(trouves);
+      const motsPresents = mots.filter((m) =>
+        devis.lots.some((lot) =>
+          lot.postes.some(
+            (p) => trouvesSet.has(p.id) && motsDe(`${hay(p)} ${strip(lot.label)}`).has(m),
+          ),
+        ),
+      );
+      const sujet = (motsPresents.length > 0 ? motsPresents : mots).join(' ');
       const liste = pts
         .slice(0, 6)
         .map(

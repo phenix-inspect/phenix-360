@@ -8,7 +8,6 @@
  * par le sélecteur core (aucune duplication de logique).
  */
 import {
-  DEFAULT_AUDIENCE,
   INTERNAL_AUDIENCE,
   SHARED_AUDIENCE,
   attachmentId,

@@ -392,18 +392,6 @@ export function detailsTechniquesDuContrat(
   return deriverDetailsContrat(validatedDevis(holder ?? undefined));
 }
 
-/** Détails techniques regroupés par PIÈCE (aide au contrôle / à la commande). */
-export function detailsParPiece(details: DetailTechnique[]): Map<string, DetailTechnique[]> {
-  const map = new Map<string, DetailTechnique[]>();
-  for (const d of details) {
-    const clé = d.pièce ?? 'Non localisé';
-    const arr = map.get(clé);
-    if (arr) arr.push(d);
-    else map.set(clé, [d]);
-  }
-  return map;
-}
-
 /* -------------------------------------------------------------------------- *
  * Agrégation : « besoins matériels » (PRÉPARÉS, jamais transformés en commande)
  * -------------------------------------------------------------------------- */
@@ -456,16 +444,4 @@ export function agregerBesoins(details: DetailTechnique[]): BesoinMateriel[] {
     }
   }
   return [...map.values()];
-}
-
-/**
- * PRÉPARE (sans les créer) les besoins matériels du contrat validé — matière
- * première d'une future commande / d'un choix client. On NE crée AUCUNE commande
- * ni demande client ici : le conducteur reste décideur. Simple lecture agrégée,
- * traçable, prudente (quantités additionnées seulement quand elles sont fiables).
- */
-export function preparerBesoinsContrat(
-  holder: ContractHolder | null | undefined,
-): BesoinMateriel[] {
-  return agregerBesoins(detailsTechniquesDuContrat(holder));
 }

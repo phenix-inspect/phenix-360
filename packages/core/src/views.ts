@@ -136,20 +136,6 @@ export function demandeRepondue(e: DemandeEvent): boolean {
   return e.content.resolution != null;
 }
 
-/**
- * Signalements des ARTISANS en attente de validation du conducteur (« j'ai
- * terminé, à valider »). Canal distinct des questions client — lecture filtrée
- * du journal (Mode Artisan). Toujours interne : jamais exposé au client.
- */
-export function signalementsArtisan(events: Event[]): DemandeEvent[] {
-  return sortByDate(
-    events
-      .filter(isDemande)
-      .filter((e) => e.content.destinataire === 'conducteur' && e.state === 'ouverte'),
-    'asc',
-  );
-}
-
 /** Le récit client : tout le journal visible au client, récent d'abord. */
 export function clientFeed(events: Event[]): Event[] {
   return sortByDate(forClient(events), 'desc');
@@ -204,14 +190,6 @@ export function reservesOuvertes(events: Event[]): ReserveEvent[] {
   return reserveEvents(events).filter((r) => reserveStatut(r, events) === 'ouverte');
 }
 
-/**
- * Historique du projet : les jalons du journal en ordre chronologique
- * (du devis signé jusqu'à aujourd'hui). Lecture filtrée du journal.
- */
-export function projectHistory(events: Event[]): Event[] {
-  return sortByDate(events.filter(isMilestone), 'asc');
-}
-
 /** Décisions en attente du client (anciennes d'abord : on traite la plus vieille). */
 export function pendingClientDecisions(events: Event[]): Decision[] {
   return sortByDate(events.filter(isAwaitingClientDecision), 'asc').map(toDecision);
@@ -231,12 +209,4 @@ export function choixClientValides(events: Event[]): DecisionEvent[] {
       .filter((e) => e.content.kind === 'validee' || e.content.kind === 'deleguee'),
     'desc',
   );
-}
-
-/** État du bandeau d'accueil client — une seule priorité. */
-export function clientDecisionBanner(events: Event[]): ClientDecisionBanner {
-  const pending = pendingClientDecisions(events);
-  const next = pending[0];
-  if (next === undefined) return { kind: 'rien_a_faire' };
-  return { kind: 'decision_attendue', total: pending.length, prochaine: next };
 }

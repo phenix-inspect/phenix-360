@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { Button, Card, CardContent } from '@phenix360/ui';
 import {
   PREP_DOC_CATEGORY_LABEL,
-  type EventAttachment,
   type EventVisibility,
   type Project,
   type ProjectDocument,
@@ -123,8 +122,9 @@ export function PrepDocumentsSection({
                         else setDiffuseDoc(d);
                       }}
                     >
-                      {shared ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
-                      {shared ? 'Visible client' : 'Interne'}
+                      {/* Libellé = ACTION du clic (verbe), jamais un statut. */}
+                      {shared ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                      {shared ? 'Ne plus partager' : 'Partager'}
                     </Button>
                   );
                 })()}

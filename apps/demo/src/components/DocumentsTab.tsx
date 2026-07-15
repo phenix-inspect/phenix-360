@@ -225,8 +225,12 @@ export function DocumentsTab({
                         else setDiffuseDoc(e);
                       }}
                     >
-                      {e.visibility === 'client' ? <Eye aria-hidden /> : <EyeOff aria-hidden />}
-                      {e.visibility === 'client' ? 'Visible client' : 'Partager'}
+                      {/* Le libellé décrit l'ACTION du clic (verbe), jamais un statut :
+                          « Visible client » se lisait comme un état → on ne savait pas
+                          que cliquer le RETIRAIT au client. Le statut est déjà porté
+                          par le Badge à gauche. */}
+                      {e.visibility === 'client' ? <EyeOff aria-hidden /> : <Eye aria-hidden />}
+                      {e.visibility === 'client' ? 'Ne plus partager' : 'Partager'}
                     </Button>
                   )}
                 </li>

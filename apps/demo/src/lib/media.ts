@@ -71,3 +71,45 @@ export const mediaUploader: MediaUploader = async (file: File): Promise<Uploaded
     height,
   };
 };
+
+/** Taille maximale d'une photo (Mo) en stockage local (démo). */
+export const MAX_PHOTO_MB = 25;
+
+export interface PhotoLoadResult {
+  media: UploadedMedia[];
+  /** Message clair (client-safe) si une ou plusieurs photos ont été refusées. */
+  error: string | null;
+}
+
+/**
+ * Charge des photos en VALIDANT type + taille, et NE JETTE JAMAIS. Sans ce garde,
+ * une photo non-image (vidéo autorisée par le sélecteur mobile), trop lourde, ou
+ * illisible (HEIC de l'iPhone) faisait échouer l'upload EN SILENCE — le spinner
+ * s'arrêtait, rien n'apparaissait, aucun message. Ici, on ajoute les photos
+ * valides et on renvoie un message d'erreur agrégé, à afficher à l'utilisateur.
+ */
+export async function loadPhotos(files: FileList | File[] | null): Promise<PhotoLoadResult> {
+  const list = files ? Array.from(files) : [];
+  const media: UploadedMedia[] = [];
+  const rejected: string[] = [];
+  for (const f of list) {
+    if (!f.type.startsWith('image/')) {
+      rejected.push(`« ${f.name} » n’est pas une image`);
+      continue;
+    }
+    if (f.size > MAX_PHOTO_MB * 1024 * 1024) {
+      rejected.push(`« ${f.name} » dépasse ${MAX_PHOTO_MB} Mo`);
+      continue;
+    }
+    try {
+      media.push(await mediaUploader(f));
+    } catch {
+      rejected.push(`« ${f.name} » n’a pas pu être lue (format non pris en charge, ex. HEIC)`);
+    }
+  }
+  const error =
+    rejected.length === 0
+      ? null
+      : `${rejected.length === 1 ? 'Photo non ajoutée' : `${rejected.length} photos non ajoutées`} : ${rejected.join(' ; ')}.`;
+  return { media, error };
+}

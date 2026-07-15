@@ -26,7 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { demo } from '../store';
-import { mediaUploader } from '../lib/media';
+import { loadPhotos } from '../lib/media';
 import { extractPdfGeometry, extractPdfText } from '../lib/pdf';
 import { fmtDuree } from '../lib/format';
 import { ProposalReview } from './ProposalReview';
@@ -186,9 +186,12 @@ function NewChantierScreen({
       const id = crypto.randomUUID();
       setFiles((prev) => [...prev, { id, name: file.name, file }]);
       if (file.type.startsWith('image/')) {
-        void mediaUploader(file).then((media) =>
-          setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, media } : f))),
-        );
+        // Aperçu best-effort via `loadPhotos` (ne jette JAMAIS) : une image illisible
+        // (HEIC…) laisse le fichier en place SANS aperçu, jamais de rejection non gérée.
+        void loadPhotos([file]).then(({ media }) => {
+          const m = media[0];
+          if (m) setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, media: m } : f)));
+        });
       }
     }
   };

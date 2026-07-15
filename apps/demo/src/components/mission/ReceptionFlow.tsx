@@ -7,7 +7,6 @@ import {
   isPublished,
   prereceptionReference,
   receptionComplete,
-  receptionReference,
   reservesDePrereception,
   reservesRestantes,
   reserveEstLevee,
@@ -34,7 +33,7 @@ import {
   X,
 } from 'lucide-react';
 import { demo, dossierOf, nameOf } from '../../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 import { fmtDate } from '../../lib/format';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
@@ -536,6 +535,7 @@ function LeveeFields({
   incomplete: boolean;
 }): React.JSX.Element {
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const photos = levee.photos;
 
   const addPhotos = async (files: FileList | null): Promise<void> => {
@@ -543,12 +543,9 @@ function LeveeFields({
     setBusy(true);
     try {
       const room = MAX_LEVEE_PHOTOS - photos.length;
-      const uploaded = await Promise.all(
-        Array.from(files)
-          .slice(0, room)
-          .map((f) => mediaUploader(f)),
-      );
-      onPatch(r.posteId, { photos: [...photos, ...uploaded] });
+      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      setPhotoError(error);
+      onPatch(r.posteId, { photos: [...photos, ...media] });
     } finally {
       setBusy(false);
     }
@@ -598,6 +595,11 @@ function LeveeFields({
             </label>
           )}
         </div>
+        {photoError && (
+          <p role="alert" className="text-sm text-destructive">
+            {photoError}
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5">

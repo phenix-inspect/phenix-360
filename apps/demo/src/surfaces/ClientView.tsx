@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@phenix360/ui';
 import { Check, FileText, Lock, MessageCircle } from 'lucide-react';
 import {
@@ -74,10 +74,14 @@ export function ClientView({
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
   const [clientTab, setClientTab] = useState<ClientTab>('aujourdhui');
 
+  // Verrou anti double-clic PAR choix (synchrone) : un client qui double-clique
+  // « Valider » ne doit émettre qu'UNE décision, jamais deux notifications.
+  const validatingDecisions = useRef(new Set<string>());
   const validateDecision = async (d: ClientDecision, optionId?: string, comment?: string) => {
-    if (!dossier) return;
+    if (!dossier || validatingDecisions.current.has(d.id)) return;
     const sel = dossier.selections.find((s) => s.id === d.id);
     if (!sel) return;
+    validatingDecisions.current.add(d.id);
     const delegated = isPhenixDelegate(optionId);
     const chosen = d.options.find((o) => o.id === optionId);
     const detail = delegated ? 'Choix confié à PHÉNIX' : chosen?.title;
@@ -114,6 +118,7 @@ export function ClientView({
       state: 'publie',
       content,
     });
+    validatingDecisions.current.delete(d.id);
   };
 
   // Décisions demandées via le Journal (échange documentaire ou question) — des

@@ -2,8 +2,6 @@ import { useRef, useState } from 'react';
 import {
   Badge,
   Button,
-  Card,
-  CardContent,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -110,6 +108,8 @@ export function DossierPanel({
 
   // Avenants en attente de validation (déposés, PAS ENCORE intégrés au contrat).
   const brouillons = dossier.avenantsBrouillon ?? [];
+  // Verrou d'intégration d'avenant (anti double-clic, synchrone).
+  const validatingRef = useRef(false);
 
   // Enregistrer un avenant DÉPOSÉ en BROUILLON. PHÉNIX ne fabrique rien et
   // n'intègre rien : le brouillon reste à l'écart du contrat (il ne nourrit ni
@@ -128,7 +128,10 @@ export function DossierPanel({
   // et rejoint `avenants` (source unique du contrat consolidé). On trace au journal
   // interne. Append-only : rien n'est réécrit, le devis initial reste intact.
   const validateAvenant = async (brouillon: Avenant): Promise<void> => {
-    if (!dossier.devis) return;
+    // Verrou SYNCHRONE anti double-clic : sans lui, un second clic rapide
+    // réintègre l'avenant (même numéro) avant le re-rendu → doublon au contrat.
+    if (validatingRef.current || !dossier.devis) return;
+    validatingRef.current = true;
     const validated = dossier.avenants ?? [];
     const numero = validated.length + 1;
     const finalAvenant: Avenant = {
@@ -168,6 +171,7 @@ export function DossierPanel({
       state: 'publie',
       content: { texte: lines.join('\n') },
     });
+    validatingRef.current = false;
   };
 
   const stepLabels = (ids?: string[]): string[] =>

@@ -260,9 +260,6 @@ export interface DocumentContent {
  */
 export type DemandeAudience = 'client' | 'phenix' | 'conducteur';
 
-/** Nombre maximum de photos jointes à une demande / une réponse. */
-export const MAX_DEMANDE_PHOTOS = 3;
-
 /** Réponse PORTÉE par la demande (pas un événement séparé, pas un fil). */
 export interface DemandeResolution {
   texte: string;
@@ -539,8 +536,6 @@ export const isAction = (e: Event): e is ActionEvent => e.type === 'action';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';
-export const isDemandeOpen = (e: Event): e is DemandeEvent => isDemande(e) && e.state === 'ouverte';
-
 /* -------------------------------------------------------------------------- *
  * Règle de VISIBILITÉ CLIENT — source unique, miroir de la RLS (ADR-004 §4)
  * -------------------------------------------------------------------------- *

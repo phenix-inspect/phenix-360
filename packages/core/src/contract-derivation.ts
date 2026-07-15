@@ -72,11 +72,3 @@ export interface ContractPlan {
   photosAttendues: DerivedPhotoAttendue[];
   decisionsClientProbables: DerivedDecisionClient[];
 }
-
-/**
- * L'INTERFACE du futur moteur de dérivation. On l'implémentera derrière ce
- * contrat (comme le port `DossierAnalyzer`), sans toucher aux écrans. Le
- * `devis` passé en entrée est TOUJOURS le devis restreint aux lots validés
- * (`validatedDevis(dossier)`).
- */
-export type ContractDeriver = (input: { devis: Devis }) => ContractPlan;

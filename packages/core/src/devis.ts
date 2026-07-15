@@ -22,12 +22,6 @@ import type { EventAttachment } from './attachment.js';
  */
 export type VerificationNiveau = 'verifie' | 'a_verifier' | 'non_compris';
 
-export const VERIFICATION_LABEL: Record<VerificationNiveau, string> = {
-  verifie: 'Vérifié automatiquement',
-  a_verifier: 'À vérifier',
-  non_compris: 'Non compris',
-};
-
 /** Un POSTE du devis : une ligne chiffrée (fourniture et/ou pose). */
 export interface DevisPoste {
   id: string;
@@ -358,10 +352,6 @@ export function describeAvenantImpact(impact: AvenantImpact): string {
 /* ------------------------------- sélecteurs -------------------------------- */
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
-
-/** Total HT d'un lot (somme de ses postes). */
-export const lotTotalHT = (lot: DevisLot): number =>
-  round2(lot.postes.reduce((a, p) => a + p.montantHT, 0));
 
 export interface DevisTotals {
   ht: number;

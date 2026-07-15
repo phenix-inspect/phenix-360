@@ -77,21 +77,6 @@ export const MOMENT_TYPES = [
 ] as const;
 export type MomentType = (typeof MOMENT_TYPES)[number];
 
-export const MOMENT_TYPE_LABEL: Record<MomentType, string> = {
-  compte_rendu: 'Compte rendu de chantier',
-  // `reunion` / `visite` : valeurs HÉRITÉES (données antérieures) — la mission
-  // « Visite » et « Réunion » a fusionné en un unique « Compte rendu de chantier ».
-  reunion: 'Compte rendu de chantier',
-  visite: 'Compte rendu de chantier',
-  livraison: 'Livraison',
-  prereception: 'Pré-réception',
-  reception: 'Réception',
-  sav: 'SAV',
-  note: 'Note de chantier',
-  decision: 'Décision',
-  etape: 'Étape franchie',
-};
-
 /** Libellé court (pour les puces / chips discrètes). */
 export const MOMENT_TYPE_SHORT: Record<MomentType, string> = {
   compte_rendu: 'Compte rendu',
@@ -364,11 +349,6 @@ export function filDuChantier(
     entries.push({ kind: 'moment', moment });
   }
   return entries;
-}
-
-/** Coups de cœur d'un Moment. */
-export function coupsDeCoeurDuMoment(id: MomentId, coups: CoupDeCoeur[]): CoupDeCoeur[] {
-  return coups.filter((c) => c.momentId === id);
 }
 
 /** Cet utilisateur a-t-il déjà mis un coup de cœur sur ce Moment ? */

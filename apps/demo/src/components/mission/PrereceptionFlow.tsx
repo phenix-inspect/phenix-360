@@ -41,7 +41,7 @@ import {
   X,
 } from 'lucide-react';
 import { demo, dossierOf, nameOf } from '../../store';
-import { ACCEPT_IMAGE, mediaUploader } from '../../lib/media';
+import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
@@ -843,6 +843,7 @@ function ReserveFields({
   onPatch: (posteId: string, patch: Partial<PrestationVerif>) => void;
 }): React.JSX.Element {
   const [busy, setBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const reserve = p.reserve ?? { photos: [], commentaire: '', responsable: 'artisan' as const };
   const photos = reserve.photos;
 
@@ -851,12 +852,9 @@ function ReserveFields({
     setBusy(true);
     try {
       const room = MAX_PRERECEPTION_PHOTOS - photos.length;
-      const uploaded = await Promise.all(
-        Array.from(files)
-          .slice(0, room)
-          .map((f) => mediaUploader(f)),
-      );
-      onPatch(p.posteId, { reserve: { ...reserve, photos: [...photos, ...uploaded] } });
+      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      setPhotoError(error);
+      onPatch(p.posteId, { reserve: { ...reserve, photos: [...photos, ...media] } });
     } finally {
       setBusy(false);
     }
@@ -904,6 +902,11 @@ function ReserveFields({
             </label>
           )}
         </div>
+        {photoError && (
+          <p role="alert" className="text-sm text-destructive">
+            {photoError}
+          </p>
+        )}
       </div>
 
       <div className="space-y-1.5">

@@ -45,6 +45,3 @@ export const MISSIONS: MissionDef[] = [
   },
   { kind: 'reception', label: 'Réception', description: 'Clôturer le chantier proprement' },
 ];
-
-/** Assure qu'un MissionKind est bien un MomentType (contrôle de compilation). */
-export const missionMomentType = (kind: MissionKind): MomentType => kind;

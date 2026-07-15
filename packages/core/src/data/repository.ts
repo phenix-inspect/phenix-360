@@ -5,7 +5,7 @@
  * et l'UI ne parlent qu'à ces ports ; passer en Supabase = remplacer
  * l'implémentation, sans toucher au produit, à l'UI, ni à la logique métier.
  */
-import type { CaptureId, EventId, ProjectId, ProjectMemberId, UserId } from '../ids.js';
+import type { CaptureId, EventId, ProjectId, UserId } from '../ids.js';
 import type { EventActor, Role } from '../actor.js';
 import type {
   DemandeResolution,

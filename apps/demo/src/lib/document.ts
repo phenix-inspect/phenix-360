@@ -104,7 +104,9 @@ export function downloadAttachment(attachment: EventAttachment): void {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     downloadBlob(new Blob([bytes], { type: mime }), attachment.fileName ?? safeName('document'));
   } catch {
-    /* silencieux : on n'a rien à télécharger */
+    // Fichier corrompu / illisible : on ne laisse PAS l'utilisateur devant un
+    // bouton « mort ». On affiche le message honnête « document indisponible ».
+    openUnavailableDocument();
   }
 }
 

@@ -58,13 +58,6 @@ export const PRESTATION_STATUT_SHORT: Record<PrestationStatut, string> = {
 
 /** Tonalité visuelle d'un statut (la réserve seule est mise en évidence en rouge). */
 export type StatutTon = 'ok' | 'reserve' | 'todo' | 'retire';
-export const PRESTATION_STATUT_TON: Record<PrestationStatut, StatutTon> = {
-  fait: 'ok',
-  reserve: 'reserve',
-  non_fait: 'todo',
-  moins_value: 'retire',
-};
-
 /** Pastille de statut (repère visuel discret, cohérent écran ↔ document). */
 export const PRESTATION_STATUT_DOT: Record<PrestationStatut, string> = {
   fait: '🟢',
@@ -176,30 +169,6 @@ export function prereceptionReference(dateISO?: string, version = 1): string {
   return d ? `PR-${d}-V${version}` : `PR-V${version}`;
 }
 
-/**
- * EN-TÊTE d'une pré-réception (mission & documents) : identité complète du
- * chantier, horodatée AUTOMATIQUEMENT. Le conducteur ne saisit ni la date ni
- * l'heure. `présents` reste optionnel.
- */
-export interface PrereceptionEntete {
-  /** Nom / référence du chantier. */
-  chantier: string;
-  /** Adresse complète du chantier (si connue). */
-  adresse?: string;
-  /** Nom du client. */
-  client?: string;
-  /** Conducteur PHÉNIX (auteur). */
-  conducteur?: string;
-  /** Date + heure ISO (horodatage automatique). */
-  dateISO: string;
-  /** Intervenants présents (optionnel). */
-  presents: string[];
-  /** Version du document (1, 2, 3…). */
-  version: number;
-  /** Référence stable dérivée (PR-AAAAMMJJ-Vx). */
-  reference: string;
-}
-
 /** Libellés PROFESSIONNELS de la synthèse (cohérents écran ↔ document). */
 export const PRERECEPTION_SYNTHESE_LABEL: Record<
   keyof Omit<PrereceptionSynthese, 'total'>,
@@ -291,15 +260,6 @@ export function prereceptionSynthese(prestations: PrestationVerif[]): Prerecepti
     else if (p.statut === 'moins_value') s.supprimees += 1;
   }
   return s;
-}
-
-/**
- * Prestations à DÉDUIRE de la facture finale (les moins-values). Cette lecture
- * sera exploitée plus tard lors de la génération de la facture finale — on la
- * dérive ici, à la source, sans jamais la ressaisir.
- */
-export function prestationsADeduire(prestations: PrestationVerif[]): PrestationVerif[] {
-  return prestations.filter((p) => p.statut === 'moins_value');
 }
 
 /**

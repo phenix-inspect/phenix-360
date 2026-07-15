@@ -12,7 +12,6 @@
  */
 import { useSyncExternalStore } from 'react';
 import {
-  DEFAULT_AUDIENCE,
   INTERNAL_AUDIENCE,
   SHARED_AUDIENCE,
   InMemoryBackend,
@@ -256,7 +255,14 @@ const memMirror = new Map<string, string>();
 
 function lsGet(key: string): string | null {
   if (memMirror.has(key)) return memMirror.get(key) ?? null;
-  return localStorage.getItem(key);
+  try {
+    // Lecture best-effort : sur certains navigateurs (mode privé strict, stockage
+    // désactivé), `getItem` lui-même LÈVE (SecurityError). Sans ce garde, la
+    // construction de l'état échouait au démarrage → écran blanc.
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 
 function safeSetItem(key: string, value: string): boolean {
