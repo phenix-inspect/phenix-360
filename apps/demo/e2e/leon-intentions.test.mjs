@@ -487,5 +487,34 @@ check('ambigu — « et ensuite ? » sans contexte ne fabrique pas', () => {
     throw new Error('une relance vague a ouvert un document au hasard');
 });
 
+/* -- IDENTITÉ : « qui es-tu ? » → Léon se présente (jamais « pas trouvé ») -- */
+// Un client qui demande à qui il parle mérite une présentation, pas un mur froid.
+check('identité — « vous êtes qui ? » présente Léon', say('Vous êtes qui ?', /Léon|assistant/i));
+check(
+  'identité — « c’est quoi PHÉNIX ? » présente Léon',
+  say('c’est quoi PHÉNIX ?', /Léon|assistant/i),
+);
+check('identité — « tu sers à quoi ? » présente Léon', say('tu sers à quoi ?', /Léon|assistant/i));
+check('identité — ne dit jamais « pas trouvé »', notSay('qui es-tu ?', /pas trouv/i));
+check('identité — répond, n’escalade pas', answers('qui es-tu ?'));
+
+/* -- SIGNALEMENT DE PROBLÈME : le VERBE et le mot NU escaladent (confiance) -- */
+// « la douche fuit » (verbe, pas « une fuite »), « j'ai un souci », « des traces »
+// sont des alertes : Léon les transmet au conducteur, il ne répond pas « pas trouvé ».
+check('problème — « la douche fuit » (verbe) escalade', escalates('la douche fuit'));
+check('problème — « ça fuit sous l’évier » escalade', escalates('ça fuit sous l’évier'));
+check('problème — « j’ai un souci » (mot nu) escalade', escalates('j’ai un souci'));
+check(
+  'problème — « des traces sur la peinture » escalade',
+  escalates('il y a des traces sur la peinture'),
+);
+check('problème — « le carrelage est fissuré » escalade', escalates('le carrelage est fissuré'));
+check('problème — « la porte ferme mal » escalade', escalates('la porte ne ferme pas bien'));
+
+/* -- DÉCISION GRAVE : « je veux tout arrêter » → transmission humaine -------- */
+check('crise — « je veux tout arrêter » escalade', escalates('je veux tout arrêter'));
+check('crise — « on arrête tout » escalade', escalates('on arrête tout'));
+check('crise — « annuler le chantier » escalade', escalates('je veux annuler le chantier'));
+
 console.log(`\n=== ${passed}/${results.length} PASS ===`);
 process.exit(results.every(Boolean) ? 0 : 1);

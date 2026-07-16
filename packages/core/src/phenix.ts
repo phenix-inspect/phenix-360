@@ -259,7 +259,13 @@ const MODIFY_RX =
  * conducteur est requis, on transmet immédiatement (jamais de réponse à côté).
  */
 const PROBLEM_RX =
-  /(fissure|felure|fêlure|infiltration|fuite|degat|dégât|malfacon|malfaçon|cassé|cassee|cassée|abime|abîme|moisissure|inondation|ne (marche|fonctionne) (pas|plus)|mal fini|mal fait|signale.*(probleme|problème|souci|defaut|défaut|malfacon|malfaçon))/;
+  // Un vrai humain signale un défaut avec des formes que le seul substantif ne
+  // couvre pas : le VERBE (« la douche fuit », « ça fuit »), le mot NU (« j'ai un
+  // souci », « y a un problème ») sans « je signale », et le vocabulaire concret
+  // des malfaçons (traces, taches, rayures, décollé, gondolé, fissuré). Manquer
+  // ces formes renvoyait le client vers un « je n'ai pas trouvé » glaçant alors
+  // qu'il alertait sur un problème — exactement le moment où l'on perd sa confiance.
+  /(fissur|felure|fêlure|infiltration|fuite|\bfuit\b|\bfuient\b|degat|dégât|malfacon|malfaçon|casse|cassé|cassee|cassée|abime|abîme|moisissure|inondation|gondol|décoll|decoll|\braye[e]?s?\b|rayure|\btrace|\btache|\btâche|\bpete[e]?s?\b|pété|\bsouci|probleme|problème|defaut|défaut|ne (marche|fonctionne|ferme|s'ouvre|s'allume) (pas|plus)|marche (pas|plus)|mal fini|mal fait|mal pose|mal posé)/;
 
 /**
  * BESOIN LOGISTIQUE / ADMINISTRATIF qui requiert une action humaine (clés
@@ -268,6 +274,22 @@ const PROBLEM_RX =
  */
 const ADMIN_RX =
   /(plus (les |de |mes )?cle|perdu (les |mes )?cle|egare.*cle|égaré.*cle|prendre (un )?rendez-vous|prendre (un )?rdv|\brdv\b|resilier|résilier|resiliation|résiliation|sinistre|cambriol)/;
+
+/**
+ * DÉCISION GRAVE : le client veut TOUT arrêter / annuler le chantier. Jamais une
+ * réponse automatique (« je n'ai pas trouvé ») — c'est le pire moment pour un
+ * mur froid. On transmet immédiatement, avec chaleur, au conducteur (humain).
+ */
+const CANCEL_RX =
+  /(tout (arreter|arrêter|annuler|stopper|plaquer|lacher|lâcher)|(arreter|arrêter|annuler|stopper|suspendre) (le|les|mon|ce) (chantier|travaux|projet)|on (arrete|arrête) tout|je (veux|voudrais|souhaite) (tout )?(arreter|arrêter|annuler|stopper)|j'arrete|j'arrête tout)/;
+
+/**
+ * IDENTITÉ : « qui es-tu ? », « vous êtes qui ? », « c'est quoi PHÉNIX ? ». Léon
+ * SE CONNAÎT — un client qui demande à qui il parle mérite une présentation, pas
+ * un « je n'ai pas trouvé cette information ». Réponse fixe (aucune donnée à lire).
+ */
+const IDENTITY_RX =
+  /(qui (es-?tu|est-?tu|etes?[ -]vous|êtes?[ -]vous|c'est|es tu|est ce que je parle)|(tu es|vous etes|vous êtes|t'es) qui|(c'est|ces|c) quoi (leon|léon|phenix|phénix)|(leon|léon|phenix|phénix) c'est (quoi|qui)|a qui je parle|à qui je parle|tu sers a quoi|tu sers à quoi|tu peux faire quoi|que peux-?tu faire|qu'est-ce que tu (sais|peux) fai)/;
 
 /** Le client veut nous joindre (téléphone / e-mail / coordonnées PHÉNIX). */
 const CONTACT_PHONE_RX =
@@ -724,9 +746,21 @@ export function askPhenix(input: PhenixInput): PhenixReply {
   // ---- Garde-fous prioritaires (avant toute recherche) : ces cas sortent du
   // pipeline immédiatement, car aucune donnée du dossier ne doit être « cherchée ».
 
+  // « Qui es-tu ? » : Léon se présente lui-même (info fixe) — jamais un « je n'ai
+  // pas trouvé ». Placé AVANT les escalades pour ne pas transmettre une présentation.
+  if (IDENTITY_RX.test(q))
+    return reply(
+      'Je suis Léon, votre assistant PHÉNIX 360 👋 Je réponds à vos questions sur ' +
+        'votre chantier — avancement, documents, choix à valider, artisans — et je ' +
+        'transmets à votre conducteur de travaux tout ce qui demande son intervention.',
+      undefined,
+      false,
+    );
   // Une photo jointe = un point à REGARDER : PHÉNIX ne voit pas les images, donc
   // toute demande avec photo passe directement au conducteur (jamais à l'aveugle).
   if (input.hasPhotos) return escalate();
+  // Décision grave (« je veux tout arrêter ») → transmission immédiate au conducteur.
+  if (CANCEL_RX.test(q)) return escalate();
   // Le client demande EXPLICITEMENT une transmission (ou à parler à un humain).
   if (TRANSMIT_RX.test(q)) return escalate();
   // Signalement d'un problème (fissure, fuite, malfaçon…) → conducteur.

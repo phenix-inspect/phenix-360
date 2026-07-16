@@ -23,7 +23,12 @@
     }
   }
   .view-enter {
-    animation: view-enter 180ms ease-out both;
+    /* `backwards` (et non `both`) : l'animation d'entrée joue, mais NE RETIENT PAS
+       `transform: translateY(0)` à la fin. Un transform résiduel — même identité —
+       crée un bloc contenant qui piège les overlays `position: fixed` (missions
+       plein écran) : ils ne couvraient alors plus l'en-tête. Sans transform
+       persistant, les missions recouvrent bien tout l'écran. */
+    animation: view-enter 180ms ease-out backwards;
   }
   @media (prefers-reduced-motion: reduce) {
     .view-enter {

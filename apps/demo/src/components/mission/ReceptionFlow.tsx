@@ -36,6 +36,7 @@ import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 import { fmtDate } from '../../lib/format';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
+import { Portal } from '../Portal';
 
 type Step = 'lever' | 'valider' | 'termine';
 
@@ -344,23 +345,25 @@ function Shell({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <div className="fixed inset-0 z-modal flex flex-col bg-background">
-      <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Fermer"
-          className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
-        >
-          <X aria-hidden />
-        </button>
-        <p className="font-serif text-lg font-semibold text-foreground">Réception</p>
-        <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
-          {sousTitre}
-        </span>
-      </header>
-      {children}
-    </div>
+    <Portal>
+      <div className="fixed inset-0 z-modal flex flex-col bg-background">
+        <header className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Fermer"
+            className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
+          >
+            <X aria-hidden />
+          </button>
+          <p className="font-serif text-lg font-semibold text-foreground">Réception</p>
+          <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
+            {sousTitre}
+          </span>
+        </header>
+        {children}
+      </div>
+    </Portal>
   );
 }
 

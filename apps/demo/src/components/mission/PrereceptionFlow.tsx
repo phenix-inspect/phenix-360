@@ -43,6 +43,7 @@ import {
 import { demo, dossierOf, nameOf } from '../../store';
 import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
+import { Portal } from '../Portal';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
 
@@ -286,240 +287,244 @@ export function PrereceptionFlow({
   const positionCible = Math.max(0, incompletsIds.indexOf(cibleId ?? '')) + 1;
 
   return (
-    <div className="fixed inset-0 z-modal flex flex-col bg-background">
-      <header className="flex items-center gap-3 border-b border-border px-5 py-4">
-        <button
-          type="button"
-          onClick={requestClose}
-          aria-label="Fermer"
-          className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
-        >
-          <X aria-hidden />
-        </button>
-        <p className="font-serif text-lg font-semibold text-foreground">Pré-réception</p>
-        <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
-          {step === 'verifier'
-            ? 'Vérification du contrat'
-            : step === 'finaliser'
-              ? 'Synthèse'
-              : step === 'valider'
-                ? 'Validation avant envoi'
-                : 'Envoyé'}
-        </span>
-      </header>
+    <Portal>
+      <div className="fixed inset-0 z-modal flex flex-col bg-background">
+        <header className="flex items-center gap-3 border-b border-border px-5 py-4">
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Fermer"
+            className="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-surface hover:text-foreground [&_svg]:size-5"
+          >
+            <X aria-hidden />
+          </button>
+          <p className="font-serif text-lg font-semibold text-foreground">Pré-réception</p>
+          <span className="ml-auto text-xs uppercase tracking-wide text-muted-foreground">
+            {step === 'verifier'
+              ? 'Vérification du contrat'
+              : step === 'finaliser'
+                ? 'Synthèse'
+                : step === 'valider'
+                  ? 'Validation avant envoi'
+                  : 'Envoyé'}
+          </span>
+        </header>
 
-      <div className="flex-1 overflow-y-auto">
-        {step === 'verifier' && (
-          <>
-            {navMode && incompletsIds.length > 1 && (
-              <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-warning bg-warning/10 px-5 py-2.5">
-                <span className="text-xs font-medium text-foreground">
-                  Élément incomplet {positionCible} sur {incompletsIds.length}
-                </span>
-                <div className="ml-auto flex gap-1.5">
-                  <Button size="sm" variant="outline" onClick={() => navErreur(-1)}>
-                    <ArrowLeft aria-hidden /> Précédent
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => navErreur(1)}>
-                    Suivant <ArrowRight aria-hidden />
-                  </Button>
-                </div>
-              </div>
-            )}
-            <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
-              <EnteteMission
-                chantier={project.name}
-                adresse={project.address}
-                client={clientName}
-                conducteur={conducteur}
-                reference={reference}
-                version={nextVersion}
-                dateStr={dateStr}
-                heureStr={heureStr}
-                presents={presents}
-                onPresents={setPresents}
-              />
-
-              {!hasContract ? (
-                <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
-                  {enBrouillon
-                    ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier le devis » depuis la Préparation.'
-                    : 'Aucune prestation au contrat : ajoutez d’abord le devis signé du chantier pour lancer la pré-réception.'}
-                </div>
-              ) : (
-                <PrestationsListe
-                  prestations={prestations}
-                  onStatut={setStatut}
-                  onPatch={patchPrestation}
-                  highlightId={highlightId}
-                />
-              )}
-            </div>
-          </>
-        )}
-
-        {step === 'finaliser' && (
-          <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
-            <div className="space-y-1">
-              <h2 className="font-serif text-2xl font-semibold text-foreground">
-                Synthèse de la pré-réception
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Calculée automatiquement à partir de votre vérification.
-              </p>
-            </div>
-
-            <SyntheseTiles synthese={synthese} />
-
-            {incomplets > 0 ? (
-              <div className="rounded-xl border border-warning bg-warning/10 p-3">
-                <button
-                  type="button"
-                  onClick={() => allerVers(incompletsListe[0]!.p.posteId)}
-                  className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-warning"
-                >
-                  <ClipboardCheck aria-hidden />
-                  {incomplets} prestation{incomplets > 1 ? 's' : ''} à compléter
-                  <ArrowRight aria-hidden className="ml-auto" />
-                </button>
-                {incomplets === 1 && (
-                  <p className="mt-1 pl-6 text-xs text-muted-foreground">
-                    {courtLabel(incompletsListe[0]!.p.label, 44)} —{' '}
-                    {incompletsListe[0]!.manque.label} manquant
-                  </p>
-                )}
-                {incomplets > 1 && (
-                  <ul className="mt-2 space-y-0.5">
-                    {(showAllInc ? incompletsListe : incompletsListe.slice(0, 3)).map(
-                      ({ p, manque }) => (
-                        <li key={p.posteId}>
-                          <button
-                            type="button"
-                            onClick={() => allerVers(p.posteId)}
-                            className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-xs text-foreground hover:bg-warning/15 [&_svg]:size-3.5 [&_svg]:text-warning"
-                          >
-                            <ArrowRight aria-hidden />
-                            <span className="font-medium">{courtLabel(p.label, 34)}</span>
-                            <span className="text-muted-foreground">— {manque.court} manquant</span>
-                          </button>
-                        </li>
-                      ),
-                    )}
-                    {incompletsListe.length > 3 && (
-                      <li>
-                        <button
-                          type="button"
-                          onClick={() => setShowAllInc((v) => !v)}
-                          className="pl-2 pt-0.5 text-xs font-medium text-gold-700 hover:underline"
-                        >
-                          {showAllInc
-                            ? 'Réduire'
-                            : `Voir les ${incompletsListe.length} prestations`}
-                        </button>
-                      </li>
-                    )}
-                  </ul>
-                )}
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
-                <ShieldCheck aria-hidden />
-                Toutes les prestations sont complètes. Les documents peuvent être vérifiés.
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <label
-                htmlFor="pv-mot"
-                className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-              >
-                Commentaire général de pré-réception
-              </label>
-              <textarea
-                id="pv-mot"
-                value={commentaireGeneral}
-                onChange={(e) => setCommentaireGeneral(e.target.value)}
-                rows={4}
-                placeholder="La pré-réception s’est déroulée dans de bonnes conditions. Les principaux ouvrages sont conformes. Quelques finitions restent à reprendre avant la réception définitive."
-                className="w-full resize-y rounded-2xl border border-input bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
-              />
-              <p className="text-xs text-muted-foreground">
-                Ce commentaire apparaîtra dans le document client et le document artisan.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {step === 'valider' && (
-          <ValidationStep
-            project={project}
-            onPreview={(audience) => demo.previewPrereception(project.id, actor, data, audience)}
-          />
-        )}
-
-        {step === 'envoye' && (
-          <EnvoyeStep createdId={createdId} synthese={synthese} project={project} />
-        )}
-      </div>
-
-      <footer className="border-t border-border px-5 py-4">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+        <div className="flex-1 overflow-y-auto">
           {step === 'verifier' && (
             <>
-              <span className="text-xs text-muted-foreground">
-                {hasContract
-                  ? `${prestations.length} prestation${prestations.length > 1 ? 's' : ''} au contrat`
-                  : 'Aucune prestation'}
-              </span>
-              <Button size="lg" onClick={() => setStep('finaliser')} disabled={!hasContract}>
-                Voir la synthèse
-              </Button>
+              {navMode && incompletsIds.length > 1 && (
+                <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-warning bg-warning/10 px-5 py-2.5">
+                  <span className="text-xs font-medium text-foreground">
+                    Élément incomplet {positionCible} sur {incompletsIds.length}
+                  </span>
+                  <div className="ml-auto flex gap-1.5">
+                    <Button size="sm" variant="outline" onClick={() => navErreur(-1)}>
+                      <ArrowLeft aria-hidden /> Précédent
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => navErreur(1)}>
+                      Suivant <ArrowRight aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
+                <EnteteMission
+                  chantier={project.name}
+                  adresse={project.address}
+                  client={clientName}
+                  conducteur={conducteur}
+                  reference={reference}
+                  version={nextVersion}
+                  dateStr={dateStr}
+                  heureStr={heureStr}
+                  presents={presents}
+                  onPresents={setPresents}
+                />
+
+                {!hasContract ? (
+                  <div className="rounded-2xl border border-dashed border-border bg-surface p-6 text-center text-sm text-muted-foreground">
+                    {enBrouillon
+                      ? 'Le devis doit être analysé et validé avant de lancer la pré-réception. Ouvrez « Vérifier le devis » depuis la Préparation.'
+                      : 'Aucune prestation au contrat : ajoutez d’abord le devis signé du chantier pour lancer la pré-réception.'}
+                  </div>
+                ) : (
+                  <PrestationsListe
+                    prestations={prestations}
+                    onStatut={setStatut}
+                    onPatch={patchPrestation}
+                    highlightId={highlightId}
+                  />
+                )}
+              </div>
             </>
           )}
+
           {step === 'finaliser' && (
-            <>
-              <Button variant="ghost" onClick={() => setStep('verifier')}>
-                Revenir aux prestations
-              </Button>
-              <Button
-                size="lg"
-                onClick={() => setStep('valider')}
-                disabled={incomplets > 0 || !hasContract}
-              >
-                <ShieldCheck aria-hidden /> Générer les documents
-              </Button>
-            </>
+            <div className="mx-auto max-w-2xl space-y-6 px-5 py-7">
+              <div className="space-y-1">
+                <h2 className="font-serif text-2xl font-semibold text-foreground">
+                  Synthèse de la pré-réception
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Calculée automatiquement à partir de votre vérification.
+                </p>
+              </div>
+
+              <SyntheseTiles synthese={synthese} />
+
+              {incomplets > 0 ? (
+                <div className="rounded-xl border border-warning bg-warning/10 p-3">
+                  <button
+                    type="button"
+                    onClick={() => allerVers(incompletsListe[0]!.p.posteId)}
+                    className="flex w-full items-center gap-2 text-left text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-warning"
+                  >
+                    <ClipboardCheck aria-hidden />
+                    {incomplets} prestation{incomplets > 1 ? 's' : ''} à compléter
+                    <ArrowRight aria-hidden className="ml-auto" />
+                  </button>
+                  {incomplets === 1 && (
+                    <p className="mt-1 pl-6 text-xs text-muted-foreground">
+                      {courtLabel(incompletsListe[0]!.p.label, 44)} —{' '}
+                      {incompletsListe[0]!.manque.label} manquant
+                    </p>
+                  )}
+                  {incomplets > 1 && (
+                    <ul className="mt-2 space-y-0.5">
+                      {(showAllInc ? incompletsListe : incompletsListe.slice(0, 3)).map(
+                        ({ p, manque }) => (
+                          <li key={p.posteId}>
+                            <button
+                              type="button"
+                              onClick={() => allerVers(p.posteId)}
+                              className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1 text-left text-xs text-foreground hover:bg-warning/15 [&_svg]:size-3.5 [&_svg]:text-warning"
+                            >
+                              <ArrowRight aria-hidden />
+                              <span className="font-medium">{courtLabel(p.label, 34)}</span>
+                              <span className="text-muted-foreground">
+                                — {manque.court} manquant
+                              </span>
+                            </button>
+                          </li>
+                        ),
+                      )}
+                      {incompletsListe.length > 3 && (
+                        <li>
+                          <button
+                            type="button"
+                            onClick={() => setShowAllInc((v) => !v)}
+                            className="pl-2 pt-0.5 text-xs font-medium text-gold-700 hover:underline"
+                          >
+                            {showAllInc
+                              ? 'Réduire'
+                              : `Voir les ${incompletsListe.length} prestations`}
+                          </button>
+                        </li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-gold-200 bg-gold-50 px-4 py-3 text-sm text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+                  <ShieldCheck aria-hidden />
+                  Toutes les prestations sont complètes. Les documents peuvent être vérifiés.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="pv-mot"
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  Commentaire général de pré-réception
+                </label>
+                <textarea
+                  id="pv-mot"
+                  value={commentaireGeneral}
+                  onChange={(e) => setCommentaireGeneral(e.target.value)}
+                  rows={4}
+                  placeholder="La pré-réception s’est déroulée dans de bonnes conditions. Les principaux ouvrages sont conformes. Quelques finitions restent à reprendre avant la réception définitive."
+                  className="w-full resize-y rounded-2xl border border-input bg-surface px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold-400"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ce commentaire apparaîtra dans le document client et le document artisan.
+                </p>
+              </div>
+            </div>
           )}
+
           {step === 'valider' && (
-            <>
-              <Button variant="ghost" onClick={() => setStep('verifier')}>
-                <Pencil aria-hidden /> Modifier la Pré-réception
-              </Button>
-              <Button size="lg" onClick={() => void validate()} disabled={busy || incomplets > 0}>
-                {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
-                Valider et envoyer
-              </Button>
-            </>
+            <ValidationStep
+              project={project}
+              onPreview={(audience) => demo.previewPrereception(project.id, actor, data, audience)}
+            />
           )}
+
           {step === 'envoye' && (
-            <>
-              <span className="text-xs text-muted-foreground">
-                Document validé — diffusé et verrouillé.
-              </span>
-              <Button size="lg" onClick={onClose}>
-                <Check aria-hidden /> Terminer
-              </Button>
-            </>
+            <EnvoyeStep createdId={createdId} synthese={synthese} project={project} />
           )}
         </div>
-      </footer>
 
-      <LeaveConfirmDialog
-        open={confirmLeave}
-        onCancel={() => setConfirmLeave(false)}
-        onLeave={onClose}
-      />
-    </div>
+        <footer className="border-t border-border px-5 py-4">
+          <div className="mx-auto flex max-w-2xl items-center justify-between gap-3">
+            {step === 'verifier' && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  {hasContract
+                    ? `${prestations.length} prestation${prestations.length > 1 ? 's' : ''} au contrat`
+                    : 'Aucune prestation'}
+                </span>
+                <Button size="lg" onClick={() => setStep('finaliser')} disabled={!hasContract}>
+                  Voir la synthèse
+                </Button>
+              </>
+            )}
+            {step === 'finaliser' && (
+              <>
+                <Button variant="ghost" onClick={() => setStep('verifier')}>
+                  Revenir aux prestations
+                </Button>
+                <Button
+                  size="lg"
+                  onClick={() => setStep('valider')}
+                  disabled={incomplets > 0 || !hasContract}
+                >
+                  <ShieldCheck aria-hidden /> Générer les documents
+                </Button>
+              </>
+            )}
+            {step === 'valider' && (
+              <>
+                <Button variant="ghost" onClick={() => setStep('verifier')}>
+                  <Pencil aria-hidden /> Modifier la Pré-réception
+                </Button>
+                <Button size="lg" onClick={() => void validate()} disabled={busy || incomplets > 0}>
+                  {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Check aria-hidden />}
+                  Valider et envoyer
+                </Button>
+              </>
+            )}
+            {step === 'envoye' && (
+              <>
+                <span className="text-xs text-muted-foreground">
+                  Document validé — diffusé et verrouillé.
+                </span>
+                <Button size="lg" onClick={onClose}>
+                  <Check aria-hidden /> Terminer
+                </Button>
+              </>
+            )}
+          </div>
+        </footer>
+
+        <LeaveConfirmDialog
+          open={confirmLeave}
+          onCancel={() => setConfirmLeave(false)}
+          onLeave={onClose}
+        />
+      </div>
+    </Portal>
   );
 }
 

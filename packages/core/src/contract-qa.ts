@@ -71,7 +71,13 @@ const STOP = new Set(
     'le la les un une des du de d au aux a à et ou est sont il elle on prevoit prevu prevue prevus ' +
       'compris comprise comprises inclus incluse inclues dans pour quel quelle quels quelles quoi que ' +
       'qu combien y a t il ce cette mon ma mes votre vos devis chantier contrat prestation prestations ' +
-      'sur avec par en plus moins cher chere fait faite total montant quelle est ',
+      'sur avec par en plus moins cher chere fait faite total montant quelle est ' +
+      // Négations & fillers : « non », « pas », « oui », « si » ne sont JAMAIS des
+      // entités à chercher. Ils apparaissent pourtant dans beaucoup de libellés
+      // (« béton non armé », « si nécessaire »…) : les traiter comme entité faisait
+      // matcher n'importe quel poste (« la porte est prévue non ? » → « porte non »
+      // renvoyait démolition, plomberie, peinture…). Les politesses aussi.
+      'non pas oui si svp stp merci bonjour bonsoir salut coucou',
   ).split(' '),
 );
 

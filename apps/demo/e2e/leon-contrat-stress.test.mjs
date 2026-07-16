@@ -235,6 +235,19 @@ check('Composite — « véranda carrelage » ne prétend pas qu’une véranda 
   if (r.found && /véranda/i.test(r.answer))
     throw new Error(`sur-affirmation : « véranda » citée comme prévue — ${r.answer.slice(0, 90)}`);
 });
+// Négation traitée comme MOT VIDE : « non »/« pas » ne doivent JAMAIS être une
+// entité de recherche. Sinon « la porte est prévue non ? » faisait matcher tous
+// les postes contenant le mot « non » (démolition, plomberie, peinture…).
+check('Négation — « non » n’est pas cité comme une entité trouvée', () => {
+  const r = ask('jpense ke la porte dentree est prevu non');
+  if (/«\s*[^»]*\bnon\b[^»]*»/i.test(r.answer))
+    throw new Error(`« non » traité comme entité — ${r.answer.slice(0, 90)}`);
+});
+check('Négation — « pas » n’ajoute pas de faux positifs (jacuzzi absent reste absent)', () => {
+  const r = ask('le jacuzzi n’est pas prévu si ?');
+  if (r.found && r.postes.length > 0)
+    throw new Error(`faux positif via mots vides — ${r.answer.slice(0, 90)}`);
+});
 
 const passed = results.filter(Boolean).length;
 console.log(`\n=== STRESS LÉON — ${results.length} questions ===`);
