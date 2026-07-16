@@ -19,10 +19,13 @@ export function DecisionResponder({
   decision,
   actor,
   className,
+  onResolved,
 }: {
   decision: Decision;
   actor: EventActor;
   className?: string;
+  /** Appelé après une réponse RÉUSSIE — permet un accusé rassurant côté client. */
+  onResolved?: (kind: 'reponse' | 'document') => void;
 }): React.JSX.Element {
   const isDocument = decision.attendu === 'document';
   const [open, setOpen] = useState(false);
@@ -63,6 +66,7 @@ export function DecisionResponder({
         ...(decision.docCategorie ? { categorie: decision.docCategorie } : {}),
       });
       reset();
+      onResolved?.('document');
     } finally {
       setBusy(false);
     }
@@ -79,6 +83,7 @@ export function DecisionResponder({
         resolvedAt: new Date().toISOString(),
       });
       reset();
+      onResolved?.('reponse');
     } finally {
       setBusy(false);
     }

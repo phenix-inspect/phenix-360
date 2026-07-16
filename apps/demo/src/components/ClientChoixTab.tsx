@@ -91,11 +91,21 @@ export function ClientChoixTab({
                     </p>
                     <p className="truncate text-sm text-foreground">{d.label}</p>
                   </div>
-                  <Badge variant={repondu(d) ? 'success' : 'warning'}>
-                    {repondu(d) ? 'Répondu' : 'En attente'}
+                  {/* Un choix NON encore actionnable n'est PAS « en attente de vous » —
+                      PHÉNIX prépare vos options. On l'annonce d'un ton neutre et
+                      rassurant (« Bientôt ») plutôt qu'une pastille d'alerte ambre qui
+                      laisserait croire au client qu'il est en retard ou bloqué. */}
+                  <Badge variant={repondu(d) ? 'success' : 'neutral'}>
+                    {repondu(d) ? 'Répondu' : 'Bientôt'}
                   </Badge>
                 </div>
-                {repondu(d) && <ChoixReponse decision={d} />}
+                {repondu(d) ? (
+                  <ChoixReponse decision={d} />
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    PHÉNIX vous proposera des options pour ce choix — rien à faire pour l’instant.
+                  </p>
+                )}
               </li>
             ),
           )}

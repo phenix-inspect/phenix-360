@@ -101,6 +101,20 @@ try {
   await assert('CLIENT — valide un choix', async () => {
     await page.getByRole('radio', { name: new RegExp(OPT_A, 'i') }).click();
     await page.getByRole('button', { name: /Valider mon choix/ }).click();
+  });
+
+  // ACCUSÉ RASSURANT : après validation, le client ne reste JAMAIS sans réponse —
+  // un message confirme que c'est enregistré ET transmis à un humain (réassurance).
+  await assert('CLIENT — un accusé rassurant confirme la validation', async () => {
+    const accuse = page.getByRole('status').filter({ hasText: /C.est noté/i });
+    await accuse.waitFor({ state: 'visible', timeout: 5000 });
+    await page
+      .getByText(/transmis à votre conducteur|votre conducteur s.en occupe/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 3000 });
+  });
+
+  await assert('CLIENT — le récap « Vos choix » liste le choix validé', async () => {
     // Le récap des choix vit dans l'onglet dédié « Vos choix ».
     await page.getByRole('tab', { name: 'Vos choix' }).click();
     await page

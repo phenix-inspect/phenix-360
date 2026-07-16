@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@phenix360/ui';
-import { Check, FileText, Lock, MessageCircle } from 'lucide-react';
+import { Check, FileText, Lock, MessageCircle, X } from 'lucide-react';
 import {
   buildClientDecisions,
   buildClientShareReadiness,
@@ -74,6 +74,19 @@ export function ClientView({
   const [filView, setFilView] = useState<'fil' | 'bibliotheque'>('fil');
   const [clientTab, setClientTab] = useState<ClientTab>('aujourdhui');
 
+  // Accusé de réception d'un geste client : après un choix validé, une réponse à
+  // une question ou l'envoi d'un document, un vrai humain (client qui paie
+  // 50 000 €) a besoin d'être RASSURÉ que son action a bien été prise en compte
+  // ET transmise. Sans cet accusé, la carte disparaissait en silence — un « ai-je
+  // bien validé ? » anxiogène. On mémorise le TYPE de geste (et la catégorie du
+  // choix, le cas échéant) pour un message adapté et chaleureux.
+  const [justValidated, setJustValidated] = useState<
+    | { kind: 'choix'; label: string; delegated: boolean }
+    | { kind: 'reponse' }
+    | { kind: 'document' }
+    | null
+  >(null);
+
   // Verrou anti double-clic PAR choix (synchrone) : un client qui double-clique
   // « Valider » ne doit émettre qu'UNE décision, jamais deux notifications.
   const validatingDecisions = useRef(new Set<string>());
@@ -119,6 +132,8 @@ export function ClientView({
       content,
     });
     validatingDecisions.current.delete(d.id);
+    // Accusé RASSURANT : le client sait que c'est enregistré ET transmis à un humain.
+    setJustValidated({ kind: 'choix', label: sel.categorie, delegated });
   };
 
   // Décisions demandées via le Journal (échange documentaire ou question) — des
@@ -188,7 +203,44 @@ export function ClientView({
 
   return (
     <div className="space-y-6">
-      <Tabs value={clientTab} onValueChange={(v) => setClientTab(v as ClientTab)}>
+      {justValidated && (
+        <div
+          role="status"
+          className="flex items-start gap-3 rounded-2xl border border-success/30 bg-success/10 p-4 sm:p-5"
+        >
+          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground [&_svg]:size-5">
+            <Check aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium text-foreground">C’est noté — merci !</p>
+            <p className="mt-0.5 text-sm leading-relaxed text-ink-600">
+              {justValidated.kind === 'document'
+                ? 'Votre document est bien reçu et transmis à votre conducteur. Vous n’avez rien d’autre à faire.'
+                : justValidated.kind === 'reponse'
+                  ? 'Votre réponse est transmise à votre conducteur. Il revient vers vous s’il a besoin d’une précision.'
+                  : justValidated.delegated
+                    ? `Vous nous confiez le choix « ${justValidated.label} » : c’est enregistré, votre conducteur s’en occupe. Vous n’avez rien d’autre à faire.`
+                    : `Votre choix « ${justValidated.label} » est enregistré et transmis à votre conducteur. Vous n’avez rien d’autre à faire : il revient vers vous s’il a besoin d’une précision.`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setJustValidated(null)}
+            aria-label="Fermer ce message"
+            className="shrink-0 rounded-full p-1 text-muted-foreground transition-colors hover:bg-surface hover:text-foreground [&_svg]:size-4"
+          >
+            <X aria-hidden />
+          </button>
+        </div>
+      )}
+      <Tabs
+        value={clientTab}
+        onValueChange={(v) => {
+          // Changer d'onglet acquitte l'accusé (il a joué son rôle de réassurance).
+          setJustValidated(null);
+          setClientTab(v as ClientTab);
+        }}
+      >
         <TabsList className="h-auto flex-wrap">
           <TabsTrigger value="aujourdhui">Aujourd’hui</TabsTrigger>
           <TabsTrigger value="demandes">Vos demandes</TabsTrigger>
@@ -261,7 +313,12 @@ export function ClientView({
                             <FileText aria-hidden />
                             {d.question}
                           </p>
-                          <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                          <DecisionResponder
+                            decision={d}
+                            actor={actor}
+                            className="mt-2"
+                            onResolved={(kind) => setJustValidated({ kind })}
+                          />
                         </li>
                       ))}
                     </ul>
@@ -280,7 +337,12 @@ export function ClientView({
                           className="rounded-xl border border-border bg-surface p-4"
                         >
                           <p className="text-sm text-foreground">{d.question}</p>
-                          <DecisionResponder decision={d} actor={actor} className="mt-2" />
+                          <DecisionResponder
+                            decision={d}
+                            actor={actor}
+                            className="mt-2"
+                            onResolved={(kind) => setJustValidated({ kind })}
+                          />
                         </li>
                       ))}
                     </ul>
