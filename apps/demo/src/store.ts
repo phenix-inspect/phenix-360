@@ -253,6 +253,16 @@ const emptyState = (): BackendState => ({ projects: [], members: [], events: [] 
  */
 const memMirror = new Map<string, string>();
 
+/**
+ * L'écriture localStorage a-t-elle échoué au moins une fois (quota saturé) ? La
+ * session reste fonctionnelle (miroir mémoire), mais le travail pourrait ne pas
+ * survivre à un rechargement. On l'expose dans le snapshot pour AVERTIR
+ * l'utilisateur — sans ce signal visible, la perte serait silencieuse (le pire
+ * appel au support : « mes photos ont disparu »). Drapeau collant : une fois vrai,
+ * il le reste pour la session (le quota ne se libère pas tout seul).
+ */
+let storageSaturated = false;
+
 function lsGet(key: string): string | null {
   if (memMirror.has(key)) return memMirror.get(key) ?? null;
   try {
@@ -272,6 +282,7 @@ function safeSetItem(key: string, value: string): boolean {
     localStorage.setItem(key, value);
     return true;
   } catch (e) {
+    storageSaturated = true;
     console.warn(
       `[phenix-demo] Persistance impossible pour « ${key} » (quota localStorage ?). ` +
         `La session continue en mémoire ; la donnée peut ne pas survivre au rechargement.`,
@@ -407,6 +418,12 @@ export interface DemoSnapshot extends BackendState {
    * d'imposer la démo. Passe à `true` dès qu'un choix est fait.
    */
   seeded: boolean;
+  /**
+   * Le stockage local est-il saturé (une écriture a échoué) ? Vrai ⇒ la session
+   * reste active mais le travail pourrait ne pas survivre à un rechargement. L'UI
+   * l'affiche pour que l'utilisateur agisse (libérer de l'espace) — jamais silencieux.
+   */
+  storageSaturated: boolean;
 }
 
 const kv = new LocalStorageKeyValueStore();
@@ -484,6 +501,7 @@ function build(): DemoSnapshot {
         ? localStorage.getItem(COOKIE_CONSENT_KEY) !== null
         : false,
     seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
+    storageSaturated,
   };
 }
 

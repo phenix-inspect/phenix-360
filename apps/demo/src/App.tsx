@@ -143,6 +143,22 @@ export function App(): React.JSX.Element {
 
   return (
     <div className="min-h-screen">
+      {snap.storageSaturated && (
+        // AVERTISSEMENT DE STOCKAGE SATURÉ — jamais silencieux. La session reste
+        // active (vérité en mémoire), mais le travail pourrait ne pas survivre à un
+        // rechargement : on prévient clairement pour éviter la perte « invisible ».
+        <div
+          role="alert"
+          className="flex items-start justify-center gap-2 bg-warning/15 px-4 py-2 text-center text-sm text-foreground [&_svg]:mt-0.5 [&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-warning"
+        >
+          <AlertTriangle aria-hidden />
+          <span>
+            <strong>Espace de stockage saturé sur cet appareil.</strong> Votre travail reste actif
+            pour cette session, mais pourrait ne pas être conservé après un rechargement. Fermez
+            d’autres onglets ou contactez PHÉNIX avant de recharger.
+          </span>
+        </div>
+      )}
       <header className="sticky top-0 z-sticky border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-4 py-5 sm:px-6">
           <button
