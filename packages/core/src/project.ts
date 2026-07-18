@@ -66,6 +66,13 @@ export const PROJECT_STATUS_ORDER: Record<ProjectStatus, number> = {
 
 export interface Project {
   id: ProjectId;
+  /**
+   * Code chantier `AA-VV-NNN` (ex. « 26-LY-001 ») — identifiant UNIQUE, DÉFINITIF
+   * et lisible, généré automatiquement à la création (voir `project-code.ts`). Ne
+   * change JAMAIS, même si le chantier change de nom, d'adresse ou de ville :
+   * aucun `ProjectPatch` ne l'expose. Référence commune à tout l'écosystème.
+   */
+  code: string;
   /** Titre du chantier. */
   name: string;
   /** Client propriétaire — V1 : un client = un chantier. */

@@ -15,6 +15,7 @@ import {
   defaultLaunchChecklist,
   coupDeCoeurId,
   currentStep,
+  ensureProjectCodes,
   eventId,
   filPhotoId,
   messageId,
@@ -296,6 +297,10 @@ export function buildDemoSeed(): DemoSeed {
 
   const project: Project = {
     id: pid,
+    // Code attribué par `ensureProjectCodes` à l'assemblage final (déterministe,
+    // ordre chronologique) — on ne le fige pas ici pour rester juste quelle que
+    // soit l'année de génération de la démo.
+    code: '',
     name: 'Appartement Lyon 6e',
     clientId,
     address: '8 rue Vauban, 69006 Lyon',
@@ -937,6 +942,7 @@ export function buildDemoSeed(): DemoSeed {
 
     extraProjects.push({
       id: cid,
+      code: '', // attribué à l'assemblage final (voir `ensureProjectCodes`)
       name: opts.name,
       clientId: clId,
       address: opts.address,
@@ -1094,7 +1100,8 @@ export function buildDemoSeed(): DemoSeed {
 
   return {
     state: {
-      projects: [project, ...extraProjects],
+      // Codes chantier attribués ici (déterministe, ordre chronologique de création).
+      projects: ensureProjectCodes([project, ...extraProjects]),
       members: [...members, ...extraMembers],
       events: [...events, ...extraEvents],
     },

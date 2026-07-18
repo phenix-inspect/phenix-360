@@ -43,6 +43,12 @@ export interface ArtisanSignataire {
 /** Contexte de rendu d'un document (résolu depuis le snapshot par le store). */
 export interface DocumentContext {
   projectName: string;
+  /**
+   * Code chantier `AA-VV-NNN` — référence UNIQUE reprise sur TOUS les documents
+   * (CR, PV, DOE…) et lisible par tous (client, artisan, conducteur), contrairement
+   * aux codes système internes PR-/REC- masqués côté client.
+   */
+  projectCode?: string;
   authorName: string;
   /** Adresse complète du chantier (en-tête du PV). */
   address?: string;
@@ -482,6 +488,7 @@ export function buildDocumentHtml(
   <div class="brand">PHÉNIX 360${audienceLabel ? ` · ${esc(audienceLabel)}` : ''}</div>
   <h1>${esc(title)}</h1>
   <div class="metas">
+    ${line('Code chantier', ctx.projectCode)}
     ${line('Chantier', ctx.projectName)}
     ${line('Adresse', ctx.address)}
     ${line('Client', ctx.clientName)}

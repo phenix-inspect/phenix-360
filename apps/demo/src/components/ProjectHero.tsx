@@ -40,6 +40,13 @@ export function ProjectHero({
   return (
     <div className={cn('flex flex-wrap items-start justify-between gap-x-6 gap-y-3', className)}>
       <div className="space-y-1">
+        {project.code && (
+          // Code chantier = référence unique et définitive, mise en avant (mono
+          // pour la lisibilité d'un identifiant, repris dans tous les documents).
+          <p className="font-mono text-xs font-semibold uppercase tracking-[0.14em] text-gold-700">
+            {project.code}
+          </p>
+        )}
         <h1
           className={cn(
             'font-serif font-semibold tracking-tight text-foreground',

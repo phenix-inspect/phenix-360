@@ -431,6 +431,8 @@ function header(
   const isClient = audience === 'client';
 
   const rows: [string, string | undefined][] = [
+    // Le CODE CHANTIER est la référence commune à tous (client compris) : en tête.
+    ['Code chantier', ctx.projectCode],
     ['Chantier', ctx.projectName],
     ['Adresse', ctx.address],
     ['Client', ctx.clientName],

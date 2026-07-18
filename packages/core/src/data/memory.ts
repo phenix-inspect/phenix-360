@@ -22,6 +22,7 @@ import {
 } from '../ids.js';
 import type { DemandeResolution, Event, EventVisibility } from '../event.js';
 import type { Project, ProjectMember } from '../project.js';
+import { generateProjectCode } from '../project-code.js';
 import { currentStep } from '../views.js';
 import type { Backend, NewEvent, NewMember, NewProject, ProjectPatch } from './repository.js';
 
@@ -72,14 +73,22 @@ export class InMemoryBackend implements Backend {
   /* --- Projets & membres ------------------------------------------------- */
   async createProject(input: NewProject): Promise<Project> {
     const state = this.read();
+    const createdAt = now();
     const project: Project = {
       id: toProjectId(uuid()),
+      // Code chantier DÉFINITIF, généré ici (seul point de création). Le compteur
+      // annuel global se lit sur les codes déjà attribués — jamais de doublon.
+      code: generateProjectCode({
+        address: input.address ?? null,
+        createdAt,
+        existingCodes: state.projects.map((p) => p.code).filter(Boolean),
+      }),
       name: input.name,
       clientId: input.clientId ?? null,
       ...(input.address !== undefined ? { address: input.address } : {}),
       status: input.status ?? 'pas_commence',
       currentStep: input.currentStep ?? null,
-      createdAt: now(),
+      createdAt,
     };
     state.projects.push(project);
     this.write(state);

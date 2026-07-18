@@ -60,6 +60,7 @@ const readPdf = async (bytes) => {
 
 const ctx = {
   projectName: 'Appartement Lyon 6e',
+  projectCode: '26-LY-001',
   authorName: 'Léon',
   address: '12 rue de la Ré, Lyon 6e',
   clientName: 'Mme Bernard',
@@ -217,6 +218,17 @@ await check('Compte rendu (points) → PDF + commentaire du point', async () => 
   const { text } = await readPdf(buildDocumentPdf(crPointsEvent(), ctx, 'client'));
   if (!text.includes('Carrelage terminé au séjour.'))
     throw new Error('commentaire du point absent');
+});
+
+/* -- 5b. Code chantier : présent sur TOUS les PDF, toutes audiences --------- */
+await check('Le code chantier figure sur le PDF client ET artisan', async () => {
+  for (const audience of ['client', 'artisan', 'conducteur']) {
+    const { text } = await readPdf(buildDocumentPdf(prereceptionEvent('publie'), ctx, audience));
+    const flat = text.replace(/\s+/g, ' ');
+    if (!flat.includes('Code chantier'))
+      throw new Error(`libellé « Code chantier » absent (${audience})`);
+    if (!flat.includes('26-LY-001')) throw new Error(`code « 26-LY-001 » absent (${audience})`);
+  }
 });
 
 /* -- 6. Pagination : un document volumineux tient sur plusieurs pages ------- */

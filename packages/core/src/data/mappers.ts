@@ -27,6 +27,7 @@ import type { NewEvent } from './repository.js';
 export function mapProjectRow(r: ProjectRow): Project {
   return {
     id: projectId(r.id),
+    code: r.code,
     name: r.name,
     clientId: r.client_id !== null ? userId(r.client_id) : null,
     status: r.status,

@@ -11,6 +11,8 @@ import type { ProjectStatus, ProjectStep } from '../project.js';
 
 export interface ProjectRow {
   id: string;
+  /** Code chantier `AA-VV-NNN` — identifiant définitif (colonne stockée). */
+  code: string;
   name: string;
   client_id: string | null;
   status: ProjectStatus;

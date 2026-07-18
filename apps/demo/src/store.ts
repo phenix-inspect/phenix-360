@@ -15,6 +15,7 @@ import {
   INTERNAL_AUDIENCE,
   SHARED_AUDIENCE,
   InMemoryBackend,
+  ensureProjectCodes,
   PROJECT_STATUS_LABEL,
   deriveProjectStatus,
   answerContractQuestion,
@@ -461,6 +462,20 @@ function migrateDossierChecklists(): void {
 }
 
 /**
+ * Migration douce : les chantiers créés AVANT le code chantier `AA-VV-NNN` n'en
+ * ont pas. On l'attribue de façon déterministe (ordre chronologique), en
+ * préservant les codes déjà valides (définitifs). Idempotent.
+ */
+function migrateProjectCodes(): void {
+  if (typeof localStorage === 'undefined') return;
+  const state = kv.load();
+  if (!state) return;
+  const projects = ensureProjectCodes(state.projects);
+  const changed = projects.some((p, i) => p !== state.projects[i]);
+  if (changed) kv.save({ ...state, projects });
+}
+
+/**
  * Repère « notifications » : posé au tout premier chargement (ou à la migration
  * d'un poste existant). Les faits antérieurs (historique seedé) ne notifient pas ;
  * seules les actions de la session en cours le font.
@@ -472,6 +487,7 @@ function ensureNotifBaseline(): void {
 }
 
 migrateDossierChecklists();
+migrateProjectCodes();
 ensureNotifBaseline();
 let snapshot: DemoSnapshot = build();
 
@@ -884,6 +900,8 @@ export const demo = {
       name: proposal.projectName,
       status: 'pas_commence',
       clientId,
+      // L'adresse (issue du devis) sert à dériver le code ville VV du code chantier.
+      ...(proposal.dossier.infos.address ? { address: proposal.dossier.infos.address } : {}),
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
     await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
@@ -2335,6 +2353,7 @@ function docContextFor(
   const clientName = project?.clientId ? snap.people[project.clientId] : undefined;
   return {
     projectName: project?.name ?? 'Chantier',
+    ...(project?.code ? { projectCode: project.code } : {}),
     authorName: nameOf(snap, authorUserId ?? event.actor.userId),
     ...(project?.address ? { address: project.address } : {}),
     ...(clientName ? { clientName } : {}),

@@ -456,6 +456,7 @@ export function AujourdhuiView({
                       clientName={nameOf(snap, projectClientId(snap, c.projectId))}
                       active={c.projectId === activeId}
                       clientComments={comments}
+                      code={projectById(c.projectId)?.code}
                       onOpen={() =>
                         onOpenChantier(
                           c.projectId,
@@ -698,6 +699,7 @@ function ChantierCard({
   clientName,
   active,
   clientComments = 0,
+  code,
   onOpen,
 }: {
   domId: string;
@@ -705,6 +707,8 @@ function ChantierCard({
   clientName: string;
   active?: boolean;
   clientComments?: number;
+  /** Code chantier `AA-VV-NNN` — référence unique affichée dans la liste. */
+  code?: string;
   onOpen: () => void;
 }): React.JSX.Element {
   const c = chantier;
@@ -750,6 +754,11 @@ function ChantierCard({
       />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          {code && (
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-wider text-gold-700">
+              {code}
+            </span>
+          )}
           <span className="font-serif text-lg font-semibold text-foreground">{c.name}</span>
           <Badge variant={PROJECT_STATUS_BADGE[c.status]}>{PROJECT_STATUS_LABEL[c.status]}</Badge>
           <span className="text-xs text-muted-foreground">{clientName}</span>

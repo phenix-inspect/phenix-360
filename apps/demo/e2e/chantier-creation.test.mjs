@@ -80,6 +80,21 @@ try {
       .waitFor({ state: 'visible', timeout: 8000 });
   });
 
+  await assert(
+    'La création attribue automatiquement un code chantier (ville Lyon → LY)',
+    async () => {
+      // Adresse du devis « … 69006 Lyon » ⇒ VV = LY. Le code est généré à la création.
+      const codes = await page.evaluate(() =>
+        Array.from(document.querySelectorAll('span, p'))
+          .map((e) => (e.textContent || '').trim())
+          .filter((t) => /^\d{2}-[A-Z]{2}-\d{3}$/.test(t)),
+      );
+      const code = codes[0] ?? '';
+      if (!/^\d{2}-LY-\d{3}$/.test(code))
+        throw new Error(`code attendu au format AA-LY-NNN, obtenu « ${code} »`);
+    },
+  );
+
   await assert('Les « photos avant travaux » sont bien au Récit', async () => {
     await page.getByRole('tab', { name: 'Dans les coulisses' }).click();
     await page.getByText('Avant travaux').first().waitFor({ state: 'visible', timeout: 5000 });
