@@ -5,7 +5,7 @@
  * (camelCase, identifiants branded). Le contenu jsonb est stocké tel quel
  * (clés camelCase) : seul un cast typé selon `type` est nécessaire.
  */
-import { captureId, eventId, projectId, userId } from '../ids.js';
+import { captureId, eventId, projectId, projectMemberId, userId } from '../ids.js';
 import type { EventActor } from '../actor.js';
 import type {
   ActionEventContent,
@@ -20,9 +20,28 @@ import type {
   PhotoContent,
   ReserveEventContent,
 } from '../event.js';
-import type { Project } from '../project.js';
-import type { EventRow, ProjectRow } from './rows.js';
-import type { NewEvent } from './repository.js';
+import type { Project, ProjectMember } from '../project.js';
+import type { EventRow, MemberRow, ProjectRow } from './rows.js';
+import type { NewEvent, NewMember } from './repository.js';
+
+export function mapMemberRow(r: MemberRow): ProjectMember {
+  return {
+    id: projectMemberId(r.id),
+    projectId: projectId(r.project_id),
+    userId: userId(r.user_id),
+    role: r.role,
+    createdAt: r.created_at,
+  };
+}
+
+/** Construit la ligne d'insertion d'un membre (id/date générés par la base). */
+export function toMemberInsert(input: NewMember): Omit<MemberRow, 'id' | 'created_at'> {
+  return {
+    project_id: input.projectId,
+    user_id: input.userId,
+    role: input.role,
+  };
+}
 
 export function mapProjectRow(r: ProjectRow): Project {
   return {

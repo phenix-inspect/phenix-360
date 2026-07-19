@@ -20,6 +20,14 @@ export interface ProjectRow {
   created_at: string;
 }
 
+export interface MemberRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: Role;
+  created_at: string;
+}
+
 export interface EventRow {
   id: string;
   project_id: string;
