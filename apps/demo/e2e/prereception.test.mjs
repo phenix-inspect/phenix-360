@@ -129,7 +129,7 @@ try {
         throw new Error('la réserve n’est pas mise en évidence (pictogramme d’alerte)');
       await c.getByText(/Photos \(0\/3\)/).waitFor({ state: 'visible', timeout: 4000 });
       // 1 à 3 photos : on en ajoute deux.
-      await c.locator('input[type=file]').setInputFiles([photo(1), photo(2)]);
+      await c.locator('input[type=file]:not([capture])').setInputFiles([photo(1), photo(2)]);
       await c.locator('img').nth(1).waitFor({ state: 'visible', timeout: 5000 });
       if ((await c.locator('img').count()) !== 2)
         throw new Error('les 2 photos ne sont pas montées');

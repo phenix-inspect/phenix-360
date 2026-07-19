@@ -34,7 +34,7 @@ const addViaMission = async (libelle, visibilityLabel, file) => {
   await page.getByRole('button', { name: /Ajouter un document/ }).click();
   const dlg = page.getByRole('dialog');
   await dlg.getByLabel('Libellé du document').fill(libelle);
-  await dlg.locator('input[type=file]').setInputFiles(file);
+  await dlg.locator('input[type=file]:not([capture])').setInputFiles(file);
   await dlg.getByText(file.name).first().waitFor({ state: 'visible', timeout: 6000 });
   await dlg.locator('select').selectOption({ label: visibilityLabel });
   await dlg.getByRole('button', { name: 'Publier' }).click();
@@ -49,7 +49,7 @@ try {
   await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
   await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
   await page
-    .locator('input[type=file]')
+    .locator('input[type=file]:not([capture])')
     .first()
     .setInputFiles([
       { name: 'Devis.pdf', mimeType: 'application/pdf', buffer: phenixDevisPdf({}) },

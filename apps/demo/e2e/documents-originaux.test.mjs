@@ -72,7 +72,7 @@ const importDocument = async (libelle, file) => {
     .click();
   const dlg = page.getByRole('dialog');
   await dlg.getByLabel('Libellé du document').fill(libelle);
-  await dlg.locator('input[type=file]').setInputFiles(file);
+  await dlg.locator('input[type=file]:not([capture])').setInputFiles(file);
   await dlg.getByText(file.name).waitFor({ state: 'visible', timeout: 6000 });
   await dlg.getByRole('button', { name: 'Publier' }).click();
   await dlg.waitFor({ state: 'detached', timeout: 6000 });

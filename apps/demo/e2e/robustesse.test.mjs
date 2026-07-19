@@ -27,7 +27,7 @@ const deposit = async (files) => {
   await gerer().click();
   await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
   await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
-  await page.locator('input[type=file]').first().setInputFiles(files);
+  await page.locator('input[type=file]:not([capture])').first().setInputFiles(files);
   await page.getByRole('button', { name: /Préparer mon chantier/ }).click();
 };
 const pdf = (name, buffer) => ({ name, mimeType: 'application/pdf', buffer });
@@ -94,7 +94,7 @@ try {
     await gerer().click();
     await page.getByRole('button', { name: /Importer une sauvegarde/ }).click();
     await page
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles([
         {
@@ -118,7 +118,7 @@ try {
     const content = readFileSync(await (await dl).path(), 'utf8');
     await page.getByRole('button', { name: /Importer une sauvegarde/ }).click();
     await page
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles([
         { name: 'save.json', mimeType: 'application/json', buffer: Buffer.from(content) },

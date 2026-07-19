@@ -109,7 +109,7 @@ try {
         .click();
       const dlg = page.getByRole('dialog');
       await dlg.getByLabel('Libellé du document').fill(DOC_LABEL);
-      await dlg.locator('input[type=file]').setInputFiles(PDF);
+      await dlg.locator('input[type=file]:not([capture])').setInputFiles(PDF);
       await dlg.getByText(PDF.name).waitFor({ state: 'visible', timeout: 6000 });
       await dlg.getByRole('button', { name: 'Publier' }).click();
       await dlg.waitFor({ state: 'detached', timeout: 6000 });

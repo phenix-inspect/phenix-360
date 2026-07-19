@@ -21,7 +21,7 @@ const deposit = async (buffer, name) => {
   await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
   await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
   await page
-    .locator('input[type=file]')
+    .locator('input[type=file]:not([capture])')
     .first()
     .setInputFiles([{ name, mimeType: 'application/pdf', buffer }]);
   await page.getByRole('button', { name: /Préparer mon chantier/ }).click();

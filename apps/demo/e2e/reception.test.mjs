@@ -81,7 +81,7 @@ try {
       .waitFor({ state: 'visible', timeout: 8000 });
     await card(P_WC).getByRole('button', { name: 'Avec réserve', exact: true }).click();
     const c = card(P_WC);
-    await c.locator('input[type=file]').setInputFiles([photo(1)]);
+    await c.locator('input[type=file]:not([capture])').setInputFiles([photo(1)]);
     await c.locator('img').first().waitFor({ state: 'visible', timeout: 5000 });
     await c.locator('textarea').fill(RESERVE_COMMENT);
     await page.getByRole('button', { name: 'Voir la synthèse' }).click();
@@ -148,7 +148,7 @@ try {
     if (!(await validerBtn().isDisabled()))
       throw new Error('validation permise sans photo « après »');
     // + une photo « après » → la réserve est levée.
-    await c.locator('input[type=file]').setInputFiles([photo(2)]);
+    await c.locator('input[type=file]:not([capture])').setInputFiles([photo(2)]);
     await c.locator('img').last().waitFor({ state: 'visible', timeout: 5000 });
   });
 

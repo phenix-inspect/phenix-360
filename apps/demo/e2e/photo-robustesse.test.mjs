@@ -27,7 +27,7 @@ try {
   await openDemo(page);
   await openCompteRendu();
 
-  const fileInput = page.locator('input[type=file][accept="image/*"]').first();
+  const fileInput = page.locator('input[type=file]:not([capture])').first();
 
   await assert('Fichier NON-image → message clair, aucune photo ajoutée', async () => {
     await fileInput.setInputFiles({

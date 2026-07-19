@@ -11,7 +11,8 @@ import {
 import type { EventActor, ReserveEvent, UploadedMedia } from '@phenix360/core';
 import { ImagePlus, Loader2, X } from 'lucide-react';
 import { demo } from '../store';
-import { ACCEPT_IMAGE, loadPhotos } from '../lib/media';
+import { loadPhotos } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 
 /**
  * Lever une réserve — clôture PROPRE et append-only. On n'efface ni ne modifie
@@ -32,8 +33,8 @@ export function ReserveLeveeDialog({
   const [busy, setBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
 
-  const onPick = async (files: FileList | null): Promise<void> => {
-    const file = files?.[0];
+  const onPick = async (files: File[]): Promise<void> => {
+    const file = files[0];
     if (!file) return;
     setBusy(true);
     try {
@@ -101,25 +102,20 @@ export function ReserveLeveeDialog({
                 </button>
               </div>
             ) : (
-              <label className="block">
-                <input
-                  type="file"
-                  accept={ACCEPT_IMAGE}
-                  className="sr-only"
-                  onChange={(e) => void onPick(e.target.files)}
-                />
-                <span className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-paper-50 py-4 text-sm text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground [&_svg]:size-5">
-                  {busy ? (
-                    <>
-                      <Loader2 aria-hidden className="animate-spin" /> Traitement…
-                    </>
-                  ) : (
-                    <>
-                      <ImagePlus aria-hidden /> Ajouter une photo de preuve
-                    </>
-                  )}
-                </span>
-              </label>
+              <PhotoInput
+                onFiles={onPick}
+                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-paper-50 py-4 text-sm text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground [&_svg]:size-5"
+              >
+                {busy ? (
+                  <>
+                    <Loader2 aria-hidden className="animate-spin" /> Traitement…
+                  </>
+                ) : (
+                  <>
+                    <ImagePlus aria-hidden /> Ajouter une photo de preuve
+                  </>
+                )}
+              </PhotoInput>
             )}
             {photoError && (
               <p role="alert" className="text-sm text-destructive">

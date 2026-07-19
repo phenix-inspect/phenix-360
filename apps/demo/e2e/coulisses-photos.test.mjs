@@ -85,7 +85,7 @@ try {
     await page.getByRole('button', { name: /Ajouter un document/ }).click();
     const dlg = page.getByRole('dialog');
     await dlg.getByLabel('Libellé du document').fill(DOC_LIBELLE);
-    await dlg.locator('input[type=file]').setInputFiles(photo(99));
+    await dlg.locator('input[type=file]:not([capture])').setInputFiles(photo(99));
     await dlg
       .getByText(/photo-99/)
       .first()
@@ -120,7 +120,7 @@ try {
     // On publie SANS ouvrir « Dans les coulisses » (le sous-menu ne publie plus).
     await openAlbumComposer();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('input[type=file]').setInputFiles(photo(1));
+    await dialog.locator('input[type=file]:not([capture])').setInputFiles(photo(1));
     await dialog.getByPlaceholder(/Décrivez ce moment/).fill('Une première photo');
     await dialog.getByRole('button', { name: /Créer le moment/ }).click();
     await dialog.waitFor({ state: 'detached', timeout: 8000 });
@@ -143,7 +143,7 @@ try {
   await assert('Ajout de 12 photos → un seul album, limité à 10 (partagé client)', async () => {
     await openAlbumComposer();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('input[type=file]').setInputFiles(TWELVE);
+    await dialog.locator('input[type=file]:not([capture])').setInputFiles(TWELVE);
     // La limite est atteinte → « Album complet — 10 photos maximum ».
     await dialog
       .getByText(/Album complet — 10 photos maximum/)

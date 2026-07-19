@@ -80,11 +80,11 @@ try {
     // [1] photo de l'option A, puis [2] photo de l'option B après « Ajouter ».
     // Option A + photo.
     await dlg.getByPlaceholder('Titre du choix A').fill(OPT_A);
-    await dlg.locator('input[type=file]').nth(1).setInputFiles(PNG);
+    await dlg.locator('input[type=file]:not([capture])').nth(1).setInputFiles(PNG);
     // Option B + photo.
     await dlg.getByRole('button', { name: /Ajouter un choix/ }).click();
     await dlg.getByPlaceholder('Titre du choix B').fill(OPT_B);
-    await dlg.locator('input[type=file]').nth(2).setInputFiles(PNG);
+    await dlg.locator('input[type=file]:not([capture])').nth(2).setInputFiles(PNG);
     await page.waitForTimeout(400);
     await dlg.getByRole('button', { name: /Envoyer au client/ }).click();
     await dlg.waitFor({ state: 'detached', timeout: 6000 });

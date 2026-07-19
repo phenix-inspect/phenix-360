@@ -37,7 +37,7 @@ const draftSection = () => page.locator('section').filter({ hasText: 'Ajouter ce
 /** Ajoute un point : n photos + commentaire + cible, puis « Ajouter ce point ». */
 const addPoint = async (i, comment, cible, nbPhotos = 1) => {
   const files = Array.from({ length: nbPhotos }, (_, k) => photo(i * 10 + k));
-  await page.locator('input[type=file]').first().setInputFiles(files);
+  await page.locator('input[type=file]:not([capture])').first().setInputFiles(files);
   await page.getByPlaceholder(/Décrivez ce point/).fill(comment);
   await page.getByRole('button', { name: cible, exact: true }).click();
   await page.getByRole('button', { name: 'Ajouter ce point' }).click();
@@ -79,7 +79,7 @@ try {
     await page.getByText('point par point', { exact: false }).first().waitFor({ timeout: 6000 });
     // Point 1 : un mini-album de 3 photos (l'upload est asynchrone → on attend).
     await page
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles([photo(10), photo(11), photo(12)]);
     await draftSection().locator('img').nth(2).waitFor({ state: 'visible', timeout: 5000 });

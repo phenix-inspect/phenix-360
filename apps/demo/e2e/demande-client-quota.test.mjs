@@ -90,7 +90,7 @@ try {
       await page.getByRole('button', { name: 'Ouvrir PHÉNIX' }).click();
       await leon().getByPlaceholder('Écrivez à PHÉNIX').fill('Peut-on décaler la réception ?');
       await leon()
-        .locator('input[type=file]')
+        .locator('input[type=file]:not([capture])')
         .setInputFiles({ name: 'grande.png', mimeType: 'image/png', buffer: bigPng(1200) });
       await page.waitForTimeout(1200);
       await leon().getByRole('button', { name: 'Envoyer' }).click();

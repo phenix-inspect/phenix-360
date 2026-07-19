@@ -53,7 +53,7 @@ const createChantier = async () => {
   await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
   await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
   await page
-    .locator('input[type=file]')
+    .locator('input[type=file]:not([capture])')
     .first()
     .setInputFiles([
       { name: 'Devis.pdf', mimeType: 'application/pdf', buffer: phenixDevisPdf({}) },
@@ -146,7 +146,7 @@ try {
     // Le champ fichier de « Gérer » (la Préparation derrière le dialogue en a un aussi).
     await page
       .getByRole('dialog')
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .setInputFiles([
         { name: 'save.json', mimeType: 'application/json', buffer: Buffer.from(content) },
       ]);

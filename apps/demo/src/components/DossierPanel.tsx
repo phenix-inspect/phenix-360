@@ -58,6 +58,7 @@ import { fmtDate, fmtDateShort, fmtMoney } from '../lib/format';
 import { openAttachment } from '../lib/document';
 import { readDocumentAttachment, MAX_DOC_MB } from '../lib/upload';
 import { ACCEPT_DOCUMENT } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 import { LeaveConfirmInline } from './mission/LeaveGuard';
 import { ContactPicker } from './contacts/ContactPicker';
 import { DevisVerification } from './DevisVerification';
@@ -896,7 +897,6 @@ function AvenantDepositDialog({
     { id: crypto.randomUUID(), label: '', montantHT: '', tva: 20, remplacePosteId: '' },
   ]);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   // Postes ACTIFS du contrat consolidé (pour cibler un remplacement).
   const consolidated = consolidateDevis(devis, validatedAvenants);
@@ -1000,16 +1000,6 @@ function AvenantDepositDialog({
         <div className="space-y-5">
           {/* 1. Le document signé (obligatoire). */}
           <div className="space-y-2">
-            <input
-              ref={fileRef}
-              type="file"
-              accept={ACCEPT_DOCUMENT}
-              className="hidden"
-              onChange={(e) => {
-                void onPick(e.target.files?.[0]);
-                e.target.value = '';
-              }}
-            />
             {attachment ? (
               <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-sm">
                 <span className="flex size-9 items-center justify-center rounded-lg bg-gold-100 text-gold-700 [&_svg]:size-5">
@@ -1028,14 +1018,16 @@ function AvenantDepositDialog({
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
+              <PhotoInput
+                onFiles={(files) => onPick(files[0])}
+                accept={ACCEPT_DOCUMENT}
+                disabled={busy}
+                title="Déposer l’avenant signé"
                 className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted-foreground transition-colors hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-6 [&_svg]:text-gold-600"
               >
                 {busy ? <Loader2 aria-hidden className="animate-spin" /> : <Upload aria-hidden />}
                 Déposer l’avenant signé (PDF ou image, max {MAX_DOC_MB} Mo)
-              </button>
+              </PhotoInput>
             )}
             {uploadError && (
               <p role="alert" className="text-sm text-destructive">

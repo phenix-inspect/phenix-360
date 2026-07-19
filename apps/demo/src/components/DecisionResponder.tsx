@@ -1,10 +1,11 @@
-import { useRef, useState } from 'react';
-import { Button, Textarea } from '@phenix360/ui';
+import { useState } from 'react';
+import { Button, Textarea, buttonVariants } from '@phenix360/ui';
 import { Paperclip, X } from 'lucide-react';
 import type { Decision, EventActor, EventAttachment } from '@phenix360/core';
 import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment } from '../lib/upload';
 import { ACCEPT_DOCUMENT } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 
 /**
  * Réponse du client à une demande adressée par le conducteur. Deux natures :
@@ -33,7 +34,6 @@ export function DecisionResponder({
   const [pending, setPending] = useState<EventAttachment | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = (): void => {
     setTexte('');
@@ -121,22 +121,19 @@ export function DecisionResponder({
 
   return (
     <div className={className}>
-      <input
-        ref={fileRef}
-        type="file"
-        accept={ACCEPT_DOCUMENT}
-        className="hidden"
-        data-testid="client-doc-file"
-        onChange={(e) => {
-          void onPick(e.target.files?.[0]);
-          e.target.value = '';
-        }}
-      />
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+        {/* Document : PDF ou PHOTO d'un document — « Prendre une photo » (appareil)
+            ou « Choisir un fichier » (PDF depuis Fichiers/Drive/iCloud). */}
+        <PhotoInput
+          onFiles={(files) => onPick(files[0])}
+          accept={ACCEPT_DOCUMENT}
+          inputTestId="client-doc-file"
+          title="Joindre un document"
+          className={buttonVariants({ variant: 'outline', size: 'sm' })}
+        >
           <Paperclip aria-hidden />
           {pending ? pending.fileName : `Joindre un document (PDF ou photo, max ${MAX_DOC_MB} Mo)`}
-        </Button>
+        </PhotoInput>
         {pending && (
           <button
             type="button"

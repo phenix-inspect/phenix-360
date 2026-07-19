@@ -46,7 +46,7 @@ try {
     await page.getByRole('dialog').getByText('Compte rendu de chantier', { exact: true }).click();
     await page.getByPlaceholder(/Décrivez ce point/).waitFor({ state: 'visible', timeout: 6000 });
     // La photo se joint dans le point en cours (input image du plein écran).
-    await page.locator('input[type="file"][accept="image/*"]').first().setInputFiles(PHOTO);
+    await page.locator('input[type="file"]:not([capture])').first().setInputFiles(PHOTO);
     await page
       .getByRole('button', { name: /Ajouter \(1\/3\)/ })
       .waitFor({ state: 'visible', timeout: 6000 });

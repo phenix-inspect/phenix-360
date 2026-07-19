@@ -42,7 +42,7 @@ const ask = async (texte, nbPhotos = 0) => {
   if (texte) await leon().getByPlaceholder('Écrivez à PHÉNIX').fill(texte);
   if (nbPhotos > 0) {
     await leon()
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .setInputFiles(Array.from({ length: nbPhotos }, () => photo));
     await page.waitForTimeout(400);
   }

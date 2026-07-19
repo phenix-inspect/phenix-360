@@ -1,13 +1,14 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Camera, ImagePlus, X } from 'lucide-react';
 import type { UploadedMedia } from '@phenix360/core';
-import { ACCEPT_IMAGE, loadPhotos } from '../lib/media';
+import { loadPhotos } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 
 /**
- * Sélecteur de PHOTOS réutilisable (0 à `max`, défaut 3) — prise directe ou choix
- * dans la galerie (sélecteur natif `image/*`, sans `capture`). Utilisé par la
- * demande client et la réponse conducteur. Présentation seule : l'appelant tient
- * la liste. Aucune photo n'est obligatoire.
+ * Sélecteur de PHOTOS réutilisable (0 à `max`, défaut 3). L'ajout passe par le
+ * composant partagé `PhotoInput` : « Prendre une photo » (appareil) ou « Choisir
+ * une photo ou un fichier » (sélecteur natif). Utilisé par la demande client et la
+ * réponse conducteur. Présentation seule : l'appelant tient la liste.
  */
 export function PhotoPicker({
   photos,
@@ -20,34 +21,23 @@ export function PhotoPicker({
 }): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const add = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const add = async (files: File[]): Promise<void> => {
     const room = max - photos.length;
     if (room <= 0) return;
     setBusy(true);
     try {
-      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      const { media, error } = await loadPhotos(files.slice(0, room));
       setPhotoError(error);
       onChange([...photos, ...media].slice(0, max));
     } finally {
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
   return (
     <>
       <div className="grid grid-cols-3 gap-2">
-        <input
-          ref={fileRef}
-          type="file"
-          accept={ACCEPT_IMAGE}
-          multiple
-          className="sr-only"
-          onChange={(e) => void add(e.target.files)}
-        />
         {photos.map((ph, i) => (
           <div key={i} className="relative aspect-square overflow-hidden rounded-xl">
             <img src={ph.imageUrl} alt="" className="size-full object-cover" />
@@ -62,9 +52,9 @@ export function PhotoPicker({
           </div>
         ))}
         {photos.length < max && (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
+          <PhotoInput
+            onFiles={add}
+            multiple
             disabled={busy}
             className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-6"
           >
@@ -76,7 +66,7 @@ export function PhotoPicker({
                   ? 'Photo'
                   : `Ajouter (${photos.length}/${max})`}
             </span>
-          </button>
+          </PhotoInput>
         )}
       </div>
       {photoError && (

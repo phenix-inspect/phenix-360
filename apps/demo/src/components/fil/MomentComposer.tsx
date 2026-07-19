@@ -16,7 +16,8 @@ import {
   type UploadedMedia,
 } from '@phenix360/core';
 import { demo } from '../../store';
-import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
+import { loadPhotos } from '../../lib/media';
+import { PhotoInput } from '../PhotoInput';
 
 interface Pick {
   key: string;
@@ -51,14 +52,14 @@ export function MomentComposer({
   const [legende, setLegende] = useState('');
   const [zone, setZone] = useState('');
 
-  const onPick = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const onPick = async (files: File[]): Promise<void> => {
+    if (files.length === 0) return;
     setBusy(true);
     try {
       // Un album = 10 photos MAXIMUM : on ne prend que ce qui reste de place.
       const remaining = MAX_ALBUM_PHOTOS - picks.length;
       if (remaining <= 0) return;
-      const { media, error } = await loadPhotos(Array.from(files).slice(0, remaining));
+      const { media, error } = await loadPhotos(files.slice(0, remaining));
       setPhotoError(error);
       const next = media.map((m) => ({ key: crypto.randomUUID(), media: m }));
       setPicks((p) => [...p, ...next]);
@@ -192,33 +193,26 @@ export function MomentComposer({
               Album complet — {MAX_ALBUM_PHOTOS} photos maximum.
             </p>
           ) : (
-            <label className="block">
-              <input
-                type="file"
-                accept={ACCEPT_IMAGE}
-                multiple
-                className="sr-only"
-                onChange={(e) => void onPick(e.target.files)}
-              />
-              <span
-                className={`flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-border bg-paper-50 text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground ${
-                  picks.length > 0 ? 'py-4' : 'aspect-[4/5]'
-                }`}
-              >
-                {busy ? (
-                  <span className="inline-flex items-center gap-2 text-sm [&_svg]:size-5 [&_svg]:animate-spin">
-                    <Loader2 aria-hidden /> Traitement…
-                  </span>
-                ) : (
-                  <span className="inline-flex flex-col items-center gap-2 text-sm [&_svg]:size-7">
-                    <ImagePlus aria-hidden />
-                    {picks.length > 0
-                      ? `Ajouter des photos (${picks.length}/${MAX_ALBUM_PHOTOS})`
-                      : 'Choisir des photos'}
-                  </span>
-                )}
-              </span>
-            </label>
+            <PhotoInput
+              onFiles={onPick}
+              multiple
+              className={`flex w-full cursor-pointer items-center justify-center rounded-xl border border-dashed border-border bg-paper-50 text-muted-foreground transition-colors duration-base hover:border-gold-300 hover:text-foreground ${
+                picks.length > 0 ? 'py-4' : 'aspect-[4/5]'
+              }`}
+            >
+              {busy ? (
+                <span className="inline-flex items-center gap-2 text-sm [&_svg]:size-5 [&_svg]:animate-spin">
+                  <Loader2 aria-hidden /> Traitement…
+                </span>
+              ) : (
+                <span className="inline-flex flex-col items-center gap-2 text-sm [&_svg]:size-7">
+                  <ImagePlus aria-hidden />
+                  {picks.length > 0
+                    ? `Ajouter des photos (${picks.length}/${MAX_ALBUM_PHOTOS})`
+                    : 'Choisir des photos'}
+                </span>
+              )}
+            </PhotoInput>
           )}
 
           {photoError && (

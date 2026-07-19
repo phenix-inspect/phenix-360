@@ -41,9 +41,10 @@ import {
   X,
 } from 'lucide-react';
 import { demo, dossierOf, nameOf } from '../../store';
-import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
+import { loadPhotos } from '../../lib/media';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 import { Portal } from '../Portal';
+import { PhotoInput } from '../PhotoInput';
 
 type Step = 'verifier' | 'finaliser' | 'valider' | 'envoye';
 
@@ -852,12 +853,12 @@ function ReserveFields({
   const reserve = p.reserve ?? { photos: [], commentaire: '', responsable: 'artisan' as const };
   const photos = reserve.photos;
 
-  const addPhotos = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const addPhotos = async (files: File[]): Promise<void> => {
+    if (files.length === 0) return;
     setBusy(true);
     try {
       const room = MAX_PRERECEPTION_PHOTOS - photos.length;
-      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      const { media, error } = await loadPhotos(files.slice(0, room));
       setPhotoError(error);
       onPatch(p.posteId, { reserve: { ...reserve, photos: [...photos, ...media] } });
     } finally {
@@ -891,20 +892,18 @@ function ReserveFields({
             </div>
           ))}
           {photos.length < MAX_PRERECEPTION_PHOTOS && (
-            <label className="grid aspect-square cursor-pointer place-items-center rounded-lg border border-dashed border-border bg-surface text-muted-foreground transition-colors hover:border-gold-300 hover:text-foreground">
-              <input
-                type="file"
-                accept={ACCEPT_IMAGE}
-                multiple
-                className="sr-only"
-                onChange={(e) => void addPhotos(e.target.files)}
-              />
+            <PhotoInput
+              onFiles={addPhotos}
+              multiple
+              ariaLabel="Ajouter une photo"
+              className="grid aspect-square cursor-pointer place-items-center rounded-lg border border-dashed border-border bg-surface text-muted-foreground transition-colors hover:border-gold-300 hover:text-foreground"
+            >
               {busy ? (
                 <Loader2 aria-hidden className="size-5 animate-spin" />
               ) : (
                 <Camera aria-hidden className="size-5" />
               )}
-            </label>
+            </PhotoInput>
           )}
         </div>
         {photoError && (

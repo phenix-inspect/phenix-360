@@ -49,7 +49,7 @@ try {
     await nouveau().click();
     await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
     await page
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles([
         { name: 'devis-signe.pdf', mimeType: 'application/pdf', buffer: textPdf(DEVIS_LINES) },

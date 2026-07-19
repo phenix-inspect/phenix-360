@@ -104,7 +104,7 @@ try {
       await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
       await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
       await page
-        .locator('input[type=file]')
+        .locator('input[type=file]:not([capture])')
         .first()
         .setInputFiles([
           {

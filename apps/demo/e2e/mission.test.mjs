@@ -58,7 +58,7 @@ try {
     await page.getByRole('dialog').getByText('Compte rendu de chantier', { exact: true }).click();
     const draft = page.getByPlaceholder(/Décrivez ce point/);
     await draft.waitFor({ state: 'visible', timeout: 6000 });
-    await page.locator('input[type=file][accept="image/*"]').first().setInputFiles(PHOTO);
+    await page.locator('input[type=file]:not([capture])').first().setInputFiles(PHOTO);
     await draft.fill('Coulage de la dalle terminé, séchage en cours côté séjour.');
     await page.getByRole('button', { name: /Ajouter ce point/ }).click();
     // Le point rejoint la liste (l'observation est reprise telle quelle).

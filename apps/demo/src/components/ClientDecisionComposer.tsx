@@ -13,7 +13,7 @@ import { Image as ImageIcon, Plus, Send, Sparkles, Trash2, Upload, X } from 'luc
 import type { SelectionOption } from '@phenix360/core';
 import { warmGradient } from './gradient';
 import { fileToImageUrl } from '../lib/image';
-import { ACCEPT_IMAGE } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 import { LeaveConfirmInline, useBeforeUnloadGuard } from './mission/LeaveGuard';
 
 const MAX_OPTIONS = 5;
@@ -156,23 +156,14 @@ export function ClientDecisionComposer({
                   </button>
                 </div>
               ))}
-              <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:border-gold-300 hover:text-foreground [&_svg]:size-4">
+              <PhotoInput
+                multiple
+                onFiles={addPhotos}
+                className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:border-gold-300 hover:text-foreground [&_svg]:size-4"
+              >
                 <Upload aria-hidden />
                 Ajouter
-                <input
-                  type="file"
-                  accept={ACCEPT_IMAGE}
-                  multiple
-                  className="hidden"
-                  onChange={(e) => {
-                    // Capturer les File AVANT de réinitialiser l'input (sinon la
-                    // FileList vive se vide et les fichiers sont perdus).
-                    const arr = Array.from(e.target.files ?? []);
-                    e.target.value = '';
-                    if (arr.length > 0) void addPhotos(arr);
-                  }}
-                />
-              </label>
+              </PhotoInput>
             </div>
           </div>
 
@@ -209,23 +200,19 @@ export function ClientDecisionComposer({
                           </span>
                         )}
                       </div>
-                      <label className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground [&_svg]:size-3.5">
+                      <PhotoInput
+                        onFiles={(files) => {
+                          const file = files[0];
+                          if (file)
+                            void fileToImageUrl(file).then((imageUrl) =>
+                              setOption(o.id, { imageUrl }),
+                            );
+                        }}
+                        className="inline-flex cursor-pointer items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground [&_svg]:size-3.5"
+                      >
                         <Upload aria-hidden />
                         {o.imageUrl ? 'Remplacer' : 'Photo'}
-                        <input
-                          type="file"
-                          accept={ACCEPT_IMAGE}
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            e.target.value = '';
-                            if (file)
-                              void fileToImageUrl(file).then((imageUrl) =>
-                                setOption(o.id, { imageUrl }),
-                              );
-                          }}
-                        />
-                      </label>
+                      </PhotoInput>
                     </div>
 
                     <div className="min-w-0 flex-1 space-y-2">

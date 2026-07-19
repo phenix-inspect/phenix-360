@@ -54,9 +54,19 @@ const DEEP_LINK_GUARD = () => {
 };
 
 export async function session(browser, opts = {}) {
-  const { width = 1280, height = 1800, guardDeepLinks = false, timezoneId } = opts;
+  const {
+    width = 1280,
+    height = 1800,
+    guardDeepLinks = false,
+    timezoneId,
+    // `hasTouch` : émule un appareil TACTILE (téléphone/tablette). Le média
+    // `(pointer: coarse)` devient vrai — ce qui déclenche le choix « Prendre une
+    // photo / Choisir un fichier » du composant partagé `PhotoInput`.
+    hasTouch = false,
+  } = opts;
   const ctx = await browser.newContext({
     viewport: { width, height },
+    ...(hasTouch ? { hasTouch: true, isMobile: true } : {}),
     ...(timezoneId ? { timezoneId } : {}),
   });
   const page = await ctx.newPage();

@@ -71,7 +71,7 @@ const parleAleon = async (texte, nbPhotos = 0) => {
   if (texte) await leon().getByPlaceholder('Écrivez à PHÉNIX').fill(texte);
   if (nbPhotos > 0) {
     const files = Array.from({ length: nbPhotos }, (_, k) => photo(k));
-    await leon().locator('input[type=file]').setInputFiles(files);
+    await leon().locator('input[type=file]:not([capture])').setInputFiles(files);
     await page.waitForTimeout(400); // laisse le temps à l'upload
   }
   await leon().getByRole('button', { name: 'Envoyer' }).click();
@@ -200,7 +200,7 @@ try {
     await th.getByRole('button', { name: 'Répondre' }).click();
     await th.getByLabel('Réponse au client').fill(R2);
     await page
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles([photo(7), photo(8)]);
     await page.waitForTimeout(400);

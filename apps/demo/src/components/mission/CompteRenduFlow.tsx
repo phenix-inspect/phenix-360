@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@phenix360/ui';
 import {
   DIFFUSION_LABEL,
@@ -13,9 +13,10 @@ import {
 } from '@phenix360/core';
 import { Camera, Check, ImagePlus, Trash2, X } from 'lucide-react';
 import { demo } from '../../store';
-import { ACCEPT_IMAGE, loadPhotos } from '../../lib/media';
+import { loadPhotos } from '../../lib/media';
 import { LeaveConfirmDialog, useBeforeUnloadGuard } from './LeaveGuard';
 import { Portal } from '../Portal';
+import { PhotoInput } from '../PhotoInput';
 
 interface DraftPoint {
   photos: UploadedMedia[];
@@ -52,20 +53,18 @@ export function CompteRenduFlow({
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
-  const addPhotos = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const addPhotos = async (files: File[]): Promise<void> => {
+    if (files.length === 0) return;
     const room = MAX_POINT_PHOTOS - photos.length;
     if (room <= 0) return;
     setBusy(true);
     try {
-      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      const { media, error } = await loadPhotos(files.slice(0, room));
       setPhotoError(error);
       setPhotos((ps) => [...ps, ...media].slice(0, MAX_POINT_PHOTOS));
     } finally {
       setBusy(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -74,7 +73,6 @@ export function CompteRenduFlow({
     setPhotos([]);
     setComment('');
     setDiffusion('client');
-    if (fileRef.current) fileRef.current.value = '';
   };
   const addPoint = (): void => {
     if (!canAdd) return;
@@ -222,15 +220,6 @@ export function CompteRenduFlow({
                   Nouveau point{points.length > 0 ? ` (${points.length + 1})` : ''}
                 </p>
 
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept={ACCEPT_IMAGE}
-                  multiple
-                  className="sr-only"
-                  onChange={(e) => void addPhotos(e.target.files)}
-                />
-
                 {/* Mini-album du point en cours (jusqu'à 3 photos). */}
                 <div className="grid grid-cols-3 gap-2">
                   {photos.map((ph, i) => (
@@ -247,9 +236,9 @@ export function CompteRenduFlow({
                     </div>
                   ))}
                   {photos.length < MAX_POINT_PHOTOS && (
-                    <button
-                      type="button"
-                      onClick={() => fileRef.current?.click()}
+                    <PhotoInput
+                      onFiles={addPhotos}
+                      multiple
                       disabled={busy}
                       className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-border bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-6"
                     >
@@ -261,7 +250,7 @@ export function CompteRenduFlow({
                             ? 'Photo'
                             : `Ajouter (${photos.length}/${MAX_POINT_PHOTOS})`}
                       </span>
-                    </button>
+                    </PhotoInput>
                   )}
                 </div>
                 {photoError && (

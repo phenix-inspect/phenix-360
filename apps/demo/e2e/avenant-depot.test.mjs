@@ -45,7 +45,7 @@ try {
   });
 
   await assert('Dépôt : document réel + poste saisi → impacts proposés calculés', async () => {
-    await dialog().locator('input[type=file]').setInputFiles(PDF);
+    await dialog().locator('input[type=file]:not([capture])').setInputFiles(PDF);
     await dialog().getByText(PDF.name).first().waitFor({ state: 'visible', timeout: 6000 });
     await dialog()
       .getByPlaceholder(/Désignation du poste/)

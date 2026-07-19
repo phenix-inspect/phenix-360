@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { Button, Card, CardContent } from '@phenix360/ui';
+import { useState } from 'react';
+import { Button, Card, CardContent, buttonVariants } from '@phenix360/ui';
 import {
   PREP_DOC_CATEGORY_LABEL,
   type EventVisibility,
@@ -14,7 +14,7 @@ import { DocumentLink } from '../DocumentLink';
 import { DiffusionConfirmDialog } from '../DiffusionConfirmDialog';
 import { demo, nameOf, useDemo } from '../../store';
 import { readPhotoAttachment } from '../../lib/upload';
-import { ACCEPT_IMAGE } from '../../lib/media';
+import { PhotoInput } from '../PhotoInput';
 
 /**
  * Documents du chantier (EPIC 1 — Préparation) : devis, plans, diagnostics, DPE,
@@ -171,13 +171,11 @@ export function PhotosAvantSection({
   const photos = dossier.documents.filter((d) => d.categorie === 'photo_avant' && d.attachment);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  const onPick = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const onPick = async (files: File[]): Promise<void> => {
     setError(null);
     const added: ProjectDocument[] = [];
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       const res = await readPhotoAttachment(project.id, file);
       if (!res.ok) {
         setError(res.error);
@@ -239,21 +237,14 @@ export function PhotosAvantSection({
               </div>
             )}
 
-            <input
-              ref={fileRef}
-              type="file"
-              accept={ACCEPT_IMAGE}
+            <PhotoInput
+              onFiles={onPick}
               multiple
-              className="hidden"
-              data-testid="prep-photo-file"
-              onChange={(e) => {
-                void onPick(e.target.files);
-                e.target.value = '';
-              }}
-            />
-            <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+              inputTestId="prep-photo-file"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
               <ImagePlus aria-hidden /> Ajouter des photos
-            </Button>
+            </PhotoInput>
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}

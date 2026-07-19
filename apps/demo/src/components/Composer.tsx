@@ -8,6 +8,7 @@ import {
   DialogTitle,
   Input,
   Textarea,
+  buttonVariants,
 } from '@phenix360/ui';
 import {
   PROJECT_STEPS,
@@ -28,7 +29,8 @@ import {
 } from 'lucide-react';
 import { demo } from '../store';
 import { MAX_DOC_MB, readDocumentAttachment, readPhotoAttachment } from '../lib/upload';
-import { ACCEPT_DOCUMENT, ACCEPT_IMAGE } from '../lib/media';
+import { ACCEPT_DOCUMENT } from '../lib/media';
+import { PhotoInput } from './PhotoInput';
 import { LeaveConfirmInline, useBeforeUnloadGuard } from './mission/LeaveGuard';
 
 export type ComposerKind = 'compte_rendu' | 'photo' | 'document' | 'demande';
@@ -154,8 +156,6 @@ function CaptureForm({
   const [doc, setDoc] = useState<EventAttachment | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const photoInput = useRef<HTMLInputElement>(null);
-  const docInput = useRef<HTMLInputElement>(null);
 
   // « En cours de saisie » dès qu'un champ utile est renseigné (tous types
   // confondus). Le menu « Demander au client » vide n'est pas considéré saisi.
@@ -176,12 +176,12 @@ function CaptureForm({
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
 
-  const onPickPhotos = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const onPickPhotos = async (files: File[]): Promise<void> => {
+    if (files.length === 0) return;
     setBusy(true);
     setUploadError(null);
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const res = await readPhotoAttachment(project.id, file);
         if (!res.ok) {
           setUploadError(res.error); // message clair, on stoppe l'ajout
@@ -194,8 +194,8 @@ function CaptureForm({
     }
   };
 
-  const onPickDoc = async (files: FileList | null): Promise<void> => {
-    const file = files?.[0];
+  const onPickDoc = async (files: File[]): Promise<void> => {
+    const file = files[0];
     if (!file) return;
     setBusy(true);
     setUploadError(null);
@@ -352,26 +352,15 @@ function CaptureForm({
 
       {kind === 'photo' && (
         <>
-          <input
-            ref={photoInput}
-            type="file"
-            accept={ACCEPT_IMAGE}
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              void onPickPhotos(e.target.files);
-              e.target.value = '';
-            }}
-          />
           {photos.length === 0 ? (
-            <button
-              type="button"
-              onClick={() => photoInput.current?.click()}
+            <PhotoInput
+              onFiles={onPickPhotos}
+              multiple
               className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted-foreground transition-colors hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-6 [&_svg]:text-gold-600"
             >
               <ImageIcon aria-hidden />
               Choisir des photos
-            </button>
+            </PhotoInput>
           ) : (
             <div className="space-y-2">
               <div className="grid grid-cols-3 gap-2">
@@ -393,9 +382,13 @@ function CaptureForm({
                   </div>
                 ))}
               </div>
-              <Button variant="outline" size="sm" onClick={() => photoInput.current?.click()}>
+              <PhotoInput
+                onFiles={onPickPhotos}
+                multiple
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
                 <Upload aria-hidden /> Ajouter d’autres photos
-              </Button>
+              </PhotoInput>
             </div>
           )}
           <Field label="Légende">
@@ -417,16 +410,6 @@ function CaptureForm({
 
       {kind === 'document' && (
         <>
-          <input
-            ref={docInput}
-            type="file"
-            accept={ACCEPT_DOCUMENT}
-            className="hidden"
-            onChange={(e) => {
-              void onPickDoc(e.target.files);
-              e.target.value = '';
-            }}
-          />
           {doc ? (
             <div className="flex items-center gap-3 rounded-xl border border-border bg-surface p-3 text-sm">
               <span className="flex size-9 items-center justify-center rounded-lg bg-gold-100 text-gold-700 [&_svg]:size-5">
@@ -443,14 +426,15 @@ function CaptureForm({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => docInput.current?.click()}
+            <PhotoInput
+              onFiles={onPickDoc}
+              accept={ACCEPT_DOCUMENT}
+              title="Ajouter un document"
               className="flex w-full flex-col items-center gap-2 rounded-xl border border-dashed border-border bg-surface p-6 text-sm text-muted-foreground transition-colors hover:border-gold-300 hover:bg-gold-50 [&_svg]:size-6 [&_svg]:text-gold-600"
             >
               <FileText aria-hidden />
               Choisir un fichier (PDF ou image, max {MAX_DOC_MB} Mo)
-            </button>
+            </PhotoInput>
           )}
           <Field label="Libellé du document">
             <Input

@@ -90,7 +90,7 @@ try {
 
   await assert('Publication avec des PHOTOS SEULES (sans légende) fonctionne', async () => {
     await dialog()
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .setInputFiles([photo(1), photo(2)]);
     await dialog()
       .getByText(/2 photos/)
@@ -108,7 +108,7 @@ try {
   await assert('Publication avec PHOTOS + LÉGENDE fonctionne', async () => {
     await openAlbumComposer();
     await dialog()
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .setInputFiles([photo(3)]);
     await legendeField().fill(LEGENDE);
     await dialog()

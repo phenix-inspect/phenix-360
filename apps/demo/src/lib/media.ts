@@ -13,18 +13,26 @@ import type { MediaUploader, UploadedMedia } from '@phenix360/core';
  * Types acceptés par les sélecteurs de PHOTO — source unique, pour un comportement
  * IDENTIQUE partout (coulisses, compte rendu, pré/réception, réserves, décisions…).
  *
- * Sur SMARTPHONE, `accept="image/*"` déclenche le sélecteur NATIF du téléphone :
- * l'utilisateur peut prendre une photo à l'instant avec l'appareil, choisir dans sa
- * galerie, ou piocher un fichier (Drive / Fichiers / iCloud). On n'impose JAMAIS
- * l'attribut `capture` : il forcerait l'appareil photo et masquerait galerie et
- * fichiers — or les trois options doivent rester offertes. Sur ORDINATEUR, le même
- * attribut ouvre la sélection d'un ou plusieurs fichiers (le glisser-déposer reste
- * géré là où il est proposé). On ne réinvente pas l'interface : on laisse l'OS faire.
+ * `image/*` couvre déjà JPEG/PNG/HEIC/HEIF côté iOS ; on ajoute les EXTENSIONS
+ * `.heic/.heif/.jpg/.jpeg/.png` pour que le sélecteur de FICHIERS d'un ordinateur
+ * (ou d'Android) laisse aussi choisir un HEIC qu'il ne « tague » pas toujours
+ * `image/*`. Le choix caméra vs bibliothèque/Fichiers/iCloud/Drive est offert par
+ * le composant partagé `PhotoInput` (bouton « Prendre une photo » = attribut
+ * `capture` ; bouton « Choisir une photo ou un fichier » = sélecteur natif complet).
+ * Source unique : comportement IDENTIQUE partout.
  */
-export const ACCEPT_IMAGE = 'image/*';
+export const ACCEPT_IMAGE = 'image/*,.heic,.heif,.jpg,.jpeg,.png';
 
 /** Sélecteurs de DOCUMENT : un PDF, ou la PHOTO d'un document (prise sur mobile). */
-export const ACCEPT_DOCUMENT = '.pdf,application/pdf,image/*';
+export const ACCEPT_DOCUMENT = '.pdf,application/pdf,image/*,.heic,.heif';
+
+/** Extensions image reconnues même si le navigateur ne renseigne pas le type MIME. */
+const IMAGE_EXT_RE = /\.(heic|heif|jpe?g|png|gif|webp|bmp|tiff?|avif)$/i;
+
+/** Un fichier est-il une image (par type MIME OU par extension, ex. HEIC sans type) ? */
+export function isImageFile(f: File): boolean {
+  return f.type.startsWith('image/') || IMAGE_EXT_RE.test(f.name);
+}
 
 const MAX = 1600;
 const QUALITY = 0.82;
@@ -93,7 +101,9 @@ export async function loadPhotos(files: FileList | File[] | null): Promise<Photo
   const media: UploadedMedia[] = [];
   const rejected: string[] = [];
   for (const f of list) {
-    if (!f.type.startsWith('image/')) {
+    // On accepte par TYPE ou par EXTENSION : un HEIC importé depuis Fichiers/Drive
+    // arrive parfois sans type MIME — on le laisse passer, le décodage réel tranchera.
+    if (!isImageFile(f)) {
       rejected.push(`« ${f.name} » n’est pas une image`);
       continue;
     }

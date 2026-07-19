@@ -24,7 +24,7 @@ const addViaMission = async (libelle, visibilityLabel) => {
   await page.getByRole('button', { name: /Ajouter un document/ }).click();
   const dlg = page.getByRole('dialog');
   await dlg.getByLabel('Libellé du document').fill(libelle);
-  await dlg.locator('input[type=file]').setInputFiles(PDF);
+  await dlg.locator('input[type=file]:not([capture])').setInputFiles(PDF);
   await dlg.getByText(PDF.name).first().waitFor({ state: 'visible', timeout: 6000 });
   await dlg.locator('select').selectOption({ label: visibilityLabel });
   await dlg.getByRole('button', { name: 'Publier' }).click();

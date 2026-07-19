@@ -77,7 +77,7 @@ try {
   await assert('CONDUCTEUR publie une photo partagée (via Nouvelle mission)', async () => {
     await openAlbumComposer();
     const dialog = page.getByRole('dialog');
-    await dialog.locator('input[type=file]').setInputFiles({
+    await dialog.locator('input[type=file]:not([capture])').setInputFiles({
       name: 'chantier.png',
       mimeType: 'image/png',
       buffer: Buffer.from(PNG, 'base64'),
@@ -106,7 +106,7 @@ try {
       await page.getByRole('button', { name: /Ajouter un document/ }).click();
       const dlg = page.getByRole('dialog');
       await dlg.getByLabel('Libellé du document').fill(DOC_LIBELLE);
-      await dlg.locator('input[type=file]').setInputFiles(DOC);
+      await dlg.locator('input[type=file]:not([capture])').setInputFiles(DOC);
       await dlg
         .getByText(new RegExp(DOC.name))
         .first()

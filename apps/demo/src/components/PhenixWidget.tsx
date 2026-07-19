@@ -5,8 +5,9 @@ import { isDemande, type EventActor, type Project, type UploadedMedia } from '@p
 import type { PhenixAction } from '@phenix360/core';
 import { ArrowRight, ImagePlus, Send, X } from 'lucide-react';
 import { conversationOf, demo, type DemoSnapshot, type PhenixMessage } from '../store';
-import { ACCEPT_IMAGE, loadPhotos } from '../lib/media';
+import { loadPhotos } from '../lib/media';
 import { LeonAvatar } from './LeonAvatar';
+import { PhotoInput } from './PhotoInput';
 
 const MAX_PHOTOS = 3;
 
@@ -40,7 +41,6 @@ export function PhenixWidget({
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
 
   const messages = conversationOf(snap, project.id);
   const events = snap.events.filter((e) => e.projectId === project.id);
@@ -118,18 +118,17 @@ export function PhenixWidget({
     }
   };
 
-  const addPhotos = async (files: FileList | null): Promise<void> => {
-    if (!files || files.length === 0) return;
+  const addPhotos = async (files: File[]): Promise<void> => {
+    if (files.length === 0) return;
     const room = MAX_PHOTOS - photos.length;
     if (room <= 0) return;
     setAttaching(true);
     try {
-      const { media, error } = await loadPhotos(Array.from(files).slice(0, room));
+      const { media, error } = await loadPhotos(files.slice(0, room));
       setPhotoError(error);
       setPhotos((prev) => [...prev, ...media].slice(0, MAX_PHOTOS));
     } finally {
       setAttaching(false);
-      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -233,24 +232,15 @@ export function PhenixWidget({
               </div>
             )}
             <div className="flex items-end gap-2">
-              <input
-                ref={fileRef}
-                type="file"
-                accept={ACCEPT_IMAGE}
+              <PhotoInput
+                onFiles={addPhotos}
                 multiple
-                className="sr-only"
-                onChange={(e) => void addPhotos(e.target.files)}
-              />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
                 disabled={photos.length >= MAX_PHOTOS || attaching || busy}
-                aria-label={`Ajouter une photo (jusqu’à ${MAX_PHOTOS})`}
-                title="Ajouter une photo"
+                ariaLabel={`Ajouter une photo (jusqu’à ${MAX_PHOTOS})`}
                 className="grid size-11 shrink-0 place-items-center rounded-xl border border-input bg-surface text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40 [&_svg]:size-5"
               >
                 <ImagePlus aria-hidden />
-              </button>
+              </PhotoInput>
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}

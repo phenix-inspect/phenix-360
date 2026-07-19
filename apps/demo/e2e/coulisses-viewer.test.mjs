@@ -86,7 +86,7 @@ try {
     await page.getByRole('button', { name: /Publier dans les coulisses/ }).click();
     const dlg = page.getByRole('dialog');
     await dlg.getByRole('heading', { name: 'Créer un moment' }).waitFor({ state: 'visible' });
-    await dlg.locator('input[type=file]').setInputFiles(THREE);
+    await dlg.locator('input[type=file]:not([capture])').setInputFiles(THREE);
     await dlg.getByPlaceholder(/Décrivez ce moment/).fill(ALBUM);
     await dlg.getByRole('button', { name: /Créer le moment/ }).click();
     await dlg.waitFor({ state: 'detached', timeout: 8000 });
@@ -275,7 +275,7 @@ try {
     await desk.page.getByRole('button', { name: /Publier dans les coulisses/ }).click();
     const dlg = desk.page.getByRole('dialog');
     await dlg.getByRole('heading', { name: 'Créer un moment' }).waitFor({ state: 'visible' });
-    await dlg.locator('input[type=file]').setInputFiles(THREE);
+    await dlg.locator('input[type=file]:not([capture])').setInputFiles(THREE);
     await dlg.getByPlaceholder(/Décrivez ce moment/).fill(ALBUM);
     await dlg.getByRole('button', { name: /Créer le moment/ }).click();
     await dlg.waitFor({ state: 'detached', timeout: 8000 });

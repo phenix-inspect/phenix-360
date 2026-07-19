@@ -48,7 +48,7 @@ try {
       .fill('Deux ambiances possibles pour la salle de bain.');
     // Photo de la décision (exerce l'upload → data URL).
     await dialog()
-      .locator('input[type=file]')
+      .locator('input[type=file]:not([capture])')
       .first()
       .setInputFiles({
         name: 'sdb.png',

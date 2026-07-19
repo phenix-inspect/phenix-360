@@ -94,7 +94,7 @@ try {
       await page.getByRole('button', { name: /^Nouveau chantier$/ }).click();
       await page.getByRole('heading', { name: 'Nouveau chantier' }).waitFor({ state: 'visible' });
       // La zone de dépôt et le champ fichier existent (capture / upload).
-      if ((await page.locator('input[type=file]').count()) === 0)
+      if ((await page.locator('input[type=file]:not([capture])').count()) === 0)
         throw new Error('aucun champ de dépôt de fichier');
       const ov = await overflowX(page);
       if (ov > 2) throw new Error(`débordement de ${ov}px sur « Nouveau chantier »`);
