@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { BUILD, recordError } from './lib/diagnostics';
 
 /**
  * Filet de sécurité de dernier recours. Si un écran lève une erreur au rendu,
@@ -20,6 +21,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError
   override componentDidCatch(error: Error, info: ErrorInfo): void {
     // Trace pour le diagnostic ; l'utilisateur, lui, voit un message soigné.
     console.error('PHÉNIX 360 — erreur de rendu interceptée', error, info.componentStack);
+    // Collecte pour l'observabilité (version + dernière erreur, cf. diagnostics.ts).
+    recordError('render', error?.message ?? String(error), {
+      stack: error?.stack ?? info.componentStack ?? undefined,
+    });
   }
 
   override render(): ReactNode {
@@ -73,6 +78,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, { hasError
           >
             Recharger l’application
           </button>
+          <p style={{ marginTop: '1.25rem', fontSize: '0.7rem', color: '#a3a3a3' }}>
+            Version {BUILD.version} · {BUILD.builtAt.slice(0, 10)}
+          </p>
         </div>
       </div>
     );

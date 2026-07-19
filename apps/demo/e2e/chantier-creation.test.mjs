@@ -84,6 +84,16 @@ try {
     'La création attribue automatiquement un code chantier (ville Lyon → LY)',
     async () => {
       // Adresse du devis « … 69006 Lyon » ⇒ VV = LY. Le code est généré à la création.
+      // La fiche vient de se monter : on attend que le code (rendu juste après le
+      // titre) soit présent, plutôt que de lire trop tôt (course de rendu).
+      await page.waitForFunction(
+        () =>
+          Array.from(document.querySelectorAll('span, p')).some((e) =>
+            /^\d{2}-[A-Z]{2}-\d{3}$/.test((e.textContent || '').trim()),
+          ),
+        undefined,
+        { timeout: 8000 },
+      );
       const codes = await page.evaluate(() =>
         Array.from(document.querySelectorAll('span, p'))
           .map((e) => (e.textContent || '').trim())
