@@ -11,6 +11,10 @@ declare const __APP_BUILD_TIME__: string;
 interface ImportMetaEnv {
   /** Mot de passe du gate RC1 (démo déployée). Absent en dev/e2e → pas de gate. */
   readonly VITE_DEMO_PASSWORD?: string;
+  /** URL du projet Supabase (mode SaaS). Absent → mode démo local. */
+  readonly VITE_SUPABASE_URL?: string;
+  /** Clé publique « anon » Supabase (mode SaaS). Absent → mode démo local. */
+  readonly VITE_SUPABASE_ANON_KEY?: string;
 }
 
 interface Window {

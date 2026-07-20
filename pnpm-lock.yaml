@@ -78,6 +78,9 @@ importers:
       '@phenix360/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@supabase/supabase-js':
+        specifier: ^2.108.2
+        version: 2.108.2
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
