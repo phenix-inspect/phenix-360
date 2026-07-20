@@ -4,7 +4,7 @@ import '@phenix360/ui/fonts.css';
 import '@phenix360/ui/tokens.css';
 import './index.css';
 import { App } from './App';
-import { PasswordGate } from './PasswordGate';
+import { AccessGate } from './AccessGate';
 import { ErrorBoundary } from './ErrorBoundary';
 import { installDiagnostics } from './lib/diagnostics';
 
@@ -15,9 +15,9 @@ installDiagnostics();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <PasswordGate>
+      <AccessGate>
         <App />
-      </PasswordGate>
+      </AccessGate>
     </ErrorBoundary>
   </StrictMode>,
 );

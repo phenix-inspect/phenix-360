@@ -45,6 +45,12 @@ jobs:
         env:
           PAGES_BASE: /phenix-360/
           VITE_DEMO_PASSWORD: ${{ vars.DEMO_PASSWORD || 'phenix2026' }}
+          # Branchement Supabase (mode SaaS). Clés PUBLIQUES par conception (URL +
+          # clé « anon ») : la sécurité vient de la RLS, pas du secret de la clé.
+          # Surchargeable via des variables de dépôt (Settings → Variables) sans
+          # toucher au workflow. Vides → build en mode démo local.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://vbvnalesrmukwdvmwpkn.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZidm5hbGVzcm11a3dkdm13cGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1Mzg2MTgsImV4cCI6MjEwMDExNDYxOH0.bac8dtAjTFp9yGXt4e9mG7QVHEkAokYL4PWySlc3zNI' }}
 
       - name: Fallback SPA (404 → index.html)
         run: cp apps/demo/dist/index.html apps/demo/dist/404.html
