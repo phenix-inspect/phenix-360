@@ -3,6 +3,7 @@ import { BrandMark, Button, Input } from '@phenix360/ui';
 import { LogOut } from 'lucide-react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './lib/supabase';
+import { recordError } from './lib/diagnostics';
 
 /**
  * Authentification réelle (mode SaaS). N'est montée QUE lorsque Supabase est
@@ -50,7 +51,57 @@ export function AuthGate({ children }: { children: React.ReactNode }): React.JSX
     <>
       {children}
       <SignOutButton client={client} />
+      <ConnectionStatus client={client} />
     </>
+  );
+}
+
+/**
+ * Témoin de connexion à la base : après connexion, tente une lecture inoffensive
+ * de la table `project` (la RLS filtre — une liste vide est un SUCCÈS). Prouve en
+ * direct que le navigateur joint bien Supabase (réseau + CSP + jeton + RLS + schéma).
+ * Étape de validation du branchement, avant de déplacer les vraies données.
+ */
+function ConnectionStatus({ client }: { client: SupabaseClient }): React.JSX.Element | null {
+  const [state, setState] = useState<'checking' | 'ok' | 'error'>('checking');
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    void client
+      .from('project')
+      .select('id')
+      .limit(1)
+      .then(({ error }) => {
+        if (!alive) return;
+        if (error) {
+          setState('error');
+          setMessage(error.message);
+          recordError('error', `Supabase health: ${error.message}`);
+        } else {
+          setState('ok');
+        }
+      });
+    return () => {
+      alive = false;
+    };
+  }, [client]);
+
+  if (state === 'checking') return null;
+  const ok = state === 'ok';
+  return (
+    <div
+      role="status"
+      title={ok ? 'PHÉNIX dialogue avec votre base de données.' : message}
+      className="fixed bottom-5 right-5 z-modal inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur"
+    >
+      <span
+        aria-hidden
+        className="size-2 rounded-full"
+        style={{ backgroundColor: ok ? '#129d6b' : '#c2410c' }}
+      />
+      {ok ? 'Base connectée' : 'Base injoignable'}
+    </div>
   );
 }
 
