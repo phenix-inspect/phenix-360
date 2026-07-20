@@ -974,7 +974,10 @@ export const demo = {
     const project = await backend.createProject({
       name: proposal.projectName,
       status: 'pas_commence',
-      clientId,
+      // En SaaS, la colonne `client_id` référence un VRAI compte (auth.users) : on
+      // n'y met pas une identité fabriquée (le client sera rattaché à l'invitation,
+      // M7). Le `clientId` local sert quand même aux satellites (nom, contact, rôle).
+      clientId: saasUserId ? null : clientId,
       // L'adresse (issue du devis) sert à dériver le code ville VV du code chantier.
       ...(proposal.dossier.infos.address ? { address: proposal.dossier.infos.address } : {}),
     });
@@ -1104,7 +1107,10 @@ export const demo = {
     const project = await backend.createProject({
       name,
       status: 'pas_commence',
-      clientId,
+      // En SaaS, `client_id` référence un vrai compte : pas d'identité fabriquée
+      // (rattachement du client à l'invitation, M7). Le `clientId` local reste
+      // utilisé pour les satellites (nom affichable, contact, rôle).
+      clientId: saasUserId ? null : clientId,
       ...(address ? { address } : {}),
       ...(input.startStep ? { currentStep: input.startStep } : {}),
     });

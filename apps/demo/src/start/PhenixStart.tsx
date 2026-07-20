@@ -26,6 +26,7 @@ import {
   X,
 } from 'lucide-react';
 import { demo } from '../store';
+import { recordError } from '../lib/diagnostics';
 import { loadPhotos } from '../lib/media';
 import { extractPdfGeometry, extractPdfText } from '../lib/pdf';
 import { fmtDuree } from '../lib/format';
@@ -61,6 +62,10 @@ export function PhenixStart({
   const [name, setName] = useState('');
   const [clientName, setClientName] = useState('');
   const [address, setAddress] = useState('');
+  // Création en cours + message d'erreur VISIBLE : une création qui échoue ne doit
+  // JAMAIS rester silencieuse (sinon le bouton semble « ne rien faire »).
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
 
   const photos = (): UploadedMedia[] =>
     files.map((f) => f.media).filter((m): m is UploadedMedia => m != null);
@@ -85,22 +90,41 @@ export function PhenixStart({
     setPhase('analysis');
   };
 
-  const quickCreate = async (): Promise<void> => {
-    await demo.createChantier({
-      name: name.trim(),
-      clientName: clientName.trim() || undefined,
-      address: address.trim() || undefined,
-      startStep: 'gros_oeuvre',
-    });
-    onCreated();
+  // Enveloppe COMMUNE de création : anti double-clic + surface toute erreur au
+  // lieu de la laisser filer (une promesse rejetée « avalée » = bouton muet).
+  const runCreate = async (fn: () => Promise<unknown>, context: string): Promise<void> => {
+    if (creating) return;
+    setCreating(true);
+    setError('');
+    try {
+      await fn();
+      onCreated();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setError(msg || 'La création a échoué. Réessayez.');
+      recordError('error', `${context}: ${msg}`);
+      setCreating(false);
+    }
   };
 
-  const enter = async (p: ProjectProposal): Promise<void> => {
-    // On ARCHIVE le fichier original du devis (source officielle, ouvrable).
-    const devisFile = files.find((f) => /\.pdf$/i.test(f.name) && f.file)?.file;
-    await demo.createFromProposal(p, photos(), devisFile);
-    onCreated();
-  };
+  const quickCreate = (): Promise<void> =>
+    runCreate(
+      () =>
+        demo.createChantier({
+          name: name.trim(),
+          clientName: clientName.trim() || undefined,
+          address: address.trim() || undefined,
+          startStep: 'gros_oeuvre',
+        }),
+      'createChantier',
+    );
+
+  const enter = (p: ProjectProposal): Promise<void> =>
+    runCreate(() => {
+      // On ARCHIVE le fichier original du devis (source officielle, ouvrable).
+      const devisFile = files.find((f) => /\.pdf$/i.test(f.name) && f.file)?.file;
+      return demo.createFromProposal(p, photos(), devisFile);
+    }, 'createFromProposal');
 
   // Alternative temporaire (PDF non extractible) : analyser un texte collé à la
   // main. Passe par le MÊME port d'analyse — rien d'inventé, on lit ce texte.
@@ -111,10 +135,11 @@ export function PhenixStart({
     setProposal(name.trim() ? { ...result, projectName: name.trim() } : result);
   };
 
-  if (phase === 'analysis' && proposal)
-    return <AnalysisScene proposal={proposal} onDone={() => setPhase('synthesis')} />;
-  if (phase === 'synthesis' && proposal)
-    return (
+  let screen: React.JSX.Element;
+  if (phase === 'analysis' && proposal) {
+    screen = <AnalysisScene proposal={proposal} onDone={() => setPhase('synthesis')} />;
+  } else if (phase === 'synthesis' && proposal) {
+    screen = (
       <SynthesisScreen
         proposal={proposal}
         photosCount={photos().length}
@@ -123,29 +148,53 @@ export function PhenixStart({
         onAnalyzeText={(t) => void analyzePastedText(t)}
       />
     );
-  if (phase === 'review' && proposal)
-    return (
+  } else if (phase === 'review' && proposal) {
+    screen = (
       <ProposalReview
         proposal={proposal}
         onValidate={(p) => void enter(p)}
         onCancel={() => setPhase('synthesis')}
       />
     );
+  } else {
+    screen = (
+      <NewChantierScreen
+        files={files}
+        setFiles={setFiles}
+        name={name}
+        setName={setName}
+        clientName={clientName}
+        setClientName={setClientName}
+        address={address}
+        setAddress={setAddress}
+        onPrepare={() => void prepare()}
+        onQuickCreate={() => void quickCreate()}
+        onCancel={onCancel}
+      />
+    );
+  }
 
   return (
-    <NewChantierScreen
-      files={files}
-      setFiles={setFiles}
-      name={name}
-      setName={setName}
-      clientName={clientName}
-      setClientName={setClientName}
-      address={address}
-      setAddress={setAddress}
-      onPrepare={() => void prepare()}
-      onQuickCreate={() => void quickCreate()}
-      onCancel={onCancel}
-    />
+    <>
+      {screen}
+      {(creating || error) && (
+        <div className="fixed inset-x-0 bottom-5 z-modal flex justify-center px-4">
+          <div
+            role={error ? 'alert' : 'status'}
+            className="max-w-lg rounded-xl border border-border bg-surface px-4 py-3 text-sm shadow-lg"
+            style={{ color: error ? '#c2410c' : undefined }}
+          >
+            {error ? (
+              <>
+                <strong>La création n’a pas abouti.</strong> {error}
+              </>
+            ) : (
+              'Création du chantier en cours…'
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
