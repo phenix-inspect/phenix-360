@@ -41,6 +41,7 @@ import {
   momentPartageClient,
   nextReserveNumero,
   userId as toUserId,
+  type Backend,
   type BackendState,
   type CommCanal,
   type Contact,
@@ -104,6 +105,8 @@ import {
 } from './lib/generatedDocument';
 import { buildDocumentPdf } from './lib/pdfEngine';
 import { readDocumentAttachment } from './lib/upload';
+import { SaaSBackend } from './lib/saasBackend';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
@@ -428,7 +431,26 @@ export interface DemoSnapshot extends BackendState {
 }
 
 const kv = new LocalStorageKeyValueStore();
-const backend = new InMemoryBackend(kv);
+/**
+ * Backend ACTIF (port `Backend`). Par défaut : mémoire adossée à localStorage
+ * (démo / e2e — comportement d'origine, mode par défaut). En mode SaaS (Supabase
+ * configuré ET utilisateur connecté), `connectSupabase()` le remplace par
+ * `SaaSBackend` (write-through cloud). Le reste du store ne voit AUCUNE différence :
+ * il parle au port, pas au stockage.
+ */
+let backend: Backend = new InMemoryBackend(kv);
+/**
+ * Backend SaaS courant, s'il est branché : sa source de vérité colonne vertébrale
+ * (projets/membres/événements) est un cache hydraté depuis Supabase, exposé à
+ * `build()` de façon synchrone via `snapshot()`. `null` en mode démo.
+ */
+let saasBackend: SaaSBackend | null = null;
+/**
+ * Identité RÉELLE du conducteur connecté (mode SaaS) : c'est LUI qui crée et
+ * signe les chantiers/comptes rendus (auteur = `auth.uid()`, exigé par la RLS).
+ * `null` en démo (identités fabriquées localement).
+ */
+let saasUserId: UserId | null = null;
 const channel = new BroadcastChannel('phenix-demo');
 const listeners = new Set<() => void>();
 
@@ -491,9 +513,19 @@ migrateProjectCodes();
 ensureNotifBaseline();
 let snapshot: DemoSnapshot = build();
 
+/**
+ * Snapshot SYNCHRONE de la colonne vertébrale (projets/membres/événements) pour
+ * `build()`. Démo : localStorage. SaaS : le cache mémoire du `SaaSBackend`
+ * (hydraté depuis Supabase). Les « satellites » (people, dossiers, Fil…) restent
+ * locaux pour cette tranche (migration progressive, cf. MIGRATION.md M4).
+ */
+function coreState(): BackendState {
+  return saasBackend ? saasBackend.snapshot() : (kv.load() ?? emptyState());
+}
+
 function build(): DemoSnapshot {
   return {
-    ...(kv.load() ?? emptyState()),
+    ...coreState(),
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
@@ -516,7 +548,13 @@ function build(): DemoSnapshot {
       typeof localStorage !== 'undefined'
         ? localStorage.getItem(COOKIE_CONSENT_KEY) !== null
         : false,
-    seeded: typeof localStorage !== 'undefined' ? localStorage.getItem(SEEDED_KEY) !== null : true,
+    // En SaaS, l'espace de travail EST le cloud (pas d'écran « découvrir la
+    // démo / démarrer à vide ») : on considère l'espace initialisé d'emblée.
+    seeded: saasBackend
+      ? true
+      : typeof localStorage !== 'undefined'
+        ? localStorage.getItem(SEEDED_KEY) !== null
+        : true,
     storageSaturated,
   };
 }
@@ -584,6 +622,41 @@ export const demo = {
   },
   getSnapshot(): DemoSnapshot {
     return snapshot;
+  },
+
+  /**
+   * Branche la colonne vertébrale sur Supabase (mode SaaS). Idempotent : si déjà
+   * connecté pour ce même utilisateur, ne refait rien. Hydrate le cache depuis le
+   * cloud AVANT de basculer, puis rafraîchit l'UI. Tolérant : si l'hydratation
+   * échoue, on reste en démo locale (jamais d'écran cassé). À appeler une fois la
+   * session Supabase connue (cf. AuthGate).
+   */
+  async connectSupabase(client: SupabaseClient, userId: string): Promise<void> {
+    const uid = toUserId(userId);
+    if (saasBackend && saasUserId === uid) return;
+    try {
+      const sb = new SaaSBackend(client, userId);
+      await sb.hydrate();
+      saasBackend = sb;
+      backend = sb;
+      saasUserId = uid;
+    } catch (e) {
+      // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
+      console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);
+    }
+    refresh();
+    // Pas de broadcast : chaque onglet a sa propre session / son propre cache.
+  },
+  /** Débranche Supabase (déconnexion) : retour au backend local (démo). */
+  disconnectSupabase(): void {
+    saasBackend = null;
+    saasUserId = null;
+    backend = new InMemoryBackend(kv);
+    refresh();
+  },
+  /** Vrai si la colonne vertébrale est actuellement servie par Supabase. */
+  isSaaS(): boolean {
+    return saasBackend !== null;
   },
 
   // Identités de démo (noms) — hors modèle core.
@@ -895,7 +968,9 @@ export const demo = {
     devisFile?: File,
   ): Promise<ProjectId> {
     const clientId = toUserId(crypto.randomUUID());
-    const compaId = toUserId(crypto.randomUUID());
+    // En SaaS, le conducteur est l'utilisateur RÉELLEMENT connecté (auteur exigé
+    // par la RLS). En démo, une identité fabriquée suffit.
+    const compaId = saasUserId ?? toUserId(crypto.randomUUID());
     const project = await backend.createProject({
       name: proposal.projectName,
       status: 'pas_commence',
@@ -1022,7 +1097,9 @@ export const demo = {
   }): Promise<ProjectId> {
     const name = input.name.trim();
     const clientId = toUserId(crypto.randomUUID());
-    const compaId = toUserId(crypto.randomUUID());
+    // En SaaS, le conducteur est l'utilisateur RÉELLEMENT connecté (auteur exigé
+    // par la RLS). En démo, une identité fabriquée suffit.
+    const compaId = saasUserId ?? toUserId(crypto.randomUUID());
     const address = input.address?.trim();
     const project = await backend.createProject({
       name,

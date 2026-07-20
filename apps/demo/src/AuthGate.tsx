@@ -5,6 +5,7 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { SupabaseBackend, projectId as toProjectId } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
 import { recordError } from './lib/diagnostics';
+import { demo } from './store';
 
 /**
  * Authentification réelle (mode SaaS). N'est montée QUE lorsque Supabase est
@@ -17,6 +18,10 @@ export function AuthGate({ children }: { children: React.ReactNode }): React.JSX
   const [client, setClient] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
+  // Le cache colonne vertébrale est-il hydraté depuis Supabase ? On n'affiche
+  // l'app qu'une fois les chantiers du cloud chargés (sinon on verrait un espace
+  // vide se remplir après coup).
+  const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     let unsub: (() => void) | undefined;
@@ -42,11 +47,33 @@ export function AuthGate({ children }: { children: React.ReactNode }): React.JSX
     };
   }, []);
 
+  // Branche / débranche le store sur Supabase selon la session. Connecté = les
+  // chantiers du conducteur (cloud) sont chargés ; déconnecté = retour au local.
+  useEffect(() => {
+    if (!client) return;
+    let alive = true;
+    if (session) {
+      setConnected(false);
+      void demo.connectSupabase(client, session.user.id).finally(() => {
+        if (alive) setConnected(true);
+      });
+    } else {
+      demo.disconnectSupabase();
+      setConnected(false);
+    }
+    return () => {
+      alive = false;
+    };
+  }, [client, session]);
+
   if (!ready) {
     return <Splash label="Chargement…" />;
   }
   if (!client || !session) {
     return <LoginScreen client={client} />;
+  }
+  if (!connected) {
+    return <Splash label="Chargement de vos chantiers…" />;
   }
   return (
     <>

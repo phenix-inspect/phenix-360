@@ -41,6 +41,27 @@ L'app **n'est pas encore branchée** à Supabase : ce serait prématuré tant qu
 (a) le projet Supabase n'existe pas et (b) seuls projets/membres/événements sont
 couverts (voir §3). La démo reste intacte et fonctionnelle.
 
+## 1bis. Fait dans l'incrément M2–M3 (branchement colonne vertébrale)
+
+- **Auth réelle** (`AuthGate`) + schéma appliqué sur le projet Supabase (UE) ;
+  écriture prouvée en base (round-trip create/read/delete).
+- **`SaaSBackend`** (`apps/demo/src/lib/saasBackend.ts`) : enveloppe write-through
+  autour de `SupabaseBackend`. Lectures servies par un **cache mémoire hydraté**
+  au login (synchrone pour l'UI, via `snapshot()` que `build()` consomme) ;
+  écritures **durables** à Supabase puis répercutées au cache.
+- **Store** : backend ACTIF échangeable (`connectSupabase`/`disconnectSupabase`) ;
+  en SaaS, le **conducteur = l'utilisateur connecté** (auteur exigé par la RLS),
+  rattaché à ses chantiers via la RPC sécurisée `app_add_self_as`.
+- **Frontière assumée** : les identités fabriquées (client démo) et leurs
+  écritures restent en **cache local** (aperçu) tant que le client n'a pas sa
+  propre connexion (invitations / passerelle — M7). Résilience : une écriture
+  durable qui échoue n'interrompt jamais la session (poursuite en cache + diag).
+- **Satellites** (dossiers, Le Fil, contacts, réglages « Mon espace »…) : encore
+  locaux — migration en **M4**. Sur le MÊME appareil, l'expérience est complète ;
+  le cross-device ne couvre pour l'instant que la colonne vertébrale.
+- **Tests** : `apps/demo/e2e/saas-backend.test.mjs` (9 assertions — hydrate,
+  aiguillage durable/local, cache) ; démo 100 % inchangée (gate complet vert).
+
 ---
 
 ## 2. L'unique action humaine indispensable
