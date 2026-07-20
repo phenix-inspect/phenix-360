@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrandMark, Button, Input } from '@phenix360/ui';
 import { LogOut } from 'lucide-react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseBackend, userId as toUserId } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
 import { recordError } from './lib/diagnostics';
 
@@ -51,20 +52,32 @@ export function AuthGate({ children }: { children: React.ReactNode }): React.JSX
     <>
       {children}
       <SignOutButton client={client} />
-      <ConnectionStatus client={client} />
+      <ConnectionStatus client={client} userId={session.user.id} />
     </>
   );
 }
 
 /**
- * Témoin de connexion à la base : après connexion, tente une lecture inoffensive
- * de la table `project` (la RLS filtre — une liste vide est un SUCCÈS). Prouve en
- * direct que le navigateur joint bien Supabase (réseau + CSP + jeton + RLS + schéma).
- * Étape de validation du branchement, avant de déplacer les vraies données.
+ * Témoin de connexion à la base + test d'enregistrement.
+ * ---------------------------------------------------------------------------
+ * 1) LECTURE : tente une lecture inoffensive de `project` (la RLS filtre — une
+ *    liste vide est un SUCCÈS). Prouve réseau + CSP + jeton + RLS + schéma.
+ * 2) ÉCRITURE (à la demande) : crée un chantier de test via l'adaptateur RÉEL
+ *    (SupabaseBackend), le relit, puis le supprime — round-trip complet et
+ *    auto-nettoyé qui prouve que l'écriture persiste bien dans la base.
+ * Échafaudage de validation du branchement (retiré une fois les données migrées).
  */
-function ConnectionStatus({ client }: { client: SupabaseClient }): React.JSX.Element | null {
+function ConnectionStatus({
+  client,
+  userId,
+}: {
+  client: SupabaseClient;
+  userId: string;
+}): React.JSX.Element | null {
   const [state, setState] = useState<'checking' | 'ok' | 'error'>('checking');
   const [message, setMessage] = useState('');
+  const [writeState, setWriteState] = useState<'idle' | 'running' | 'ok' | 'error'>('idle');
+  const [writeMessage, setWriteMessage] = useState('');
 
   useEffect(() => {
     let alive = true;
@@ -87,20 +100,71 @@ function ConnectionStatus({ client }: { client: SupabaseClient }): React.JSX.Ele
     };
   }, [client]);
 
+  const runWriteTest = async (): Promise<void> => {
+    setWriteState('running');
+    setWriteMessage('');
+    try {
+      const backend = new SupabaseBackend(client);
+      const created = await backend.createProject({
+        name: `Test enregistrement ${new Date().toISOString()}`,
+        address: '1 rue de Test, 75001 Paris',
+      });
+      await backend.addMember({
+        projectId: created.id,
+        userId: toUserId(userId),
+        role: 'compagnon',
+      });
+      const list = await backend.listProjects();
+      const found = list.some((p) => p.id === created.id);
+      await backend.deleteProject(created.id); // nettoyage (cascade)
+      if (!found) throw new Error('chantier créé mais non relu dans la base');
+      setWriteState('ok');
+      setWriteMessage(`Chantier ${created.code} créé, relu et nettoyé.`);
+    } catch (e) {
+      const raw = e instanceof Error ? e.message : String(e);
+      setWriteState('error');
+      setWriteMessage(raw);
+      recordError('error', `Supabase write test: ${raw}`);
+    }
+  };
+
   if (state === 'checking') return null;
   const ok = state === 'ok';
   return (
-    <div
-      role="status"
-      title={ok ? 'PHÉNIX dialogue avec votre base de données.' : message}
-      className="fixed bottom-5 right-5 z-modal inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur"
-    >
-      <span
-        aria-hidden
-        className="size-2 rounded-full"
-        style={{ backgroundColor: ok ? '#129d6b' : '#c2410c' }}
-      />
-      {ok ? 'Base connectée' : 'Base injoignable'}
+    <div className="fixed bottom-5 right-5 z-modal flex flex-col items-end gap-2">
+      {writeMessage && (
+        <div
+          className="max-w-xs rounded-xl border border-border bg-surface/95 px-3 py-2 text-xs shadow-sm backdrop-blur"
+          style={{ color: writeState === 'error' ? '#c2410c' : '#129d6b' }}
+        >
+          {writeState === 'ok' ? '✅ Écriture OK — ' : '⚠️ '}
+          {writeMessage}
+        </div>
+      )}
+      <div className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur">
+        <span
+          role="status"
+          title={ok ? 'PHÉNIX dialogue avec votre base de données.' : message}
+          className="inline-flex items-center gap-1.5"
+        >
+          <span
+            aria-hidden
+            className="size-2 rounded-full"
+            style={{ backgroundColor: ok ? '#129d6b' : '#c2410c' }}
+          />
+          {ok ? 'Base connectée' : 'Base injoignable'}
+        </span>
+        {ok && (
+          <button
+            type="button"
+            onClick={() => void runWriteTest()}
+            disabled={writeState === 'running'}
+            className="border-l border-border pl-2 font-medium text-foreground underline-offset-2 hover:underline disabled:opacity-60"
+          >
+            {writeState === 'running' ? 'Test en cours…' : 'Tester l’enregistrement'}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
