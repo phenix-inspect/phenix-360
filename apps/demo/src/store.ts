@@ -106,6 +106,7 @@ import {
 import { buildDocumentPdf } from './lib/pdfEngine';
 import { readDocumentAttachment } from './lib/upload';
 import { SaaSBackend } from './lib/saasBackend';
+import { CloudKv } from './lib/cloudKv';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const STATE_KEY = 'phenix-demo:state:v1';
@@ -142,6 +143,29 @@ const CLIENT_SETTINGS_KEY = 'phenix-demo:client-settings:v1';
 // Consentement cookies (device-local, global) : une fois accepté, le bandeau ne
 // réapparaît plus. V1 : cookies nécessaires uniquement, pas de CMP.
 const COOKIE_CONSENT_KEY = 'phenix-demo:cookie-consent:v1';
+
+/**
+ * Clés « satellites » synchronisées dans le cloud en mode SaaS (M4) — celles qui
+ * décrivent le TRAVAIL du conducteur et doivent le suivre d'un appareil à l'autre.
+ * La colonne vertébrale (STATE_KEY) est gérée à part par `SaaSBackend`. On EXCLUT
+ * volontairement les marqueurs purement locaux à l'appareil (consentement cookies,
+ * repère de notifications, « espace initialisé »), qui n'ont pas à voyager.
+ */
+const SYNCED_SATELLITE_KEYS: ReadonlySet<string> = new Set([
+  PEOPLE_KEY,
+  ACTIVE_KEY,
+  DOSSIERS_KEY,
+  FIL_MOMENTS_KEY,
+  FIL_COUPS_KEY,
+  FIL_MESSAGES_KEY,
+  FIL_ZONES_KEY,
+  PHENIX_CONV_KEY,
+  SHARES_KEY,
+  CONTACTS_KEY,
+  SEEN_KEY,
+  CHOIX_TRAITES_KEY,
+  CLIENT_SETTINGS_KEY,
+]);
 
 /** Une entrée du journal des partages (aperçu / journalisation, pas d'envoi réel). */
 export interface ShareLog {
@@ -267,6 +291,13 @@ const memMirror = new Map<string, string>();
  */
 let storageSaturated = false;
 
+/**
+ * Coffre cloud des satellites (mode SaaS). `null` en démo. Branché par
+ * `connectSupabase` : les écritures locales des clés `SYNCED_SATELLITE_KEYS` sont
+ * alors répercutées (best-effort) vers Supabase pour suivre le conducteur.
+ */
+let cloudKv: CloudKv | null = null;
+
 function lsGet(key: string): string | null {
   if (memMirror.has(key)) return memMirror.get(key) ?? null;
   try {
@@ -282,6 +313,8 @@ function lsGet(key: string): string | null {
 function safeSetItem(key: string, value: string): boolean {
   // Vérité en mémoire — TOUJOURS. localStorage ensuite, best-effort.
   memMirror.set(key, value);
+  // Miroir cloud (SaaS) pour les satellites qui doivent suivre le conducteur.
+  if (cloudKv && SYNCED_SATELLITE_KEYS.has(key)) cloudKv.set(key, value);
   try {
     localStorage.setItem(key, value);
     return true;
@@ -298,10 +331,42 @@ function safeSetItem(key: string, value: string): boolean {
 
 function lsRemove(key: string): void {
   memMirror.delete(key);
+  if (cloudKv && SYNCED_SATELLITE_KEYS.has(key)) cloudKv.remove(key);
   try {
     localStorage.removeItem(key);
   } catch {
     /* rien à faire : la clé mémoire est déjà retirée */
+  }
+}
+
+/**
+ * Écrit une paire satellite en local SANS la répercuter au cloud (miroir mémoire
+ * + localStorage bruts). Sert à HYDRATER le cloud → local à la connexion : on ne
+ * veut pas réémettre vers Supabase ce qu'on vient d'en lire.
+ */
+function hydrateLocalRaw(key: string, value: string): void {
+  memMirror.set(key, value);
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* quota : le miroir mémoire suffit à la session */
+  }
+}
+
+/**
+ * Purge localement les satellites synchronisés (mémoire + localStorage), SANS
+ * toucher au cloud. À la connexion, on repart ainsi d'une ardoise propre avant
+ * d'hydrater les données de l'utilisateur courant (pas de résidus d'un autre
+ * compte / de la démo locale).
+ */
+function clearSyncedLocalRaw(): void {
+  for (const key of SYNCED_SATELLITE_KEYS) {
+    memMirror.delete(key);
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* rien : la clé mémoire est déjà retirée */
+    }
   }
 }
 
@@ -640,6 +705,15 @@ export const demo = {
       saasBackend = sb;
       backend = sb;
       saasUserId = uid;
+      // Satellites (dossier, contacts, Fil, réglages…) : on repart d'une ardoise
+      // locale propre, puis on HYDRATE depuis le coffre cloud de CET utilisateur.
+      // On ne branche `cloudKv` (miroir des écritures) qu'APRÈS l'hydratation,
+      // pour ne pas réémettre vers Supabase ce qu'on vient d'en lire.
+      const kvClient = new CloudKv(client, userId);
+      clearSyncedLocalRaw();
+      const rows = await kvClient.loadAll();
+      for (const [k, v] of Object.entries(rows)) hydrateLocalRaw(k, v);
+      cloudKv = kvClient;
     } catch (e) {
       // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
       console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);
@@ -651,6 +725,11 @@ export const demo = {
   disconnectSupabase(): void {
     saasBackend = null;
     saasUserId = null;
+    cloudKv = null;
+    // On retire les satellites du compte quitté (mémoire + localStorage), sans
+    // toucher au cloud : la prochaine connexion réhydrate depuis Supabase.
+    clearSyncedLocalRaw();
+    clearMemMirror();
     backend = new InMemoryBackend(kv);
     refresh();
   },

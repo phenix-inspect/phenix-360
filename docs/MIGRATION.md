@@ -56,11 +56,27 @@ couverts (voir §3). La démo reste intacte et fonctionnelle.
   écritures restent en **cache local** (aperçu) tant que le client n'a pas sa
   propre connexion (invitations / passerelle — M7). Résilience : une écriture
   durable qui échoue n'interrompt jamais la session (poursuite en cache + diag).
-- **Satellites** (dossiers, Le Fil, contacts, réglages « Mon espace »…) : encore
-  locaux — migration en **M4**. Sur le MÊME appareil, l'expérience est complète ;
-  le cross-device ne couvre pour l'instant que la colonne vertébrale.
 - **Tests** : `apps/demo/e2e/saas-backend.test.mjs` (9 assertions — hydrate,
   aiguillage durable/local, cache) ; démo 100 % inchangée (gate complet vert).
+
+## 1ter. Fait dans l'incrément M4 (satellites → cloud, par utilisateur)
+
+Les « satellites » du conducteur suivent désormais son compte d'un appareil à
+l'autre, comme la colonne vertébrale :
+
+- **Table `app_kv`** (RLS `user_id = auth.uid()`) : coffre clé→valeur PRIVÉ,
+  contenu opaque (chaîne JSON) — miroir durable du stockage local, pas un modèle.
+- **`CloudKv`** (`apps/demo/src/lib/cloudKv.ts`) : `loadAll()` (hydratation) +
+  écritures best-effort **coalescées et sérialisées par clé** (dernière valeur
+  gagnante, pas de course). Un échec réseau ne bloque jamais la session.
+- **Store** : `safeSetItem`/`lsRemove` répercutent au cloud les clés satellites
+  (`SYNCED_SATELLITE_KEYS`) ; `connectSupabase` purge le local puis **hydrate**
+  depuis le coffre de l'utilisateur (sans réémettre ce qu'il vient de lire).
+  Marqueurs purement locaux (cookies, baseline notifs, « initialisé ») exclus.
+- **Frontière** : coffre PAR UTILISATEUR (le conducteur) — le partage de ces
+  éléments avec le client suit avec les invitations / la passerelle (**M7**).
+- **Tests** : `apps/demo/e2e/cloud-kv.test.mjs` (5 assertions — hydrate,
+  tolérance, upsert/delete, coalescing). Démo inchangée (gate complet vert).
 
 ---
 
