@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrandMark, Button, Input } from '@phenix360/ui';
 import { LogOut } from 'lucide-react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseBackend, projectId as toProjectId, userId as toUserId } from '@phenix360/core';
+import { SupabaseBackend, projectId as toProjectId } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
 import { recordError } from './lib/diagnostics';
 
@@ -135,11 +135,12 @@ function ConnectionStatus({
         address: '1 rue de Test, 75001 Paris',
       });
       createdId = created.id;
-      await backend.addMember({
-        projectId: created.id,
-        userId: toUserId(userId),
-        role: 'compagnon',
+      // Rattachement du créateur via la fonction sécurisée (contourne l'anomalie RLS).
+      const join = await client.rpc('app_add_self_as', {
+        p_project: created.id,
+        p_role: 'compagnon',
       });
+      if (join.error) throw new Error(`app_add_self_as: ${join.error.message}`);
       const list = await backend.listProjects();
       const found = list.some((p) => p.id === created.id);
       if (!found) throw new Error('chantier créé mais non relu dans la base');
