@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BrandMark, Button, Input } from '@phenix360/ui';
 import { LogOut } from 'lucide-react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { SupabaseBackend, userId as toUserId } from '@phenix360/core';
+import { SupabaseBackend, projectId as toProjectId, userId as toUserId } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
 import { recordError } from './lib/diagnostics';
 
@@ -103,12 +103,38 @@ function ConnectionStatus({
   const runWriteTest = async (): Promise<void> => {
     setWriteState('running');
     setWriteMessage('');
+    const backend = new SupabaseBackend(client);
+    let createdId: string | null = null;
+    // Diagnostic : propriétaire enregistré vs utilisateur courant + test de la
+    // fonction de sécurité. Révèle la cause exacte d'un refus d'écriture.
+    const diag = async (): Promise<string> => {
+      let s = `uid=${userId.slice(0, 8)}`;
+      if (!createdId) return s;
+      try {
+        const back = await client
+          .from('project')
+          .select('created_by')
+          .eq('id', createdId)
+          .maybeSingle();
+        const cb = back.data?.created_by ? String(back.data.created_by) : 'NULL';
+        s += ` cb=${cb.slice(0, 8)}`;
+      } catch {
+        s += ' cb=?';
+      }
+      try {
+        const owns = await client.rpc('app_owns_project', { p_project: createdId });
+        s += ` owns=${owns.error ? 'fn-absente' : String(owns.data)}`;
+      } catch {
+        s += ' owns=?';
+      }
+      return s;
+    };
     try {
-      const backend = new SupabaseBackend(client);
       const created = await backend.createProject({
         name: `Test enregistrement ${new Date().toISOString()}`,
         address: '1 rue de Test, 75001 Paris',
       });
+      createdId = created.id;
       await backend.addMember({
         projectId: created.id,
         userId: toUserId(userId),
@@ -116,15 +142,23 @@ function ConnectionStatus({
       });
       const list = await backend.listProjects();
       const found = list.some((p) => p.id === created.id);
-      await backend.deleteProject(created.id); // nettoyage (cascade)
       if (!found) throw new Error('chantier créé mais non relu dans la base');
       setWriteState('ok');
       setWriteMessage(`Chantier ${created.code} créé, relu et nettoyé.`);
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e);
+      const d = await diag();
       setWriteState('error');
-      setWriteMessage(raw);
-      recordError('error', `Supabase write test: ${raw}`);
+      setWriteMessage(`${raw} — [${d}]`);
+      recordError('error', `Supabase write test: ${raw} ${d}`);
+    } finally {
+      if (createdId) {
+        try {
+          await backend.deleteProject(toProjectId(createdId)); // nettoyage best-effort (cascade)
+        } catch {
+          /* rien : sera nettoyé plus tard */
+        }
+      }
     }
   };
 
