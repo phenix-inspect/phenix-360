@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Input } from '@phenix360/ui';
-import { LogOut, Mail } from 'lucide-react';
+import { BrandMark, Button, Input } from '@phenix360/ui';
+import { LogOut } from 'lucide-react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseClient } from './lib/supabase';
 
@@ -109,9 +109,7 @@ function LoginScreen({ client }: { client: SupabaseClient | null }): React.JSX.E
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className="w-full max-w-sm space-y-5 rounded-2xl border border-border bg-surface p-8 text-center shadow-lg">
-        <span className="mx-auto flex size-14 items-center justify-center rounded-full bg-gold-100 text-gold-700 [&_svg]:size-7">
-          <Mail aria-hidden />
-        </span>
+        <BrandMark className="mx-auto size-16" />
         <div className="space-y-1">
           <h1 className="font-serif text-2xl font-semibold tracking-tight text-foreground">
             PHÉNIX 360
