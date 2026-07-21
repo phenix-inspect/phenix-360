@@ -2856,6 +2856,27 @@ export function conductorNotifications(
     });
   }
 
+  // 💬 Réponse du client à une QUESTION du conducteur (« Demander au client →
+  // Poser une question »). La demande (`destinataire='client'`, texte — pas un
+  // document) est passée à `traitee` avec sa `resolution` → sans ce signal, la
+  // réponse dormait au Suivi sans jamais alerter le conducteur. On la surface dans
+  // « Aujourd'hui » ; la trace complète (question → réponse) se lit au Suivi.
+  for (const e of snap.events) {
+    if (e.projectId !== projectId || e.type !== 'demande') continue;
+    const c = e.content;
+    if (c.destinataire !== 'client' || c.attendu === 'document' || !c.resolution) continue;
+    if (c.resolution.resolvedAt <= base || seen[e.id]) continue;
+    out.push({
+      id: `question-reponse-${e.id}`,
+      icon: '💬',
+      text: `${clientName} a répondu à votre question`,
+      createdAt: c.resolution.resolvedAt,
+      seenKeys: [e.id],
+      projectId,
+      tab: 'suivi',
+    });
+  }
+
   // 📩 Nouvelle demande du client (posée à Léon, escaladée au conducteur) : tant
   // qu'elle est OUVERTE, elle doit sauter aux yeux dans « Aujourd'hui ». C'est le
   // signal « Nouvelle demande client à traiter » attendu côté conducteur.
