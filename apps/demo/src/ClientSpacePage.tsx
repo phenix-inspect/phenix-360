@@ -405,23 +405,30 @@ function EventCard({
 
   if (event.type === 'demande') {
     const question = (c.question as string) ?? '';
-    const resolution = c.resolution as { texte?: string } | undefined;
+    const resolution = c.resolution as
+      { texte?: string; photos?: { imageUrl?: string }[] } | undefined;
     const destinataire = c.destinataire as string;
+    const reponsePhotos = resolutionImages(resolution);
 
     // Message DU client au conducteur (`destinataire='phenix'`) : on le lui rappelle
-    // et on affiche la réponse du conducteur quand elle arrive.
+    // et on affiche la réponse du conducteur (texte + photos) quand elle arrive.
     if (destinataire === 'phenix') {
+      const hasReponse = Boolean(resolution?.texte) || reponsePhotos.length > 0;
       return (
         <Card date={date} tag="Votre message">
           <p className="text-sm text-foreground">{question}</p>
-          {resolution?.texte ? (
-            <p className="mt-2 rounded-lg border border-success/40 bg-success/5 px-3 py-2 text-sm text-foreground">
-              <span className="text-xs font-medium uppercase tracking-wide text-success">
+          {hasReponse ? (
+            <div className="mt-2 rounded-lg border border-success/40 bg-success/5 px-3 py-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-success">
                 Réponse de votre conducteur
-              </span>
-              <br />
-              {resolution.texte}
-            </p>
+              </p>
+              {resolution?.texte && (
+                <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">
+                  {resolution.texte}
+                </p>
+              )}
+              <PhotoGrid srcs={reponsePhotos} alt="Photo de votre conducteur" />
+            </div>
           ) : (
             <p className="mt-1 text-xs text-muted-foreground">
               En attente de la réponse de votre conducteur.
@@ -432,14 +439,21 @@ function EventCard({
     }
 
     // Demande adressée au client et encore ouverte ⇒ il peut RÉPONDRE.
-    const canReply = destinataire === 'client' && event.state === 'ouverte' && !resolution?.texte;
+    const canReply =
+      destinataire === 'client' &&
+      event.state === 'ouverte' &&
+      !resolution?.texte &&
+      reponsePhotos.length === 0;
     return (
       <Card date={date} tag="Demande">
         <p className="text-sm text-foreground">{question}</p>
-        {resolution?.texte ? (
-          <p className="mt-2 rounded-lg bg-background px-3 py-2 text-sm text-muted-foreground">
-            Votre réponse : {resolution.texte}
-          </p>
+        {resolution?.texte || reponsePhotos.length > 0 ? (
+          <div className="mt-2 rounded-lg bg-background px-3 py-2">
+            {resolution?.texte && (
+              <p className="text-sm text-muted-foreground">Votre réponse : {resolution.texte}</p>
+            )}
+            <PhotoGrid srcs={reponsePhotos} alt="Photo jointe" />
+          </div>
         ) : canReply ? (
           <DemandeResponder eventId={event.id} onRespond={onRespond} />
         ) : (
@@ -792,6 +806,35 @@ function extractPhotos(content: Record<string, unknown>): string[] {
   return raw
     .map((p) => (p && typeof p === 'object' ? (p as { imageUrl?: string }).imageUrl : undefined))
     .filter((u): u is string => typeof u === 'string' && u.startsWith('data:'));
+}
+
+/** Photos jointes à une RÉPONSE (résolution d'une demande) — mêmes conventions. */
+function resolutionImages(resolution: { photos?: { imageUrl?: string }[] } | undefined): string[] {
+  const raw = resolution?.photos;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((p) => (p && typeof p === 'object' ? p.imageUrl : undefined))
+    .filter(
+      (u): u is string => typeof u === 'string' && (u.startsWith('data:') || u.startsWith('http')),
+    );
+}
+
+/** Grille de photos affichables (rien si la liste est vide). */
+function PhotoGrid({ srcs, alt }: { srcs: string[]; alt: string }): React.JSX.Element | null {
+  if (srcs.length === 0) return null;
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {srcs.map((src, i) => (
+        <img
+          key={i}
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="aspect-square w-full rounded-lg object-cover"
+        />
+      ))}
+    </div>
+  );
 }
 
 function formatDate(iso: string): string {
