@@ -135,7 +135,7 @@ ou le confier à PHÉNIX — sans compte.
 - **SQL** (`20260721120000_client_validate_choix.sql`, aussi dans install.sql) :
   `client_space` **redéfini** pour renvoyer aussi les événements `decision`
   client-safe (envoi + résolutions) ; `client_validate_choix(project, code,
-  event, option, message)` SECURITY DEFINER exécutable par `anon` — vérifie le
+event, option, message)` SECURITY DEFINER exécutable par `anon` — vérifie le
   code, refuse un choix déjà résolu (pas de réécriture), résout le libellé de
   l'option depuis la présentation portée, pose une TRACE `decision/validee` (ou
   `deleguee` si `option = '__phenix_delegate__'`), `author_id` NULL, visible
