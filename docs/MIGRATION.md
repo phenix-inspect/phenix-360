@@ -78,6 +78,28 @@ l'autre, comme la colonne vertébrale :
 - **Tests** : `apps/demo/e2e/cloud-kv.test.mjs` (5 assertions — hydrate,
   tolérance, upsert/delete, coalescing). Démo inchangée (gate complet vert).
 
+## 1quater. Fait dans l'incrément M7.1 (espace client — lien + code, lecture seule)
+
+Premier temps de l'accès client : le client CONSULTE son chantier via un lien
+`…/#/c/<projectId>` + un code, **sans compte**.
+
+- **SQL** (`20260721100000_client_space.sql`, aussi dans install.sql) :
+  `project_client_access` (code **haché** bcrypt, RLS sans policy) ;
+  `set_client_access(project, code)` (conducteur interne) ;
+  `client_space(project, code)` SECURITY DEFINER exécutable par `anon` — vérifie
+  le code CÔTÉ SERVEUR et ne renvoie que les événements **visibles au client**
+  (miroir exact de `isVisibleToClient` / `event_select_client`).
+- **App** : route `#/c/<id>` dans `main.tsx` → page AUTONOME `ClientSpacePage`
+  (aucun accès au store conducteur) : saisie du code, appel RPC, récit en lecture
+  seule (avancement, photos, documents, décisions/demandes). Le conducteur
+  obtient le **lien + code** dans « Mon espace » (`LienDeSuivi`, mode SaaS).
+- **Store** : publie le code (`set_client_access`) à la création du chantier, au
+  changement de code, et à l'affichage de « Mon espace » (best-effort).
+- **Vérifié** sur PostgreSQL 16 (suite SQL : mauvais code refusé, bon code =
+  3 événements visibles). Démo 100 % inchangée (gate complet vert).
+- **Frontière** : LECTURE seule. Répondre / valider un choix (écriture client via
+  RPC code-gardées) = tranche **M7.2**.
+
 ---
 
 ## 2. L'unique action humaine indispensable

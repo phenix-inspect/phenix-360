@@ -57,3 +57,27 @@ begin
   raise notice 'OK RLS — client=%, interne=%, avancement=%', v_client, v_internal, v_step;
 end
 $$;
+
+-- 4. Espace client par LIEN + CODE (M7.1) : code vérifié + miroir de la vue client
+do $$
+declare v_nb int; v_name text; v_bad boolean := false;
+begin
+  perform set_config('app.user_id', '11111111-1111-1111-1111-111111111111', true);
+  perform set_client_access('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234');
+
+  begin
+    perform client_space('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'wrong');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL espace client : mauvais code accepté'; end if;
+
+  select jsonb_array_length(
+           client_space('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234') -> 'events'),
+         client_space('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234') -> 'project' ->> 'name'
+    into v_nb, v_name;
+  if v_nb <> 3 then
+    raise exception 'FAIL espace client : attendu 3 événements visibles, obtenu %', v_nb;
+  end if;
+  raise notice 'OK espace client — % événements, projet %', v_nb, v_name;
+end
+$$;

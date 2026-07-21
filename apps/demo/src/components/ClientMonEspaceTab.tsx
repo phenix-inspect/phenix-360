@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import {
   Badge,
   Button,
@@ -15,8 +15,10 @@ import type { Project } from '@phenix360/core';
 import {
   Bell,
   Check,
+  Copy,
   Eye,
   EyeOff,
+  Link2,
   Lock,
   MapPin,
   ShieldCheck,
@@ -134,6 +136,8 @@ function AccesChantier({
         </div>
       </dl>
 
+      {demo.isSaaS() && <LienDeSuivi projectId={project.id} code={settings.accessCode} />}
+
       {saved && (
         <p
           role="status"
@@ -168,6 +172,60 @@ function AccesChantier({
         }}
       />
     </Section>
+  );
+}
+
+/**
+ * Lien de suivi à donner au client (mode SaaS). Le client ouvre ce lien et saisit
+ * le code d'accès ci-dessus — aucun compte à créer. Bouton « Copier » pour le
+ * partager par SMS / email.
+ */
+function LienDeSuivi({
+  projectId,
+  code,
+}: {
+  projectId: Project['id'];
+  code: string;
+}): React.JSX.Element {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}${window.location.pathname}#/c/${projectId}`;
+  // Garantit que le code courant est publié côté serveur (le lien fonctionne même
+  // pour un chantier créé avant cette fonctionnalité). Best-effort, idempotent.
+  useEffect(() => {
+    demo.publishClientAccess(projectId);
+  }, [projectId]);
+  const copy = async (text: string): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* presse-papiers indisponible : le client peut sélectionner le texte à la main */
+    }
+  };
+  return (
+    <div className="mt-4 space-y-2 rounded-xl border border-border bg-background/60 p-3">
+      <p className="flex items-center gap-2 text-sm font-medium text-foreground [&_svg]:size-4 [&_svg]:text-gold-600">
+        <Link2 aria-hidden />
+        Lien de suivi du client
+      </p>
+      <p className="text-xs text-muted-foreground">
+        Envoyez ce lien à votre client (SMS, email) avec son code d’accès. Il suit son chantier sans
+        créer de compte.
+      </p>
+      <div className="flex items-center gap-2">
+        <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-2 py-1.5 text-xs text-foreground">
+          {link}
+        </code>
+        <Button type="button" variant="outline" size="sm" onClick={() => void copy(link)}>
+          {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+          {copied ? 'Copié' : 'Copier'}
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Code à communiquer : <span className="font-mono font-medium text-foreground">{code}</span>
+      </p>
+    </div>
   );
 }
 

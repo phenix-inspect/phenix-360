@@ -107,6 +107,7 @@ import { buildDocumentPdf } from './lib/pdfEngine';
 import { readDocumentAttachment } from './lib/upload';
 import { SaaSBackend } from './lib/saasBackend';
 import { CloudKv } from './lib/cloudKv';
+import { recordError } from './lib/diagnostics';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const STATE_KEY = 'phenix-demo:state:v1';
@@ -516,7 +517,32 @@ let saasBackend: SaaSBackend | null = null;
  * `null` en démo (identités fabriquées localement).
  */
 let saasUserId: UserId | null = null;
+/**
+ * Client Supabase courant (mode SaaS), pour les RPC hors port `Backend` — p.ex.
+ * publier le code d'accès de l'espace client (`set_client_access`). `null` en démo.
+ */
+let saasClient: SupabaseClient | null = null;
 const channel = new BroadcastChannel('phenix-demo');
+
+/**
+ * Publie (best-effort) le code d'accès de l'espace client d'un chantier dans le
+ * cloud, pour que le lien client (…/#/c/<id>) le vérifie côté serveur. Sans
+ * incidence en démo. Ne bloque jamais l'appelant.
+ */
+function syncClientAccessCode(projectId: string, code: string): void {
+  if (!saasClient || code.trim().length < 4) return;
+  // `rpc` renvoie un « thenable » (pas une vraie Promise) : on l'enveloppe pour
+  // disposer de `.catch`. Best-effort — n'interrompt jamais l'appelant.
+  Promise.resolve(
+    saasClient.rpc('set_client_access', { p_project: projectId, p_code: code.trim() }),
+  )
+    .then((res: { error: { message: string } | null }) => {
+      if (res.error) recordError('error', `set_client_access: ${res.error.message}`);
+    })
+    .catch((e: unknown) => {
+      recordError('error', `set_client_access: ${e instanceof Error ? e.message : String(e)}`);
+    });
+}
 const listeners = new Set<() => void>();
 
 // Cibles transitoires (en mémoire) : lien retour « Voir la photo » + navigation
@@ -714,6 +740,7 @@ export const demo = {
       const rows = await kvClient.loadAll();
       for (const [k, v] of Object.entries(rows)) hydrateLocalRaw(k, v);
       cloudKv = kvClient;
+      saasClient = client;
     } catch (e) {
       // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
       console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);
@@ -726,6 +753,7 @@ export const demo = {
     saasBackend = null;
     saasUserId = null;
     cloudKv = null;
+    saasClient = null;
     // On retire les satellites du compte quitté (mémoire + localStorage), sans
     // toucher au cloud : la prochaine connexion réhydrate depuis Supabase.
     clearSyncedLocalRaw();
@@ -896,6 +924,17 @@ export const demo = {
   /** Le client change son code d'accès (min. 6 caractères, obligatoire). */
   setClientAccessCode(projectId: ProjectId, code: string): void {
     demo._writeClientSettings(projectId, { accessCode: code });
+    // Propage le nouveau code au serveur pour que le lien client le vérifie.
+    syncClientAccessCode(projectId, code);
+  },
+  /**
+   * S'assure que le code d'accès COURANT d'un chantier est publié côté serveur
+   * (pour que le lien client fonctionne), y compris pour un chantier créé avant
+   * cette fonctionnalité. Idempotent, best-effort. Sans effet en démo.
+   */
+  publishClientAccess(projectId: ProjectId): void {
+    const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
+    syncClientAccessCode(projectId, all[projectId]?.accessCode ?? DEFAULT_ACCESS_CODE);
   },
   /** Le client invite une personne de confiance à suivre son chantier. */
   inviteClientPerson(
@@ -1062,6 +1101,9 @@ export const demo = {
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
     await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
+    // Espace client (lien + code) : le chantier naît avec le code par défaut, que
+    // le conducteur pourra changer dans « Mon espace ». Sans effet en démo.
+    syncClientAccessCode(project.id, DEFAULT_ACCESS_CODE);
 
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';
@@ -1195,6 +1237,9 @@ export const demo = {
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
     await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
+    // Espace client (lien + code) : code par défaut à la création (modifiable
+    // ensuite dans « Mon espace »). Sans effet en démo.
+    syncClientAccessCode(project.id, DEFAULT_ACCESS_CODE);
 
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';
