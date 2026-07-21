@@ -205,6 +205,35 @@ Troisième et dernier geste d'écriture côté client : envoyer un message libre
   écrire un message (M7.2.3) — toutes par RPC code-gardées, jamais d'écriture
   directe (RLS). Suite : médias vers Storage (M5).
 
+## 1nonies. Fait dans l'incrément M5 (médias → Supabase Storage)
+
+Les photos/documents quittent le base64 du journal pour **Supabase Storage** —
+journal plus léger, pas de limite de payload, chargements plus rapides.
+
+- **Approche à UN seul point** (faible risque) : plutôt que de câbler l'upload
+  dans chaque capture, on intercepte à l'écriture durable
+  (`SaaSBackend.appendEvent` / `resolveDemande`) avec un **parcours générique**
+  (`uploadMediaDeep`, `lib/mediaStore.ts`) qui remplace **tout data URL base64**
+  du contenu par une **URL Storage publique**. Couvre TOUS les médias
+  d'événements (photos de CR, documents, photos de réponse) — et donc tout ce que
+  voit le client — sans connaître les formes de contenu.
+- **Rétro-compatible + repli sûr** : en démo (pas de client) ou si un upload
+  échoue, on garde le base64 — l'app se comporte comme avant, jamais d'écran
+  cassé. Les composants d'affichage ne changent pas (`<img src>` reçoit une URL
+  `https://` au lieu de `data:`). `openAttachment` ouvre une URL Storage
+  directement ; `extractPhotos` accepte data URL **et** https.
+- **SQL** (`20260721150000_storage_public.sql` + install.sql) : bucket
+  `attachments` **PUBLIC** (lecture par URL). Sert l'app interne ET la page
+  cliente anonyme sans fonction serveur. Chemins en UUID aléatoire
+  (URL-capacité) ; écriture réservée aux membres internes.
+- **Tests** : `saas-backend.test.mjs` 16/16 (image base64 → URL publique, médias
+  imbriqués des points, aucun upload sans média). Démo inchangée (gate complet).
+- **Vérification LIVE requise** (upload réel depuis le navigateur) — l'e2e ne
+  couvre que la démo/base64. Réglage : re-jouer install.sql + rendre le bucket
+  public.
+- **Frontière** : couvre les médias du JOURNAL (événements). Le **Fil / coulisses**
+  (satellite `app_kv`) reste en base64 = **M5 v2**.
+
 ---
 
 ## 2. L'unique action humaine indispensable

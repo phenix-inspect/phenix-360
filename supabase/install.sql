@@ -189,21 +189,23 @@ create policy event_update_internal on event
   for update using (app_is_internal(project_id)) with check (app_is_internal(project_id));
 
 -- ----------------------------------------------------------------------------
--- Storage — bucket privé des pièces jointes (photos / documents)
+-- Storage — bucket PUBLIC des pièces jointes (photos / documents), M5
 -- ----------------------------------------------------------------------------
+-- Bucket PUBLIC (lecture par URL) : sert l'app interne ET la page cliente
+-- anonyme (lien+code) sans fonction serveur. Les chemins sont des UUID
+-- aléatoires (URL-capacité) : seules les personnes à qui l'URL est transmise
+-- (via une réponse déjà gardée par la RLS / le code) peuvent l'ouvrir.
 insert into storage.buckets (id, name, public)
-values ('attachments', 'attachments', false)
-on conflict (id) do nothing;
+values ('attachments', 'attachments', true)
+on conflict (id) do update set public = true;
 
-drop policy if exists "attachments read members" on storage.objects;
-create policy "attachments read members" on storage.objects
-  for select to authenticated
-  using (bucket_id = 'attachments' and app_is_member(((storage.foldername(name))[1])::uuid));
-
+-- L'ÉCRITURE reste réservée aux membres INTERNES du chantier (dossier = projet).
 drop policy if exists "attachments write internal" on storage.objects;
 create policy "attachments write internal" on storage.objects
   for insert to authenticated
   with check (bucket_id = 'attachments' and app_is_internal(((storage.foldername(name))[1])::uuid));
+-- La lecture publique est portée par le bucket (public=true) : pas de policy select.
+drop policy if exists "attachments read members" on storage.objects;
 
 -- ----------------------------------------------------------------------------
 -- app_kv — coffre clé→valeur privé par utilisateur (satellites, M4)

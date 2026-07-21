@@ -3251,3 +3251,52 @@ Impact : correctif vérifié en live (photo « OUI » du conducteur). Gate compl
 Note : la vraie livraison temps réel côté client viendra avec les comptes client (auth). Les
 médias restent en base64 (M5 Storage = lot d'infra ultérieur, à mener avec test d'upload live).
 VISION Art. 9, 10, 11.
+
+---
+
+21/07/2026
+Décision : M5 — les MÉDIAS (photos/documents) quittent le base64 pour Supabase Storage.
+Pourquoi : le base64 dans le journal alourdit la base et plafonne la taille. Approche à UN
+SEUL point pour minimiser le risque : au lieu de câbler l'upload dans chaque capture (photos
+via `mediaUploader` sans projectId, documents, etc.), on intercepte à l'écriture durable
+(`SaaSBackend.appendEvent` / `resolveDemande`) avec un PARCOURS GÉNÉRIQUE (`uploadMediaDeep`,
+`lib/mediaStore.ts`) qui remplace tout data URL base64 du contenu par une URL Storage publique
+(`getPublicUrl`). Générique = aucune connaissance des formes ; couvre TOUS les médias
+d'événements (CR, documents, réponses) et donc tout ce que voit le client. Bucket `attachments`
+rendu PUBLIC (URL-capacité, chemins UUID) : sert l'app interne ET la page cliente anonyme
+(lien+code) sans fonction serveur. Écriture réservée aux membres internes. Repli sûr : démo ou
+échec d'upload → on garde le base64 (rétro-compatible, jamais d'écran cassé). Affichage
+inchangé (`<img src>` reçoit https au lieu de data:) ; `openAttachment` ouvre l'URL directement.
+Alternatives rejetées : câblage par point de capture (threading projectId dans mediaUploader/
+PhotoInput — surface énorme, régressions) ; bucket privé + URLs signées (impossible à signer
+pour le client anonyme sans edge function — infra) ; edge function de signature (hors périmètre).
+Le bucket public + URL-capacité est le plus simple qui sert les deux publics ; réversible.
+Impact : `saas-backend.test.mjs` 16/16 (image → URL publique, médias imbriqués des points,
+aucun upload sans média). Suite SQL verte, install.sql idempotent, bucket public vérifié.
+Gate complet vert. VÉRIFICATION LIVE requise (upload réel navigateur — l'e2e ne couvre que la
+démo/base64). Frontière : médias du JOURNAL couverts ; Fil/coulisses (satellite app_kv) = M5 v2.
+VISION Art. 8, 9, 11.
+
+---
+
+21/07/2026
+Décision : Espace client (lien+code) — REFONTE PREMIUM à parité visuelle avec l'app.
+Pourquoi : signalé par le PO — le lien envoyé au client (`#/c/<id>`, page autonome
+`ClientSpacePage`) affichait une page minimaliste (fil de cartes) qui « ne ressemblait pas du
+tout » à l'espace client validé (`ClientView`, riche, 6 onglets). Cause : deux expériences
+distinctes. `ClientView` est bâti pour tourner DANS l'app conducteur (store complet + dossier
+satellite + Léon) ; le client anonyme (lien+code, pas de compte — modèle choisi par le PO) n'a
+que les données de `client_space` (le journal). On ne peut donc pas réutiliser `ClientView` tel
+quel. Refonte de la page autonome au MÊME système de design : en-tête soigné, bandeau
+d'avancement (« où en est votre chantier »), et layout à ONGLETS calqué sur `ClientView` —
+Aujourd'hui (actions : choix à trancher + réponses attendues, sinon « rien à faire ») /
+Vos choix / Vos échanges (messages + demandes + composer) / Documents / Le récit
+(comptes rendus + photos). Nourri par les événements de `client_space`. Aucune fuite (le RPC
+reste le miroir gardé).
+Alternatives rejetées : porter `ClientView` sur `client_space` (nécessite d'exposer le dossier/
+planning + le Fil/coulisses + Léon à l'anonyme — gros chantier, données non disponibles côté
+serveur) ; comptes clients réels (refusés par le PO — modèle lien+code). Parité de FEATURES
+complète (planning daté, galerie coulisses, Léon) = lot ultérieur si besoin (dépend d'exposer
+ces satellites au client).
+Impact : typecheck + prettier + build verts. Page autonome uniquement (hors périmètre e2e démo,
+qui ne charge pas la route `#/c/`). Vérification VISUELLE en live par le PO. VISION Art. 2, 9, 11.

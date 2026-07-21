@@ -101,14 +101,28 @@ function mockClient(responder, rpcResponder = () => ({ data: null, error: null }
     };
     return b;
   };
+  const storageLog = [];
   const client = {
     from: (t) => builder(t),
     rpc: (name, params) => {
       rpcLog.push({ name, params });
       return Promise.resolve(rpcResponder(name, params));
     },
+    storage: {
+      from: (bucket) => ({
+        upload: (path, data, opts) => {
+          storageLog.push({ bucket, path, contentType: opts?.contentType });
+          return Promise.resolve({ data: { path }, error: null });
+        },
+        getPublicUrl: (path) => ({
+          data: {
+            publicUrl: `https://test.supabase.co/storage/v1/object/public/${bucket}/${path}`,
+          },
+        }),
+      }),
+    },
   };
-  return { client, log, rpcLog };
+  return { client, log, rpcLog, storageLog };
 }
 
 const ISO = '2026-07-19T10:00:00.000Z';
@@ -441,6 +455,89 @@ await check('ingestEvent : IGNORE un événement d’un projet inconnu', async (
   const changed = be.ingestEvent(domainEvent({ id: 'e-orphan', projectId: 'p-inconnu' }));
   assert(changed === false, 'un projet inconnu ne doit rien changer');
   assert(be.snapshot().events.length === 0, 'aucun événement orphelin ne doit entrer');
+});
+
+/* -- M5 : les médias base64 partent vers Storage à l'écriture --------------- */
+const PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const eventInsert = (log) => log.find((c) => c.table === 'event' && c.insert)?.insert;
+
+await check('appendEvent : une image base64 est téléversée (URL publique en base)', async () => {
+  const { client, log, storageLog } = mockClient((chain) => ({
+    data: eventRow({ ...chain.insert, id: 'e-media' }),
+    error: null,
+  }));
+  const be = new SaaSBackend(client, SELF);
+  await be.appendEvent({
+    projectId: 'p-1',
+    type: 'photo',
+    actor: { userId: SELF, role: 'compagnon' },
+    visibility: 'client',
+    state: 'publie',
+    content: {
+      attachment: {
+        id: 'a-1',
+        kind: 'photo',
+        bucket: 'local',
+        storagePath: 'x',
+        mimeType: 'image/png',
+        createdAt: ISO,
+        dataUrl: PNG_DATA_URL,
+      },
+    },
+  });
+  assert(storageLog.length === 1, 'upload Storage non appelé');
+  assert(storageLog[0].bucket === 'attachments', 'mauvais bucket');
+  const inserted = eventInsert(log);
+  const url = inserted?.content?.attachment?.dataUrl;
+  assert(typeof url === 'string' && url.startsWith('https://'), 'base64 non remplacé par une URL');
+  assert(!url.startsWith('data:'), 'le base64 subsiste dans le journal');
+});
+
+await check('appendEvent : médias base64 IMBRIQUÉS (photos de points) téléversés', async () => {
+  const { client, log, storageLog } = mockClient((chain) => ({
+    data: eventRow({ ...chain.insert, id: 'e-cr' }),
+    error: null,
+  }));
+  const be = new SaaSBackend(client, SELF);
+  await be.appendEvent({
+    projectId: 'p-1',
+    type: 'compte_rendu',
+    actor: { userId: SELF, role: 'compagnon' },
+    visibility: 'client',
+    state: 'publie',
+    content: {
+      texte: 'CR',
+      points: [
+        { comment: 'a', diffusion: 'client', photos: [{ imageUrl: PNG_DATA_URL }] },
+        { comment: 'b', diffusion: 'both', photos: [{ imageUrl: PNG_DATA_URL }] },
+      ],
+    },
+  });
+  assert(storageLog.length === 2, `attendu 2 uploads, obtenu ${storageLog.length}`);
+  const points = eventInsert(log)?.content?.points ?? [];
+  const urls = points.flatMap((p) => p.photos.map((ph) => ph.imageUrl));
+  assert(
+    urls.every((u) => u.startsWith('https://')),
+    'toutes les photos de points ne sont pas migrées',
+  );
+});
+
+await check('appendEvent : sans média, aucun upload Storage', async () => {
+  const { client, storageLog } = mockClient((chain) => ({
+    data: eventRow({ ...chain.insert, id: 'e-plain' }),
+    error: null,
+  }));
+  const be = new SaaSBackend(client, SELF);
+  await be.appendEvent({
+    projectId: 'p-1',
+    type: 'compte_rendu',
+    actor: { userId: SELF, role: 'compagnon' },
+    visibility: 'interne',
+    state: 'publie',
+    content: { texte: 'aucune image' },
+  });
+  assert(storageLog.length === 0, 'upload Storage déclenché sans média');
 });
 
 const passed = results.filter(Boolean).length;

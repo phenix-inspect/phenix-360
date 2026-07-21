@@ -46,6 +46,7 @@ import {
   type UserId,
 } from '@phenix360/core';
 import { recordError } from './diagnostics';
+import { uploadMediaDeep } from './mediaStore';
 
 const empty = (): BackendState => ({ projects: [], members: [], events: [] });
 const uuid = (): string => globalThis.crypto.randomUUID();
@@ -210,7 +211,12 @@ export class SaaSBackend implements Backend {
     // exige `author_id = auth.uid()` + membre interne). Sinon : aperçu local.
     if (input.actor.userId === this.selfUserId) {
       try {
-        const event = await this.remote.appendEvent(input);
+        // M5 : sortir les médias base64 du journal → Storage (URL publique).
+        const withMedia = {
+          ...input,
+          content: await uploadMediaDeep(this.client, input.projectId, input.content),
+        } as NewEvent;
+        const event = await this.remote.appendEvent(withMedia);
         this.state.events.push(event);
         this.durableEvents.add(event.id);
         this.refreshCurrentStep(input.projectId);
@@ -267,7 +273,9 @@ export class SaaSBackend implements Backend {
     if (event.type !== 'demande') throw new Error(`L'événement ${id} n'est pas une demande`);
     if (this.durableEvents.has(id)) {
       try {
-        const updated = await this.remote.resolveDemande(id, resolution);
+        // M5 : les photos de la réponse (base64) partent vers Storage.
+        const stored = await uploadMediaDeep(this.client, event.projectId, resolution);
+        const updated = await this.remote.resolveDemande(id, stored);
         Object.assign(event, updated);
         return event;
       } catch (e) {

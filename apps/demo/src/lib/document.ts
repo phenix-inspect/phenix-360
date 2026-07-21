@@ -1,4 +1,29 @@
 import type { EventAttachment } from '@phenix360/core';
+import { isRemoteUrl, publicUrl } from './mediaStore';
+
+/** Ouvre une URL distante (https) dans un nouvel onglet (Storage / lien public). */
+function openUrl(url: string): void {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/**
+ * Source affichable/ouvrable d'une pièce jointe : l'URL distante (Storage) si le
+ * média y vit, sinon le data URL base64 (démo / ancien contenu). Tolérant.
+ */
+function attachmentSrc(attachment: EventAttachment): string | undefined {
+  if (isRemoteUrl(attachment.dataUrl)) return attachment.dataUrl;
+  if (attachment.bucket && attachment.bucket !== 'local' && attachment.bucket !== 'demo') {
+    const url = publicUrl(attachment.bucket, attachment.storagePath);
+    if (url) return url;
+  }
+  return attachment.dataUrl;
+}
 
 /**
  * Ouvre un Blob dans un NOUVEL ONGLET (aperçu natif du navigateur).
@@ -25,8 +50,13 @@ function openBlob(blob: Blob): void {
  * onglet. Sans fichier attaché, on ne fait RIEN (aucun faux lien). 100 % local.
  */
 export function openAttachment(attachment: EventAttachment): void {
-  const dataUrl = attachment.dataUrl;
+  const dataUrl = attachmentSrc(attachment);
   if (!dataUrl) return;
+  // Média en Storage (URL https) : on ouvre l'URL directement (pas de Blob base64).
+  if (isRemoteUrl(dataUrl)) {
+    openUrl(dataUrl);
+    return;
+  }
   try {
     const comma = dataUrl.indexOf(',');
     const meta = dataUrl.slice(0, comma);
@@ -93,8 +123,13 @@ const safeName = (name: string): string =>
 
 /** Télécharge une pièce jointe RÉELLE (le fichier d'origine). Sans fichier → rien. */
 export function downloadAttachment(attachment: EventAttachment): void {
-  const dataUrl = attachment.dataUrl;
+  const dataUrl = attachmentSrc(attachment);
   if (!dataUrl) return;
+  // Média en Storage (URL https) : on l'ouvre (le navigateur gère l'enregistrement).
+  if (isRemoteUrl(dataUrl)) {
+    openUrl(dataUrl);
+    return;
+  }
   try {
     const comma = dataUrl.indexOf(',');
     const base64 = dataUrl.slice(comma + 1);
