@@ -21,6 +21,8 @@ import {
   answerContractQuestion,
   type ContractAnswer,
   askPhenix as corePhenix,
+  mapEventRow,
+  type EventRow,
   attachmentId as toAttachmentId,
   buildDecisionContent,
   choixClientValides,
@@ -108,7 +110,7 @@ import { readDocumentAttachment } from './lib/upload';
 import { SaaSBackend } from './lib/saasBackend';
 import { CloudKv } from './lib/cloudKv';
 import { recordError } from './lib/diagnostics';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 
 const STATE_KEY = 'phenix-demo:state:v1';
 const PEOPLE_KEY = 'phenix-demo:people:v1';
@@ -522,6 +524,13 @@ let saasUserId: UserId | null = null;
  * publier le code d'accès de l'espace client (`set_client_access`). `null` en démo.
  */
 let saasClient: SupabaseClient | null = null;
+/**
+ * Canal Supabase Realtime (M6) : écoute les changements de la table `event` pour
+ * CE conducteur (RLS appliquée côté serveur). Quand le client répond/valide sur
+ * un autre appareil, l'événement arrive ici et le cache se met à jour SANS
+ * rechargement. `null` en démo (pas de temps réel local).
+ */
+let realtimeChannel: RealtimeChannel | null = null;
 const channel = new BroadcastChannel('phenix-demo');
 
 /**
@@ -543,6 +552,45 @@ function syncClientAccessCode(projectId: string, code: string): void {
       recordError('error', `set_client_access: ${e instanceof Error ? e.message : String(e)}`);
     });
 }
+/**
+ * Branche l'écoute TEMPS RÉEL (M6) sur la table `event`. Chaque INSERT/UPDATE
+ * visible du conducteur (RLS) est remappé (`mapEventRow`) et fondu au cache
+ * (`ingestEvent`) ; si le cache change, on rafraîchit l'UI — pas de rechargement.
+ * Best-effort : une erreur de mapping n'interrompt jamais la session. Idempotent
+ * (on retire un canal précédent avant d'en ouvrir un nouveau).
+ */
+function subscribeRealtime(client: SupabaseClient): void {
+  unsubscribeRealtime();
+  realtimeChannel = client
+    .channel('phenix-events')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'event' },
+      (payload: { new?: Record<string, unknown> | null }) => {
+        const row = payload.new;
+        if (!row || typeof row.id !== 'string') return; // DELETE / charge vide : ignoré
+        try {
+          const event = mapEventRow(row as unknown as EventRow);
+          if (saasBackend?.ingestEvent(event)) refresh();
+        } catch (e) {
+          recordError('error', `realtime event: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      },
+    )
+    .subscribe();
+}
+
+/** Coupe l'écoute temps réel (déconnexion / reconnexion). Best-effort. */
+function unsubscribeRealtime(): void {
+  if (!realtimeChannel) return;
+  try {
+    void realtimeChannel.unsubscribe();
+  } catch {
+    /* rien : on nettoie au mieux */
+  }
+  realtimeChannel = null;
+}
+
 const listeners = new Set<() => void>();
 
 // Cibles transitoires (en mémoire) : lien retour « Voir la photo » + navigation
@@ -741,6 +789,9 @@ export const demo = {
       for (const [k, v] of Object.entries(rows)) hydrateLocalRaw(k, v);
       cloudKv = kvClient;
       saasClient = client;
+      // TEMPS RÉEL (M6) : écouter les écritures des autres appareils (réponse /
+      // validation du client) pour les refléter sans rechargement.
+      subscribeRealtime(client);
     } catch (e) {
       // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
       console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);
@@ -750,6 +801,7 @@ export const demo = {
   },
   /** Débranche Supabase (déconnexion) : retour au backend local (démo). */
   disconnectSupabase(): void {
+    unsubscribeRealtime();
     saasBackend = null;
     saasUserId = null;
     cloudKv = null;

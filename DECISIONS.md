@@ -3163,3 +3163,47 @@ enregistrée avec libellé résolu, double validation refusée). Démo 100 % inc
 complet vert (typecheck, lint, prettier, build, e2e, zéro erreur console). Écriture client
 en direct toujours interdite par la RLS — seul le chemin RPC code-gardé écrit. Suite :
 message libre client (M7.2.3), médias vers Storage (M5), temps réel (M6). VISION Art. 2, 9, 11.
+
+---
+
+21/07/2026
+Décision : Correctif blocage — la réponse du client à une QUESTION alerte le conducteur.
+Pourquoi : Le conducteur pose une question au client (« Demander au client → Poser une
+question ») ; le client répond depuis son espace (RPC `client_respond_demande`, M7.2.1) →
+la demande passe à `traitee` avec sa `resolution`, mais AUCUN signal ne remontait au
+conducteur : la réponse dormait au Suivi, jamais vue. `conductorNotifications` couvrait la
+réponse à une demande de DOCUMENT (`attendu='document'`) et la validation d'un choix, mais
+PAS la réponse texte à une question (`destinataire='client'`, `attendu != 'document'`,
+`resolution` posée). Ajout de la branche manquante : la réponse apparaît dans « Aujourd'hui »
+(« {client} a répondu à votre question »), ouvre le Suivi (question → réponse) et s'éteint à
+la lecture (accusé). Client-safe (jamais côté client).
+Alternatives rejetées : ne rien changer et compter sur le Suivi (le conducteur ne scrolle pas
+le journal — le signal doit être dans « Aujourd'hui ») ; attendre M6 (le temps réel accélère
+la livraison mais ne crée pas le signal manquant — deux problèmes distincts).
+Impact : Test `question-reponse-conducteur.test.mjs` (6/6) — reproduit le parcours
+conducteur↔client, verrouille le signal + l'accusé + le client-safe. Gate complet vert
+(e2e 99/99). Vérifié en live par le PO. Note : sans rechargement, le cache conducteur ne se
+met à jour qu'au prochain `hydrate` — d'où M6 juste après. VISION Art. 9, 10.
+
+---
+
+21/07/2026
+Décision : M6 — TEMPS RÉEL : le conducteur voit les écritures du client SANS recharger.
+Pourquoi : Le cache conducteur (`SaaSBackend`) ne se rafraîchissait qu'à l'hydratation
+(login / rechargement). Après le correctif ci-dessus, le conducteur était bien ALERTÉ de la
+réponse du client — mais seulement après un ⌘R. M6 supprime ce rechargement. À la connexion,
+le store ouvre un canal Supabase Realtime sur la table `event` (`subscribeRealtime`) ; chaque
+INSERT/UPDATE reçu est remappé (`mapEventRow`) puis fondu au cache (`SaaSBackend.ingestEvent` :
+upsert par id, IGNORE un projet inconnu, no-op si strictement identique) ; si le cache change,
+l'UI se rafraîchit. Coupé proprement à la déconnexion. SQL : `event` inscrite à la publication
+`supabase_realtime` (gardé + idempotent, sans danger sur Postgres nu) + `replica identity full`.
+Sécurité : Realtime applique la RLS de l'ABONNÉ — un conducteur ne reçoit que les événements de
+SES chantiers (miroir exact de la vue). Le temps réel n'ouvre AUCUNE donnée nouvelle.
+Alternatives rejetées : polling périodique (latence + coût réseau, pas « temps réel ») ;
+étendre le BroadcastChannel (local multi-onglets seulement, ne traverse pas les appareils) ;
+diffuser aussi `project` (l'étape courante est redérivée du flux d'événements côté cache —
+inutile pour cette tranche). Portée limitée à `event` (le journal) volontairement.
+Impact : `saas-backend.test.mjs` 13/13 (dont ingestEvent : ajout, demande→traitée, no-op,
+projet inconnu). Suite SQL verte (bloc publication ignoré sur Postgres nu). Aucune incidence
+en démo (pas de temps réel local). Gate complet vert. Nécessite d'activer Realtime pour la
+table `event` dans le projet Supabase (migration `20260721130000_realtime.sql`). VISION Art. 9, 10, 11.

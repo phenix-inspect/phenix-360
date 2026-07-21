@@ -105,6 +105,29 @@ export class SaaSBackend implements Backend {
     }
   }
 
+  /**
+   * TEMPS RÉEL (M6) : applique au cache un événement reçu d'un AUTRE appareil
+   * (p. ex. la réponse du client à une question, ou sa validation de choix).
+   * Upsert par id — remplace si présent, ajoute sinon — puis recalcule l'étape
+   * courante. On IGNORE un événement d'un projet absent du cache (il sera pris à
+   * la prochaine hydratation) et un doublon strictement identique (évite un rendu
+   * inutile). Retourne `true` si le cache a réellement changé (⇒ rafraîchir l'UI).
+   */
+  ingestEvent(event: Event): boolean {
+    // Projet inconnu du cache : on n'introduit pas d'événement orphelin.
+    if (!this.state.projects.some((p) => p.id === event.projectId)) return false;
+    const i = this.state.events.findIndex((e) => e.id === event.id);
+    if (i >= 0) {
+      if (JSON.stringify(this.state.events[i]) === JSON.stringify(event)) return false;
+      this.state.events[i] = event;
+    } else {
+      this.state.events.push(event);
+    }
+    this.durableEvents.add(event.id);
+    this.refreshCurrentStep(event.projectId);
+    return true;
+  }
+
   /* --- Projets & membres ------------------------------------------------- */
 
   async createProject(input: NewProject): Promise<Project> {

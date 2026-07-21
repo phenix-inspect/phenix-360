@@ -394,3 +394,19 @@ begin
 end;
 $$;
 grant execute on function client_validate_choix(uuid, text, uuid, text, text) to anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- Temps réel (M6) : diffuser les changements de `event` (RLS appliquée à l'abonné)
+-- ----------------------------------------------------------------------------
+alter table event replica identity full;
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'event')
+  then
+    alter publication supabase_realtime add table event;
+  end if;
+end
+$$;

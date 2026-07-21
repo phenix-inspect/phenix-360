@@ -334,6 +334,115 @@ await check(
   },
 );
 
+/* -- ingestEvent (M6 temps réel) : upsert d'un événement reçu d'un autre appareil.
+ * `ingestEvent` prend un événement au format DOMAINE (ce que le store obtient via
+ * `mapEventRow` sur le flux Realtime) — on le construit directement ici. */
+const domainEvent = (over = {}) => ({
+  id: 'e-1',
+  projectId: 'p-1',
+  type: 'compte_rendu',
+  actor: { userId: SELF, role: 'compagnon' },
+  visibility: 'interne',
+  state: 'publie',
+  captureId: null,
+  createdAt: ISO,
+  publishedBy: SELF,
+  publishedAt: ISO,
+  content: { texte: 'ok' },
+  ...over,
+});
+
+await check('ingestEvent : AJOUTE un nouvel événement d’un projet connu', async () => {
+  const { client } = mockClient((chain) => {
+    if (chain.table === 'project') return { data: [projectRow()], error: null };
+    if (chain.table === 'project_member') return { data: [], error: null };
+    if (chain.table === 'event') return { data: [], error: null };
+    return { data: [], error: null };
+  });
+  const be = new SaaSBackend(client, SELF);
+  await be.hydrate(); // le projet p-1 est dans le cache, aucun événement
+  const changed = be.ingestEvent(domainEvent({ id: 'e-rt', content: { texte: 'live' } }));
+  assert(changed === true, 'devrait signaler un changement');
+  assert(
+    be.snapshot().events.some((e) => e.id === 'e-rt'),
+    'événement temps réel absent du cache',
+  );
+});
+
+await check('ingestEvent : MET À JOUR un événement existant (demande → traitée)', async () => {
+  const demandeDomain = domainEvent({
+    id: 'e-dem',
+    type: 'demande',
+    visibility: 'client',
+    state: 'ouverte',
+    actor: { userId: '', role: 'client' },
+    publishedBy: null,
+    publishedAt: null,
+    content: { question: 'Couleur ?', destinataire: 'client' },
+  });
+  const { client } = mockClient((chain) => {
+    if (chain.table === 'project') return { data: [projectRow()], error: null };
+    if (chain.table === 'project_member') return { data: [], error: null };
+    // Le cloud renvoie la demande OUVERTE (format ligne) à l'hydratation.
+    if (chain.table === 'event')
+      return {
+        data: [
+          eventRow({
+            id: 'e-dem',
+            type: 'demande',
+            visibility: 'client',
+            state: 'ouverte',
+            author_id: null,
+            author_role: 'client',
+            published_by: null,
+            published_at: null,
+            content: { question: 'Couleur ?', destinataire: 'client' },
+          }),
+        ],
+        error: null,
+      };
+    return { data: [], error: null };
+  });
+  const be = new SaaSBackend(client, SELF);
+  await be.hydrate();
+  // Le temps réel apporte la version TRAITÉE (le client a répondu sur son appareil).
+  const changed = be.ingestEvent({
+    ...demandeDomain,
+    state: 'traitee',
+    content: { ...demandeDomain.content, resolution: { texte: 'Bleu nuit' } },
+  });
+  assert(changed === true, 'la mise à jour devrait signaler un changement');
+  const got = be.snapshot().events.find((e) => e.id === 'e-dem');
+  assert(got && got.state === 'traitee', 'état non mis à jour');
+  assert(got.content.resolution?.texte === 'Bleu nuit', 'réponse non fusionnée');
+  assert(be.snapshot().events.filter((e) => e.id === 'e-dem').length === 1, 'doublon créé');
+});
+
+await check('ingestEvent : NO-OP pour un événement identique (pas de rendu inutile)', async () => {
+  const { client } = mockClient((chain) => {
+    if (chain.table === 'project') return { data: [projectRow()], error: null };
+    if (chain.table === 'project_member') return { data: [], error: null };
+    if (chain.table === 'event') return { data: [eventRow({ id: 'e-x' })], error: null };
+    return { data: [], error: null };
+  });
+  const be = new SaaSBackend(client, SELF);
+  await be.hydrate();
+  // On ré-ingère une COPIE exacte de l'événement hydraté (même en production, le
+  // flux Realtime et l'hydratation passent par le même `mapEventRow`) ⇒ no-op.
+  const cached = be.snapshot().events.find((e) => e.id === 'e-x');
+  const changed = be.ingestEvent(JSON.parse(JSON.stringify(cached)));
+  assert(changed === false, 'un événement identique ne doit PAS signaler de changement');
+});
+
+await check('ingestEvent : IGNORE un événement d’un projet inconnu', async () => {
+  const { client } = mockClient(() => ({ data: [], error: null }));
+  const be = new SaaSBackend(client, SELF);
+  await be.hydrate(); // cache vide (aucun projet)
+  const changed = be.ingestEvent(domainEvent({ id: 'e-orphan', projectId: 'p-inconnu' }));
+  assert(changed === false, 'un projet inconnu ne doit rien changer');
+  assert(be.snapshot().events.length === 0, 'aucun événement orphelin ne doit entrer');
+});
+
 const passed = results.filter(Boolean).length;
 console.log(`\n=== BACKEND SaaS — ${passed}/${results.length} PASS ===`);
 process.exit(passed === results.length ? 0 : 1);

@@ -151,6 +151,31 @@ event, option, message)` SECURITY DEFINER exécutable par `anon` — vérifie le
 - **Suite** : écrire un message libre (M7.2.3), puis médias vers Storage (M5),
   temps réel (M6).
 
+## 1septies. Fait dans l'incrément M6 (temps réel — le conducteur voit sans recharger)
+
+Jusqu'ici le cache conducteur ne se rafraîchissait qu'à l'hydratation (login /
+rechargement complet). Quand le client répondait/validait depuis son espace, le
+conducteur ne le voyait qu'après un ⌘R. M6 supprime ce rechargement.
+
+- **App** : à la connexion (`connectSupabase`), le store ouvre un canal **Supabase
+  Realtime** sur la table `event` (`subscribeRealtime`) ; chaque INSERT/UPDATE
+  reçu est remappé (`mapEventRow`) puis fondu au cache
+  (`SaaSBackend.ingestEvent` — upsert par id, ignore projet inconnu, no-op si
+  identique) ; si le cache change, l'UI se rafraîchit. Coupé proprement à la
+  déconnexion. Aucune incidence en démo (pas de temps réel local).
+- **Sécurité** : Realtime applique la **RLS de l'abonné** — un conducteur ne
+  reçoit que les événements de SES chantiers (miroir exact de la vue existante).
+  Le temps réel n'ouvre AUCUNE donnée nouvelle, il accélère sa livraison.
+- **SQL** (`20260721130000_realtime.sql`, aussi dans install.sql) : `event`
+  inscrite à la publication `supabase_realtime` (gardé + idempotent) +
+  `replica identity full` (les UPDATE portent toutes leurs colonnes dans le flux).
+- **Tests** : `saas-backend.test.mjs` (13/13 — dont ingestEvent : ajout, mise à
+  jour demande→traitée, no-op identique, projet inconnu ignoré). Suite SQL verte
+  (le bloc publication est ignoré sur Postgres nu). Démo inchangée (gate complet).
+- **Frontière** : `event` seule (le journal). L'étape courante d'un chantier est
+  redérivée du flux d'événements côté cache. Les satellites (`app_kv`) et les
+  médias suivront si besoin.
+
 ---
 
 ## 2. L'unique action humaine indispensable
@@ -189,15 +214,15 @@ receptionne`) est obsolète.
 
 ## 4. Séquence incrémentale (chaque étape = app fonctionnelle)
 
-| #      | Tranche                           | Contenu                                                                                                                                                                                                                   | Vérifiable                    |
-| ------ | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| **M2** | **Comptes / Auth**                | Migration schéma (§3) appliquée ; auth Supabase (email magic-link) ; le point de vue (conducteur/client/artisan) **dérivé de l'appartenance réelle** (`project_member`), plus d'un onglet. Fallback démo si non connecté. | e2e auth réelle (projet créé) |
-| **M3** | **Journal (colonne vertébrale)**  | Brancher `SupabaseBackend` pour projets/membres/événements derrière un drapeau `VITE_SUPABASE_URL`. Démo = défaut si absent. Vérifier création chantier + comptes rendus multi-utilisateurs.                              | e2e live                      |
-| **M4** | **Satellites**                    | Migrer les ~17 clés localStorage hors-journal (Le Fil, dossiers/devis, contacts, réglages « Mon espace » client, accusés de lecture) vers des tables + rendre ces méthodes async.                                         | e2e par domaine               |
-| **M5** | **Médias**                        | Photos/documents : des **data URLs base64 en localStorage** vers **Supabase Storage** (bucket `attachments/{project_id}/…`, déjà prévu). Les champs `bucket`/`storagePath` existent déjà.                                 | upload/download live          |
-| **M6** | **Temps réel**                    | Remplacer/compléter le `BroadcastChannel` (multi-onglets) par **Supabase Realtime** : le client voit les mises à jour en direct.                                                                                          | e2e 2 sessions                |
-| **M7** | **Écritures client (passerelle)** | La RLS interdit au client d'écrire le journal en direct : router ses actions (décisions, demandes) via `apps/gateway` (rôle de service, revalidation). Déployer la passerelle.                                            | tests gateway                 |
-| **M8** | **Cutover + données**             | Migration optionnelle des données de démo ; désactivation du `PasswordGate` (remplacé par l'auth) ; bascule Supabase par défaut.                                                                                          | recette complète              |
+| #         | Tranche                           | Contenu                                                                                                                                                                                                                   | Vérifiable                    |
+| --------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| **M2**    | **Comptes / Auth**                | Migration schéma (§3) appliquée ; auth Supabase (email magic-link) ; le point de vue (conducteur/client/artisan) **dérivé de l'appartenance réelle** (`project_member`), plus d'un onglet. Fallback démo si non connecté. | e2e auth réelle (projet créé) |
+| **M3**    | **Journal (colonne vertébrale)**  | Brancher `SupabaseBackend` pour projets/membres/événements derrière un drapeau `VITE_SUPABASE_URL`. Démo = défaut si absent. Vérifier création chantier + comptes rendus multi-utilisateurs.                              | e2e live                      |
+| **M4**    | **Satellites**                    | Migrer les ~17 clés localStorage hors-journal (Le Fil, dossiers/devis, contacts, réglages « Mon espace » client, accusés de lecture) vers des tables + rendre ces méthodes async.                                         | e2e par domaine               |
+| **M5**    | **Médias**                        | Photos/documents : des **data URLs base64 en localStorage** vers **Supabase Storage** (bucket `attachments/{project_id}/…`, déjà prévu). Les champs `bucket`/`storagePath` existent déjà.                                 | upload/download live          |
+| **M6** ✅ | **Temps réel**                    | Canal **Supabase Realtime** sur `event` : le conducteur voit les écritures du client (réponse, choix) SANS recharger. RLS appliquée à l'abonné. Voir §1septies.                                                           | fait (ingestEvent 13/13)      |
+| **M7**    | **Écritures client (passerelle)** | La RLS interdit au client d'écrire le journal en direct : router ses actions (décisions, demandes) via `apps/gateway` (rôle de service, revalidation). Déployer la passerelle.                                            | tests gateway                 |
+| **M8**    | **Cutover + données**             | Migration optionnelle des données de démo ; désactivation du `PasswordGate` (remplacé par l'auth) ; bascule Supabase par défaut.                                                                                          | recette complète              |
 
 Contrainte invariante à chaque étape : **`DemoSnapshot` et les signatures des
 méthodes `demo.*` restent stables** → l'UI et les parcours ne changent pas
