@@ -100,6 +100,24 @@ Premier temps de l'accès client : le client CONSULTE son chantier via un lien
 - **Frontière** : LECTURE seule. Répondre / valider un choix (écriture client via
   RPC code-gardées) = tranche **M7.2**.
 
+## 1quinquies. Fait dans l'incrément M7.2.1 (le client RÉPOND à une demande)
+
+Premier geste d'écriture côté client, toujours sans compte :
+
+- **SQL** (`20260721110000_client_respond.sql`, aussi dans install.sql) :
+  `client_respond_demande(project, code, event, texte)` SECURITY DEFINER,
+  exécutable par `anon` — vérifie le code, n'écrit QUE sur une demande du bon
+  projet, `visibility='client'`, `destinataire='client'`, encore `ouverte`
+  (pas de réécriture), pose `resolution` + `state='traitee'`, `author_id` NULL.
+  Renvoie l'espace client à jour.
+- **App** : la carte « Demande » de `ClientSpacePage` propose un formulaire de
+  réponse (`DemandeResponder`) quand la demande est ouverte ; à l'envoi, l'espace
+  se rafraîchit (la fonction renvoie l'état à jour). Le conducteur voit la réponse
+  à sa prochaine ouverture (temps réel = M6).
+- **Vérifié** sur PostgreSQL 16 (suite SQL : mauvais code refusé, réponse
+  enregistrée + demande traitée, re-réponse refusée). Gate complet vert.
+- **Suite** : valider un choix (décision) et écrire un message = M7.2.2/M7.2.3.
+
 ---
 
 ## 2. L'unique action humaine indispensable

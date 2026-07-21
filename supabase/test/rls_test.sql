@@ -81,3 +81,28 @@ begin
   raise notice 'OK espace client — % événements, projet %', v_nb, v_name;
 end
 $$;
+
+-- 5. Écriture client : répondre à une demande (M7.2.1)
+do $$
+declare v_eid uuid; v_state text; v_txt text; v_bad boolean := false;
+begin
+  insert into event(project_id, type, author_id, author_role, visibility, state, content)
+  values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'demande',
+          '11111111-1111-1111-1111-111111111111', 'compagnon', 'client', 'ouverte',
+          '{"question":"Couleur ?","destinataire":"client"}')
+  returning id into v_eid;
+  -- mauvais code refusé (le code 'test1234' a été posé au test 4)
+  begin
+    perform client_respond_demande('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nope', v_eid, 'bleu');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL respond : mauvais code accepté'; end if;
+  -- bon code : réponse enregistrée + demande traitée
+  perform client_respond_demande('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', v_eid, 'Bleu nuit');
+  select state, content -> 'resolution' ->> 'texte' into v_state, v_txt from event where id = v_eid;
+  if v_state <> 'traitee' or v_txt <> 'Bleu nuit' then
+    raise exception 'FAIL respond : état/réponse inattendus (% / %)', v_state, v_txt;
+  end if;
+  raise notice 'OK réponse client — %', v_txt;
+end
+$$;

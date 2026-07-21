@@ -12,7 +12,7 @@
  * un choix, répondre à une demande) viendra dans une tranche ultérieure (M7.2).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { BrandMark, Button, Input } from '@phenix360/ui';
+import { BrandMark, Button, Input, Textarea } from '@phenix360/ui';
 import { PROJECT_STATUS_LABEL, type EventAttachment, type ProjectStatus } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
 import { openAttachment } from './lib/document';
@@ -48,6 +48,8 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [data, setData] = useState<ClientSpaceData | null>(null);
+  // Code validé de la session (pour les écritures : répondre à une demande).
+  const [activeCode, setActiveCode] = useState('');
 
   const fetchSpace = async (theCode: string): Promise<void> => {
     setBusy(true);
@@ -62,6 +64,7 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
       if (res.error || !res.data || !(res.data as ClientSpaceData).project)
         throw new Error('denied');
       setData(res.data as ClientSpaceData);
+      setActiveCode(theCode.trim());
       try {
         sessionStorage.setItem(codeKey(projectId), theCode.trim());
       } catch {
@@ -81,6 +84,26 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
     }
   };
 
+  /**
+   * Le client RÉPOND à une demande (écriture via RPC code-gardée). Renvoie
+   * l'espace à jour (la fonction serveur le recalcule) ⇒ l'UI se met à jour.
+   * Lève en cas d'échec pour que le formulaire affiche l'erreur.
+   */
+  const respondDemande = async (eventId: string, texte: string): Promise<void> => {
+    const client = await getSupabaseClient();
+    if (!client) throw new Error('config');
+    const res = await client.rpc('client_respond_demande', {
+      p_project: projectId,
+      p_code: activeCode,
+      p_event: eventId,
+      p_texte: texte,
+    });
+    if (res.error || !res.data || !(res.data as ClientSpaceData).project) {
+      throw new Error(res.error?.message ?? 'échec');
+    }
+    setData(res.data as ClientSpaceData);
+  };
+
   // Reprise silencieuse : si le code de cette session est déjà connu, on entre.
   useEffect(() => {
     let saved = '';
@@ -93,7 +116,7 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  if (data) return <ClientSpace data={data} />;
+  if (data) return <ClientSpace data={data} onRespond={respondDemande} />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
@@ -145,7 +168,13 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
  * Le récit (lecture seule)
  * -------------------------------------------------------------------------- */
 
-function ClientSpace({ data }: { data: ClientSpaceData }): React.JSX.Element {
+function ClientSpace({
+  data,
+  onRespond,
+}: {
+  data: ClientSpaceData;
+  onRespond: (eventId: string, texte: string) => Promise<void>;
+}): React.JSX.Element {
   const { project, events } = data;
   // Ordre anté-chronologique : le plus récent en haut (un fil d'actualité).
   const feed = useMemo(
@@ -177,17 +206,21 @@ function ClientSpace({ data }: { data: ClientSpaceData }): React.JSX.Element {
             Votre chantier démarre. Les actualités de votre artisan apparaîtront ici.
           </p>
         ) : (
-          feed.map((e) => <EventCard key={e.id} event={e} />)
+          feed.map((e) => <EventCard key={e.id} event={e} onRespond={onRespond} />)
         )}
-        <p className="pt-4 text-center text-xs text-muted-foreground">
-          Suivi de chantier PHÉNIX · lecture seule
-        </p>
+        <p className="pt-4 text-center text-xs text-muted-foreground">Suivi de chantier PHÉNIX</p>
       </main>
     </div>
   );
 }
 
-function EventCard({ event }: { event: ClientEvent }): React.JSX.Element | null {
+function EventCard({
+  event,
+  onRespond,
+}: {
+  event: ClientEvent;
+  onRespond: (eventId: string, texte: string) => Promise<void>;
+}): React.JSX.Element | null {
   const date = formatDate(event.created_at);
   const c = event.content;
 
@@ -216,6 +249,9 @@ function EventCard({ event }: { event: ClientEvent }): React.JSX.Element | null 
   if (event.type === 'demande') {
     const question = (c.question as string) ?? '';
     const resolution = c.resolution as { texte?: string } | undefined;
+    // Demande adressée au client et encore ouverte ⇒ il peut RÉPONDRE.
+    const canReply =
+      (c.destinataire as string) === 'client' && event.state === 'ouverte' && !resolution?.texte;
     return (
       <Card date={date} tag="Demande">
         <p className="text-sm text-foreground">{question}</p>
@@ -223,6 +259,8 @@ function EventCard({ event }: { event: ClientEvent }): React.JSX.Element | null 
           <p className="mt-2 rounded-lg bg-background px-3 py-2 text-sm text-muted-foreground">
             Votre réponse : {resolution.texte}
           </p>
+        ) : canReply ? (
+          <DemandeResponder eventId={event.id} onRespond={onRespond} />
         ) : (
           <p className="mt-1 text-xs text-muted-foreground">En attente de votre réponse.</p>
         )}
@@ -263,6 +301,55 @@ function EventCard({ event }: { event: ClientEvent }): React.JSX.Element | null 
         </div>
       )}
     </Card>
+  );
+}
+
+/** Formulaire de réponse du client à une demande (écriture via RPC code-gardée). */
+function DemandeResponder({
+  eventId,
+  onRespond,
+}: {
+  eventId: string;
+  onRespond: (eventId: string, texte: string) => Promise<void>;
+}): React.JSX.Element {
+  const [texte, setTexte] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (): Promise<void> => {
+    if (busy || texte.trim().length === 0) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onRespond(eventId, texte.trim());
+      // Succès : l'espace est rafraîchi par le parent (la carte passera en « répondu »).
+    } catch {
+      setError('Votre réponse n’a pas pu être envoyée. Réessayez.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 space-y-2">
+      <Textarea
+        value={texte}
+        onChange={(e) => {
+          setTexte(e.target.value);
+          setError('');
+        }}
+        placeholder="Votre réponse…"
+        rows={3}
+        aria-label="Votre réponse"
+      />
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      <Button size="sm" onClick={() => void submit()} disabled={busy || texte.trim().length === 0}>
+        {busy ? 'Envoi…' : 'Envoyer ma réponse'}
+      </Button>
+    </div>
   );
 }
 
