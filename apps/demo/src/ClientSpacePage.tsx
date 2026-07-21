@@ -9,9 +9,10 @@
  *
  * Volontairement séparée de l'app conducteur (AUCUN accès au store local) : elle
  * ne peut donc rien casser côté conducteur. Le client peut désormais ÉCRIRE, via
- * des RPC code-gardées : répondre à une demande (M7.2.1) et valider un choix / le
- * confier à PHÉNIX (M7.2.2). Chaque écriture ne pose qu'une trace au journal, que
- * le conducteur relit — jamais d'accès direct en écriture (RLS).
+ * des RPC code-gardées : répondre à une demande (M7.2.1), valider un choix / le
+ * confier à PHÉNIX (M7.2.2), et écrire un message libre au conducteur (M7.2.3).
+ * Chaque écriture ne pose qu'une trace au journal, que le conducteur relit (et
+ * reçoit en temps réel, M6) — jamais d'accès direct en écriture (RLS).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { BrandMark, Button, Input, Textarea } from '@phenix360/ui';
@@ -135,6 +136,25 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
     setData(res.data as ClientSpaceData);
   };
 
+  /**
+   * Le client ÉCRIT UN MESSAGE au conducteur (écriture via RPC code-gardée). La
+   * fonction serveur crée une demande adressée au conducteur et renvoie l'espace
+   * à jour (le client voit son message aussitôt).
+   */
+  const sendMessage = async (texte: string): Promise<void> => {
+    const client = await getSupabaseClient();
+    if (!client) throw new Error('config');
+    const res = await client.rpc('client_message', {
+      p_project: projectId,
+      p_code: activeCode,
+      p_texte: texte,
+    });
+    if (res.error || !res.data || !(res.data as ClientSpaceData).project) {
+      throw new Error(res.error?.message ?? 'échec');
+    }
+    setData(res.data as ClientSpaceData);
+  };
+
   // Reprise silencieuse : si le code de cette session est déjà connu, on entre.
   useEffect(() => {
     let saved = '';
@@ -148,7 +168,14 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
   }, [projectId]);
 
   if (data)
-    return <ClientSpace data={data} onRespond={respondDemande} onValidateChoix={validateChoix} />;
+    return (
+      <ClientSpace
+        data={data}
+        onRespond={respondDemande}
+        onValidateChoix={validateChoix}
+        onSendMessage={sendMessage}
+      />
+    );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6">
@@ -204,10 +231,12 @@ function ClientSpace({
   data,
   onRespond,
   onValidateChoix,
+  onSendMessage,
 }: {
   data: ClientSpaceData;
   onRespond: (eventId: string, texte: string) => Promise<void>;
   onValidateChoix: (carrierEventId: string, optionId: string, comment: string) => Promise<void>;
+  onSendMessage: (texte: string) => Promise<void>;
 }): React.JSX.Element {
   const { project, events } = data;
   // Les CHOIX (événements `decision`) sont regroupés par sélection et présentés à
@@ -264,9 +293,81 @@ function ClientSpace({
         ) : (
           feed.map((e) => <EventCard key={e.id} event={e} onRespond={onRespond} />)
         )}
+
+        <MessageComposer onSend={onSendMessage} />
+
         <p className="pt-4 text-center text-xs text-muted-foreground">Suivi de chantier PHÉNIX</p>
       </main>
     </div>
+  );
+}
+
+/** Composer « Écrire à votre conducteur » : un message libre (écriture code-gardée). */
+function MessageComposer({
+  onSend,
+}: {
+  onSend: (texte: string) => Promise<void>;
+}): React.JSX.Element {
+  const [texte, setTexte] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [sent, setSent] = useState(false);
+
+  const submit = async (): Promise<void> => {
+    if (busy || texte.trim().length === 0) return;
+    setBusy(true);
+    setError('');
+    try {
+      await onSend(texte.trim());
+      setTexte('');
+      setSent(true);
+    } catch {
+      setError('Votre message n’a pas pu être envoyé. Réessayez.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section
+      className="rounded-xl border border-border bg-surface p-4 shadow-sm"
+      aria-label="Écrire à votre conducteur"
+    >
+      <p className="text-sm font-medium text-foreground">Une question, une remarque ?</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Écrivez à votre conducteur — il vous répondra ici.
+      </p>
+      <Textarea
+        className="mt-2"
+        value={texte}
+        onChange={(e) => {
+          setTexte(e.target.value);
+          setError('');
+          setSent(false);
+        }}
+        placeholder="Votre message…"
+        rows={3}
+        aria-label="Votre message"
+      />
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {sent && !error && (
+        <p role="status" className="mt-2 text-sm text-success">
+          Message envoyé — votre conducteur vous répondra ici.
+        </p>
+      )}
+      <Button
+        className="mt-2"
+        size="sm"
+        onClick={() => void submit()}
+        disabled={busy || texte.trim().length === 0}
+      >
+        {busy ? 'Envoi…' : 'Envoyer mon message'}
+      </Button>
+    </section>
   );
 }
 
@@ -305,9 +406,33 @@ function EventCard({
   if (event.type === 'demande') {
     const question = (c.question as string) ?? '';
     const resolution = c.resolution as { texte?: string } | undefined;
+    const destinataire = c.destinataire as string;
+
+    // Message DU client au conducteur (`destinataire='phenix'`) : on le lui rappelle
+    // et on affiche la réponse du conducteur quand elle arrive.
+    if (destinataire === 'phenix') {
+      return (
+        <Card date={date} tag="Votre message">
+          <p className="text-sm text-foreground">{question}</p>
+          {resolution?.texte ? (
+            <p className="mt-2 rounded-lg border border-success/40 bg-success/5 px-3 py-2 text-sm text-foreground">
+              <span className="text-xs font-medium uppercase tracking-wide text-success">
+                Réponse de votre conducteur
+              </span>
+              <br />
+              {resolution.texte}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-muted-foreground">
+              En attente de la réponse de votre conducteur.
+            </p>
+          )}
+        </Card>
+      );
+    }
+
     // Demande adressée au client et encore ouverte ⇒ il peut RÉPONDRE.
-    const canReply =
-      (c.destinataire as string) === 'client' && event.state === 'ouverte' && !resolution?.texte;
+    const canReply = destinataire === 'client' && event.state === 'ouverte' && !resolution?.texte;
     return (
       <Card date={date} tag="Demande">
         <p className="text-sm text-foreground">{question}</p>

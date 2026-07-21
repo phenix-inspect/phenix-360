@@ -559,8 +559,19 @@ function syncClientAccessCode(projectId: string, code: string): void {
  * Best-effort : une erreur de mapping n'interrompt jamais la session. Idempotent
  * (on retire un canal précédent avant d'en ouvrir un nouveau).
  */
-function subscribeRealtime(client: SupabaseClient): void {
+async function subscribeRealtime(client: SupabaseClient): Promise<void> {
   unsubscribeRealtime();
+  // RLS sur `postgres_changes` : le canal Realtime doit porter le JETON de
+  // l'utilisateur connecté, sinon il n'a que les droits `anon` et ne reçoit rien.
+  // `createClient` le câble automatiquement, mais on le pose explicitement avant
+  // l'abonnement pour éviter toute course au démarrage. Best-effort.
+  try {
+    const { data } = await client.auth.getSession();
+    const token = data.session?.access_token;
+    if (token) client.realtime.setAuth(token);
+  } catch {
+    /* le client recâble le token à la connexion/refresh ; on continue */
+  }
   realtimeChannel = client
     .channel('phenix-events')
     .on(
@@ -790,8 +801,8 @@ export const demo = {
       cloudKv = kvClient;
       saasClient = client;
       // TEMPS RÉEL (M6) : écouter les écritures des autres appareils (réponse /
-      // validation du client) pour les refléter sans rechargement.
-      subscribeRealtime(client);
+      // validation / message du client) pour les refléter sans rechargement.
+      await subscribeRealtime(client);
     } catch (e) {
       // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
       console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);

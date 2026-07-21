@@ -175,6 +175,35 @@ conducteur ne le voyait qu'après un ⌘R. M6 supprime ce rechargement.
 - **Frontière** : `event` seule (le journal). L'étape courante d'un chantier est
   redérivée du flux d'événements côté cache. Les satellites (`app_kv`) et les
   médias suivront si besoin.
+- **Durcissement** : le canal Realtime pose explicitement le **jeton d'auth** de
+  l'utilisateur (`realtime.setAuth`) avant l'abonnement — garantit que la RLS
+  `postgres_changes` s'évalue avec ses droits (et non `anon`).
+
+## 1octies. Fait dans l'incrément M7.2.3 (le client ÉCRIT UN MESSAGE)
+
+Troisième et dernier geste d'écriture côté client : envoyer un message libre
+(question, remarque) au conducteur, sans compte.
+
+- **SQL** (`20260721140000_client_message.sql`, aussi dans install.sql) :
+  `client_message(project, code, texte)` SECURITY DEFINER exécutable par `anon` —
+  vérifie le code, refuse un message vide, crée une `demande` adressée au
+  conducteur (`destinataire='phenix'`, `author_id` NULL, `author_role='client'`,
+  `ouverte`). `client_space` **redéfini** pour renvoyer aussi les messages du
+  client (leurs demandes `destinataire='phenix'`, dès `ouverte`) — il voit son
+  message ET la réponse.
+- **Intégration** : le message est une demande client ordinaire ⇒ le conducteur
+  la voit dans son onglet **« Demandes client »** + notification « Nouvelle
+  demande client à traiter », y répond avec ses outils habituels
+  (`resolveDemande`, RLS `event_update_internal`), et le temps réel (M6) la lui
+  livre en direct. Aucune nouvelle machinerie conducteur.
+- **App** : `ClientSpacePage` — composer « Écrire à votre conducteur »
+  (`client_message`) + rendu des messages du client (« Votre message » + réponse
+  du conducteur quand elle arrive).
+- **Vérifié** sur PostgreSQL 16 (suite SQL : mauvais code refusé, message vide
+  refusé, message créé et visible dans l'espace). Démo inchangée (gate complet).
+- **Écritures client COMPLÈTES** : répondre (M7.2.1), valider un choix (M7.2.2),
+  écrire un message (M7.2.3) — toutes par RPC code-gardées, jamais d'écriture
+  directe (RLS). Suite : médias vers Storage (M5).
 
 ---
 

@@ -3207,3 +3207,27 @@ Impact : `saas-backend.test.mjs` 13/13 (dont ingestEvent : ajout, demande→trai
 projet inconnu). Suite SQL verte (bloc publication ignoré sur Postgres nu). Aucune incidence
 en démo (pas de temps réel local). Gate complet vert. Nécessite d'activer Realtime pour la
 table `event` dans le projet Supabase (migration `20260721130000_realtime.sql`). VISION Art. 9, 10, 11.
+
+---
+
+21/07/2026
+Décision : M7.2.3 — le CLIENT écrit un message au conducteur (écritures client COMPLÈTES).
+Pourquoi : Après « répondre » (M7.2.1) et « valider un choix » (M7.2.2), il manquait le geste
+libre : envoyer une question/remarque. Plutôt qu'une nouvelle mécanique, on réutilise le
+modèle demande : `client_message(project, code, texte)` SECURITY DEFINER (anon), code vérifié
+serveur, refuse un message vide, crée une demande `destinataire='phenix'` (auteur NULL,
+`author_role='client'`, ouverte). Le conducteur la voit déjà dans « Demandes client » +
+notification « Nouvelle demande client à traiter », y répond via `resolveDemande` (RLS
+`event_update_internal` autorise l'interne à mettre à jour tout événement du projet), et M6 la
+lui livre en direct. `client_space` redéfini pour renvoyer aussi les messages du client (leurs
+demandes `destinataire='phenix'` dès `ouverte`) — côté standalone uniquement (n'affecte pas
+`isVisibleToClient` / l'app embarquée). UI : composer « Écrire à votre conducteur » +
+rendu « Votre message » / réponse.
+Alternatives rejetées : un nouveau type d'événement `message` (le journal a déjà la demande —
+1 besoin = 1 résolution, ADR-001) ; élargir `isVisibleToClient` (risque de régression sur
+l'app embarquée — on a limité le changement à `client_space`, la vue du standalone).
+Impact : suite SQL `rls_test` #7 (mauvais code refusé, message vide refusé, message créé et
+visible dans l'espace). Gate complet vert. Le message client via la page autonome se teste en
+live (Supabase) ; la surface conducteur est déjà couverte par `demande-client`. VISION Art. 2, 9, 11.
+Durcissement M6 : le canal Realtime pose explicitement `realtime.setAuth(jeton)` avant
+l'abonnement — la RLS `postgres_changes` s'évalue avec les droits du conducteur, pas `anon`.

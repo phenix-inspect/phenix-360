@@ -290,12 +290,15 @@ begin
             (type = 'decision'
                and (content ->> 'kind')
                      in ('envoyee','renvoyee','validee','deleguee','modification'))
-            or (type <> 'decision' and visibility = 'client'
-                and (case when type = 'demande' then (
-                       case when (content ->> 'destinataire') = 'client'
-                            then state in ('ouverte','traitee','close')
-                            else state in ('traitee','close') end)
-                     else state = 'publie' end))
+            or (type = 'demande' and visibility = 'client'
+                and (case
+                       when (content ->> 'destinataire') = 'client'
+                         then state in ('ouverte','traitee','close')
+                       when (content ->> 'destinataire') = 'phenix' -- message DU client
+                         then state in ('ouverte','traitee','close')
+                       else state in ('traitee','close') end))
+            or (type <> 'decision' and type <> 'demande'
+                and visibility = 'client' and state = 'publie')
           )
       ) e), '[]'::jsonb)
   ) into v_result;
@@ -394,6 +397,28 @@ begin
 end;
 $$;
 grant execute on function client_validate_choix(uuid, text, uuid, text, text) to anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- Écriture client : ÉCRIRE UN MESSAGE au conducteur (M7.2.3)
+-- ----------------------------------------------------------------------------
+create or replace function client_message(p_project uuid, p_code text, p_texte text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare v_hash text;
+begin
+  select code_hash into v_hash from project_client_access where project_id = p_project;
+  if v_hash is null or v_hash <> crypt(p_code, v_hash) then
+    raise exception 'forbidden: bad code' using errcode = '42501';
+  end if;
+  if length(coalesce(btrim(p_texte), '')) = 0 then
+    raise exception 'message vide' using errcode = '22023';
+  end if;
+  insert into event(project_id, type, author_id, author_role, visibility, state, content)
+  values (p_project, 'demande', null, 'client', 'client', 'ouverte',
+          jsonb_build_object('question', btrim(p_texte), 'destinataire', 'phenix'));
+  return client_space(p_project, p_code);
+end;
+$$;
+grant execute on function client_message(uuid, text, text) to anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- Temps réel (M6) : diffuser les changements de `event` (RLS appliquée à l'abonné)

@@ -161,3 +161,44 @@ begin
   raise notice 'OK choix client — %', v_label;
 end
 $$;
+
+-- 7. Écriture client : ÉCRIRE UN MESSAGE au conducteur (M7.2.3)
+do $$
+declare
+  v_space jsonb;
+  v_found boolean;
+  v_bad   boolean := false;
+begin
+  -- mauvais code refusé
+  begin
+    perform client_message('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nope', 'Bonjour');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL message : mauvais code accepté'; end if;
+
+  -- message vide refusé
+  v_bad := false;
+  begin
+    perform client_message('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', '   ');
+  exception when sqlstate '22023' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL message : message vide accepté'; end if;
+
+  -- bon code : le message est créé (demande destinataire=phenix, auteur client)
+  -- et RENVOYÉ dans l'espace client (le client voit son propre message).
+  v_space := client_message(
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234',
+    'Bonjour, une question sur les délais ?');
+  select exists (
+    select 1 from jsonb_array_elements(v_space -> 'events') ev
+    where ev ->> 'type' = 'demande'
+      and ev -> 'content' ->> 'destinataire' = 'phenix'
+      and ev -> 'content' ->> 'question' = 'Bonjour, une question sur les délais ?'
+      and ev ->> 'author_role' = 'client'
+      and ev ->> 'state' = 'ouverte'
+  ) into v_found;
+  if not v_found then raise exception 'FAIL message : message client absent de l''espace'; end if;
+
+  raise notice 'OK message client — visible dans l''espace';
+end
+$$;
