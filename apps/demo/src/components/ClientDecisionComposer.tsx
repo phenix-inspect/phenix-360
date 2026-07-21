@@ -104,7 +104,9 @@ export function ClientDecisionComposer({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
-      <DialogContent className="relative max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      {/* Pas de `relative` : `DialogContent` est déjà `fixed` (le passer casserait
+          le centrage — tailwind-merge résout le conflit de position → hors écran). */}
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Demander une décision au client</DialogTitle>
           <DialogDescription>

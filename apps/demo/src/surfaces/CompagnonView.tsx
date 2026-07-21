@@ -73,17 +73,6 @@ function compagnonActor(snap: DemoSnapshot, project: Project): EventActor {
 
 export type CompagnonTab = 'suivi' | 'preparation' | 'documents' | 'fil' | 'demandes';
 
-/**
- * Enchaîne DEUX fenêtres modales : exécute `fn` (ouvrir la suivante) une fois la
- * fenêtre courante FERMÉE. Ouvrir la nouvelle avant que l'ancienne ait fini de se
- * démonter peut, selon l'environnement/navigateur, masquer son contenu (gestion
- * du focus/`inert` de la couche qui se ferme) → un écran gris sans contenu. Le
- * délai couvre l'animation de sortie (`--duration-base` = 200 ms).
- */
-function afterDialogClose(fn: () => void): void {
-  window.setTimeout(fn, 240);
-}
-
 export function CompagnonView({
   snap,
   project,
@@ -256,10 +245,8 @@ export function CompagnonView({
         onClose={() => setComposer(null)}
         onEscalateDecision={() => {
           // « Demander au client → Décision » : bascule vers le composer structuré.
-          // On attend la fermeture du composer avant d'ouvrir le suivant (cf.
-          // afterDialogClose — évite l'écran gris sans contenu).
           setComposer(null);
-          afterDialogClose(() => setDecisionComposer(true));
+          setDecisionComposer(true);
         }}
       />
 
@@ -271,17 +258,13 @@ export function CompagnonView({
             setMissionKind(kind);
             setMissionPicker(false);
           }}
-          // Enchaînement de DEUX fenêtres (Radix) : on laisse le sélecteur se
-          // FERMER entièrement avant d'ouvrir la suivante. Ouvrir les deux dans
-          // le même cycle peut, selon l'environnement, masquer le contenu de la
-          // nouvelle (focus/inert de la couche qui se ferme) → écran gris vide.
           onPublishAlbum={() => {
             setMissionPicker(false);
-            afterDialogClose(() => setAlbumComposer(true));
+            setAlbumComposer(true);
           }}
           onCompose={(kind) => {
             setMissionPicker(false);
-            afterDialogClose(() => setComposer(kind));
+            setComposer(kind);
           }}
           onClose={() => setMissionPicker(false)}
         />

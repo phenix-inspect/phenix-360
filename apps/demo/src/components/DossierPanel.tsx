@@ -988,7 +988,9 @@ function AvenantDepositDialog({
 
   return (
     <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
-      <DialogContent className="relative max-h-[88vh] max-w-2xl overflow-y-auto">
+      {/* Pas de `relative` : `DialogContent` est déjà `fixed` (le passer casserait
+          le centrage — tailwind-merge résout le conflit de position → hors écran). */}
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Déposer un avenant signé</DialogTitle>
           <DialogDescription>

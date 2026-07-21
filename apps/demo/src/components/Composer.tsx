@@ -97,7 +97,11 @@ export function Composer({
   const meta = TITLES[kind];
   return (
     <Dialog open onOpenChange={(o) => !o && !confirmLeave && requestClose()}>
-      <DialogContent className="relative">
+      {/* Pas de classe `position` ici : `DialogContent` est déjà `fixed` (centré)
+          ET sert d'ancrage aux enfants `absolute` (LeaveConfirmInline). Passer
+          `relative` ferait tomber `fixed` (tailwind-merge résout le conflit de
+          position) → la fenêtre partait hors écran (seul le voile gris restait). */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{meta.title}</DialogTitle>
           <DialogDescription>{meta.description}</DialogDescription>
