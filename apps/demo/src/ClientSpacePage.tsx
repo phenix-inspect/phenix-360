@@ -13,8 +13,9 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { BrandMark, Button, Input } from '@phenix360/ui';
-import { PROJECT_STATUS_LABEL, type ProjectStatus } from '@phenix360/core';
+import { PROJECT_STATUS_LABEL, type EventAttachment, type ProjectStatus } from '@phenix360/core';
 import { getSupabaseClient } from './lib/supabase';
+import { openAttachment } from './lib/document';
 
 interface ClientEvent {
   id: string;
@@ -191,20 +192,22 @@ function EventCard({ event }: { event: ClientEvent }): React.JSX.Element | null 
   const c = event.content;
 
   if (event.type === 'document') {
-    const att = (c.attachment ?? {}) as { dataUrl?: string; fileName?: string };
+    const att = (c.attachment ?? {}) as Partial<EventAttachment>;
     const libelle = (c.libelle as string) || att.fileName || 'Document';
     return (
       <Card date={date} tag="Document">
         <p className="text-sm font-medium text-foreground">{libelle}</p>
         {att.dataUrl && (
-          <a
-            href={att.dataUrl}
-            target="_blank"
-            rel="noreferrer"
+          // Ouverture via URL d'objet (Blob) : les navigateurs BLOQUENT la
+          // navigation directe vers une URL `data:` (page noire). Même mécanique
+          // que côté conducteur (lib/document → openAttachment).
+          <button
+            type="button"
+            onClick={() => openAttachment(att as EventAttachment)}
             className="mt-1 inline-block text-sm text-gold-700 underline-offset-2 hover:underline"
           >
             Ouvrir le document
-          </a>
+          </button>
         )}
       </Card>
     );
