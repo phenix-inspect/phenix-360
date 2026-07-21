@@ -18,6 +18,7 @@
 import type { IsoDateTime } from './ids.js';
 import type { EventAttachment } from './attachment.js';
 import type {
+  DecisionChoix,
   DecisionEventContent,
   DecisionEventKind,
   DecisionOrigin,
@@ -301,6 +302,23 @@ export function buildDecisionContent(args: {
   const { kind, origin, selection, statutApres, optionId, message } = args;
   const opt = optionId ? (selection.options ?? []).find((o) => o.id === optionId) : undefined;
   const optionLabel = isPhenixDelegate(optionId) ? 'PHÉNIX décide' : opt?.title;
+  // Les événements d'ENVOI portent la présentation du choix au journal, pour que
+  // l'espace client autonome (sans dossier) puisse l'afficher et le valider.
+  const carrier = kind === 'envoyee' || kind === 'renvoyee';
+  const choix: DecisionChoix | undefined = carrier
+    ? {
+        titre: selection.label,
+        ...(selection.contexte ? { contexte: selection.contexte } : {}),
+        options: (selection.options ?? []).map((o) => ({
+          id: o.id,
+          ...(o.ref ? { ref: o.ref } : {}),
+          title: o.title,
+          ...(o.description ? { description: o.description } : {}),
+          ...(o.imageUrl ? { imageUrl: o.imageUrl } : {}),
+        })),
+        ...(selection.photos && selection.photos.length > 0 ? { photos: selection.photos } : {}),
+      }
+    : undefined;
   return {
     kind,
     origin,
@@ -311,6 +329,7 @@ export function buildDecisionContent(args: {
     ...(optionId ? { optionId } : {}),
     ...(optionLabel ? { optionLabel } : {}),
     ...(message ? { message } : {}),
+    ...(choix ? { choix } : {}),
   };
 }
 

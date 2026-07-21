@@ -118,6 +118,39 @@ Premier geste d'écriture côté client, toujours sans compte :
   enregistrée + demande traitée, re-réponse refusée). Gate complet vert.
 - **Suite** : valider un choix (décision) et écrire un message = M7.2.2/M7.2.3.
 
+## 1sexies. Fait dans l'incrément M7.2.2 (le client VALIDE un choix)
+
+Deuxième geste d'écriture côté client : valider un choix (carrelage, peinture…)
+ou le confier à PHÉNIX — sans compte.
+
+- **Frontière franchie proprement** : la page cliente autonome ne lit que le
+  JOURNAL ; or la présentation d'un choix (options A–E, photos, contexte) vivait
+  jusqu'ici dans le **dossier** (satellite conducteur), invisible au client.
+  Décision : **porter la présentation au journal**, sur l'événement d'envoi
+  `decision/envoyee` (part client-safe d'une `ClientSelection`).
+- **Core** : `DecisionEventContent.choix` (nouveau champ OPTIONNEL : `titre`,
+  `contexte`, `options`, `photos`) ; `buildDecisionContent` le porte sur
+  `envoyee`/`renvoyee`. Purement additif — aucun consommateur existant cassé, les
+  deux chemins d'envoi (`createClientDecision`, PHÉNIX Start) le portent d'office.
+- **SQL** (`20260721120000_client_validate_choix.sql`, aussi dans install.sql) :
+  `client_space` **redéfini** pour renvoyer aussi les événements `decision`
+  client-safe (envoi + résolutions) ; `client_validate_choix(project, code,
+  event, option, message)` SECURITY DEFINER exécutable par `anon` — vérifie le
+  code, refuse un choix déjà résolu (pas de réécriture), résout le libellé de
+  l'option depuis la présentation portée, pose une TRACE `decision/validee` (ou
+  `deleguee` si `option = '__phenix_delegate__'`), `author_id` NULL, visible
+  client. Le conducteur la relit déjà du journal (`choixClientValides` /
+  `choixClientValidesATraiter`) — aucune mécanique conducteur modifiée.
+- **App** : `ClientSpacePage` regroupe les événements `decision` par sélection
+  (`deriveChoix`) et rend « Vos choix » — options A–E (repère + image),
+  contexte, photos, commentaire libre, « Valider mon choix » / « Je vous laisse
+  choisir » ; choix résolu en lecture seule. Rafraîchi par la fonction serveur.
+- **Vérifié** sur PostgreSQL 16 (suite SQL : mauvais code refusé, validation
+  enregistrée avec libellé résolu, double validation refusée). Démo 100 %
+  inchangée (gate complet vert).
+- **Suite** : écrire un message libre (M7.2.3), puis médias vers Storage (M5),
+  temps réel (M6).
+
 ---
 
 ## 2. L'unique action humaine indispensable

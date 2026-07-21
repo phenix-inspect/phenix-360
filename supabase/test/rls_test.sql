@@ -106,3 +106,58 @@ begin
   raise notice 'OK réponse client — %', v_txt;
 end
 $$;
+
+-- 6. Écriture client : valider un CHOIX (M7.2.2)
+do $$
+declare
+  v_carrier uuid;
+  v_label   text;
+  v_kind    text;
+  v_apres   text;
+  v_bad     boolean := false;
+begin
+  -- Le conducteur ENVOIE un choix (présentation portée par l'événement d'envoi).
+  insert into event(project_id, type, author_id, author_role, visibility, state, content)
+  values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'decision',
+          '11111111-1111-1111-1111-111111111111', 'compagnon', 'interne', 'publie',
+          '{"kind":"envoyee","origin":"conducteur","selectionId":"sel-carrelage",'
+          '"categorie":"Carrelage","statutAvant":"a_choisir","statutApres":"propose",'
+          '"choix":{"titre":"Carrelage salle de bain","options":['
+          '{"id":"opt-a","ref":"A","title":"Grès clair"},'
+          '{"id":"opt-b","ref":"B","title":"Ardoise anthracite"}]}}')
+  returning id into v_carrier;
+
+  -- mauvais code refusé (le code 'test1234' a été posé au test 4)
+  begin
+    perform client_validate_choix(
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nope', v_carrier, 'opt-b', null);
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL choix : mauvais code accepté'; end if;
+
+  -- bon code : validation enregistrée (trace decision/validee, libellé résolu)
+  perform client_validate_choix(
+    'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', v_carrier, 'opt-b', 'Merci');
+  select content ->> 'kind', content ->> 'optionLabel', content ->> 'statutApres'
+    into v_kind, v_label, v_apres
+  from event
+  where project_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    and type = 'decision' and (content ->> 'kind') = 'validee'
+    and (content ->> 'selectionId') = 'sel-carrelage'
+  order by created_at desc limit 1;
+  if v_kind <> 'validee' or v_label <> 'Ardoise anthracite' or v_apres <> 'valide' then
+    raise exception 'FAIL choix : résolution inattendue (% / % / %)', v_kind, v_label, v_apres;
+  end if;
+
+  -- pas de réécriture : re-valider le même choix est refusé
+  v_bad := false;
+  begin
+    perform client_validate_choix(
+      'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', v_carrier, 'opt-a', null);
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL choix : double validation acceptée'; end if;
+
+  raise notice 'OK choix client — %', v_label;
+end
+$$;

@@ -327,6 +327,38 @@ export type DecisionEventKind =
 /** À l'origine de l'action (distinct de l'auteur technique de l'enveloppe). */
 export type DecisionOrigin = 'client' | 'conducteur' | 'phenix';
 
+/**
+ * Une option présentée au client, PORTÉE PAR LE JOURNAL (miroir léger de
+ * `SelectionOption`). Elle voyage sur l'événement `decision/envoyee` pour que
+ * l'espace client AUTONOME (qui ne lit que le journal, sans le dossier
+ * conducteur) puisse afficher le choix et le laisser valider.
+ */
+export interface DecisionChoixOption {
+  id: string;
+  /** Repère affiché (A, B, C…). */
+  ref?: string;
+  title: string;
+  description?: string;
+  /** Vraie image, quand elle existe (data URL en démo). */
+  imageUrl?: string;
+}
+
+/**
+ * PRÉSENTATION d'un choix portée au journal (sur `envoyee` / `renvoyee`).
+ * C'est la part CLIENT-SAFE d'une `ClientSelection` — jamais la mécanique interne
+ * (délais, planning) : de quoi présenter le choix et recueillir la décision.
+ */
+export interface DecisionChoix {
+  /** Intitulé du choix (« Carrelage salle de bain »). */
+  titre: string;
+  /** Contexte libre rédigé par le conducteur (le cas échéant). */
+  contexte?: string;
+  /** Propositions présentées au client (A–E). */
+  options: DecisionChoixOption[];
+  /** Photos illustrant la décision elle-même (data URLs), hors options. */
+  photos?: string[];
+}
+
 export interface DecisionEventContent {
   kind: DecisionEventKind;
   origin: DecisionOrigin;
@@ -341,6 +373,12 @@ export interface DecisionEventContent {
   optionLabel?: string;
   /** Message libre (ex. demande de modification du client). */
   message?: string;
+  /**
+   * PRÉSENTATION du choix, portée par l'événement d'envoi (`envoyee`/`renvoyee`).
+   * Absente sur les traces de résolution (`validee`/`deleguee`/`modification`).
+   * Permet à l'espace client autonome de rendre le choix sans le dossier.
+   */
+  choix?: DecisionChoix;
 }
 
 /* -------------------------------------------------------------------------- *

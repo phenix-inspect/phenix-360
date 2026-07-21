@@ -3127,3 +3127,39 @@ contrat validé est la source unique de vérité. Restes non bloquants : dérive
 `ContractDeriver` (commandes, choix client…), lecture des sous-listes de matériaux.
 Gate complète verte (typecheck, lint, prettier, build, lecteur, corpus OBAT, métier,
 Playwright 71/71, zéro erreur console). VISION Art. 8, 9, 11.
+
+---
+
+21/07/2026
+Décision : M7.2.2 — le CLIENT valide un CHOIX depuis son espace autonome (lien + code),
+sans compte. Deuxième geste d'écriture client, sur le patron code-gardé de M7.2.1.
+Pourquoi : Après « répondre à une demande » (M7.2.1), le client doit pouvoir TRANCHER les
+choix que le conducteur lui envoie (carrelage, peinture…) ou les CONFIER à PHÉNIX — depuis
+la vraie page cliente (`ClientSpacePage`), pas seulement l'aperçu embarqué. Frontière à
+franchir : la page autonome ne lit que le JOURNAL, or la présentation d'un choix (options
+A–E, photos, contexte) vivait dans le DOSSIER (satellite conducteur), invisible au client.
+Choix d'architecture : PORTER LA PRÉSENTATION AU JOURNAL, sur l'événement d'envoi déjà émis
+`decision/envoyee` (part client-safe d'une `ClientSelection`) — journal-native, additif,
+sans big-bang. (1) CORE : `DecisionEventContent.choix` (champ OPTIONNEL : titre, contexte,
+options, photos) ; `buildDecisionContent` le porte sur `envoyee`/`renvoyee` — les deux
+chemins d'envoi (`createClientDecision`, PHÉNIX Start) en héritent d'office, aucun
+consommateur cassé. (2) SQL (`20260721120000_client_validate_choix.sql` + install.sql) :
+`client_space` redéfini pour renvoyer aussi les `decision` client-safe (envoi +
+résolutions) ; `client_validate_choix(project, code, event, option, message)` SECURITY
+DEFINER exécutable par `anon` — vérifie le code, refuse un choix déjà résolu (append-only,
+pas de réécriture), résout le libellé de l'option depuis la présentation portée, pose une
+TRACE `decision/validee` (ou `deleguee` si `option='__phenix_delegate__'`), `author_id`
+NULL, visible client. (3) APP : `ClientSpacePage` regroupe les `decision` par sélection
+(`deriveChoix`) et rend « Vos choix » (options A–E, contexte, photos, commentaire,
+« Valider mon choix » / « Je vous laisse choisir ») ; choix résolu en lecture seule.
+Alternatives rejetées : exposer le dossier (satellite `app_kv`) au client (coffre opaque
+par utilisateur, non requêtable par projet côté serveur — fragile) ; flipper la visibilité
+globale des événements `envoyee` en « client » (régressions sur l'app embarquée :
+`isMilestone`, récit, notifications) — préféré un aiguillage CIBLÉ dans `client_space`,
+app conducteur inchangée. Aucune mécanique conducteur touchée : la validation est relue du
+journal comme aujourd'hui (`choixClientValides` / `choixClientValidesATraiter`).
+Impact : Vérifié sur PostgreSQL 16 (suite SQL `rls_test` : mauvais code refusé, validation
+enregistrée avec libellé résolu, double validation refusée). Démo 100 % inchangée : gate
+complet vert (typecheck, lint, prettier, build, e2e, zéro erreur console). Écriture client
+en direct toujours interdite par la RLS — seul le chemin RPC code-gardé écrit. Suite :
+message libre client (M7.2.3), médias vers Storage (M5), temps réel (M6). VISION Art. 2, 9, 11.

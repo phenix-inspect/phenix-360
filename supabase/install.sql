@@ -284,12 +284,19 @@ begin
         select id, project_id, type, author_id, author_role, visibility, state,
                capture_id, created_at, published_by, published_at, content
         from event
-        where project_id = p_project and visibility = 'client'
-          and (case when type = 'demande' then (
-                 case when (content ->> 'destinataire') = 'client'
-                      then state in ('ouverte','traitee','close')
-                      else state in ('traitee','close') end)
-               else state = 'publie' end)
+        where project_id = p_project
+          and (
+            -- Choix (M7.2.2) : envoi (présentation) + résolutions, part client-safe.
+            (type = 'decision'
+               and (content ->> 'kind')
+                     in ('envoyee','renvoyee','validee','deleguee','modification'))
+            or (type <> 'decision' and visibility = 'client'
+                and (case when type = 'demande' then (
+                       case when (content ->> 'destinataire') = 'client'
+                            then state in ('ouverte','traitee','close')
+                            else state in ('traitee','close') end)
+                     else state = 'publie' end))
+          )
       ) e), '[]'::jsonb)
   ) into v_result;
   return v_result;
@@ -332,3 +339,58 @@ begin
 end;
 $$;
 grant execute on function client_respond_demande(uuid, text, uuid, text) to anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- Écriture client : valider un CHOIX (M7.2.2) — code vérifié côté serveur
+-- ----------------------------------------------------------------------------
+-- p_option : id de l'option retenue, ou '__phenix_delegate__' (confier à PHÉNIX).
+create or replace function client_validate_choix(
+  p_project uuid, p_code text, p_event uuid, p_option text, p_message text
+)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_hash text; v_content jsonb; v_selection text; v_categorie text; v_avant text;
+  v_delegate boolean; v_kind text; v_label text; v_done boolean;
+begin
+  select code_hash into v_hash from project_client_access where project_id = p_project;
+  if v_hash is null or v_hash <> crypt(p_code, v_hash) then
+    raise exception 'forbidden: bad code' using errcode = '42501';
+  end if;
+  -- Le porteur : un choix ENVOYÉ au client (envoyee/renvoyee) de CE projet.
+  select content into v_content from event
+   where id = p_event and project_id = p_project and type = 'decision'
+     and (content ->> 'kind') in ('envoyee','renvoyee');
+  if v_content is null then
+    raise exception 'choix introuvable' using errcode = '42501';
+  end if;
+  v_selection := v_content ->> 'selectionId';
+  v_categorie := v_content ->> 'categorie';
+  v_avant := coalesce(v_content ->> 'statutApres', 'propose');
+  -- Pas de réécriture : un choix déjà résolu est refusé.
+  select exists (
+    select 1 from event where project_id = p_project and type = 'decision'
+      and (content ->> 'selectionId') = v_selection
+      and (content ->> 'kind') in ('validee','deleguee')
+  ) into v_done;
+  if v_done then raise exception 'choix deja resolu' using errcode = '42501'; end if;
+  v_delegate := (p_option = '__phenix_delegate__');
+  v_kind := case when v_delegate then 'deleguee' else 'validee' end;
+  if v_delegate then
+    v_label := 'PHÉNIX décide';
+  else
+    select opt ->> 'title' into v_label
+    from jsonb_array_elements(coalesce(v_content -> 'choix' -> 'options', '[]'::jsonb)) opt
+    where opt ->> 'id' = p_option limit 1;
+    if v_label is null then raise exception 'option inconnue' using errcode = '22023'; end if;
+  end if;
+  insert into event(project_id, type, author_id, author_role, visibility, state, content)
+  values (p_project, 'decision', null, 'client', 'client', 'publie',
+    jsonb_strip_nulls(jsonb_build_object(
+      'kind', v_kind, 'origin', 'client', 'selectionId', v_selection,
+      'categorie', v_categorie, 'statutAvant', v_avant, 'statutApres', 'valide',
+      'optionId', case when v_delegate then null else p_option end,
+      'optionLabel', v_label, 'message', nullif(btrim(coalesce(p_message,'')), ''))));
+  return client_space(p_project, p_code);
+end;
+$$;
+grant execute on function client_validate_choix(uuid, text, uuid, text, text) to anon, authenticated;
