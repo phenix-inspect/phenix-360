@@ -13,9 +13,26 @@
  * confier à PHÉNIX (M7.2.2), et écrire un message libre au conducteur (M7.2.3).
  * Chaque écriture ne pose qu'une trace au journal, que le conducteur relit (et
  * reçoit en temps réel, M6) — jamais d'accès direct en écriture (RLS).
+ *
+ * EXPÉRIENCE PREMIUM (parité visuelle avec l'espace client de l'app) : layout à
+ * ONGLETS (Aujourd'hui / Vos choix / Vos échanges / Documents / Le récit), en-tête
+ * soigné, bandeau d'avancement — le même système de design que le reste de PHÉNIX.
+ * Le client anonyme (lien+code) n'a que les données de `client_space` (journal) :
+ * les onglets sont nourris par les événements (choix, demandes, messages,
+ * documents, comptes rendus/photos).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BrandMark, Button, Input, Textarea } from '@phenix360/ui';
+import {
+  Badge,
+  BrandMark,
+  Button,
+  Input,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from '@phenix360/ui';
 import {
   PHENIX_DELEGATE_ID,
   PROJECT_STATUS_LABEL,
@@ -264,6 +281,17 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
  * Le récit (lecture seule)
  * -------------------------------------------------------------------------- */
 
+type ClientSpaceTab = 'aujourdhui' | 'choix' | 'echanges' | 'documents' | 'recit';
+
+/** Message d'ambiance selon l'avancement — rassure le client sans jargon. */
+const STATUS_MESSAGE: Record<ProjectStatus, string> = {
+  pas_commence: 'Votre chantier va bientôt démarrer — votre équipe prépare tout.',
+  en_cours: 'Votre chantier avance. Retrouvez ici son actualité et vos décisions.',
+  pre_reception: 'La pré-réception approche : on vérifie que tout est conforme au contrat.',
+  levee_reserves: 'On lève les dernières réserves avant la réception définitive.',
+  cloture: 'Votre chantier est terminé. Merci de votre confiance !',
+};
+
 function ClientSpace({
   data,
   onRespond,
@@ -276,19 +304,38 @@ function ClientSpace({
   onSendMessage: (texte: string) => Promise<void>;
 }): React.JSX.Element {
   const { project, events } = data;
-  // Les CHOIX (événements `decision`) sont regroupés par sélection et présentés à
-  // part (« Vos choix ») : le client doit d'abord savoir ce qu'il a à décider.
+  const [tab, setTab] = useState<ClientSpaceTab>('aujourdhui');
+
+  const byDateDesc = (a: ClientEvent, b: ClientEvent): number =>
+    b.created_at.localeCompare(a.created_at);
+
   const choix = useMemo(() => deriveChoix(events), [events]);
-  // Le fil d'actualité : tout le reste, le plus récent en haut.
-  const feed = useMemo(
-    () =>
-      events
-        .filter((e) => e.type !== 'decision')
-        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+  const pendingChoix = choix.filter((c) => !c.resolved);
+
+  // Demandes/messages (échanges avec le conducteur), récentes d'abord.
+  const demandes = useMemo(
+    () => events.filter((e) => e.type === 'demande').sort(byDateDesc),
     [events],
   );
+  // Demandes adressées au client, ENCORE ouvertes ⇒ une réponse est attendue.
+  const aRepondre = demandes.filter(
+    (e) =>
+      (e.content.destinataire as string) === 'client' &&
+      e.state === 'ouverte' &&
+      !(e.content.resolution as { texte?: string } | undefined)?.texte,
+  );
+  const documents = useMemo(
+    () => events.filter((e) => e.type === 'document').sort(byDateDesc),
+    [events],
+  );
+  // Le récit : comptes rendus et photos publiés par l'équipe.
+  const recit = useMemo(
+    () => events.filter((e) => e.type === 'compte_rendu' || e.type === 'photo').sort(byDateDesc),
+    [events],
+  );
+
+  const nbAFaire = pendingChoix.length + aRepondre.length;
   const statusLabel = PROJECT_STATUS_LABEL[project.status] ?? '';
-  const pending = choix.filter((c) => !c.resolved);
 
   return (
     <div className="min-h-screen bg-background">
@@ -307,35 +354,164 @@ function ClientSpace({
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-4 px-5 py-6">
-        {choix.length > 0 && (
-          <section className="space-y-3" aria-label="Vos choix">
-            <h2 className="font-serif text-base font-semibold tracking-tight text-foreground">
-              {pending.length > 0
-                ? pending.length > 1
-                  ? `${pending.length} choix vous attendent`
-                  : 'Un choix vous attend'
-                : 'Vos choix'}
-            </h2>
-            {choix.map((c) => (
-              <ChoixCard key={c.selectionId} choix={c} onValidate={onValidateChoix} />
-            ))}
-          </section>
-        )}
+      <main className="mx-auto max-w-2xl px-5 py-6">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as ClientSpaceTab)}>
+          <TabsList className="h-auto flex-wrap">
+            <TabsTrigger value="aujourdhui">
+              Aujourd’hui
+              {nbAFaire > 0 && (
+                <Badge variant="info" className="ml-1.5">
+                  {nbAFaire}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="choix">Vos choix</TabsTrigger>
+            <TabsTrigger value="echanges">Vos échanges</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="recit">Le récit</TabsTrigger>
+          </TabsList>
 
-        {feed.length === 0 && choix.length === 0 ? (
-          <p className="rounded-xl border border-border bg-surface px-4 py-6 text-center text-sm text-muted-foreground">
-            Votre chantier démarre. Les actualités de votre artisan apparaîtront ici.
-          </p>
-        ) : (
-          feed.map((e) => <EventCard key={e.id} event={e} onRespond={onRespond} />)
-        )}
+          {/* AUJOURD'HUI — où en est le chantier + ce qui attend une action. */}
+          <TabsContent value="aujourdhui">
+            <div className="space-y-5">
+              <StatusHero status={project.status} statusLabel={statusLabel} />
+              {nbAFaire === 0 ? (
+                <RienAFaire />
+              ) : (
+                <div className="space-y-5">
+                  {pendingChoix.length > 0 && (
+                    <section className="space-y-3">
+                      <SectionTitle>
+                        {pendingChoix.length > 1
+                          ? `${pendingChoix.length} choix vous attendent`
+                          : 'Un choix vous attend'}
+                      </SectionTitle>
+                      {pendingChoix.map((c) => (
+                        <ChoixCard key={c.selectionId} choix={c} onValidate={onValidateChoix} />
+                      ))}
+                    </section>
+                  )}
+                  {aRepondre.length > 0 && (
+                    <section className="space-y-3">
+                      <SectionTitle>
+                        {aRepondre.length > 1
+                          ? `${aRepondre.length} réponses attendues`
+                          : 'Une réponse attendue'}
+                      </SectionTitle>
+                      {aRepondre.map((e) => (
+                        <EventCard key={e.id} event={e} onRespond={onRespond} />
+                      ))}
+                    </section>
+                  )}
+                </div>
+              )}
+            </div>
+          </TabsContent>
 
-        <MessageComposer onSend={onSendMessage} />
+          {/* VOS CHOIX — décisions demandées au client (à trancher / déjà faites). */}
+          <TabsContent value="choix">
+            {choix.length === 0 ? (
+              <EmptyTab text="Aucun choix pour l’instant. Ceux que votre conducteur vous proposera apparaîtront ici." />
+            ) : (
+              <div className="space-y-3">
+                {choix.map((c) => (
+                  <ChoixCard key={c.selectionId} choix={c} onValidate={onValidateChoix} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
 
-        <p className="pt-4 text-center text-xs text-muted-foreground">Suivi de chantier PHÉNIX</p>
+          {/* VOS ÉCHANGES — vos messages et les demandes de votre conducteur. */}
+          <TabsContent value="echanges">
+            <div className="space-y-4">
+              {demandes.length === 0 ? (
+                <EmptyTab text="Aucun échange pour l’instant. Écrivez à votre conducteur ci-dessous." />
+              ) : (
+                demandes.map((e) => <EventCard key={e.id} event={e} onRespond={onRespond} />)
+              )}
+              <MessageComposer onSend={onSendMessage} />
+            </div>
+          </TabsContent>
+
+          {/* DOCUMENTS — devis, factures, comptes rendus, PV… */}
+          <TabsContent value="documents">
+            {documents.length === 0 ? (
+              <EmptyTab text="Aucun document pour l’instant. Ceux partagés par votre équipe apparaîtront ici." />
+            ) : (
+              <div className="space-y-3">
+                {documents.map((e) => (
+                  <EventCard key={e.id} event={e} onRespond={onRespond} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* LE RÉCIT — l'actualité en images de votre chantier. */}
+          <TabsContent value="recit">
+            {recit.length === 0 ? (
+              <EmptyTab text="Le récit de votre chantier démarrera bientôt — photos et actualités de votre équipe." />
+            ) : (
+              <div className="space-y-4">
+                {recit.map((e) => (
+                  <EventCard key={e.id} event={e} onRespond={onRespond} />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        <p className="pt-6 text-center text-xs text-muted-foreground">Suivi de chantier PHÉNIX</p>
       </main>
     </div>
+  );
+}
+
+/** Bandeau « où en est votre chantier » — premium, rassurant. */
+function StatusHero({
+  status,
+  statusLabel,
+}: {
+  status: ProjectStatus;
+  statusLabel: string;
+}): React.JSX.Element {
+  return (
+    <section className="rounded-2xl border border-gold-200 bg-gold-50 p-5">
+      <p className="text-xs font-medium uppercase tracking-wide text-gold-700">Votre chantier</p>
+      <p className="mt-1 font-serif text-xl font-semibold tracking-tight text-foreground">
+        {statusLabel}
+      </p>
+      <p className="mt-1 text-sm leading-relaxed text-ink-600">{STATUS_MESSAGE[status]}</p>
+    </section>
+  );
+}
+
+/** État « rien à faire » — rassurant, sur le ton de l'app. */
+function RienAFaire(): React.JSX.Element {
+  return (
+    <div className="rounded-2xl border border-border bg-surface px-4 py-8 text-center">
+      <p className="font-serif text-lg font-semibold tracking-tight text-foreground">
+        Vous n’avez rien à faire.
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Tout est à jour — votre équipe PHÉNIX veille sur votre chantier.
+      </p>
+    </div>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }): React.JSX.Element {
+  return (
+    <h2 className="font-serif text-base font-semibold tracking-tight text-foreground">
+      {children}
+    </h2>
+  );
+}
+
+function EmptyTab({ text }: { text: string }): React.JSX.Element {
+  return (
+    <p className="rounded-xl border border-border bg-surface px-4 py-8 text-center text-sm text-muted-foreground">
+      {text}
+    </p>
   );
 }
 
@@ -836,13 +1012,15 @@ function Card({
   );
 }
 
-/** Récupère les URLs d'images affichables (data URL base64) d'un contenu. */
+/** Récupère les URLs d'images affichables (base64 OU URL Storage https) d'un contenu. */
 function extractPhotos(content: Record<string, unknown>): string[] {
   const raw = content.photos;
   if (!Array.isArray(raw)) return [];
   return raw
     .map((p) => (p && typeof p === 'object' ? (p as { imageUrl?: string }).imageUrl : undefined))
-    .filter((u): u is string => typeof u === 'string' && u.startsWith('data:'));
+    .filter(
+      (u): u is string => typeof u === 'string' && (u.startsWith('data:') || u.startsWith('http')),
+    );
 }
 
 /** Photos jointes à une RÉPONSE (résolution d'une demande) — mêmes conventions. */
