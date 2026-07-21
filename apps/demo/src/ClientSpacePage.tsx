@@ -14,7 +14,7 @@
  * Chaque écriture ne pose qu'une trace au journal, que le conducteur relit (et
  * reçoit en temps réel, M6) — jamais d'accès direct en écriture (RLS).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandMark, Button, Input, Textarea } from '@phenix360/ui';
 import {
   PHENIX_DELEGATE_ID,
@@ -155,6 +155,28 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
     setData(res.data as ClientSpaceData);
   };
 
+  /**
+   * Rafraîchissement SILENCIEUX de l'espace (sans écran d'attente ni message
+   * d'erreur) : recharge `client_space` en tâche de fond. Sert la LIVENESS — le
+   * client n'a pas le temps réel (non authentifié), donc on interroge le serveur
+   * à intervalle léger et au retour sur l'onglet, pour voir la réponse / la photo
+   * du conducteur sans rechargement manuel. Ne touche pas aux saisies en cours
+   * (l'état des formulaires vit dans leurs composants).
+   */
+  const refreshSpace = useCallback(async (): Promise<void> => {
+    if (!activeCode) return;
+    try {
+      const client = await getSupabaseClient();
+      if (!client) return;
+      const res = await client.rpc('client_space', { p_project: projectId, p_code: activeCode });
+      if (!res.error && res.data && (res.data as ClientSpaceData).project) {
+        setData(res.data as ClientSpaceData);
+      }
+    } catch {
+      /* silencieux : on réessaiera au prochain tick */
+    }
+  }, [activeCode, projectId]);
+
   // Reprise silencieuse : si le code de cette session est déjà connu, on entre.
   useEffect(() => {
     let saved = '';
@@ -166,6 +188,21 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
     if (saved) void fetchSpace(saved);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
+
+  // LIVENESS : une fois entré, on rafraîchit toutes les 12 s (uniquement quand
+  // l'onglet est visible) et à chaque retour sur l'onglet.
+  useEffect(() => {
+    if (!activeCode) return;
+    const tick = (): void => {
+      if (document.visibilityState === 'visible') void refreshSpace();
+    };
+    const id = window.setInterval(tick, 12000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [activeCode, refreshSpace]);
 
   if (data)
     return (

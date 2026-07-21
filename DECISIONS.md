@@ -3231,3 +3231,23 @@ visible dans l'espace). Gate complet vert. Le message client via la page autonom
 live (Supabase) ; la surface conducteur est déjà couverte par `demande-client`. VISION Art. 2, 9, 11.
 Durcissement M6 : le canal Realtime pose explicitement `realtime.setAuth(jeton)` avant
 l'abonnement — la RLS `postgres_changes` s'évalue avec les droits du conducteur, pas `anon`.
+
+---
+
+21/07/2026
+Décision : Espace client — photos de réponse affichées + LIVENESS (la page se met à jour seule).
+Pourquoi : (1) Le conducteur peut joindre des photos à sa réponse (resolution.photos), bien
+persistées mais non rendues côté client — corrigé (helper resolutionImages + PhotoGrid, dans
+la réponse à un message ET à une demande). (2) La page cliente autonome n'a PAS le temps réel
+(client non authentifié → la RLS Realtime ne s'applique pas à `anon`) : elle ne voyait la
+réponse du conducteur qu'après un rafraîchissement manuel. On ajoute une LIVENESS par sondage :
+`refreshSpace` recharge `client_space` en silence toutes les 12 s (uniquement onglet visible)
+et au retour sur l'onglet. Les saisies en cours ne sont pas touchées (l'état vit dans les
+composants de formulaire).
+Alternatives rejetées : Realtime côté client (impossible en `anon` sans compte — RLS) ;
+edge function de signature (infra lourde, hors périmètre) ; rafraîchissement manuel (mauvaise
+UX, c'est le problème signalé). Le sondage léger est simple, fiable, sans nouvelle infra.
+Impact : correctif vérifié en live (photo « OUI » du conducteur). Gate complet vert (e2e 99/99).
+Note : la vraie livraison temps réel côté client viendra avec les comptes client (auth). Les
+médias restent en base64 (M5 Storage = lot d'infra ultérieur, à mener avec test d'upload live).
+VISION Art. 9, 10, 11.
