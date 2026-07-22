@@ -9,12 +9,14 @@
       est 100 % locale : aucun `connect-src` externe. Directives :
         • script-src 'self'  : aucun script inline (le build Vite n'en produit pas) ;
         • style-src 'unsafe-inline' : styles inline React + documents HTML générés ;
-        • worker-src blob:   : worker pdf.js ; img-src data:/blob: : aperçus/photos.
+        • worker-src blob:   : worker pdf.js ;
+        • img-src data:/blob: : aperçus locaux ; https://*.supabase.co : photos/
+          documents servis depuis Supabase Storage (M5, URLs publiques).
       (`frame-ancestors`/HSTS ne sont pris en compte qu'en EN-TÊTE → cf. vercel.json.)
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data: blob:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co; manifest-src 'self'"
+      content="default-src 'self'; base-uri 'self'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co; manifest-src 'self'"
     />
     <meta name="theme-color" content="#131009" />
     <meta name="description" content="Le suivi intelligent de votre projet" />
