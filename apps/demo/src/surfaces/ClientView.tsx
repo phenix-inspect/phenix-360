@@ -47,9 +47,15 @@ function clientActor(snap: DemoSnapshot, project: Project): EventActor {
 export function ClientView({
   snap,
   project,
+  clientAccess = false,
 }: {
   snap: DemoSnapshot;
   project: Project;
+  /**
+   * VRAI quand la vue est rendue pour le CLIENT LUI-MÊME (lien + code) : l'accès
+   * est déjà accordé, on saute le garde de partage (réservé à l'aperçu conducteur).
+   */
+  clientAccess?: boolean;
 }): React.JSX.Element {
   const actor = clientActor(snap, project);
   const events = snap.events.filter((e) => e.projectId === project.id);
@@ -198,8 +204,12 @@ export function ClientView({
   // acompte payé, date officielle fixée à la main), le dossier n'est PAS
   // partageable. Le conducteur voit un écran INTERNE — aucun contenu client ne
   // s'affiche, aucune fuite possible.
-  const share = buildClientShareReadiness(dossier);
-  if (!share.shareable) return <EspaceClientNonPret missing={share.missing} />;
+  // Aperçu CONDUCTEUR : on bloque tant que le dossier n'est pas partageable.
+  // CLIENT (lien + code) : l'accès est déjà accordé, on ne rejoue pas ce garde.
+  if (!clientAccess) {
+    const share = buildClientShareReadiness(dossier);
+    if (!share.shareable) return <EspaceClientNonPret missing={share.missing} />;
+  }
 
   return (
     <div className="space-y-6">

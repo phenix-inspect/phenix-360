@@ -108,6 +108,7 @@ import {
 import { buildDocumentPdf } from './lib/pdfEngine';
 import { readDocumentAttachment } from './lib/upload';
 import { SaaSBackend } from './lib/saasBackend';
+import { ClientSpaceBackend, type ClientSpaceRaw } from './lib/clientSpaceBackend';
 import { CloudKv } from './lib/cloudKv';
 import { recordError } from './lib/diagnostics';
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
@@ -514,6 +515,12 @@ let backend: Backend = new InMemoryBackend(kv);
  */
 let saasBackend: SaaSBackend | null = null;
 /**
+ * Backend MODE CLIENT (lien + code, sans compte), s'il est branché : sert les
+ * données de `client_space` au store et route les écritures du client vers les
+ * RPC code-gardées. Permet de rendre le VRAI `ClientView` (jumeau de l'app).
+ */
+let clientBackend: ClientSpaceBackend | null = null;
+/**
  * Identité RÉELLE du conducteur connecté (mode SaaS) : c'est LUI qui crée et
  * signe les chantiers/comptes rendus (auteur = `auth.uid()`, exigé par la RLS).
  * `null` en démo (identités fabriquées localement).
@@ -670,7 +677,69 @@ let snapshot: DemoSnapshot = build();
  * locaux pour cette tranche (migration progressive, cf. MIGRATION.md M4).
  */
 function coreState(): BackendState {
-  return saasBackend ? saasBackend.snapshot() : (kv.load() ?? emptyState());
+  if (saasBackend) return saasBackend.snapshot();
+  if (clientBackend) return clientBackend.snapshot();
+  return kv.load() ?? emptyState();
+}
+
+/**
+ * Synthétise un dossier CLIENT-SAFE depuis le JOURNAL (mode client) : les choix
+ * proviennent des événements `decision` (présentation via `envoyee`, résolution
+ * via `validee`/`deleguee`). Alimente `dossierOf` / `buildClientDecisions` pour
+ * que l'onglet « Vos choix » du vrai `ClientView` fonctionne, sans le dossier
+ * conducteur. Le planning daté n'est pas dans le journal → roadmap/planning vides.
+ */
+function synthClientDossier(events: Event[], clientName: string, address?: string): ProjectDossier {
+  const carriers = new Map<string, Event>();
+  const resolutions = new Map<string, Event>();
+  for (const e of events) {
+    if (e.type !== 'decision') continue;
+    const c = e.content as { selectionId?: string; kind?: string };
+    if (!c.selectionId) continue;
+    const bucket =
+      c.kind === 'envoyee' || c.kind === 'renvoyee'
+        ? carriers
+        : c.kind === 'validee' || c.kind === 'deleguee'
+          ? resolutions
+          : null;
+    if (!bucket) continue;
+    const prev = bucket.get(c.selectionId);
+    if (!prev || e.createdAt > prev.createdAt) bucket.set(c.selectionId, e);
+  }
+  const selections: ClientSelection[] = [];
+  for (const [selId, carrier] of carriers) {
+    const cc = carrier.content as {
+      categorie?: string;
+      choix?: { titre?: string; contexte?: string; options?: SelectionOption[]; photos?: string[] };
+    };
+    const choix = cc.choix ?? {};
+    const rc = resolutions.get(selId)?.content as
+      { kind?: string; optionId?: string; message?: string } | undefined;
+    selections.push({
+      id: selId,
+      categorie: cc.categorie ?? '',
+      label: choix.titre ?? cc.categorie ?? 'Choix',
+      statut: rc ? 'valide' : 'propose',
+      ...(choix.contexte ? { contexte: choix.contexte } : {}),
+      ...(Array.isArray(choix.photos) && choix.photos.length ? { photos: choix.photos } : {}),
+      options: Array.isArray(choix.options) ? choix.options : [],
+      ...(rc?.optionId ? { chosenOptionId: rc.optionId } : {}),
+      ...(rc?.kind === 'deleguee' ? { delegatedToPhenix: true } : {}),
+      ...(rc?.message ? { clientComment: rc.message } : {}),
+    });
+  }
+  return {
+    infos: { ...(clientName ? { clientName } : {}), ...(address ? { address } : {}) },
+    roadmap: [],
+    planning: [],
+    orders: [],
+    selections,
+    documents: [],
+    questions: [],
+    checklist: defaultLaunchChecklist(),
+    sources: [],
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function build(): DemoSnapshot {
@@ -823,6 +892,36 @@ export const demo = {
     clearMemMirror();
     backend = new InMemoryBackend(kv);
     refresh();
+  },
+  /**
+   * MODE CLIENT (lien + code) : branche le backend `client_space` et synthétise le
+   * dossier (choix) depuis le journal, pour rendre le VRAI `ClientView` (jumeau de
+   * l'espace client validé). Idempotent tant que le client est déjà branché.
+   */
+  connectClientSpace(
+    client: SupabaseClient,
+    projectId: string,
+    code: string,
+    space: ClientSpaceRaw,
+  ): void {
+    const cb = new ClientSpaceBackend(client, projectId, code, space);
+    clientBackend = cb;
+    backend = cb;
+    saasClient = client;
+    // Dossier synthétisé (choix + infos) écrit en local pour que `dossierOf` /
+    // `buildClientDecisions` alimentent l'onglet « Vos choix » comme dans l'app.
+    const events = cb.snapshot().events;
+    const proj = cb.snapshot().projects[0];
+    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+    dossiers[projectId] = synthClientDossier(events, proj?.name ?? '', proj?.address);
+    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    refresh();
+  },
+  /** Recharge l'espace client (liveness). Best-effort ; rafraîchit l'UI si changé. */
+  async refreshClientSpace(): Promise<void> {
+    if (!clientBackend) return;
+    const changed = await clientBackend.refresh();
+    if (changed) refresh();
   },
   /** Vrai si la colonne vertébrale est actuellement servie par Supabase. */
   isSaaS(): boolean {
