@@ -3300,3 +3300,26 @@ complète (planning daté, galerie coulisses, Léon) = lot ultérieur si besoin 
 ces satellites au client).
 Impact : typecheck + prettier + build verts. Page autonome uniquement (hors périmètre e2e démo,
 qui ne charge pas la route `#/c/`). Vérification VISUELLE en live par le PO. VISION Art. 2, 9, 11.
+
+---
+
+22/07/2026
+Décision : Espace client (lien+code) — FIABILISATION des interactions + réponse documentaire durable.
+Pourquoi : après avoir rendu le VRAI ClientView côté client (jumeaux), fiabiliser et compléter
+les écritures. (A) FIABILISER : `client-backend.test.mjs` (5/5) verrouille le routage du
+ClientSpaceBackend — resolveDemande→client_respond_demande, appendEvent(decision validee/deleguee)
+→client_validate_choix (bon carrier + option / délégation), appendEvent(demande phenix)→client_message,
+lectures depuis cache, MAJ depuis l'espace renvoyé. (B) RÉPONSE DOCUMENTAIRE DURABLE : nouvelle RPC
+`client_respond_document(project, code, event, texte, doc jsonb, libelle)` SECURITY DEFINER (anon) —
+vérifie le code + la demande (document, ouverte, client), crée un événement `document` (auteur NULL,
+author_role client, visible client) et résout la demande en le pointant (docEventId). Le fichier voyage
+en base64 (le client anonyme ne peut pas écrire Storage — réservé aux membres internes). Le store route
+`resolveDocumentDemande` vers cette RPC en mode client.
+Alternatives rejetées : upload Storage par l'anonyme (RLS écriture = interne only ; ouvrir l'écriture
+publique = risque) ; garder le fichier local non durable (perte de la pièce jointe côté conducteur).
+Frontière restante (🟡) : « Dans les coulisses » (le Fil est un satellite app_kv, absent du journal →
+exposer au client = lot séparé), likes/commentaires et invités « Mon espace » (écritures satellites par
+l'anonyme). Documentés comme lot ultérieur (exposition des satellites conducteur).
+Impact : suite SQL `rls_test` #8 (mauvais code refusé, document enregistré + demande traitée avec
+docEventId). client-backend 5/5. Gate complet vert. Vérification live des flux client par le PO.
+VISION Art. 2, 8, 9, 11.

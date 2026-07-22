@@ -100,6 +100,27 @@ export class ClientSpaceBackend implements Backend {
   }
 
   /**
+   * Répondre à une demande de DOCUMENT en joignant un fichier (durable). Crée un
+   * événement `document` côté serveur ET résout la demande — via la RPC gardée.
+   * Le fichier voyage en base64 (le client anonyme ne peut pas écrire Storage).
+   */
+  async respondDocument(
+    demandeId: string,
+    texte: string,
+    doc: unknown,
+    libelle?: string,
+  ): Promise<void> {
+    await this.callRpc('client_respond_document', {
+      p_project: this.projectId,
+      p_code: this.code,
+      p_event: demandeId,
+      p_texte: texte,
+      p_doc: doc,
+      p_libelle: libelle ?? null,
+    });
+  }
+
+  /**
    * Le client crée un événement. Deux cas routés vers une RPC :
    *  • `decision` `validee`/`deleguee` → validation d'un choix ;
    *  • `demande` `destinataire='phenix'` → message libre au conducteur.

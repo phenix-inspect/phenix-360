@@ -1167,6 +1167,18 @@ export const demo = {
       categorie?: string;
     },
   ): Promise<void> {
+    // MODE CLIENT : réponse documentaire DURABLE via la RPC gardée (crée le
+    // document + résout la demande côté serveur, en un appel).
+    if (clientBackend && input.attachment) {
+      await clientBackend.respondDocument(
+        demandeId,
+        input.texte?.trim() ?? '',
+        input.attachment,
+        input.libelle?.trim() || input.attachment.fileName || 'Document',
+      );
+      refresh();
+      return;
+    }
     let docEventId: EventId | undefined;
     if (input.attachment) {
       const ev = await backend.appendEvent({

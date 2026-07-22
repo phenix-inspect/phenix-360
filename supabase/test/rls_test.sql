@@ -202,3 +202,49 @@ begin
   raise notice 'OK message client — visible dans l''espace';
 end
 $$;
+
+-- 8. Écriture client : RÉPONDRE avec un DOCUMENT (durable)
+do $$
+declare
+  v_dem   uuid;
+  v_space jsonb;
+  v_docok boolean;
+  v_bad   boolean := false;
+begin
+  -- Le conducteur demande un document au client.
+  insert into event(project_id, type, author_id, author_role, visibility, state, content)
+  values ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'demande',
+          '11111111-1111-1111-1111-111111111111', 'compagnon', 'client', 'ouverte',
+          '{"question":"Votre attestation d''assurance ?","destinataire":"client","attendu":"document"}')
+  returning id into v_dem;
+
+  -- mauvais code refusé
+  begin
+    perform client_respond_document('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nope', v_dem,
+      'voici', '{"fileName":"assurance.pdf","mimeType":"application/pdf"}'::jsonb, null);
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL document : mauvais code accepté'; end if;
+
+  -- bon code : document créé + demande traitée, tous deux visibles dans l'espace
+  v_space := client_respond_document('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', v_dem,
+    'La voici', '{"fileName":"assurance.pdf","mimeType":"application/pdf","dataUrl":"data:application/pdf;base64,AA=="}'::jsonb,
+    'Attestation assurance');
+  select exists (
+    select 1 from jsonb_array_elements(v_space -> 'events') ev
+    where ev ->> 'type' = 'document'
+      and ev -> 'content' ->> 'libelle' = 'Attestation assurance'
+      and ev ->> 'author_role' = 'client'
+  ) into v_docok;
+  if not v_docok then raise exception 'FAIL document : document client absent de l''espace'; end if;
+  -- la demande est passée à traitee avec un docEventId
+  if not exists (
+    select 1 from event where id = v_dem and state = 'traitee'
+      and (content -> 'resolution' ->> 'docEventId') is not null
+  ) then
+    raise exception 'FAIL document : demande non résolue / docEventId manquant';
+  end if;
+
+  raise notice 'OK document client — attestation enregistrée + demande traitée';
+end
+$$;
