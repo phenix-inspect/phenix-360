@@ -22,10 +22,13 @@ import {
   PHENIX_DELEGATE_ID,
   type Backend,
   type BackendState,
+  type CoupDeCoeur,
   type DemandeResolution,
   type Event,
   type EventId,
   type EventRow,
+  type Message,
+  type Moment,
   type NewEvent,
   type NewMember,
   type Project,
@@ -33,8 +36,17 @@ import {
   type ProjectMember,
   type ProjectStatus,
   type ProjectStep,
+  type ProjectZone,
 } from '@phenix360/core';
 import { recordError } from './diagnostics';
+
+/** Le Fil « Dans les coulisses » partagé au client (lecture seule). */
+export interface ClientFil {
+  moments: Moment[];
+  coups: CoupDeCoeur[];
+  messages: Message[];
+  zones: ProjectZone[];
+}
 
 /** Forme brute renvoyée par la RPC `client_space`. */
 export interface ClientSpaceRaw {
@@ -48,12 +60,15 @@ export interface ClientSpaceRaw {
     created_at: string;
   };
   events: EventRow[];
+  /** Fil partagé au client (moments publiés + audience client) — cf. client_space. */
+  fil?: Partial<ClientFil>;
 }
 
 const CLIENT_USER = toUserId('client-espace');
 
 export class ClientSpaceBackend implements Backend {
   private state: BackendState;
+  private fil: ClientFil;
 
   constructor(
     private readonly client: SupabaseClient,
@@ -62,6 +77,7 @@ export class ClientSpaceBackend implements Backend {
     space: ClientSpaceRaw,
   ) {
     this.state = fromSpace(space);
+    this.fil = filFromSpace(space);
   }
 
   snapshot(): BackendState {
@@ -69,6 +85,16 @@ export class ClientSpaceBackend implements Backend {
       projects: [...this.state.projects],
       members: [...this.state.members],
       events: [...this.state.events],
+    };
+  }
+
+  /** Le Fil « Dans les coulisses » partagé au client (lecture seule). */
+  filSnapshot(): ClientFil {
+    return {
+      moments: [...this.fil.moments],
+      coups: [...this.fil.coups],
+      messages: [...this.fil.messages],
+      zones: [...this.fil.zones],
     };
   }
 
@@ -204,6 +230,7 @@ export class ClientSpaceBackend implements Backend {
       }
       if (res.data && (res.data as ClientSpaceRaw).project) {
         this.state = fromSpace(res.data as ClientSpaceRaw);
+        this.fil = filFromSpace(res.data as ClientSpaceRaw);
       }
     } catch (e) {
       recordError('error', `client ${name}: ${e instanceof Error ? e.message : String(e)}`);
@@ -231,9 +258,9 @@ export class ClientSpaceBackend implements Backend {
 
   /** Recharge l'espace (liveness / après action externe). Best-effort. */
   async refresh(): Promise<boolean> {
-    const before = JSON.stringify(this.state.events);
+    const before = JSON.stringify(this.state.events) + JSON.stringify(this.fil);
     await this.callRpc('client_space', { p_project: this.projectId, p_code: this.code });
-    return JSON.stringify(this.state.events) !== before;
+    return JSON.stringify(this.state.events) + JSON.stringify(this.fil) !== before;
   }
 }
 
@@ -259,6 +286,17 @@ function fromSpace(space: ClientSpaceRaw): BackendState {
   };
   const events = (space.events ?? []).map(mapEventRow);
   return { projects: [project], members: [member], events };
+}
+
+/** Extrait le Fil partagé (déjà filtré côté serveur : moments publiés + client). */
+function filFromSpace(space: ClientSpaceRaw): ClientFil {
+  const f = space.fil ?? {};
+  return {
+    moments: f.moments ?? [],
+    coups: f.coups ?? [],
+    messages: f.messages ?? [],
+    zones: f.zones ?? [],
+  };
 }
 
 /** Événement d'aperçu local (non durable). */

@@ -34,6 +34,7 @@ export function FilMoment({
   pendingComment = false,
   pendingText = 'Nouveau commentaire du client — à vous de répondre',
   focusReply = false,
+  readOnly = false,
   onToggleCoup,
   onSendMessage,
   onOpenGallery,
@@ -56,6 +57,8 @@ export function FilMoment({
   pendingText?: string;
   /** Poser le curseur dans la réponse (ouvert depuis une notification). */
   focusReply?: boolean;
+  /** Consultation seule (lien client) : album à regarder, sans ❤️ ni champ d'envoi. */
+  readOnly?: boolean;
   onToggleCoup: () => void;
   onSendMessage: (texte: string) => void;
   onOpenGallery: () => void;
@@ -215,18 +218,26 @@ export function FilMoment({
           </div>
         )}
 
-        <div className="border-t border-border pt-4">
-          <CoupDeCoeurButton active={hasCoup} onToggle={onToggleCoup} />
-        </div>
+        {!readOnly && (
+          <div className="border-t border-border pt-4">
+            <CoupDeCoeurButton active={hasCoup} onToggle={onToggleCoup} />
+          </div>
+        )}
 
-        <div className="border-t border-border pt-4">
-          <MessageThread
-            messages={messagesMoment}
-            nameOf={nameOf}
-            onSend={onSendMessage}
-            autoFocus={focusReply}
-          />
-        </div>
+        {(() => {
+          const thread = (
+            <MessageThread
+              messages={messagesMoment}
+              nameOf={nameOf}
+              onSend={onSendMessage}
+              autoFocus={focusReply}
+              readOnly={readOnly}
+            />
+          );
+          // En consultation sans message, le fil ne rend rien : pas de séparateur seul.
+          if (readOnly && messagesMoment.length === 0) return null;
+          return <div className="border-t border-border pt-4">{thread}</div>;
+        })()}
       </div>
     </article>
   );

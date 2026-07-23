@@ -234,6 +234,32 @@ journal plus léger, pas de limite de payload, chargements plus rapides.
 - **Frontière** : couvre les médias du JOURNAL (événements). Le **Fil / coulisses**
   (satellite `app_kv`) reste en base64 = **M5 v2**.
 
+## 1decies. Fait dans l'incrément « Dans les coulisses » (le client CONSULTE l'album)
+
+Le Fil (« Dans les coulisses ») vit dans le coffre satellite du conducteur
+(`app_kv`, blob JSON privé). Le client par lien + code n'y avait donc AUCUN accès :
+son onglet restait vide. Cet incrément l'expose **en lecture seule**.
+
+- **SQL** (`20260723090000_client_coulisses.sql` + install.sql) : `client_space`
+  **étendu** pour renvoyer, en plus des événements, un objet `fil` = les moments
+  **partagés** au client (`state='publie'` ET `visibleTo` contient `client`), avec
+  leurs coups de cœur / messages (filtrés aux moments partagés) et zones. Une
+  fonction interne `client_fil_array` (SECURITY DEFINER, **jamais** exposée à
+  `anon`) lit le(s) coffre(s) `app_kv` du/des conducteur(s) interne(s) du projet ;
+  un blob illisible n'échoue jamais l'espace (chaque coffre est tenté isolément).
+- **Client** (`ClientSpaceBackend.filSnapshot`, `store.wrapClientFil`) : le `fil`
+  renvoyé par `client_space` est rangé sous le `projectId`, à la forme exacte de
+  `snapshot.fil` — `FilView` s'affiche à l'identique qu'en mode conducteur, sans
+  distinction. Rafraîchi par le polling de liveness (12 s + focus).
+- **Lecture seule** : sur le lien client, ❤️ et messages sont masqués (`readOnly`
+  dans `FilView`/`FilMoment`/`MessageThread`/`MomentGallery`). Rendre les réactions
+  du client **durables** est un incrément ultérieur : écrire dans le blob `app_kv`
+  du conducteur entrerait en collision avec sa synchro CloudKv (dernier écrit
+  gagne) — la bonne cible est de porter les interactions du Fil dans le Journal.
+- **Tests** : `rls_test.sql` test 9 (moment partagé exposé, interne masqué, coup +
+  message filtrés) ; `client-backend.test.mjs` 7/7 (fil exposé + fil vide par
+  défaut). Gate complet vert, démo inchangée.
+
 ---
 
 ## 2. L'unique action humaine indispensable

@@ -521,6 +521,15 @@ let saasBackend: SaaSBackend | null = null;
  */
 let clientBackend: ClientSpaceBackend | null = null;
 /**
+ * MODE CLIENT — le Fil « Dans les coulisses » PARTAGÉ, servi par `client_space`
+ * (moments publiés + audience client, avec coups/messages/zones). Rangé par
+ * projectId pour se fondre tel quel dans `snapshot.fil` (lecture seule côté
+ * client). `null` hors mode client → `build()` lit le Fil local (conducteur).
+ */
+let clientFil: DemoSnapshot['fil'] | null = null;
+/** Projet servi en mode client (pour re-clé le Fil lors des rafraîchissements). */
+let clientProjectId: string | null = null;
+/**
  * Identité RÉELLE du conducteur connecté (mode SaaS) : c'est LUI qui crée et
  * signe les chantiers/comptes rendus (auteur = `auth.uid()`, exigé par la RLS).
  * `null` en démo (identités fabriquées localement).
@@ -683,6 +692,21 @@ function coreState(): BackendState {
 }
 
 /**
+ * Range le Fil partagé (servi par `client_space`) sous le projectId, à la forme
+ * exacte de `snapshot.fil` — pour que `FilView` / `filOf` le lisent à l'identique
+ * qu'en mode conducteur, sans distinction. Lecture seule (aucune écriture cloud).
+ */
+function wrapClientFil(projectId: string, cb: ClientSpaceBackend): DemoSnapshot['fil'] {
+  const f = cb.filSnapshot();
+  return {
+    moments: { [projectId]: f.moments },
+    coups: { [projectId]: f.coups },
+    messages: { [projectId]: f.messages },
+    zones: { [projectId]: f.zones },
+  };
+}
+
+/**
  * Synthétise un dossier CLIENT-SAFE depuis le JOURNAL (mode client) : les choix
  * proviennent des événements `decision` (présentation via `envoyee`, résolution
  * via `validee`/`deleguee`). Alimente `dossierOf` / `buildClientDecisions` pour
@@ -748,12 +772,17 @@ function build(): DemoSnapshot {
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
-    fil: {
-      moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
-      coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
-      messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
-      zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
-    },
+    // MODE CLIENT : le Fil partagé vient de `client_space` (serveur), jamais du
+    // localStorage (vide sur l'appareil du client). Sinon : Fil local du conducteur.
+    fil:
+      clientBackend && clientFil
+        ? clientFil
+        : {
+            moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
+            coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
+            messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
+            zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
+          },
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
     contacts: readJson<Contact[]>(CONTACTS_KEY, []),
@@ -908,6 +937,8 @@ export const demo = {
     clientBackend = cb;
     backend = cb;
     saasClient = client;
+    clientProjectId = projectId;
+    clientFil = wrapClientFil(projectId, cb);
     // Dossier synthétisé (choix + infos) écrit en local pour que `dossierOf` /
     // `buildClientDecisions` alimentent l'onglet « Vos choix » comme dans l'app.
     const events = cb.snapshot().events;
@@ -921,7 +952,10 @@ export const demo = {
   async refreshClientSpace(): Promise<void> {
     if (!clientBackend) return;
     const changed = await clientBackend.refresh();
-    if (changed) refresh();
+    if (changed) {
+      if (clientProjectId) clientFil = wrapClientFil(clientProjectId, clientBackend);
+      refresh();
+    }
   },
   /** Vrai si la colonne vertébrale est actuellement servie par Supabase. */
   isSaaS(): boolean {

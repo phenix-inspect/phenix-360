@@ -248,3 +248,67 @@ begin
   raise notice 'OK document client — attestation enregistrée + demande traitée';
 end
 $$;
+
+-- 9. Espace client : « Dans les coulisses » — moments PARTAGÉS uniquement.
+-- Le Fil vit dans le coffre satellite du conducteur (app_kv). client_space doit
+-- exposer au client SEULEMENT les moments publiés + audience 'client', avec leurs
+-- coups/messages ; l'interne (audience sans 'client') reste masqué.
+do $$
+declare
+  v_space   jsonb;
+  v_moments jsonb;
+  v_coups   jsonb;
+  v_msgs    jsonb;
+begin
+  -- Coffre Fil du conducteur (user 1111, compagnon interne du projet).
+  insert into app_kv(user_id, k, v) values
+    ('11111111-1111-1111-1111-111111111111', 'phenix-demo:fil-moments:v1', $json$
+     {"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa":[
+       {"id":"m-shared","projectId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","state":"publie",
+        "visibleTo":["phenix","artisans","client"],"createdAt":"2026-06-25T10:00:00.000Z",
+        "authorId":"11111111-1111-1111-1111-111111111111","authorRole":"compagnon",
+        "title":"Cuisine installée","photos":[{"id":"p1","bucket":"attachments",
+        "storagePath":"x/y.jpg","mimeType":"image/jpeg","ordre":0,
+        "createdAt":"2026-06-25T10:00:00.000Z"}]},
+       {"id":"m-internal","projectId":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","state":"publie",
+        "visibleTo":["phenix","artisans"],"createdAt":"2026-06-26T10:00:00.000Z",
+        "authorId":"11111111-1111-1111-1111-111111111111","authorRole":"compagnon",
+        "title":"Note interne","photos":[]}
+     ]}$json$),
+    ('11111111-1111-1111-1111-111111111111', 'phenix-demo:fil-coups:v1', $json$
+     {"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa":[
+       {"id":"c1","momentId":"m-shared","userId":"22222222-2222-2222-2222-222222222222",
+        "userRole":"client","createdAt":"2026-06-25T11:00:00.000Z"},
+       {"id":"c2","momentId":"m-internal","userId":"11111111-1111-1111-1111-111111111111",
+        "userRole":"compagnon","createdAt":"2026-06-26T11:00:00.000Z"}
+     ]}$json$),
+    ('11111111-1111-1111-1111-111111111111', 'phenix-demo:fil-messages:v1', $json$
+     {"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa":[
+       {"id":"msg1","momentId":"m-shared","photoId":null,"parentId":null,
+        "authorId":"11111111-1111-1111-1111-111111111111","authorRole":"compagnon",
+        "texte":"Belle avancée !","createdAt":"2026-06-25T12:00:00.000Z"}
+     ]}$json$)
+  on conflict (user_id, k) do update set v = excluded.v;
+
+  v_space   := client_space('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234');
+  v_moments := v_space -> 'fil' -> 'moments';
+  v_coups   := v_space -> 'fil' -> 'coups';
+  v_msgs    := v_space -> 'fil' -> 'messages';
+
+  if jsonb_array_length(v_moments) <> 1 then
+    raise exception 'FAIL coulisses : attendu 1 moment partagé, obtenu %',
+      jsonb_array_length(v_moments);
+  end if;
+  if (v_moments -> 0 ->> 'id') <> 'm-shared' then
+    raise exception 'FAIL coulisses : mauvais moment exposé (%)', v_moments -> 0 ->> 'id';
+  end if;
+  if jsonb_array_length(v_coups) <> 1 or (v_coups -> 0 ->> 'momentId') <> 'm-shared' then
+    raise exception 'FAIL coulisses : coup de cœur interne non filtré';
+  end if;
+  if jsonb_array_length(v_msgs) <> 1 or (v_msgs -> 0 ->> 'momentId') <> 'm-shared' then
+    raise exception 'FAIL coulisses : message inattendu';
+  end if;
+
+  raise notice 'OK coulisses — 1 moment partagé (interne masqué), coup + message filtrés';
+end
+$$;

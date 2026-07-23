@@ -269,9 +269,52 @@ end;
 $$;
 grant execute on function set_client_access(uuid, text) to authenticated;
 
+-- Agrège, à travers TOUS les membres internes du projet, le tableau du Fil rangé
+-- sous la clé `p_key` pour `p_project` (coffre satellite `app_kv` du conducteur).
+-- SECURITY DEFINER : lit au-delà de la RLS (propriétaire = postgres). JAMAIS
+-- exposée à `anon` — uniquement appelée depuis `client_space` (gardée par code).
+create or replace function client_fil_array(p_project uuid, p_key text)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public, extensions
+as $$
+declare
+  v_out jsonb := '[]'::jsonb;
+  r     record;
+  j     jsonb;
+begin
+  for r in
+    select distinct m.user_id
+    from project_member m
+    where m.project_id = p_project and m.role in ('compagnon', 'equipe')
+  loop
+    begin
+      select (kv.v)::jsonb -> (p_project::text) into j
+      from app_kv kv
+      where kv.user_id = r.user_id and kv.k = p_key;
+    exception when others then
+      j := null; -- blob corrompu : on ignore ce coffre, jamais d'échec global.
+    end;
+    if j is not null and jsonb_typeof(j) = 'array' then
+      v_out := v_out || j;
+    end if;
+  end loop;
+  return v_out;
+end;
+$$;
+
 create or replace function client_space(p_project uuid, p_code text)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare v_hash text; v_result jsonb;
+declare
+  v_hash     text;
+  v_result   jsonb;
+  v_moments  jsonb;
+  v_ids      jsonb;
+  v_coups    jsonb;
+  v_messages jsonb;
+  v_zones    jsonb;
 begin
   select code_hash into v_hash from project_client_access where project_id = p_project;
   if v_hash is null or v_hash <> crypt(p_code, v_hash) then
@@ -304,6 +347,37 @@ begin
           )
       ) e), '[]'::jsonb)
   ) into v_result;
+
+  -- FIL « Dans les coulisses » — uniquement les moments PARTAGÉS au client
+  -- (publié + audience 'client'), lus dans le coffre satellite du conducteur.
+  select coalesce(jsonb_agg(elem order by elem ->> 'createdAt'), '[]'::jsonb)
+    into v_moments
+  from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-moments:v1')) elem
+  where (elem ->> 'state') = 'publie' and (elem -> 'visibleTo') ? 'client';
+
+  select coalesce(jsonb_agg(elem ->> 'id'), '[]'::jsonb)
+    into v_ids
+  from jsonb_array_elements(v_moments) elem;
+
+  select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_coups
+  from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-coups:v1')) elem
+  where v_ids ? (elem ->> 'momentId');
+
+  select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_messages
+  from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-messages:v1')) elem
+  where v_ids ? (elem ->> 'momentId');
+
+  v_zones := client_fil_array(p_project, 'phenix-demo:fil-zones:v1');
+
+  v_result := v_result || jsonb_build_object(
+    'fil', jsonb_build_object(
+      'moments',  v_moments,
+      'coups',    v_coups,
+      'messages', v_messages,
+      'zones',    coalesce(v_zones, '[]'::jsonb)
+    )
+  );
+
   return v_result;
 end;
 $$;

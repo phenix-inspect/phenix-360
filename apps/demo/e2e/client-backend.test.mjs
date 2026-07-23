@@ -200,6 +200,38 @@ await check('appendEvent(decision deleguee) → client_validate_choix (délégat
   assert(rpcLog[0].params.p_option === '__phenix_delegate__', 'délégation non transmise');
 });
 
+/* -- Fil « Dans les coulisses » : servi par client_space ----------------- */
+await check('filSnapshot : le Fil partagé est exposé depuis client_space', async () => {
+  const { client } = mockClient();
+  const withFil = {
+    ...space([eventRow()]),
+    fil: {
+      moments: [{ id: 'm-shared', projectId: PROJECT, state: 'publie', visibleTo: ['client'] }],
+      coups: [{ id: 'c1', momentId: 'm-shared' }],
+      messages: [{ id: 'msg1', momentId: 'm-shared', texte: 'Bravo' }],
+      zones: [{ id: 'z1', projectId: PROJECT, label: 'Cuisine', ordre: 0 }],
+    },
+  };
+  const be = new ClientSpaceBackend(client, PROJECT, CODE, withFil);
+  const fil = be.filSnapshot();
+  assert(fil.moments.length === 1 && fil.moments[0].id === 'm-shared', 'moment partagé absent');
+  assert(fil.coups.length === 1 && fil.messages.length === 1, 'coups/messages non exposés');
+  assert(fil.zones.length === 1 && fil.zones[0].label === 'Cuisine', 'zones non exposées');
+});
+
+await check('filSnapshot : Fil vide par défaut (aucun champ fil dans l’espace)', async () => {
+  const { client } = mockClient();
+  const be = new ClientSpaceBackend(client, PROJECT, CODE, space([eventRow()]));
+  const fil = be.filSnapshot();
+  assert(
+    fil.moments.length === 0 &&
+      fil.coups.length === 0 &&
+      fil.messages.length === 0 &&
+      fil.zones.length === 0,
+    'Fil non vide alors que l’espace n’en fournit pas',
+  );
+});
+
 /* -- écrire un message → client_message ---------------------------------- */
 await check('appendEvent(demande phenix) → client_message', async () => {
   const { client, rpcLog } = mockClient(space([]));
