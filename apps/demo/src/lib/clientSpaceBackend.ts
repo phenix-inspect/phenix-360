@@ -146,6 +146,26 @@ export class ClientSpaceBackend implements Backend {
     });
   }
 
+  /** ❤️ Le client aime / n'aime plus un moment des coulisses (bascule durable). */
+  async coup(momentId: string): Promise<void> {
+    await this.callRpc('client_coup', {
+      p_project: this.projectId,
+      p_code: this.code,
+      p_moment: momentId,
+    });
+  }
+
+  /** 💬 Le client laisse un message sous un moment (ou une photo si `photoId`). */
+  async momentMessage(momentId: string, texte: string, photoId?: string | null): Promise<void> {
+    await this.callRpc('client_moment_message', {
+      p_project: this.projectId,
+      p_code: this.code,
+      p_moment: momentId,
+      p_texte: texte,
+      p_photo: photoId ?? null,
+    });
+  }
+
   /**
    * Le client crée un événement. Deux cas routés vers une RPC :
    *  • `decision` `validee`/`deleguee` → validation d'un choix ;

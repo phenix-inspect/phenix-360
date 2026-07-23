@@ -946,6 +946,11 @@ export const demo = {
     const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
     dossiers[projectId] = synthClientDossier(events, proj?.name ?? '', proj?.address);
     safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    // Le client anonyme ('client-espace') s'affiche « Vous » sur SON appareil :
+    // ses ❤️/💬 des coulisses lui sont attribués (l'équipe reste « PHÉNIX »).
+    const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
+    people['client-espace'] = 'Vous';
+    safeSetItem(PEOPLE_KEY, JSON.stringify(people));
     refresh();
   },
   /** Recharge l'espace client (liveness). Best-effort ; rafraîchit l'UI si changé. */
@@ -2042,6 +2047,18 @@ export const demo = {
 
   /** Bascule le ♡ coup de cœur d'un utilisateur sur un Moment. */
   toggleCoupDeCoeur(projectId: ProjectId, momentId: string, actor: EventActor): void {
+    // MODE CLIENT (lien + code) : la réaction est DURABLE via RPC code-gardée
+    // (écrite dans le coffre du conducteur), jamais en local — sinon le polling
+    // la balaierait. On rafraîchit le Fil client au retour.
+    if (clientBackend) {
+      const cb = clientBackend;
+      void cb.coup(momentId).then(() => {
+        if (clientProjectId) clientFil = wrapClientFil(clientProjectId, cb);
+        refresh();
+        broadcast();
+      });
+      return;
+    }
     const map = readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {});
     const current = map[projectId] ?? [];
     const existing = current.find((c) => c.momentId === momentId && c.userId === actor.userId);
@@ -2075,6 +2092,16 @@ export const demo = {
   ): void {
     const trimmed = texte.trim();
     if (!trimmed) return;
+    // MODE CLIENT : message DURABLE via RPC (coffre du conducteur), pas en local.
+    if (clientBackend) {
+      const cb = clientBackend;
+      void cb.momentMessage(momentId, trimmed, photoId).then(() => {
+        if (clientProjectId) clientFil = wrapClientFil(clientProjectId, cb);
+        refresh();
+        broadcast();
+      });
+      return;
+    }
     const map = readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {});
     const message: Message = {
       id: toMessageId(crypto.randomUUID()),

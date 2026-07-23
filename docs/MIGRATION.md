@@ -251,14 +251,25 @@ son onglet restait vide. Cet incrément l'expose **en lecture seule**.
   renvoyé par `client_space` est rangé sous le `projectId`, à la forme exacte de
   `snapshot.fil` — `FilView` s'affiche à l'identique qu'en mode conducteur, sans
   distinction. Rafraîchi par le polling de liveness (12 s + focus).
-- **Lecture seule** : sur le lien client, ❤️ et messages sont masqués (`readOnly`
-  dans `FilView`/`FilMoment`/`MessageThread`/`MomentGallery`). Rendre les réactions
-  du client **durables** est un incrément ultérieur : écrire dans le blob `app_kv`
-  du conducteur entrerait en collision avec sa synchro CloudKv (dernier écrit
-  gagne) — la bonne cible est de porter les interactions du Fil dans le Journal.
-- **Tests** : `rls_test.sql` test 9 (moment partagé exposé, interne masqué, coup +
-  message filtrés) ; `client-backend.test.mjs` 7/7 (fil exposé + fil vide par
-  défaut). Gate complet vert, démo inchangée.
+- **Le client RÉAGIT (jumeau complet)** : sur le lien, l'album se LIKE (❤️) et se
+  COMMENTE (💬) comme côté conducteur. Les interactions du Fil vivant dans le
+  coffre `app_kv` (agrégat distinct du Journal), la réaction du client est écrite
+  DIRECTEMENT dans le coffre du conducteur **propriétaire** du moment, via RPC
+  code-gardées `client_coup` / `client_moment_message` (SECURITY DEFINER, +
+  `client_moment_owner`). Le client anonyme = utilisateur synthétique
+  `client-espace`. Bénéfices : réaction visible tout de suite (client_space relit
+  le même coffre), qui **survit au polling** et **remonte au conducteur** (même
+  stockage, à sa prochaine hydratation). `store.toggleCoupDeCoeur`/`addMessage`
+  routent vers ces RPC en mode client (jamais en local — sinon le poll l'effacerait).
+- **Limite connue (bêta)** : pas de temps réel sur `app_kv` → le conducteur voit
+  la réaction du client à son prochain chargement (pas en direct). Une écriture
+  concurrente du conducteur sur la MÊME clé Fil (coups/messages) pourrait écraser
+  une réaction cliente très récente — rare (publier un moment touche une AUTRE
+  clé). Cible propre à terme : porter le Fil dans des tables dédiées (RLS + Realtime).
+- **Tests** : `rls_test.sql` tests 9-10 (moment partagé exposé, interne masqué,
+  coup+message filtrés ; puis like/un-like + message client durables, gardes code/
+  vide/non-partagé) ; `client-backend.test.mjs` 9/9 (fil exposé, coup/message
+  routés). Gate complet vert, démo inchangée.
 
 ---
 

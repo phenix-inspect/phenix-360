@@ -232,6 +232,38 @@ await check('filSnapshot : Fil vide par défaut (aucun champ fil dans l’espace
   );
 });
 
+/* -- coulisses : ❤️ → client_coup ; 💬 → client_moment_message ----------- */
+await check('coup → client_coup (projet + code + moment)', async () => {
+  const { client, rpcLog } = mockClient(space([eventRow()]));
+  const be = new ClientSpaceBackend(client, PROJECT, CODE, space([eventRow()]));
+  await be.coup('m-shared');
+  assert(rpcLog.length === 1 && rpcLog[0].name === 'client_coup', 'mauvaise RPC');
+  assert(
+    rpcLog[0].params.p_project === PROJECT &&
+      rpcLog[0].params.p_code === CODE &&
+      rpcLog[0].params.p_moment === 'm-shared',
+    'paramètres coup incorrects',
+  );
+});
+
+await check('momentMessage → client_moment_message (texte + photo)', async () => {
+  const { client, rpcLog } = mockClient(space([eventRow()]));
+  const be = new ClientSpaceBackend(client, PROJECT, CODE, space([eventRow()]));
+  await be.momentMessage('m-shared', 'Superbe !', 'photo-1');
+  assert(rpcLog[0].name === 'client_moment_message', 'mauvaise RPC');
+  assert(
+    rpcLog[0].params.p_moment === 'm-shared' &&
+      rpcLog[0].params.p_texte === 'Superbe !' &&
+      rpcLog[0].params.p_photo === 'photo-1',
+    'paramètres message incorrects',
+  );
+  // Sans photo → p_photo null (message de niveau 1).
+  const { client: c2, rpcLog: log2 } = mockClient(space([eventRow()]));
+  const be2 = new ClientSpaceBackend(c2, PROJECT, CODE, space([eventRow()]));
+  await be2.momentMessage('m-shared', 'Niveau 1');
+  assert(log2[0].params.p_photo === null, 'p_photo devrait être null sans photoId');
+});
+
 /* -- écrire un message → client_message ---------------------------------- */
 await check('appendEvent(demande phenix) → client_message', async () => {
   const { client, rpcLog } = mockClient(space([]));

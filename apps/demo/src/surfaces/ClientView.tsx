@@ -400,7 +400,6 @@ export function ClientView({
               project={project}
               actor={actor}
               canCompose={false}
-              readOnly={clientAccess}
               view={filView}
               onViewChange={setFilView}
             />

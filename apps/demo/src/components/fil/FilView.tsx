@@ -38,7 +38,6 @@ export function FilView({
   project,
   actor,
   canCompose,
-  readOnly = false,
   view: viewProp,
   onViewChange,
 }: {
@@ -46,12 +45,6 @@ export function FilView({
   project: Project;
   actor: EventActor;
   canCompose: boolean;
-  /**
-   * Consultation seule (lien client anonyme) : l'album se regarde, mais ❤️ et
-   * messages sont masqués tant qu'ils ne sont pas rendus DURABLES côté serveur
-   * (les réactions du lien client sont un incrément ultérieur).
-   */
-  readOnly?: boolean;
   /** Vue contrôlée (Récit / Bibliothèque) — le parent pilote (sommaire client). */
   view?: 'fil' | 'bibliotheque';
   onViewChange?: (view: 'fil' | 'bibliotheque') => void;
@@ -195,7 +188,6 @@ export function FilView({
                 pendingComment={pending.has(entry.moment.id)}
                 pendingText={pendingText}
                 focusReply={focusMomentId === entry.moment.id}
-                readOnly={readOnly}
                 onToggleCoup={() => demo.toggleCoupDeCoeur(project.id, entry.moment.id, actor)}
                 onSendMessage={(texte) =>
                   demo.addMessage(project.id, entry.moment.id, actor, texte)
@@ -215,7 +207,6 @@ export function FilView({
           moment={gallery.moment}
           messages={messages.filter((m) => m.momentId === gallery.moment.id)}
           nameOf={name}
-          readOnly={readOnly}
           {...(gallery.photoId ? { initialPhotoId: gallery.photoId } : {})}
           onSendPhotoMessage={(photoId, texte) =>
             demo.addMessage(project.id, gallery.moment.id, actor, texte, photoId)

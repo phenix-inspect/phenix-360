@@ -43,7 +43,6 @@ export function MomentGallery({
   initialPhotoId,
   onSendPhotoMessage,
   onClose,
-  readOnly = false,
 }: {
   moment: Moment;
   messages: Message[];
@@ -51,8 +50,6 @@ export function MomentGallery({
   initialPhotoId?: string;
   onSendPhotoMessage: (photoId: string, texte: string) => void;
   onClose: () => void;
-  /** Consultation seule (lien client) : on regarde/lit, sans champ de commentaire. */
-  readOnly?: boolean;
 }): React.JSX.Element {
   const photos = [...moment.photos].sort((a, b) => a.ordre - b.ordre);
   const start = Math.max(
@@ -516,28 +513,26 @@ export function MomentGallery({
               )}
             </div>
 
-            {!readOnly && (
-              <div className="flex gap-2 border-t border-paper-0/15 p-3">
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') send();
-                  }}
-                  placeholder="Écrire un petit mot sur cette photo…"
-                  className="h-10 flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
-                />
-                <button
-                  type="button"
-                  onClick={send}
-                  disabled={!draft.trim()}
-                  aria-label="Envoyer"
-                  className="inline-flex size-10 items-center justify-center rounded-lg border border-paper-0/20 text-paper-0 transition-colors duration-base hover:bg-paper-0/10 disabled:opacity-40 [&_svg]:size-4"
-                >
-                  <Send aria-hidden />
-                </button>
-              </div>
-            )}
+            <div className="flex gap-2 border-t border-paper-0/15 p-3">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') send();
+                }}
+                placeholder="Écrire un petit mot sur cette photo…"
+                className="h-10 flex-1 rounded-lg border border-paper-0/20 bg-paper-0/10 px-3 text-sm text-paper-0 placeholder:text-paper-0/50 focus:outline-none focus:ring-2 focus:ring-gold-400"
+              />
+              <button
+                type="button"
+                onClick={send}
+                disabled={!draft.trim()}
+                aria-label="Envoyer"
+                className="inline-flex size-10 items-center justify-center rounded-lg border border-paper-0/20 text-paper-0 transition-colors duration-base hover:bg-paper-0/10 disabled:opacity-40 [&_svg]:size-4"
+              >
+                <Send aria-hidden />
+              </button>
+            </div>
           </section>
         </>
       )}

@@ -312,3 +312,64 @@ begin
   raise notice 'OK coulisses — 1 moment partagé (interne masqué), coup + message filtrés';
 end
 $$;
+
+-- 10. Espace client : le client RÉAGIT dans les coulisses (❤️ bascule + 💬).
+-- (S'appuie sur les coffres Fil semés au test 9 : moment partagé 'm-shared'
+--  appartenant au conducteur 1111, moment interne 'm-internal' non partagé.)
+do $$
+declare
+  v_space jsonb;
+  v_nb    int;
+  v_bad   boolean := false;
+begin
+  -- mauvais code refusé
+  begin
+    perform client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'nope', 'm-shared');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL coup : mauvais code accepté'; end if;
+
+  -- moment NON partagé refusé (interne)
+  v_bad := false;
+  begin
+    perform client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', 'm-internal');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL coup : moment interne accepté'; end if;
+
+  -- like : un coup 'client-espace' apparaît sur le moment partagé
+  v_space := client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', 'm-shared');
+  select count(*) into v_nb
+  from jsonb_array_elements(v_space -> 'fil' -> 'coups') as x(elem)
+  where x.elem ->> 'userId' = 'client-espace' and x.elem ->> 'momentId' = 'm-shared';
+  if v_nb <> 1 then raise exception 'FAIL coup : like non enregistré (%)', v_nb; end if;
+
+  -- un-like : bascule → le coup 'client-espace' disparaît
+  v_space := client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', 'm-shared');
+  select count(*) into v_nb
+  from jsonb_array_elements(v_space -> 'fil' -> 'coups') as x(elem)
+  where x.elem ->> 'userId' = 'client-espace' and x.elem ->> 'momentId' = 'm-shared';
+  if v_nb <> 0 then raise exception 'FAIL coup : un-like non pris en compte (%)', v_nb; end if;
+
+  -- message vide refusé
+  v_bad := false;
+  begin
+    perform client_moment_message('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234',
+      'm-shared', '   ', null);
+  exception when sqlstate '22023' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL message coulisses : vide accepté'; end if;
+
+  -- message : apparaît sous le moment partagé, auteur client-espace
+  v_space := client_moment_message('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234',
+    'm-shared', 'Superbe, hâte de voir la suite !', null);
+  select count(*) into v_nb
+  from jsonb_array_elements(v_space -> 'fil' -> 'messages') as x(elem)
+  where x.elem ->> 'authorId' = 'client-espace'
+    and x.elem ->> 'momentId' = 'm-shared'
+    and x.elem ->> 'texte' = 'Superbe, hâte de voir la suite !';
+  if v_nb <> 1 then raise exception 'FAIL message coulisses : non enregistré (%)', v_nb; end if;
+
+  raise notice 'OK coulisses réactions — like/un-like + message client durables';
+end
+$$;
