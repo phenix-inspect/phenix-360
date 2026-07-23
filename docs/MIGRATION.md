@@ -271,6 +271,26 @@ son onglet restait vide. Cet incrément l'expose **en lecture seule**.
   vide/non-partagé) ; `client-backend.test.mjs` 9/9 (fil exposé, coup/message
   routés). Gate complet vert, démo inchangée.
 
+## 1undecies. Fait dans l'incrément « Dossier de chantier » (export PDF / archive)
+
+Un export PDF qui raconte tout le chantier : couverture (chantier, adresse, client,
+statut, étape), synthèse chiffrée, comptes rendus, choix du client, réserves
+(ouvertes/levées), documents et album des coulisses. Livrable à remettre au client
+ET archive lisible — au-delà des données brutes déjà persistées (et sauvegardées)
+par Supabase.
+
+- **Moteur** : nouvelle fonction PURE `buildChantierDossierPdf` (dans le moteur PDF
+  unique `pdfEngine.ts`) qui compose les primitives existantes (couverture, tuiles,
+  sections, `photoRow`, pagination). Sections vides omises (pas de titre orphelin).
+- **Orchestration** (`lib/chantierDossier.ts`) : calcule les sections depuis le
+  store (sélecteurs core : `deriveProjectStatus`, `reserveStatut`, `momentsCoulisses`…)
+  et **pré-résout les photos** Storage (URL https → data URL via fetch→blob→base64),
+  jsPDF ne sachant pas charger une image distante de façon synchrone. Best-effort et
+  plafonné (`MAX_PHOTOS`) : une photo illisible devient un cadre gris, jamais un échec.
+- **UI** : bouton « Exporter le dossier (PDF) » dans « Gérer » (chantier actif).
+- **Tests** : `dossier-pdf.test.mjs` 3/3 (vrai `%PDF-` + toutes les sections ;
+  sections vides omises ; pagination d'un dossier volumineux). Gate complet vert.
+
 ---
 
 ## 2. L'unique action humaine indispensable

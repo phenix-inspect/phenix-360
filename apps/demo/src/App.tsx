@@ -15,6 +15,7 @@ import {
   Building2,
   Download,
   Eye,
+  FileText,
   HardHat,
   Pencil,
   RotateCcw,
@@ -23,7 +24,8 @@ import {
   Upload,
 } from 'lucide-react';
 import { projectId, type ProjectId } from '@phenix360/core';
-import { demo, useDemo } from './store';
+import { demo, dossierOf, filOf, nameOf, useDemo } from './store';
+import { exportChantierDossier } from './lib/chantierDossier';
 import { DeleteChantierButton } from './components/DeleteChantierButton';
 import { AujourdhuiView } from './surfaces/AujourdhuiView';
 import { PointDuSoirView } from './surfaces/PointDuSoirView';
@@ -366,6 +368,8 @@ function ManageDialog({
   const fileInput = useRef<HTMLInputElement>(null);
   const [pendingImport, setPendingImport] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [dossierBusy, setDossierBusy] = useState(false);
+  const [dossierError, setDossierError] = useState<string | null>(null);
 
   const resetImport = (): void => {
     setPendingImport(null);
@@ -389,6 +393,28 @@ function ManageDialog({
     // Révocation DIFFÉRÉE : révoquer immédiatement après `click()` peut annuler le
     // téléchargement dans certains navigateurs (mêmes 60 s que lib/document.ts).
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  const handleDossierExport = async (): Promise<void> => {
+    const active = snap.projects.find((p) => p.id === snap.activeProjectId) ?? snap.projects[0];
+    if (!active || dossierBusy) return;
+    setDossierBusy(true);
+    setDossierError(null);
+    try {
+      const events = snap.events.filter((e) => e.projectId === active.id);
+      const { moments } = filOf(snap, active.id);
+      const clientName = active.clientId ? nameOf(snap, active.clientId) : undefined;
+      const res = await exportChantierDossier({
+        project: active,
+        events,
+        dossier: dossierOf(snap, active.id),
+        moments,
+        ...(clientName && clientName !== 'PHÉNIX' ? { clientName } : {}),
+      });
+      if (!res.ok) setDossierError(res.error);
+    } finally {
+      setDossierBusy(false);
+    }
   };
 
   const onFilePicked = async (file: File | undefined): Promise<void> => {
@@ -492,6 +518,32 @@ function ManageDialog({
                 Importer une sauvegarde
               </Button>
             </div>
+
+            {snap.projects.length > 0 && (
+              <div className="grid gap-2 border-t border-border pt-3">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Dossier de chantier
+                </p>
+                <Button
+                  variant="outline"
+                  className="justify-start"
+                  disabled={dossierBusy}
+                  onClick={() => void handleDossierExport()}
+                >
+                  <FileText aria-hidden />
+                  {dossierBusy ? 'Génération du dossier…' : 'Exporter le dossier (PDF)'}
+                </Button>
+                {dossierError && (
+                  <p
+                    role="alert"
+                    className="flex items-start gap-2 rounded-lg border border-destructive bg-surface p-2.5 text-xs text-destructive [&_svg]:size-4 [&_svg]:shrink-0"
+                  >
+                    <AlertTriangle aria-hidden />
+                    {dossierError}
+                  </p>
+                )}
+              </div>
+            )}
 
             {snap.projects.length > 0 && (
               <div className="grid gap-2 border-t border-border pt-3">

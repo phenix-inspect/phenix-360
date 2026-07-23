@@ -742,3 +742,135 @@ export function buildDocumentPdf(
   // internes (artisan / conducteur). Le document CLIENT n'en montre aucun.
   return pdf.finalize(audience === 'client' ? undefined : reference);
 }
+
+/* ========================================================================== *
+ * DOSSIER DE CHANTIER — synthèse multi-sections (livrable / archive lisible)
+ * ========================================================================== *
+ * Un SEUL document qui raconte tout le chantier : couverture, synthèse chiffrée,
+ * avancement, comptes rendus, choix du client, réserves, documents et album des
+ * coulisses. Fonction PURE : elle reçoit des données déjà calculées et des
+ * `imageUrl` déjà en data URL (les URL Storage sont résolues par l'appelant, jsPDF
+ * ne sachant pas charger une image distante de façon synchrone). */
+
+/** Une photo pour le dossier (imageUrl idéalement en data URL, sinon cadre gris). */
+export interface DossierPhoto {
+  imageUrl?: string;
+}
+
+export interface ChantierDossierInput {
+  project: {
+    name: string;
+    code?: string;
+    address?: string;
+    clientName?: string;
+    statusLabel: string;
+    stepLabel?: string;
+    createdAt: string;
+  };
+  generatedAt: string;
+  synthese: { comptesRendus: number; choix: number; documents: number; reservesOuvertes: number };
+  comptesRendus: { date: string; titre?: string; texte: string; photos: DossierPhoto[] }[];
+  choix: { categorie: string; label: string; statut: string; detail?: string }[];
+  reserves: { numero: number; libelle: string; ouverte: boolean; date: string }[];
+  documents: { libelle: string; famille?: string; date: string }[];
+  album: { titre?: string; legende?: string; date: string; photos: DossierPhoto[] }[];
+}
+
+/** Construit le PDF (octets réels) du dossier de chantier. */
+export function buildChantierDossierPdf(input: ChantierDossierInput): Uint8Array {
+  const pdf = new Pdf(false);
+  const p = input.project;
+
+  // — Couverture —
+  pdf.text('Dossier de chantier', { size: 22, bold: true });
+  pdf.gap(2);
+  pdf.text(p.name, { size: 14, bold: true, color: GOLD });
+  pdf.gap(8);
+  pdf.hr();
+  pdf.gap(8);
+  if (p.code) pdf.metaRow('Code chantier', p.code);
+  if (p.address) pdf.metaRow('Adresse', p.address);
+  if (p.clientName) pdf.metaRow('Client', p.clientName);
+  pdf.metaRow('Statut', p.statusLabel);
+  if (p.stepLabel) pdf.metaRow('Étape en cours', p.stepLabel);
+  pdf.metaRow('Ouvert le', fmtDate(p.createdAt));
+  pdf.metaRow('Document généré le', fmtDate(input.generatedAt));
+
+  // — Synthèse chiffrée —
+  pdf.sectionTitle('Synthèse');
+  pdf.tiles([
+    { n: input.synthese.comptesRendus, label: 'Comptes rendus' },
+    { n: input.synthese.choix, label: 'Choix' },
+    { n: input.synthese.documents, label: 'Documents' },
+    {
+      n: input.synthese.reservesOuvertes,
+      label: 'Réserves ouvertes',
+      alerte: input.synthese.reservesOuvertes > 0,
+    },
+  ]);
+
+  // — Comptes rendus —
+  if (input.comptesRendus.length > 0) {
+    pdf.sectionTitle('Comptes rendus');
+    for (const cr of input.comptesRendus) {
+      pdf.gap(4);
+      pdf.text(`${fmtDate(cr.date)}${cr.titre ? ` · ${cr.titre}` : ''}`, {
+        size: 10.5,
+        bold: true,
+      });
+      if (cr.texte.trim()) pdf.text(cr.texte, { size: 10, color: MUTED });
+      if (cr.photos.some((x) => x.imageUrl)) pdf.photoRow(cr.photos);
+    }
+  }
+
+  // — Choix du client —
+  if (input.choix.length > 0) {
+    pdf.sectionTitle('Choix du client');
+    for (const c of input.choix) {
+      pdf.gap(3);
+      pdf.text(`${c.categorie ? `${c.categorie} — ` : ''}${c.label}`, { size: 10.5, bold: true });
+      pdf.text(`${c.statut}${c.detail ? ` · ${c.detail}` : ''}`, { size: 10, color: MUTED });
+    }
+  }
+
+  // — Réserves —
+  if (input.reserves.length > 0) {
+    pdf.sectionTitle('Réserves');
+    for (const r of input.reserves) {
+      pdf.gap(2);
+      pdf.text(`Réserve n° ${r.numero} — ${r.libelle}`, {
+        size: 10.5,
+        bold: true,
+        color: r.ouverte ? REDINK : INK,
+      });
+      pdf.text(`${r.ouverte ? 'Ouverte' : 'Levée'} · ${fmtDate(r.date)}`, {
+        size: 9.5,
+        color: MUTED,
+      });
+    }
+  }
+
+  // — Documents —
+  if (input.documents.length > 0) {
+    pdf.sectionTitle('Documents');
+    for (const d of input.documents) {
+      pdf.text(`•  ${d.libelle}${d.famille ? `  (${d.famille})` : ''} · ${fmtDate(d.date)}`, {
+        size: 10,
+      });
+    }
+  }
+
+  // — Album « Dans les coulisses » —
+  const album = input.album.filter((m) => m.photos.some((x) => x.imageUrl));
+  if (album.length > 0) {
+    pdf.sectionTitle('Dans les coulisses');
+    for (const m of album) {
+      pdf.gap(3);
+      const cap = m.titre?.trim() || m.legende?.trim();
+      if (cap) pdf.text(`${cap} · ${fmtDate(m.date)}`, { size: 10, bold: true });
+      pdf.photoRow(m.photos, 92);
+    }
+  }
+
+  return pdf.finalize();
+}
