@@ -207,6 +207,32 @@ await check('hydrate : un échec réseau laisse un cache vide, sans jeter', asyn
   assert(be.snapshot().projects.length === 0, 'devrait démarrer sur un cache vide');
 });
 
+/* -- hydrate : un chantier en échec n'efface PAS les autres --------------- */
+await check('hydrate : un chantier en échec est ignoré, les autres survivent', async () => {
+  const { client } = mockClient((chain) => {
+    if (chain.table === 'project')
+      return {
+        data: [projectRow({ id: 'p-ok' }), projectRow({ id: 'p-bad', code: '26-PA-009' })],
+        error: null,
+      };
+    if (chain.table === 'project_member') return { data: [], error: null };
+    if (chain.table === 'event') {
+      const pid = chain.eq.find((e) => e[0] === 'project_id')?.[1];
+      if (pid === 'p-bad') return { data: null, error: { message: 'boom' } };
+      return { data: [eventRow({ project_id: 'p-ok' })], error: null };
+    }
+    return { data: [], error: null };
+  });
+  const be = new SaaSBackend(client, SELF);
+  await be.hydrate();
+  const snap = be.snapshot();
+  assert(
+    snap.projects.length === 1 && snap.projects[0].id === 'p-ok',
+    'le chantier sain doit survivre au voisin en échec',
+  );
+  assert(snap.events.length === 1, 'événement du chantier sain non hydraté');
+});
+
 /* -- createProject : durable (insert cloud) + présent dans le cache -------- */
 await check('createProject : insère au cloud et apparaît dans le cache', async () => {
   const { client, log } = mockClient((chain) => {

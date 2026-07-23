@@ -37,6 +37,10 @@ import { recordError } from './diagnostics';
 
 /** Nombre maximum de photos embarquées (poids/perf du PDF). */
 const MAX_PHOTOS = 40;
+/** Photos réellement rendues par groupe (`photoRow` en montre 3) : on ne résout
+ *  pas au-delà — sinon le budget global serait gaspillé sur des photos jamais
+ *  affichées, et les sections suivantes (dont l'album) se retrouveraient vides. */
+const PHOTOS_PER_GROUP = 3;
 
 /** Blob → data URL (base64), pour embarquer une image dans le PDF. */
 function blobToDataUrl(blob: Blob): Promise<string | undefined> {
@@ -124,7 +128,7 @@ export async function exportChantierDossier(args: {
         date: e.createdAt,
         ...(c.docTitre ? { titre: c.docTitre } : {}),
         texte: texte ?? '',
-        photos: await resolveMany(pointPhotos.map((ph) => ph.imageUrl)),
+        photos: await resolveMany(pointPhotos.slice(0, PHOTOS_PER_GROUP).map((ph) => ph.imageUrl)),
       });
     }
 
@@ -168,7 +172,7 @@ export async function exportChantierDossier(args: {
         ...(m.title?.trim() ? { titre: m.title } : {}),
         ...(cover?.legende ? { legende: cover.legende } : {}),
         date: m.createdAt,
-        photos: await resolveMany(m.photos.map((ph) => ph.imageUrl)),
+        photos: await resolveMany(m.photos.slice(0, PHOTOS_PER_GROUP).map((ph) => ph.imageUrl)),
       });
     }
 

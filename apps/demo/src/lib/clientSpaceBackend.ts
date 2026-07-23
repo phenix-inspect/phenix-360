@@ -69,6 +69,13 @@ const CLIENT_USER = toUserId('client-espace');
 export class ClientSpaceBackend implements Backend {
   private state: BackendState;
   private fil: ClientFil;
+  /**
+   * File d'attente des RPC : elles s'exécutent l'une APRÈS l'autre (ordre d'émission).
+   * Sans ça, un poll `client_space` concurrent pourrait revenir juste après un ❤️/💬
+   * et écraser l'état à jour par une lecture périmée (le cœur « clignote » puis
+   * disparaît jusqu'au poll suivant). La sérialisation supprime cette course.
+   */
+  private rpcQueue: Promise<unknown> = Promise.resolve();
 
   constructor(
     private readonly client: SupabaseClient,
@@ -241,7 +248,14 @@ export class ClientSpaceBackend implements Backend {
   }
 
   /* --- Interne ---------------------------------------------------------- */
-  private async callRpc(name: string, params: Record<string, unknown>): Promise<void> {
+  private callRpc(name: string, params: Record<string, unknown>): Promise<void> {
+    // Chaînage : chaque RPC attend la fin de la précédente (ordre = émission).
+    const run = this.rpcQueue.then(() => this.doRpc(name, params));
+    this.rpcQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async doRpc(name: string, params: Record<string, unknown>): Promise<void> {
     try {
       const res = await this.client.rpc(name, params);
       if (res.error) {

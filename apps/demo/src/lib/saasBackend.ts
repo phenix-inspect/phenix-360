@@ -85,11 +85,22 @@ export class SaaSBackend implements Backend {
    * trace le diagnostic — plutôt qu'un écran blanc.
    */
   async hydrate(): Promise<void> {
+    let projects: Project[];
     try {
-      const projects = await this.remote.listProjects();
-      const members: ProjectMember[] = [];
-      const events: Event[] = [];
-      for (const p of projects) {
+      projects = await this.remote.listProjects();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      recordError('error', `SaaS hydrate (projets): ${msg}`);
+      this.state = empty();
+      return;
+    }
+    // Résilience PAR PROJET : un projet qui échoue (réseau, RLS, mapping) est
+    // ignoré sans faire perdre les autres — jamais « zéro chantier » sur un aléa.
+    const members: ProjectMember[] = [];
+    const events: Event[] = [];
+    const loaded: Project[] = [];
+    for (const p of projects) {
+      try {
         const [ms, es] = await Promise.all([
           this.remote.listMembers(p.id),
           this.remote.listEvents(p.id),
@@ -97,13 +108,13 @@ export class SaaSBackend implements Backend {
         members.push(...ms);
         events.push(...es);
         for (const e of es) this.durableEvents.add(e.id);
+        loaded.push(p);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        recordError('error', `SaaS hydrate (chantier ${p.id}): ${msg}`);
       }
-      this.state = { projects, members, events };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      recordError('error', `SaaS hydrate: ${msg}`);
-      this.state = empty();
     }
+    this.state = { projects: loaded, members, events };
   }
 
   /**
@@ -152,12 +163,15 @@ export class SaaSBackend implements Backend {
     try {
       const updated = await this.remote.updateProject(id, patch);
       Object.assign(cached, updated);
+      // `mapProjectRow` OMET une adresse vidée (spread conditionnel) : `Object.assign`
+      // ne l'écraserait donc pas → on applique explicitement les champs vidables.
+      if (patch.address !== undefined) cached.address = patch.address || undefined;
       return cached;
     } catch (e) {
       this.recordBestEffort('updateProject', e);
       if (patch.name !== undefined) cached.name = patch.name;
       if (patch.status !== undefined) cached.status = patch.status;
-      if (patch.address !== undefined) cached.address = patch.address;
+      if (patch.address !== undefined) cached.address = patch.address || undefined;
       if (patch.currentStep !== undefined) cached.currentStep = patch.currentStep;
       return cached;
     }

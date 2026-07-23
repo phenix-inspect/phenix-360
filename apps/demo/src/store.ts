@@ -766,6 +766,39 @@ function synthClientDossier(events: Event[], clientName: string, address?: strin
   };
 }
 
+/**
+ * (Re)construit le dossier CLIENT depuis le journal et l'écrit en local. En mode
+ * REFRESH (`merge`), on PRÉSERVE les validations optimistes locales (un choix
+ * passé à « validé » côté client mais dont l'événement serveur n'est pas encore
+ * revenu) tout en intégrant les NOUVEAUX choix envoyés par le conducteur — sinon
+ * « Vos choix » restait figé à la connexion jusqu'à un rechargement complet.
+ */
+function writeClientDossier(projectId: string, cb: ClientSpaceBackend, merge: boolean): void {
+  const snap = cb.snapshot();
+  const proj = snap.projects[0];
+  const fresh = synthClientDossier(snap.events, proj?.name ?? '', proj?.address);
+  const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
+  if (merge) {
+    const old = dossiers[projectId];
+    fresh.selections = fresh.selections.map((f) => {
+      const o = old?.selections.find((s) => s.id === f.id);
+      if (o && o.statut === 'valide' && f.statut !== 'valide') {
+        return {
+          ...f,
+          statut: 'valide',
+          ...(o.chosenOptionId ? { chosenOptionId: o.chosenOptionId } : {}),
+          ...(o.delegatedToPhenix ? { delegatedToPhenix: true } : {}),
+          ...(o.clientComment ? { clientComment: o.clientComment } : {}),
+          ...(o.detail ? { detail: o.detail } : {}),
+        };
+      }
+      return f;
+    });
+  }
+  dossiers[projectId] = fresh;
+  safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+}
+
 function build(): DemoSnapshot {
   return {
     ...coreState(),
@@ -941,11 +974,7 @@ export const demo = {
     clientFil = wrapClientFil(projectId, cb);
     // Dossier synthétisé (choix + infos) écrit en local pour que `dossierOf` /
     // `buildClientDecisions` alimentent l'onglet « Vos choix » comme dans l'app.
-    const events = cb.snapshot().events;
-    const proj = cb.snapshot().projects[0];
-    const dossiers = readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {});
-    dossiers[projectId] = synthClientDossier(events, proj?.name ?? '', proj?.address);
-    safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
+    writeClientDossier(projectId, cb, false);
     // Le client anonyme ('client-espace') s'affiche « Vous » sur SON appareil :
     // ses ❤️/💬 des coulisses lui sont attribués (l'équipe reste « PHÉNIX »).
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
@@ -958,7 +987,12 @@ export const demo = {
     if (!clientBackend) return;
     const changed = await clientBackend.refresh();
     if (changed) {
-      if (clientProjectId) clientFil = wrapClientFil(clientProjectId, clientBackend);
+      if (clientProjectId) {
+        clientFil = wrapClientFil(clientProjectId, clientBackend);
+        // Re-synthétiser « Vos choix » depuis le journal rafraîchi (nouveaux choix
+        // du conducteur), en préservant les validations optimistes locales.
+        writeClientDossier(clientProjectId, clientBackend, true);
+      }
       refresh();
     }
   },
