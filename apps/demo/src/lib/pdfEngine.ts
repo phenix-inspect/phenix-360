@@ -758,6 +758,8 @@ export interface DossierPhoto {
 }
 
 export interface ChantierDossierInput {
+  /** Logo PHÉNIX en data URL (résolu par l'appelant) — dessiné en tête de couverture. */
+  logo?: string;
   project: {
     name: string;
     code?: string;
@@ -781,7 +783,11 @@ export function buildChantierDossierPdf(input: ChantierDossierInput): Uint8Array
   const pdf = new Pdf(false);
   const p = input.project;
 
-  // — Couverture (marque PHÉNIX en tête, comme les documents générés) —
+  // — Couverture (logo + marque PHÉNIX en tête) —
+  if (input.logo) {
+    pdf.image(input.logo, pdf.left, pdf.yPos, 46, 46);
+    pdf.gap(52);
+  }
   pdf.text('PHÉNIX 360', { size: 8.5, color: GOLD, bold: true });
   pdf.gap(2);
   pdf.text('Dossier de chantier', { size: 22, bold: true });

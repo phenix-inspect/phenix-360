@@ -38,6 +38,16 @@ import { recordError } from './diagnostics';
 /** Nombre maximum de photos embarquées (poids/perf du PDF). */
 const MAX_PHOTOS = 40;
 
+/** Blob → data URL (base64), pour embarquer une image dans le PDF. */
+function blobToDataUrl(blob: Blob): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(typeof fr.result === 'string' ? fr.result : undefined);
+    fr.onerror = () => resolve(undefined);
+    fr.readAsDataURL(blob);
+  });
+}
+
 /** Une image distante (Storage) → data URL ; sinon (déjà data URL) inchangée. */
 async function resolvePhoto(
   url: string,
@@ -48,20 +58,24 @@ async function resolvePhoto(
   let out: string | undefined;
   try {
     const res = await fetch(url);
-    if (res.ok) {
-      const blob = await res.blob();
-      out = await new Promise<string | undefined>((resolve) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(typeof fr.result === 'string' ? fr.result : undefined);
-        fr.onerror = () => resolve(undefined);
-        fr.readAsDataURL(blob);
-      });
-    }
+    if (res.ok) out = await blobToDataUrl(await res.blob());
   } catch (e) {
     recordError('error', `dossier photo: ${e instanceof Error ? e.message : String(e)}`);
   }
   cache.set(url, out);
   return out;
+}
+
+/** Charge le logo PHÉNIX (icône de l'app, même origine) en data URL. Best-effort. */
+async function loadLogo(): Promise<string | undefined> {
+  try {
+    const base = import.meta.env.BASE_URL || '/';
+    const res = await fetch(`${base}favicon.png`);
+    if (res.ok) return await blobToDataUrl(await res.blob());
+  } catch {
+    /* best-effort : sans logo, la marque texte « PHÉNIX 360 » reste en tête */
+  }
+  return undefined;
 }
 
 /**
@@ -163,7 +177,10 @@ export async function exportChantierDossier(args: {
     const address = project.address || dossier?.infos.address;
     const clientName = args.clientName || dossier?.infos.clientName;
 
+    const logo = await loadLogo();
+
     const input: ChantierDossierInput = {
+      ...(logo ? { logo } : {}),
       project: {
         name: project.name,
         ...(project.code ? { code: project.code } : {}),

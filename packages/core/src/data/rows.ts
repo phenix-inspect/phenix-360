@@ -15,6 +15,8 @@ export interface ProjectRow {
   code: string;
   name: string;
   client_id: string | null;
+  /** Adresse du chantier (colonne stockée) — alimente en-têtes de documents / dossier. */
+  address: string | null;
   status: ProjectStatus;
   current_step: ProjectStep | null;
   created_at: string;

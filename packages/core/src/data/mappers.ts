@@ -49,6 +49,7 @@ export function mapProjectRow(r: ProjectRow): Project {
     code: r.code,
     name: r.name,
     clientId: r.client_id !== null ? userId(r.client_id) : null,
+    ...(r.address ? { address: r.address } : {}),
     status: r.status,
     currentStep: r.current_step,
     createdAt: r.created_at,

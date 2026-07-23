@@ -109,6 +109,7 @@ const projectRow = (over = {}) => ({
   code: '26-LY-003',
   name: 'Chantier Test',
   client_id: 'c-1',
+  address: '24 rue Bugeaud, 69006 Lyon',
   status: 'en_cours',
   current_step: null,
   created_at: ISO,
@@ -179,6 +180,10 @@ await check('listProjects : trie par created_at desc et remappe (snake→camel)'
   const projects = await be.listProjects();
   assert(projects.length === 2, 'mauvais nombre de projets');
   assert(projects[0].clientId === 'c-1', 'client_id non remappé en clientId');
+  assert(
+    projects[0].address === '24 rue Bugeaud, 69006 Lyon',
+    'address non remappée (colonne perdue à l’hydratation)',
+  );
   const ord = log[0].order;
   assert(
     ord && ord[0] === 'created_at' && ord[1]?.ascending === false,
