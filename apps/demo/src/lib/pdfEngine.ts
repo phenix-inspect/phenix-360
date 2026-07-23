@@ -781,7 +781,9 @@ export function buildChantierDossierPdf(input: ChantierDossierInput): Uint8Array
   const pdf = new Pdf(false);
   const p = input.project;
 
-  // — Couverture —
+  // — Couverture (marque PHÉNIX en tête, comme les documents générés) —
+  pdf.text('PHÉNIX 360', { size: 8.5, color: GOLD, bold: true });
+  pdf.gap(2);
   pdf.text('Dossier de chantier', { size: 22, bold: true });
   pdf.gap(2);
   pdf.text(p.name, { size: 14, bold: true, color: GOLD });

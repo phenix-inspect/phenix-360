@@ -111,6 +111,7 @@ await check('Dossier → vrai PDF (%PDF-) + couverture/synthèse/sections', asyn
     'Dossier de chantier',
     'Rénovation Martin',
     '26-LY-003',
+    'Cuvie',
     'Mme Martin',
     'Synthèse',
     'Compte rendu de chantier',

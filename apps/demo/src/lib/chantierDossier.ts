@@ -158,12 +158,17 @@ export async function exportChantierDossier(args: {
       });
     }
 
+    // Adresse / client : le projet d'abord, sinon le dossier préparé (PHÉNIX Start
+    // range souvent ces infos dans `dossier.infos`, pas sur le projet).
+    const address = project.address || dossier?.infos.address;
+    const clientName = args.clientName || dossier?.infos.clientName;
+
     const input: ChantierDossierInput = {
       project: {
         name: project.name,
         ...(project.code ? { code: project.code } : {}),
-        ...(project.address ? { address: project.address } : {}),
-        ...(args.clientName ? { clientName: args.clientName } : {}),
+        ...(address ? { address } : {}),
+        ...(clientName ? { clientName } : {}),
         statusLabel: PROJECT_STATUS_LABEL[deriveProjectStatus(project, events)],
         ...(project.currentStep ? { stepLabel: PROJECT_STEP_LABEL[project.currentStep] } : {}),
         createdAt: project.createdAt,
