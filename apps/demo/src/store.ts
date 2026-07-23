@@ -529,6 +529,65 @@ let clientBackend: ClientSpaceBackend | null = null;
 let clientFil: DemoSnapshot['fil'] | null = null;
 /** Projet servi en mode client (pour re-clé le Fil lors des rafraîchissements). */
 let clientProjectId: string | null = null;
+
+/** Utilisateur synthétique du client anonyme (lien + code). */
+const CLIENT_ESPACE = 'client-espace';
+/** Une ligne de la table temps réel `fil_reaction`. */
+interface FilReactionRow {
+  id: string;
+  project_id: string;
+  moment_id: string;
+  kind: 'coup' | 'message';
+  author_id: string | null;
+  author_role: string;
+  texte: string | null;
+  photo_id: string | null;
+  created_at: string;
+}
+/**
+ * TEMPS RÉEL (conducteur) — réactions CLIENT (❤️/💬) reçues via la table
+ * `fil_reaction` (Realtime), par projet. Fondues dans le Fil du conducteur à la
+ * construction du snapshot → le conducteur les voit EN DIRECT, sans rechargement.
+ */
+let reactionCache: Record<string, { coups: CoupDeCoeur[]; messages: Message[] }> = {};
+
+/** Recharge toutes les réactions client visibles (RLS = ses chantiers). Best-effort. */
+async function loadFilReactions(client: SupabaseClient): Promise<void> {
+  try {
+    const res = await client.from('fil_reaction').select('*');
+    if (res.error) {
+      recordError('error', `fil_reaction load: ${res.error.message}`);
+      return;
+    }
+    const cache: Record<string, { coups: CoupDeCoeur[]; messages: Message[] }> = {};
+    for (const row of (res.data ?? []) as FilReactionRow[]) {
+      const bucket = (cache[row.project_id] ??= { coups: [], messages: [] });
+      if (row.kind === 'coup') {
+        bucket.coups.push({
+          id: row.id as CoupDeCoeur['id'],
+          momentId: row.moment_id as CoupDeCoeur['momentId'],
+          userId: (row.author_id ?? CLIENT_ESPACE) as CoupDeCoeur['userId'],
+          userRole: row.author_role as CoupDeCoeur['userRole'],
+          createdAt: row.created_at,
+        });
+      } else {
+        bucket.messages.push({
+          id: row.id as Message['id'],
+          momentId: row.moment_id as Message['momentId'],
+          photoId: (row.photo_id ?? null) as Message['photoId'],
+          parentId: null,
+          authorId: (row.author_id ?? CLIENT_ESPACE) as Message['authorId'],
+          authorRole: row.author_role as Message['authorRole'],
+          texte: row.texte ?? '',
+          createdAt: row.created_at,
+        });
+      }
+    }
+    reactionCache = cache;
+  } catch (e) {
+    recordError('error', `fil_reaction load: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
 /**
  * Identité RÉELLE du conducteur connecté (mode SaaS) : c'est LUI qui crée et
  * signe les chantiers/comptes rendus (auteur = `auth.uid()`, exigé par la RLS).
@@ -602,6 +661,15 @@ async function subscribeRealtime(client: SupabaseClient): Promise<void> {
         } catch (e) {
           recordError('error', `realtime event: ${e instanceof Error ? e.message : String(e)}`);
         }
+      },
+    )
+    .on(
+      // Réactions client (❤️/💬) : INSERT (like/message) ET DELETE (un-like). On
+      // recharge l'ensemble (table légère) et on rafraîchit → conducteur en direct.
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'fil_reaction' },
+      () => {
+        void loadFilReactions(client).then(() => refresh());
       },
     )
     .subscribe();
@@ -799,23 +867,40 @@ function writeClientDossier(projectId: string, cb: ClientSpaceBackend, merge: bo
   safeSetItem(DOSSIERS_KEY, JSON.stringify(dossiers));
 }
 
+/**
+ * Le Fil du snapshot. MODE CLIENT : servi par `client_space` (jamais localStorage,
+ * vide sur l'appareil du client). Sinon : Fil local du conducteur (localStorage),
+ * dans lequel on FOND les réactions client reçues en temps réel (`reactionCache`)
+ * — en retirant d'abord les anciens `client-espace` d'app_kv (source unique = table).
+ */
+function buildFil(): DemoSnapshot['fil'] {
+  if (clientBackend && clientFil) return clientFil;
+  const fil = {
+    moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
+    coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
+    messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
+    zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
+  };
+  for (const [pid, r] of Object.entries(reactionCache)) {
+    fil.coups[pid] = [
+      ...(fil.coups[pid] ?? []).filter((c) => c.userId !== CLIENT_ESPACE),
+      ...r.coups,
+    ];
+    fil.messages[pid] = [
+      ...(fil.messages[pid] ?? []).filter((m) => m.authorId !== CLIENT_ESPACE),
+      ...r.messages,
+    ];
+  }
+  return fil;
+}
+
 function build(): DemoSnapshot {
   return {
     ...coreState(),
     people: readJson<Record<string, string>>(PEOPLE_KEY, {}),
     activeProjectId: readJson<ProjectId | null>(ACTIVE_KEY, null),
     dossiers: readJson<Record<string, ProjectDossier>>(DOSSIERS_KEY, {}),
-    // MODE CLIENT : le Fil partagé vient de `client_space` (serveur), jamais du
-    // localStorage (vide sur l'appareil du client). Sinon : Fil local du conducteur.
-    fil:
-      clientBackend && clientFil
-        ? clientFil
-        : {
-            moments: readJson<Record<string, Moment[]>>(FIL_MOMENTS_KEY, {}),
-            coups: readJson<Record<string, CoupDeCoeur[]>>(FIL_COUPS_KEY, {}),
-            messages: readJson<Record<string, Message[]>>(FIL_MESSAGES_KEY, {}),
-            zones: readJson<Record<string, ProjectZone[]>>(FIL_ZONES_KEY, {}),
-          },
+    fil: buildFil(),
     phenix: readJson<Record<string, PhenixMessage[]>>(PHENIX_CONV_KEY, {}),
     shares: readJson<Record<string, ShareLog[]>>(SHARES_KEY, {}),
     contacts: readJson<Contact[]>(CONTACTS_KEY, []),
@@ -934,6 +1019,8 @@ export const demo = {
       // TEMPS RÉEL (M6) : écouter les écritures des autres appareils (réponse /
       // validation / message du client) pour les refléter sans rechargement.
       await subscribeRealtime(client);
+      // Réactions client (❤️/💬 des coulisses) — chargées puis suivies en direct.
+      await loadFilReactions(client);
     } catch (e) {
       // Échec inattendu : on ne casse pas l'app, on reste sur le backend local.
       console.warn('[phenix] connexion Supabase impossible, mode local conservé', e);
@@ -948,6 +1035,7 @@ export const demo = {
     saasUserId = null;
     cloudKv = null;
     saasClient = null;
+    reactionCache = {};
     // On retire les satellites du compte quitté (mémoire + localStorage), sans
     // toucher au cloud : la prochaine connexion réhydrate depuis Supabase.
     clearSyncedLocalRaw();

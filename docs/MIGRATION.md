@@ -291,6 +291,33 @@ par Supabase.
 - **Tests** : `dossier-pdf.test.mjs` 3/3 (vrai `%PDF-` + toutes les sections ;
   sections vides omises ; pagination d'un dossier volumineux). Gate complet vert.
 
+## 1duodecies. Fait dans l'incrément « Fil temps réel » (réactions client en direct)
+
+Les réactions du client (❤️/💬 des coulisses) étaient écrites dans le coffre
+`app_kv` du conducteur : il ne les voyait qu'à son prochain chargement (pas de
+temps réel sur `app_kv`) et une synchro CloudKv concurrente pouvait les écraser.
+
+- **Table dédiée + Realtime** (`20260723110000_fil_reaction.sql` + install.sql) :
+  `fil_reaction` (project_id, moment_id, kind coup/message, author, texte, photo)
+  remplace l'écriture app_kv. RLS : lecture réservée aux membres INTERNES du projet
+  (le conducteur voit les réactions de SES chantiers). Inscrite à la publication
+  `supabase_realtime` (`replica identity full`) → le conducteur reçoit chaque
+  ❤️/💬/un-like EN DIRECT, la même RLS appliquée à l'abonné.
+- **RPC réécrites** : `client_coup` (bascule = insert/delete d'UNE ligne) et
+  `client_moment_message` (insert) écrivent dans `fil_reaction`. `client_space`
+  FUSIONNE ces réactions dans le Fil renvoyé au client (les `client-espace`
+  d'app_kv sont ignorés — source unique = table). La course « dernier écrit gagne »
+  disparaît (append/delete atomiques).
+- **Conducteur (store)** : `reactionCache` chargé à la connexion (`loadFilReactions`,
+  RLS = ses chantiers) + abonnement Realtime sur `fil_reaction` ; `buildFil` fond
+  ces réactions dans le Fil du conducteur (en retirant les anciens `client-espace`
+  d'app_kv). Démo/mode client inchangés (`reactionCache` vide).
+- **Frontière** : seules les RÉACTIONS migrent (elles doivent remonter live). Les
+  MOMENTS restent dans `app_kv` — le client les reçoit par son polling 12 s.
+- **Tests** : `rls_test.sql` 11/11 (like/un-like crée/supprime une ligne
+  `fil_reaction` + fusion `client_space` ; RLS : le conducteur voit la réaction).
+  Gate complet vert, démo inchangée.
+
 ---
 
 ## 2. L'unique action humaine indispensable

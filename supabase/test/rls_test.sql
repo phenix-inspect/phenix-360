@@ -18,6 +18,11 @@ $$;
 
 grant usage on schema auth to app_test;
 grant select on project, project_member, event to app_test;
+do $$ begin
+  if to_regclass('public.fil_reaction') is not null then
+    execute 'grant select on fil_reaction to app_test';
+  end if;
+end $$;
 grant execute on function auth.uid() to app_test;
 grant execute on function app_is_member(uuid) to app_test;
 grant execute on function app_has_role(uuid, member_role) to app_test;
@@ -337,15 +342,23 @@ begin
   end;
   if not v_bad then raise exception 'FAIL coup : moment interne accepté'; end if;
 
-  -- like : un coup 'client-espace' apparaît sur le moment partagé
+  -- like : une LIGNE fil_reaction est créée ET le coup apparaît dans client_space
   v_space := client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', 'm-shared');
+  select count(*) into v_nb from fil_reaction
+   where project_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     and moment_id = 'm-shared' and kind = 'coup';
+  if v_nb <> 1 then raise exception 'FAIL coup : ligne fil_reaction absente (%)', v_nb; end if;
   select count(*) into v_nb
   from jsonb_array_elements(v_space -> 'fil' -> 'coups') as x(elem)
   where x.elem ->> 'userId' = 'client-espace' and x.elem ->> 'momentId' = 'm-shared';
-  if v_nb <> 1 then raise exception 'FAIL coup : like non enregistré (%)', v_nb; end if;
+  if v_nb <> 1 then raise exception 'FAIL coup : like absent de client_space (%)', v_nb; end if;
 
-  -- un-like : bascule → le coup 'client-espace' disparaît
+  -- un-like : bascule → la ligne fil_reaction est SUPPRIMÉE, le coup disparaît
   v_space := client_coup('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'test1234', 'm-shared');
+  select count(*) into v_nb from fil_reaction
+   where project_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+     and moment_id = 'm-shared' and kind = 'coup';
+  if v_nb <> 0 then raise exception 'FAIL coup : un-like ne supprime pas la ligne (%)', v_nb; end if;
   select count(*) into v_nb
   from jsonb_array_elements(v_space -> 'fil' -> 'coups') as x(elem)
   where x.elem ->> 'userId' = 'client-espace' and x.elem ->> 'momentId' = 'm-shared';
@@ -370,6 +383,24 @@ begin
     and x.elem ->> 'texte' = 'Superbe, hâte de voir la suite !';
   if v_nb <> 1 then raise exception 'FAIL message coulisses : non enregistré (%)', v_nb; end if;
 
-  raise notice 'OK coulisses réactions — like/un-like + message client durables';
+  raise notice 'OK coulisses réactions — fil_reaction (like/un-like + message) fondu dans client_space';
+end
+$$;
+
+-- 11. RLS fil_reaction : le CONDUCTEUR (membre interne) voit la réaction client
+-- (base du temps réel : Realtime applique cette même RLS à l'abonné).
+do $$
+declare v_ct int;
+begin
+  perform set_config('app.user_id', '11111111-1111-1111-1111-111111111111', true);
+  perform set_config('role', 'app_test', true);
+  select count(*) into v_ct from fil_reaction
+   where project_id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  perform set_config('role', 'none', true);
+  -- Le test 10 laisse 1 message (le coup a été retiré) → le conducteur doit le voir.
+  if v_ct < 1 then
+    raise exception 'FAIL RLS fil_reaction : le conducteur ne voit pas la réaction (%)', v_ct;
+  end if;
+  raise notice 'OK RLS fil_reaction — le conducteur voit % réaction(s) client', v_ct;
 end
 $$;

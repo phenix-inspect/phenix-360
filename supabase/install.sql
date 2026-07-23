@@ -305,6 +305,42 @@ begin
 end;
 $$;
 
+-- Fil TEMPS RÉEL : les réactions du client (❤️/💬) vivent dans une table dédiée,
+-- inscrite à Realtime → le conducteur (membre interne, RLS) les reçoit EN DIRECT.
+-- Les moments restent dans app_kv (le client les reçoit par son polling 12 s).
+create table if not exists fil_reaction (
+  id          uuid primary key default gen_random_uuid(),
+  project_id  uuid not null references project(id) on delete cascade,
+  moment_id   text not null,
+  kind        text not null check (kind in ('coup', 'message')),
+  author_id   uuid references auth.users on delete set null,
+  author_role member_role not null,
+  texte       text,
+  photo_id    text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists fil_reaction_project_idx on fil_reaction (project_id);
+alter table fil_reaction enable row level security;
+drop policy if exists fil_reaction_select_internal on fil_reaction;
+create policy fil_reaction_select_internal on fil_reaction
+  for select using (app_is_internal(project_id));
+drop policy if exists fil_reaction_write_internal on fil_reaction;
+create policy fil_reaction_write_internal on fil_reaction
+  for all using (app_is_internal(project_id)) with check (app_is_internal(project_id));
+alter table fil_reaction replica identity full;
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (
+       select 1 from pg_publication_tables
+       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'fil_reaction'
+     )
+  then
+    alter publication supabase_realtime add table fil_reaction;
+  end if;
+end
+$$;
+
 create or replace function client_space(p_project uuid, p_code text)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare
@@ -348,8 +384,7 @@ begin
       ) e), '[]'::jsonb)
   ) into v_result;
 
-  -- FIL « Dans les coulisses » — uniquement les moments PARTAGÉS au client
-  -- (publié + audience 'client'), lus dans le coffre satellite du conducteur.
+  -- Moments PARTAGÉS (publié + audience 'client'), lus dans le coffre du conducteur.
   select coalesce(jsonb_agg(elem order by elem ->> 'createdAt'), '[]'::jsonb)
     into v_moments
   from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-moments:v1')) elem
@@ -359,13 +394,32 @@ begin
     into v_ids
   from jsonb_array_elements(v_moments) elem;
 
+  -- Coups : app_kv (conducteur, hors 'client-espace') + fil_reaction (client).
   select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_coups
   from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-coups:v1')) elem
-  where v_ids ? (elem ->> 'momentId');
+  where v_ids ? (elem ->> 'momentId') and coalesce(elem ->> 'userId', '') <> 'client-espace';
+  v_coups := v_coups || coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', fr.id::text, 'momentId', fr.moment_id, 'userId', 'client-espace',
+      'userRole', fr.author_role::text,
+      'createdAt', to_char(fr.created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
+    from fil_reaction fr
+    where fr.project_id = p_project and fr.kind = 'coup' and v_ids ? fr.moment_id
+  ), '[]'::jsonb);
 
+  -- Messages : app_kv (conducteur, hors 'client-espace') + fil_reaction (client).
   select coalesce(jsonb_agg(elem), '[]'::jsonb) into v_messages
   from jsonb_array_elements(client_fil_array(p_project, 'phenix-demo:fil-messages:v1')) elem
-  where v_ids ? (elem ->> 'momentId');
+  where v_ids ? (elem ->> 'momentId') and coalesce(elem ->> 'authorId', '') <> 'client-espace';
+  v_messages := v_messages || coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', fr.id::text, 'momentId', fr.moment_id, 'photoId', fr.photo_id,
+      'parentId', null, 'authorId', 'client-espace', 'authorRole', fr.author_role::text,
+      'texte', fr.texte,
+      'createdAt', to_char(fr.created_at at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
+    from fil_reaction fr
+    where fr.project_id = p_project and fr.kind = 'message' and v_ids ? fr.moment_id
+  ), '[]'::jsonb);
 
   v_zones := client_fil_array(p_project, 'phenix-demo:fil-zones:v1');
 
@@ -426,52 +480,26 @@ language plpgsql
 security definer
 set search_path = public, extensions
 as $$
-declare
-  v_hash  text;
-  v_owner uuid;
-  v_blob  jsonb;
-  v_arr   jsonb;
-  v_has   boolean;
+declare v_hash text; v_id uuid;
 begin
   select code_hash into v_hash from project_client_access where project_id = p_project;
   if v_hash is null or v_hash <> crypt(p_code, v_hash) then
     raise exception 'forbidden: bad code' using errcode = '42501';
   end if;
-  v_owner := client_moment_owner(p_project, p_moment);
-  if v_owner is null then
+  if client_moment_owner(p_project, p_moment) is null then
     raise exception 'moment introuvable ou non partage' using errcode = '42501';
   end if;
 
-  begin
-    select (kv.v)::jsonb into v_blob from app_kv kv
-    where kv.user_id = v_owner and kv.k = 'phenix-demo:fil-coups:v1';
-  exception when others then v_blob := null;
-  end;
-  if v_blob is null or jsonb_typeof(v_blob) <> 'object' then v_blob := '{}'::jsonb; end if;
-  v_arr := coalesce(v_blob -> (p_project::text), '[]'::jsonb);
-
-  perform 1 from jsonb_array_elements(v_arr) as x(elem)
-    where x.elem ->> 'momentId' = p_moment and x.elem ->> 'userId' = 'client-espace';
-  v_has := found;
-
-  if v_has then
-    select coalesce(jsonb_agg(x.elem), '[]'::jsonb) into v_arr
-    from jsonb_array_elements(v_arr) as x(elem)
-    where not (x.elem ->> 'momentId' = p_moment and x.elem ->> 'userId' = 'client-espace');
+  select id into v_id from fil_reaction
+   where project_id = p_project and moment_id = p_moment
+     and kind = 'coup' and author_role = 'client'
+   limit 1;
+  if v_id is not null then
+    delete from fil_reaction where id = v_id;           -- un-like
   else
-    v_arr := v_arr || jsonb_build_array(jsonb_build_object(
-      'id',        gen_random_uuid()::text,
-      'momentId',  p_moment,
-      'userId',    'client-espace',
-      'userRole',  'client',
-      'createdAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-    ));
+    insert into fil_reaction(project_id, moment_id, kind, author_id, author_role)
+    values (p_project, p_moment, 'coup', null, 'client');
   end if;
-
-  insert into app_kv(user_id, k, v, updated_at)
-  values (v_owner, 'phenix-demo:fil-coups:v1',
-          (v_blob || jsonb_build_object(p_project::text, v_arr))::text, now())
-  on conflict (user_id, k) do update set v = excluded.v, updated_at = now();
 
   return client_space(p_project, p_code);
 end;
@@ -486,12 +514,7 @@ language plpgsql
 security definer
 set search_path = public, extensions
 as $$
-declare
-  v_hash  text;
-  v_owner uuid;
-  v_blob  jsonb;
-  v_arr   jsonb;
-  v_txt   text;
+declare v_hash text; v_txt text;
 begin
   select code_hash into v_hash from project_client_access where project_id = p_project;
   if v_hash is null or v_hash <> crypt(p_code, v_hash) then
@@ -501,34 +524,12 @@ begin
   if v_txt = '' then
     raise exception 'message vide' using errcode = '22023';
   end if;
-  v_owner := client_moment_owner(p_project, p_moment);
-  if v_owner is null then
+  if client_moment_owner(p_project, p_moment) is null then
     raise exception 'moment introuvable ou non partage' using errcode = '42501';
   end if;
 
-  begin
-    select (kv.v)::jsonb into v_blob from app_kv kv
-    where kv.user_id = v_owner and kv.k = 'phenix-demo:fil-messages:v1';
-  exception when others then v_blob := null;
-  end;
-  if v_blob is null or jsonb_typeof(v_blob) <> 'object' then v_blob := '{}'::jsonb; end if;
-  v_arr := coalesce(v_blob -> (p_project::text), '[]'::jsonb);
-
-  v_arr := v_arr || jsonb_build_array(jsonb_build_object(
-    'id',        gen_random_uuid()::text,
-    'momentId',  p_moment,
-    'photoId',   p_photo,
-    'parentId',  null,
-    'authorId',  'client-espace',
-    'authorRole','client',
-    'texte',     v_txt,
-    'createdAt', to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
-  ));
-
-  insert into app_kv(user_id, k, v, updated_at)
-  values (v_owner, 'phenix-demo:fil-messages:v1',
-          (v_blob || jsonb_build_object(p_project::text, v_arr))::text, now())
-  on conflict (user_id, k) do update set v = excluded.v, updated_at = now();
+  insert into fil_reaction(project_id, moment_id, kind, author_id, author_role, texte, photo_id)
+  values (p_project, p_moment, 'message', null, 'client', v_txt, p_photo);
 
   return client_space(p_project, p_code);
 end;
