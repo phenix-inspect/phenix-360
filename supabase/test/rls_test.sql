@@ -404,3 +404,15 @@ begin
   raise notice 'OK RLS fil_reaction — le conducteur voit % réaction(s) client', v_ct;
 end
 $$;
+
+-- 12. Notifications e-mail : sans pg_net (Postgres nu), notify_conductor est un
+-- NO-OP silencieux — aucune RPC client ne doit jamais échouer à cause de l'e-mail.
+do $$
+begin
+  perform notify_conductor('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'ping <b>test</b> & co');
+  if to_regclass('public.app_secret') is null then
+    raise exception 'FAIL notif : table app_secret absente';
+  end if;
+  raise notice 'OK notifications — notify_conductor no-op sûr sans pg_net';
+end
+$$;

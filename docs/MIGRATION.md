@@ -318,6 +318,31 @@ temps réel sur `app_kv`) et une synchro CloudKv concurrente pouvait les écrase
   `fil_reaction` + fusion `client_space` ; RLS : le conducteur voit la réaction).
   Gate complet vert, démo inchangée.
 
+## 1terdecies. Fait dans l'incrément « Notifications e-mail » (conducteur)
+
+Le conducteur est prévenu par e-mail quand le client agit (valide un choix, répond
+à une demande, écrit un message, envoie un document, commente les coulisses) —
+utile quand l'app est fermée (ouverte, il le voit déjà via Realtime).
+
+- **100 % serveur** (le site est statique) : envoi via l'extension `pg_net` →
+  API **Resend**. Nouvelle fonction `notify_conductor(project, body)` (SECURITY
+  DEFINER) : résout l'e-mail du conducteur (membre interne, `auth.users`), lit la
+  clé dans `app_secret` (table sans policy = hors API), et POST l'e-mail (asynchrone,
+  jamais bloquant ; texte client échappé). Appelée depuis les **RPC client** au
+  moment exact de l'action.
+- **Compat tests / dégradation sûre** : sans `pg_net` (Postgres nu), `notify_conductor`
+  est un **NO-OP silencieux** (garde `pg_extension` + `EXECUTE` dynamique de
+  `net.http_post`) → la suite RLS reste verte, aucune RPC ne casse jamais sur l'e-mail.
+- **Destinataires v1** : le conducteur seulement (e-mail fiable via son compte). Le
+  client n'a pas de compte → e-mail client = incrément ultérieur (capter l'e-mail à
+  la création du chantier).
+- **Mise en service (humain)** : (1) activer l'extension `pg_net` dans Supabase ;
+  (2) créer un compte **Resend** (gratuit) ; (3) `insert into app_secret` la clé API.
+  Sans domaine vérifié, Resend n'envoie qu'à l'adresse du compte — parfait pour la
+  bêta (conducteur = titulaire). `resend_from` (optionnel) pour un expéditeur vérifié.
+- **Tests** : `rls_test.sql` 12/12 (les RPC client passent avec l'appel notify ;
+  `notify_conductor` no-op sûr sans pg_net). App inchangée (SQL uniquement).
+
 ---
 
 ## 2. L'unique action humaine indispensable

@@ -305,6 +305,45 @@ begin
 end;
 $$;
 
+-- Notifications e-mail au conducteur (activité du client), via pg_net → Resend.
+-- Compat tests : sans pg_net, `notify_conductor` est un NO-OP silencieux.
+create table if not exists app_secret (k text primary key, v text not null);
+alter table app_secret enable row level security; -- aucune policy → hors API
+
+create or replace function notify_conductor(p_project uuid, p_body text)
+returns void language plpgsql security definer set search_path = public, extensions as $$
+declare v_key text; v_from text; v_email text; v_pname text; v_pcode text; v_body text; v_html text;
+begin
+  if not exists (select 1 from pg_extension where extname = 'pg_net') then return; end if;
+  select v into v_key from app_secret where k = 'resend_key';
+  if coalesce(v_key, '') = '' then return; end if;
+  select coalesce((select v from app_secret where k = 'resend_from'),
+                  'PHÉNIX 360 <onboarding@resend.dev>') into v_from;
+  select u.email into v_email from auth.users u
+    join project_member m on m.user_id = u.id
+   where m.project_id = p_project and m.role in ('compagnon', 'equipe')
+   order by m.created_at limit 1;
+  if coalesce(v_email, '') = '' then return; end if;
+  select name, code into v_pname, v_pcode from project where id = p_project;
+  v_body := replace(replace(replace(coalesce(p_body, ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;');
+  v_html := '<div style="font-family:system-ui,sans-serif;color:#221c12">'
+         || '<p style="font-size:16px">' || v_body || '</p>'
+         || '<p style="color:#8a8069;font-size:13px">Chantier : ' || coalesce(v_pname, '')
+         || case when v_pcode is not null then ' · ' || v_pcode else '' end || '</p>'
+         || '<p><a href="https://phenix-inspect.github.io/phenix-360/" '
+         || 'style="color:#a9803a">Ouvrir PHÉNIX 360</a></p>'
+         || '<p style="color:#b8ac90;font-size:12px">— PHÉNIX 360</p></div>';
+  begin
+    execute 'select net.http_post(url := $1, headers := $2::jsonb, body := $3::jsonb)'
+      using 'https://api.resend.com/emails',
+        jsonb_build_object('Authorization', 'Bearer ' || v_key, 'Content-Type', 'application/json'),
+        jsonb_build_object('from', v_from, 'to', v_email,
+                           'subject', 'PHÉNIX 360 — activité sur votre chantier', 'html', v_html);
+  exception when others then return;
+  end;
+end;
+$$;
+
 -- Fil TEMPS RÉEL : les réactions du client (❤️/💬) vivent dans une table dédiée,
 -- inscrite à Realtime → le conducteur (membre interne, RLS) les reçoit EN DIRECT.
 -- Les moments restent dans app_kv (le client les reçoit par son polling 12 s).
@@ -531,6 +570,7 @@ begin
   insert into fil_reaction(project_id, moment_id, kind, author_id, author_role, texte, photo_id)
   values (p_project, p_moment, 'message', null, 'client', v_txt, p_photo);
 
+  perform notify_conductor(p_project, 'Votre client a commenté dans les coulisses : « ' || v_txt || ' »');
   return client_space(p_project, p_code);
 end;
 $$;
@@ -567,6 +607,7 @@ begin
            'resolvedBy', (select client_id from project where id = p_project))),
          state = 'traitee'
    where id = p_event;
+  perform notify_conductor(p_project, 'Votre client a répondu à une demande.');
   return client_space(p_project, p_code);
 end;
 $$;
@@ -622,6 +663,9 @@ begin
       'categorie', v_categorie, 'statutAvant', v_avant, 'statutApres', 'valide',
       'optionId', case when v_delegate then null else p_option end,
       'optionLabel', v_label, 'message', nullif(btrim(coalesce(p_message,'')), ''))));
+  perform notify_conductor(p_project, case when v_delegate
+    then 'Votre client a confié un choix à PHÉNIX (' || coalesce(v_categorie, 'choix') || ').'
+    else 'Votre client a validé un choix : ' || coalesce(v_label, '') || '.' end);
   return client_space(p_project, p_code);
 end;
 $$;
@@ -644,6 +688,7 @@ begin
   insert into event(project_id, type, author_id, author_role, visibility, state, content)
   values (p_project, 'demande', null, 'client', 'client', 'ouverte',
           jsonb_build_object('question', btrim(p_texte), 'destinataire', 'phenix'));
+  perform notify_conductor(p_project, 'Nouveau message de votre client : « ' || btrim(p_texte) || ' »');
   return client_space(p_project, p_code);
 end;
 $$;
@@ -698,6 +743,7 @@ begin
            'resolvedBy', (select client_id from project where id = p_project))),
          state = 'traitee'
    where id = p_event;
+  perform notify_conductor(p_project, 'Votre client a envoyé un document : ' || v_libelle || '.');
   return client_space(p_project, p_code);
 end;
 $$;
