@@ -234,6 +234,20 @@ const TRANSMIT_RX =
   /(transmet|transmettre|prevenir le conducteur|prévenir le conducteur|demande[rz]? (au|à|a) (mon )?conducteur|contacte[rz]? (le|mon) conducteur|passe[rz]? au conducteur|remonte[rz]? au conducteur|parler (a|à) (quelqu'un|un humain|une personne|un conseiller)|joindre (quelqu'un|un humain))/;
 
 /**
+ * Léon vient de PROPOSER de transmettre au conducteur (message précédent). Ces
+ * motifs (comparés au message STRIPPÉ) reconnaissent cette proposition, pour
+ * qu'un simple « oui » / « non » du client la CONFIRME ou la DÉCLINE — au lieu de
+ * reboucler sur la même question.
+ */
+const OFFER_TRANSMIT_RX = /transmette votre demande a votre conducteur/;
+/** Confirmation courte (comparée au message strippé, en début de saisie). */
+const AFFIRM_RX =
+  /^\s*(oui|ouais|ouep|si|yes|yep|ok|okay|d'accord|dacc?|volontiers|avec plaisir|je veux bien|vas[- ]?y|allez[- ]?y|envoie[zr]?|transmet(s|tez)?|s'il (te|vous) plait|stp|svp|carrement|bien sur|parfait|ca marche|ca me va)\b/;
+/** Refus court d'une proposition de transmission. */
+const DECLINE_RX =
+  /^\s*(non|nan|no|nope|pas (la peine|besoin|maintenant|pour l'instant)|laisse tomber|c'est bon|ca ira|ca va|non merci|surtout pas)\b/;
+
+/**
  * Une DEMANDE D'ACTION / de permission / de changement (« peut-on décaler… »,
  * « je voudrais récupérer les clés… ») relève d'une décision humaine → conducteur.
  * On la distingue d'une simple demande d'INFORMATION ou de NAVIGATION (« je
@@ -721,13 +735,13 @@ export function askPhenix(input: PhenixInput): PhenixReply {
     action,
     ...(autoOpen ? { autoOpen: true } : {}),
   });
-  const escalate = (): PhenixReply => ({
+  const escalate = (question: string = input.question): PhenixReply => ({
     kind: 'escalade',
     message:
       'Je vais transmettre votre demande à votre conducteur de travaux PHÉNIX. ' +
       'Vous serez notifié dès qu’une réponse sera disponible.',
     sources: [],
-    escaladeQuestion: input.question.trim(),
+    escaladeQuestion: question.trim(),
   });
   /**
    * Confiance FAIBLE — Léon ne SAIT PAS répondre. Mieux vaut le dire honnêtement
@@ -742,6 +756,28 @@ export function askPhenix(input: PhenixInput): PhenixReply {
       undefined,
       false,
     );
+
+  // ---- Confirmation d'une proposition de transmission (mémoire du tour précédent).
+  // Léon vient peut-être de PROPOSER de transmettre au conducteur (« Voulez-vous
+  // que je transmette… ? »). Un « oui » CONFIRME → on escalade la QUESTION D'ORIGINE
+  // (le dernier message du client), jamais le « oui » lui-même. Un « non » décline
+  // poliment. Sans ça, « oui » retombait dans « je n'ai pas trouvé » → boucle infinie.
+  const lastMsg = input.history?.[input.history.length - 1];
+  if (lastMsg && lastMsg.role === 'phenix' && OFFER_TRANSMIT_RX.test(strip(lastMsg.texte))) {
+    if (AFFIRM_RX.test(q)) {
+      const origQ =
+        [...(input.history ?? [])].reverse().find((h) => h.role === 'client')?.texte ??
+        input.question;
+      return escalate(origQ);
+    }
+    if (DECLINE_RX.test(q))
+      return reply(
+        'Très bien, je ne transmets rien pour l’instant. ' +
+          'Dites-moi si je peux vous aider autrement 🙂',
+        undefined,
+        false,
+      );
+  }
 
   // ---- Garde-fous prioritaires (avant toute recherche) : ces cas sortent du
   // pipeline immédiatement, car aucune donnée du dossier ne doit être « cherchée ».

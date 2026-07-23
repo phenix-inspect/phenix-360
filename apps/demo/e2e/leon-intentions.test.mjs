@@ -516,5 +516,44 @@ check('crise — « je veux tout arrêter » escalade', escalates('je veux tout 
 check('crise — « on arrête tout » escalade', escalates('on arrête tout'));
 check('crise — « annuler le chantier » escalade', escalates('je veux annuler le chantier'));
 
+/* -- CONFIRMATION d'une proposition de transmission (anti-boucle) ----------- */
+const OFFER_MSG =
+  'Je n’ai malheureusement pas trouvé cette information dans votre espace pour le moment. ' +
+  'Voulez-vous que je transmette votre demande à votre conducteur ?';
+// Historique : le client a posé une question, Léon a proposé de transmettre.
+const afterOffer = () => [
+  { role: 'client', texte: 'on est où sur le chantier ?' },
+  { role: 'phenix', texte: OFFER_MSG },
+];
+check('confirmation « oui » → escalade la QUESTION D’ORIGINE (pas « oui »)', () => {
+  const r = ask('oui', afterOffer());
+  if (r.kind !== 'escalade') throw new Error(`« oui » aurait dû escalader (${r.kind})`);
+  if (!/on est où sur le chantier/i.test(r.escaladeQuestion || ''))
+    throw new Error(`escaladeQuestion devrait être la question d’origine (« ${r.escaladeQuestion} »)`);
+});
+check('confirmation « d’accord, allez-y » → escalade', () => {
+  const r = ask('d’accord, allez-y', afterOffer());
+  if (r.kind !== 'escalade') throw new Error(`« d'accord » aurait dû escalader (${r.kind})`);
+});
+check('confirmation « oui svp » → escalade', () => {
+  const r = ask('oui svp', afterOffer());
+  if (r.kind !== 'escalade') throw new Error(`« oui svp » aurait dû escalader (${r.kind})`);
+});
+check('refus « non merci » → décline, PAS d’escalade', () => {
+  const r = ask('non merci', afterOffer());
+  if (r.kind === 'escalade') throw new Error('« non merci » ne doit pas escalader');
+  if (!/ne transmets rien/i.test(r.message))
+    throw new Error(`décline attendu : ${r.message.slice(0, 80)}`);
+});
+check('« oui » SANS proposition préalable → pas d’escalade', () => {
+  const r = ask('oui', []);
+  if (r.kind === 'escalade') throw new Error('« oui » seul ne doit pas escalader');
+});
+check('nouvelle question après la proposition → répond, n’escalade pas', () => {
+  const r = ask('quelle est l’adresse du chantier ?', afterOffer());
+  if (r.kind !== 'reponse' || !/8 rue Vauban/.test(r.message))
+    throw new Error(`nouvelle question devrait être répondue (${r.kind})`);
+});
+
 console.log(`\n=== ${passed}/${results.length} PASS ===`);
 process.exit(results.every(Boolean) ? 0 : 1);
