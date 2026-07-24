@@ -27,7 +27,7 @@ def _demande_intent(question: str, message: str | None = None) -> AskResponse:
             "Je n'ai pas cette information dans le suivi du chantier. "
             "Je propose de transmettre votre demande à l'équipe PHÉNIX."
         ),
-        demande=DemandeIntent(question=question, destinataire="equipe"),
+        demande=DemandeIntent(question=question, destinataire="phenix"),
     )
 
 

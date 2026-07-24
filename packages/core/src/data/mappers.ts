@@ -5,25 +5,52 @@
  * (camelCase, identifiants branded). Le contenu jsonb est stocké tel quel
  * (clés camelCase) : seul un cast typé selon `type` est nécessaire.
  */
-import { captureId, eventId, projectId, userId } from '../ids.js';
+import { captureId, eventId, projectId, projectMemberId, userId } from '../ids.js';
 import type { EventActor } from '../actor.js';
 import type {
+  ActionEventContent,
+  CommunicationContent,
   CompteRenduContent,
+  DecisionEventContent,
   DemandeContent,
   DocumentContent,
   Event,
   EventEnvelope,
+  LeveeEventContent,
   PhotoContent,
+  ReserveEventContent,
 } from '../event.js';
-import type { Project } from '../project.js';
-import type { EventRow, ProjectRow } from './rows.js';
-import type { NewEvent } from './repository.js';
+import type { Project, ProjectMember } from '../project.js';
+import type { EventRow, MemberRow, ProjectRow } from './rows.js';
+import type { NewEvent, NewMember } from './repository.js';
+
+export function mapMemberRow(r: MemberRow): ProjectMember {
+  return {
+    id: projectMemberId(r.id),
+    projectId: projectId(r.project_id),
+    userId: userId(r.user_id),
+    role: r.role,
+    createdAt: r.created_at,
+  };
+}
+
+/** Construit la ligne d'insertion d'un membre (id/date générés par la base). */
+export function toMemberInsert(input: NewMember): Omit<MemberRow, 'id' | 'created_at'> {
+  return {
+    project_id: input.projectId,
+    user_id: input.userId,
+    role: input.role,
+  };
+}
 
 export function mapProjectRow(r: ProjectRow): Project {
   return {
     id: projectId(r.id),
+    code: r.code,
     name: r.name,
     clientId: r.client_id !== null ? userId(r.client_id) : null,
+    ...(r.address ? { address: r.address } : {}),
+    status: r.status,
     currentStep: r.current_step,
     createdAt: r.created_at,
   };
@@ -55,6 +82,16 @@ export function mapEventRow(r: EventRow): Event {
       return { ...envelope, type: 'document', content: r.content as DocumentContent };
     case 'demande':
       return { ...envelope, type: 'demande', content: r.content as DemandeContent };
+    case 'decision':
+      return { ...envelope, type: 'decision', content: r.content as DecisionEventContent };
+    case 'reserve':
+      return { ...envelope, type: 'reserve', content: r.content as ReserveEventContent };
+    case 'levee':
+      return { ...envelope, type: 'levee', content: r.content as LeveeEventContent };
+    case 'action':
+      return { ...envelope, type: 'action', content: r.content as ActionEventContent };
+    case 'communication':
+      return { ...envelope, type: 'communication', content: r.content as CommunicationContent };
   }
 }
 

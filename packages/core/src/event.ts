@@ -20,18 +20,39 @@ import type { CaptureId, EventId, IsoDateTime, ProjectId, UserId } from './ids.j
 import type { EventActor } from './actor.js';
 import type { EventAttachment } from './attachment.js';
 import type { ProjectStep } from './project.js';
+import type { PrereceptionData } from './prereception.js';
+import type { ReceptionData } from './reception.js';
 
 /* -------------------------------------------------------------------------- *
  * Énumérations d'enveloppe
  * -------------------------------------------------------------------------- */
-export const EVENT_TYPES = ['compte_rendu', 'photo', 'document', 'demande'] as const;
+export const EVENT_TYPES = [
+  'compte_rendu',
+  'photo',
+  'document',
+  'demande',
+  'decision',
+  'reserve',
+  'levee',
+  'action',
+  'communication',
+] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
+
+/** Canaux d'une communication lancée depuis PHÉNIX (app native ouverte). */
+export const COMM_CANALS = ['appel', 'sms', 'whatsapp', 'email', 'itineraire'] as const;
+export type CommCanal = (typeof COMM_CANALS)[number];
 
 export const EVENT_TYPE_LABEL: Record<EventType, string> = {
   compte_rendu: 'Compte rendu',
   photo: 'Photo',
   document: 'Document',
   demande: 'Demande',
+  decision: 'Décision',
+  reserve: 'Réserve',
+  levee: 'Levée de réserve',
+  action: 'Action',
+  communication: 'Communication',
 };
 
 export const EVENT_VISIBILITIES = ['client', 'interne'] as const;
@@ -40,10 +61,23 @@ export type EventVisibility = (typeof EVENT_VISIBILITIES)[number];
 /**
  * Cycle de vie. Deux familles selon le type :
  *  • publication (compte_rendu / photo / document) : `brouillon → publie`
- *  • demande : `ouverte → traitee → close`
+ *  • demande client : `ouverte → traitee (répondue) → close`
  */
 export const EVENT_STATES = ['brouillon', 'publie', 'ouverte', 'traitee', 'close'] as const;
 export type EventState = (typeof EVENT_STATES)[number];
+
+/**
+ * Libellés d'état lisibles (jamais l'énum brut à l'écran) : un produit premium
+ * en français affiche « Publié », pas « publie ». Source unique pour toutes les
+ * surfaces.
+ */
+export const EVENT_STATE_LABEL: Record<EventState, string> = {
+  brouillon: 'Brouillon',
+  publie: 'Publié',
+  ouverte: 'Ouverte',
+  traitee: 'Traitée',
+  close: 'Clôturée',
+};
 
 /* -------------------------------------------------------------------------- *
  * Contenus typés (la part spécifique à chaque type — ADR-002 §3)
@@ -54,6 +88,108 @@ export type PhotoCategory = string;
 export type DocumentCategory = string;
 export type Room = string;
 
+/* — Structures de PILOTAGE portées par le compte rendu (V1 « vrai CR ») — */
+export type ActionPriorite = 'basse' | 'normale' | 'haute';
+export type QuestionEtat = 'ouverte' | 'repondue' | 'reportee';
+
+/** Une action à suivre : qui, pour quand, priorité, commentaire. */
+export interface CrAction {
+  label: string;
+  responsable?: string;
+  echeance?: string;
+  priorite?: ActionPriorite;
+  commentaire?: string;
+}
+/** Une décision prise : qui décide, impact, bloque-t-elle le chantier ? */
+export interface CrDecision {
+  libelle: string;
+  quiDecide?: string;
+  impact?: string;
+  bloque?: boolean;
+}
+/** Une question du client : ouverte, répondue ou reportée. */
+export interface CrQuestion {
+  libelle: string;
+  etat: QuestionEtat;
+}
+
+/**
+ * Cible de diffusion d'un POINT de compte rendu (décision produit 09/07/2026).
+ * Un compte rendu de chantier est une suite de points ; CHAQUE point est destiné
+ * au client, aux artisans, ou aux deux. Le client ne voit QUE les points qui lui
+ * sont destinés ; l'export PDF est filtré par destinataire.
+ */
+export type Diffusion = 'client' | 'artisan' | 'both';
+
+/** À qui l'on présente un compte rendu (pilote le filtrage des points). */
+export type CrAudience = 'conducteur' | 'client' | 'artisan';
+
+export const DIFFUSION_LABEL: Record<Diffusion, string> = {
+  client: 'Client',
+  artisan: 'Artisan',
+  both: 'Client + Artisan',
+};
+
+/** Une photo d'un point (dataURL en démo, URL signée en production). */
+export interface CompteRenduPhoto {
+  imageUrl?: string;
+  bucket?: string;
+  storagePath?: string;
+}
+
+/** Nombre maximum de photos par point (mini-album d'une observation). */
+export const MAX_POINT_PHOTOS = 3;
+
+/**
+ * Un POINT de compte rendu = UNE observation : 1 à 3 photos (obligatoire) qui
+ * l'illustrent, 1 commentaire (obligatoire) commun aux photos, et 1 cible de
+ * diffusion. Les photos s'affichent en mini-album dans le compte rendu.
+ */
+export interface CompteRenduPoint {
+  /** Photos du point (1 à 3) — illustrent la même observation. */
+  photos: CompteRenduPhoto[];
+  /**
+   * @deprecated Ancien format : un point ne portait qu'UNE photo (`imageUrl`).
+   * Conservé pour lire les comptes rendus créés avant le mini-album — toujours lu
+   * via `pointPhotos()`, jamais écrit. Ne pas utiliser dans du nouveau code.
+   */
+  imageUrl?: string;
+  /** Commentaire (obligatoire) : ce que le conducteur constate. */
+  comment: string;
+  /** Cible de diffusion du point. */
+  diffusion: Diffusion;
+}
+
+/**
+ * Photos d'un point — TOLÉRANTE à l'ancien format (un point pouvait ne porter
+ * qu'un `imageUrl` unique, sans `photos`). Source unique de lecture des photos
+ * d'un point : garantit la compatibilité ascendante et un rendu jamais cassé.
+ */
+export function pointPhotos(point: CompteRenduPoint): CompteRenduPhoto[] {
+  if (point.photos && point.photos.length > 0) return point.photos;
+  if (point.imageUrl) return [{ imageUrl: point.imageUrl }];
+  return [];
+}
+
+/** Les points visibles pour une audience donnée (conducteur : tout). */
+export function pointsPourAudience(
+  points: CompteRenduPoint[] | undefined,
+  audience: CrAudience,
+): CompteRenduPoint[] {
+  const list = points ?? [];
+  if (audience === 'conducteur') return list;
+  if (audience === 'client') return list.filter((p) => p.diffusion !== 'artisan');
+  return list.filter((p) => p.diffusion !== 'client');
+}
+
+/** Un compte rendu a-t-il au moins un point destiné à cette audience ? */
+export function crADesPointsPour(
+  points: CompteRenduPoint[] | undefined,
+  audience: CrAudience,
+): boolean {
+  return pointsPourAudience(points, audience).length > 0;
+}
+
 export interface CompteRenduContent {
   /** Texte du compte rendu (rédigé par l'IA, validé par l'humain). */
   texte: string;
@@ -61,6 +197,46 @@ export interface CompteRenduContent {
   etapeProposee?: ProjectStep;
   /** Étape confirmée à la validation — jamais un pourcentage (ADR-004 §4). */
   etapeConfirmee?: ProjectStep;
+
+  /* — Gestion du chantier (mission) : champs OPTIONNELS, additifs — */
+  /** Mission dont ce fait est issu (visite, réunion, réception…). */
+  missionKind?: string;
+  /** Titre du document projeté (« PV de réception », « Fiche SAV »…). */
+  docTitre?: string;
+  /** Intervenants présents (réunion / réception). */
+  presents?: string[];
+  /** Décisions prises, extraites par PHÉNIX et validées. */
+  decisions?: CrDecision[];
+  /** Actions à suivre (snapshot ; chaque action est aussi un fait `action`). */
+  actions?: CrAction[];
+  /** Questions posées par le client pendant la mission (à traiter). */
+  questionsClient?: CrQuestion[];
+  /** Manquants / dommages relevés (livraison). */
+  manquants?: string[];
+  /** Version cliente (voix client) — utilisée à la projection espace client. */
+  texteClient?: string;
+  /** Lien vers le Moment (contexte) d'origine. */
+  momentId?: string;
+  /**
+   * Points du compte rendu de chantier (photo + commentaire + diffusion). Présent
+   * sur les CR issus de la mission « Compte rendu de chantier » ; le client ne voit
+   * que les points qui lui sont destinés, l'export PDF est filtré par destinataire.
+   */
+  points?: CompteRenduPoint[];
+  /**
+   * Pré-réception : vérification de l'exécution du contrat (devis + avenants),
+   * prestation par prestation. Présent sur les CR issus de la mission
+   * « Pré-réception ». La saisie est UNIQUE ; les documents client / artisan sont
+   * dérivés par destinataire (le client ne voit jamais responsable / reprise).
+   */
+  prereception?: PrereceptionData;
+  /**
+   * Réception : levée des réserves émises en Pré-réception (dernière étape
+   * contractuelle). La Réception ne recrée aucune prestation — elle vérifie que
+   * TOUTES les réserves ont été levées (commentaire + photos avant/après) puis
+   * clôture le chantier. Présent sur les CR issus de la mission « Réception ».
+   */
+  reception?: ReceptionData;
 }
 
 export interface PhotoContent {
@@ -76,22 +252,230 @@ export interface DocumentContent {
   categorie?: DocumentCategory;
 }
 
-/** Qui doit agir sur une demande — pilote le bandeau décision client. */
-export type DemandeAudience = 'client' | 'equipe';
+/**
+ * Destinataire d'une demande — jamais un collaborateur interne (PHÉNIX n'est
+ * pas un logiciel d'équipe). Deux cas :
+ *  • `client` : PHÉNIX attend une décision / une action du CLIENT ;
+ *  • `phenix` : une question DU client à laquelle PHÉNIX (le conducteur) répond.
+ */
+export type DemandeAudience = 'client' | 'phenix' | 'conducteur';
 
 /** Réponse PORTÉE par la demande (pas un événement séparé, pas un fil). */
 export interface DemandeResolution {
   texte: string;
   resolvedBy: UserId;
   resolvedAt: IsoDateTime;
+  /**
+   * Réponse à une demande de DOCUMENT : id de l'événement `document` créé par le
+   * client (le document est enregistré au projet, jamais un simple message). Le
+   * commentaire (`texte`) reste facultatif — le document est l'élément principal.
+   */
+  docEventId?: EventId;
+  /** Photos jointes à la réponse du conducteur (0 à 3). */
+  photos?: CompteRenduPhoto[];
+}
+
+/**
+ * Provenance d'une action chantier créée depuis une photo du Fil. Ids en chaînes :
+ * la colonne vertébrale reste indépendante du module Fil. Lien RETOUR vers la photo.
+ */
+export interface FilSource {
+  kind: 'fil';
+  momentId: string;
+  photoId?: string;
 }
 
 export interface DemandeContent {
-  /** Besoin du client, formulé via l'assistant (ADR-001 §6). */
+  /** Besoin / question du client (ADR-001 §6). */
   question: string;
   /** Destinataire de l'action attendue (`client` ⇒ décision client). */
   destinataire: DemandeAudience;
   resolution?: DemandeResolution;
+  /** Origine (le cas échéant) : photo annotée du Fil. */
+  source?: FilSource;
+  /**
+   * Nature attendue de la réponse. `document` ⇒ échange DOCUMENTAIRE : le client
+   * répond en JOIGNANT un document (PDF / image), commentaire facultatif.
+   */
+  attendu?: 'document';
+  /** Libellé du document attendu (classement + nom à réception). */
+  docLibelle?: string;
+  /** Catégorie du document attendu (classement automatique à réception). */
+  docCategorie?: string;
+  /** Échéance FACULTATIVE souhaitée pour la réponse (AAAA-MM-JJ). */
+  echeance?: string;
+  /** Photos jointes par le client à sa demande (0 à 3). */
+  photos?: CompteRenduPhoto[];
+}
+
+/* -------------------------------------------------------------------------- *
+ * DÉCISION — cycle de vie d'un choix client, tracé au journal (source unique)
+ * -------------------------------------------------------------------------- *
+ * Chaque action importante d'une décision client écrit UN événement structuré
+ * (jamais du texte libre dupliqué). L'auteur et la date sont portés par
+ * l'enveloppe ; le contenu porte l'origine, le choix concerné, le statut
+ * avant/après et la proposition retenue. Toutes les vues LISENT ces champs.
+ */
+export type DecisionEventKind =
+  | 'envoyee' // décision envoyée au client
+  | 'renvoyee' // proposition renvoyée au client après modification
+  | 'validee' // choix validé par le client
+  | 'deleguee' // choix confié à PHÉNIX
+  | 'modification' // modification demandée par le client
+  | 'reco_confirmee'; // recommandation PHÉNIX confirmée par le conducteur
+
+/** À l'origine de l'action (distinct de l'auteur technique de l'enveloppe). */
+export type DecisionOrigin = 'client' | 'conducteur' | 'phenix';
+
+/**
+ * Une option présentée au client, PORTÉE PAR LE JOURNAL (miroir léger de
+ * `SelectionOption`). Elle voyage sur l'événement `decision/envoyee` pour que
+ * l'espace client AUTONOME (qui ne lit que le journal, sans le dossier
+ * conducteur) puisse afficher le choix et le laisser valider.
+ */
+export interface DecisionChoixOption {
+  id: string;
+  /** Repère affiché (A, B, C…). */
+  ref?: string;
+  title: string;
+  description?: string;
+  /** Vraie image, quand elle existe (data URL en démo). */
+  imageUrl?: string;
+}
+
+/**
+ * PRÉSENTATION d'un choix portée au journal (sur `envoyee` / `renvoyee`).
+ * C'est la part CLIENT-SAFE d'une `ClientSelection` — jamais la mécanique interne
+ * (délais, planning) : de quoi présenter le choix et recueillir la décision.
+ */
+export interface DecisionChoix {
+  /** Intitulé du choix (« Carrelage salle de bain »). */
+  titre: string;
+  /** Contexte libre rédigé par le conducteur (le cas échéant). */
+  contexte?: string;
+  /** Propositions présentées au client (A–E). */
+  options: DecisionChoixOption[];
+  /** Photos illustrant la décision elle-même (data URLs), hors options. */
+  photos?: string[];
+}
+
+export interface DecisionEventContent {
+  kind: DecisionEventKind;
+  origin: DecisionOrigin;
+  /** Choix concerné (id + catégorie). */
+  selectionId: string;
+  categorie: string;
+  /** Statut du choix avant / après l'action. */
+  statutAvant: string;
+  statutApres: string;
+  /** Proposition retenue, le cas échéant. */
+  optionId?: string;
+  optionLabel?: string;
+  /** Message libre (ex. demande de modification du client). */
+  message?: string;
+  /**
+   * PRÉSENTATION du choix, portée par l'événement d'envoi (`envoyee`/`renvoyee`).
+   * Absente sur les traces de résolution (`validee`/`deleguee`/`modification`).
+   * Permet à l'espace client autonome de rendre le choix sans le dossier.
+   */
+  choix?: DecisionChoix;
+}
+
+/* -------------------------------------------------------------------------- *
+ * RÉSERVE — vrai objet de pilotage, porté par le Journal. Cycle : `ouverte` →
+ * `levée`. La levée n'est JAMAIS une mutation de la réserve : c'est un événement
+ * `levee` AJOUTÉ (append-only) qui pointe vers elle. La réserve garde donc à vie
+ * sa photo source et son origine ; le statut « levée »
+ * est une LECTURE dérivée (présence d'un événement de levée). Pourra alimenter
+ * la réception et le SAV.
+ * -------------------------------------------------------------------------- */
+export interface ReserveEventContent {
+  /** Numéro de réserve (incrémental par projet). */
+  numero: number;
+  /** Description de la réserve (« À reprendre avant réception »). */
+  libelle: string;
+  /** Responsable de la levée — un CONTACT de l'annuaire (source unique). */
+  responsableContactId?: string;
+  /**
+   * Nom du responsable AU MOMENT de la création (instantané d'affichage /
+   * recherche / historique). Le lien vivant est `responsableContactId` ; ce
+   * libellé n'est jamais ressaisi à la main.
+   */
+  responsable?: string;
+  /** Échéance de levée (ISO YYYY-MM-DD). */
+  echeance?: string;
+  /** Priorité de traitement (tri par urgence dans le registre). */
+  priorite?: ActionPriorite;
+  /** Origine : photo annotée du Fil (lien retour). */
+  source?: FilSource;
+}
+
+/**
+ * Photo de PREUVE d'une levée de réserve. Mêmes conventions que les photos du
+ * Fil : `imageUrl` (data URL en démo) double `bucket`/`storagePath` (S3 en prod)
+ * — basculer le stockage sans toucher au modèle. L'image d'origine de la réserve
+ * n'est jamais modifiée : la preuve est une pièce ajoutée.
+ */
+export interface LeveePreuve {
+  imageUrl: string;
+  bucket: string;
+  storagePath: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+}
+
+/**
+ * LEVÉE D'UNE RÉSERVE — événement AJOUTÉ qui ferme proprement une réserve
+ * (append-only : on ne supprime ni ne modifie jamais la réserve). L'auteur et la
+ * date de levée sont portés par l'enveloppe (`actor` / `createdAt`). Le contenu
+ * porte le lien vers la réserve, la note et la photo de preuve.
+ */
+export interface LeveeEventContent {
+  /** Réserve levée (id de l'événement réserve d'origine). */
+  reserveId: string;
+  /** Numéro de la réserve levée (repris pour l'affichage, sans relire). */
+  reserveNumero: number;
+  /** Note courte de levée (« Prise déplacée et reprise validée »). */
+  note?: string;
+  /** Photo de preuve de la levée (le cas échéant). */
+  preuve?: LeveePreuve;
+}
+
+/* -------------------------------------------------------------------------- *
+ * ACTION — un ENGAGEMENT né d'une mission (« PHÉNIX ne lâche rien »). Objet de
+ * pilotage : qui, pour quand, priorité. Interne. Statut porté par le contenu
+ * (append-only : la clôture viendra par un événement ajouté, plus tard).
+ * -------------------------------------------------------------------------- */
+export interface ActionEventContent {
+  libelle: string;
+  /** Responsable — un CONTACT de l'annuaire (source unique). */
+  responsableContactId?: string;
+  /** Nom du responsable au moment de la création (instantané ; jamais ressaisi). */
+  responsable?: string;
+  echeance?: string;
+  priorite?: ActionPriorite;
+  commentaire?: string;
+  statut: 'a_faire' | 'faite';
+  /** Origine : le compte rendu / la mission d'où l'action est née. */
+  source?: FilSource;
+}
+
+/* -------------------------------------------------------------------------- *
+ * COMMUNICATION — trace d'un contact lancé depuis PHÉNIX (appel, SMS, WhatsApp,
+ * email, itinéraire). Le message part dans l'app native ; PHÉNIX en garde la
+ * TRACE (append-only). Toujours INTERNE — jamais côté client (VISION Art. 9).
+ * -------------------------------------------------------------------------- */
+export interface CommunicationContent {
+  canal: CommCanal;
+  /** Nom du destinataire au moment de l'action (snapshot append-only). */
+  contactNom: string;
+  /** Contact de l'annuaire concerné (le cas échéant). */
+  contactId?: string;
+  /** Rôle du contact (lecture). */
+  role?: string;
+  /** Motif / sujet (ex. « relance intervention »). */
+  sujet?: string;
 }
 
 /** Carte type → contenu (utile aux génériques / à la couche d'accès). */
@@ -100,6 +484,11 @@ export interface EventContentByType {
   photo: PhotoContent;
   document: DocumentContent;
   demande: DemandeContent;
+  decision: DecisionEventContent;
+  reserve: ReserveEventContent;
+  levee: LeveeEventContent;
+  action: ActionEventContent;
+  communication: CommunicationContent;
 }
 
 /* -------------------------------------------------------------------------- *
@@ -137,9 +526,39 @@ export interface DemandeEvent extends EventEnvelope {
   type: 'demande';
   content: DemandeContent;
 }
+export interface DecisionEvent extends EventEnvelope {
+  type: 'decision';
+  content: DecisionEventContent;
+}
+export interface ReserveEvent extends EventEnvelope {
+  type: 'reserve';
+  content: ReserveEventContent;
+}
+export interface LeveeEvent extends EventEnvelope {
+  type: 'levee';
+  content: LeveeEventContent;
+}
+export interface ActionEvent extends EventEnvelope {
+  type: 'action';
+  content: ActionEventContent;
+}
+
+export interface CommunicationEvent extends EventEnvelope {
+  type: 'communication';
+  content: CommunicationContent;
+}
 
 /** L'événement du journal — colonne vertébrale du produit. */
-export type Event = CompteRenduEvent | PhotoEvent | DocumentEvent | DemandeEvent;
+export type Event =
+  | CompteRenduEvent
+  | PhotoEvent
+  | DocumentEvent
+  | DemandeEvent
+  | DecisionEvent
+  | ReserveEvent
+  | LeveeEvent
+  | ActionEvent
+  | CommunicationEvent;
 
 /* -------------------------------------------------------------------------- *
  * Gardes de type
@@ -148,11 +567,13 @@ export const isCompteRendu = (e: Event): e is CompteRenduEvent => e.type === 'co
 export const isPhoto = (e: Event): e is PhotoEvent => e.type === 'photo';
 export const isDocument = (e: Event): e is DocumentEvent => e.type === 'document';
 export const isDemande = (e: Event): e is DemandeEvent => e.type === 'demande';
+export const isDecision = (e: Event): e is DecisionEvent => e.type === 'decision';
+export const isReserve = (e: Event): e is ReserveEvent => e.type === 'reserve';
+export const isLevee = (e: Event): e is LeveeEvent => e.type === 'levee';
+export const isAction = (e: Event): e is ActionEvent => e.type === 'action';
 
 export const isDraft = (e: Event): boolean => e.state === 'brouillon';
 export const isPublished = (e: Event): boolean => e.state === 'publie';
-export const isDemandeOpen = (e: Event): e is DemandeEvent => isDemande(e) && e.state === 'ouverte';
-
 /* -------------------------------------------------------------------------- *
  * Règle de VISIBILITÉ CLIENT — source unique, miroir de la RLS (ADR-004 §4)
  * -------------------------------------------------------------------------- *
@@ -165,13 +586,49 @@ export function isVisibleToClient(e: Event): boolean {
     // Demande adressée au client : visible dès `ouverte` (il doit pouvoir agir),
     // puis une fois `traitee` / `close`.
     if (e.content.destinataire === 'client') {
+      // Décision attendue du client : visible dès `ouverte`, puis résolue.
       return e.state === 'ouverte' || e.state === 'traitee' || e.state === 'close';
     }
-    // Demande interne (vers l'équipe) : visible client seulement une fois résolue.
+    // Question du client à PHÉNIX : visible côté client une fois la réponse
+    // apportée (le brouillon de réponse ne fuit pas).
     return e.state === 'traitee' || e.state === 'close';
   }
   // compte_rendu / photo / document : visibles une fois publiés.
   return e.state === 'publie';
+}
+
+/**
+ * Ce que voit un ARTISAN — le RÉCIT PARTAGÉ du chantier (comptes rendus & photos
+ * PUBLIÉS et partagés). Jamais l'interne (notes du conducteur), jamais les échanges
+ * PRIVÉS du client (demandes, décisions) : l'artisan n'est ni le conducteur ni le
+ * client. Ses tâches opérationnelles (réserves/actions assignées) sont servies à
+ * part (par responsable), pas par ce fil.
+ */
+export function isVisibleToArtisan(e: Event): boolean {
+  if (e.visibility !== 'client' || e.state !== 'publie') return false;
+  return e.type === 'compte_rendu' || e.type === 'photo';
+}
+
+/**
+ * MOTEUR DE VISIBILITÉ UNIQUE (Condition bêta #6). Une seule fonction décide, pour
+ * un événement et une AUDIENCE, ce qui est visible — toutes les surfaces (feeds,
+ * notifications, espace artisan, Léon…) doivent passer par ici, jamais par une
+ * règle recopiée à la main.
+ *  • `conducteur` (interne) : voit TOUT (le Journal complet) ;
+ *  • `client`    : `isVisibleToClient` (miroir RLS) ;
+ *  • `artisan`   : `isVisibleToArtisan` (récit partagé, sans interne ni privé client).
+ */
+export type Audience = 'conducteur' | 'client' | 'artisan';
+
+export function isVisibleTo(e: Event, audience: Audience): boolean {
+  switch (audience) {
+    case 'conducteur':
+      return true;
+    case 'client':
+      return isVisibleToClient(e);
+    case 'artisan':
+      return isVisibleToArtisan(e);
+  }
 }
 
 /** Une décision attend explicitement le client (pilote le bandeau d'accueil). */

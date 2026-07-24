@@ -184,6 +184,9 @@ export const zIndex = {
   sticky: '1100',
   overlay: '1300',
   modal: '1400',
+  /** Consultation plein écran (viewer photo) : au-dessus des modales et du
+   *  concierge flottant, sous les toasts. */
+  viewer: '1500',
   toast: '1600',
 } as const;
 

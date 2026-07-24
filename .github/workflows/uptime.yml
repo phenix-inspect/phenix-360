@@ -1,0 +1,33 @@
+name: Supervision (uptime)
+
+# Sonde de disponibilité de PHÉNIX 360 en ligne. Tourne toutes les 30 minutes et
+# vérifie que le site répond bien (HTTP 200). En cas d'échec, le run passe au
+# ROUGE et GitHub notifie automatiquement l'auteur du dépôt par e-mail — une
+# supervision réelle, gratuite, sans compte ni service externe.
+#
+# NB : les workflows planifiés ne s'exécutent que sur la branche par défaut
+# (ici, la branche de travail = branche par défaut du dépôt).
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Le site répond-il ?
+    runs-on: ubuntu-latest
+    steps:
+      - name: Vérifier PHÉNIX 360 (HTTP 200)
+        run: |
+          url="https://phenix-inspect.github.io/phenix-360/"
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 25 --retry 3 --retry-delay 5 "$url")
+          echo "HTTP $code — $url"
+          if [ "$code" != "200" ]; then
+            echo "::error::PHÉNIX 360 injoignable (HTTP $code) — vérifier GitHub Pages / le dernier déploiement."
+            exit 1
+          fi
+          echo "PHÉNIX 360 est en ligne."

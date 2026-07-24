@@ -43,8 +43,8 @@ discriminée sur `type` ; affiner `type` donne un `content` typé.
 ## Vues dérivées (`views.ts`)
 
 Sélecteurs purs sur `Event[]`, réutilisables partout :
-`currentStep`, `gallery`, `vault`, `teamQueue`, `clientFeed`, `forClient`,
-`pendingClientDecisions`, `clientDecisionBanner`.
+`currentStep`, `gallery`, `vault`, `questionsEnAttente`, `clientFeed`, `forClient`,
+`reserveEvents`, `reserveStatut`, `pendingClientDecisions`, `clientDecisionBanner`.
 
 > `isVisibleToClient(event)` est la **source unique** de la règle de visibilité
 > client ; la policy RLS Postgres la **reflète** (et non l'inverse).

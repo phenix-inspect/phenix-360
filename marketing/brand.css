@@ -1,0 +1,408 @@
+/* PHÉNIX 360 — Kit de marque commun (vidéos motion + PDF).
+   Charte exacte de l'app : or #b5893c, encre #1c1915, papier #fcfaf6, Newsreader. */
+
+@font-face {
+  font-family: 'Newsreader';
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: block;
+  src: url('./assets/fonts/newsreader.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Newsreader';
+  font-style: italic;
+  font-weight: 200 700;
+  font-display: block;
+  src: url('./assets/fonts/newsreader-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: block;
+  src: url('./assets/fonts/mono.woff2') format('woff2');
+}
+
+:root {
+  --gold-100: #f4e8ce;
+  --gold-200: #e8d09c;
+  --gold-300: #dbb667;
+  --gold-400: #c99f45;
+  --gold-500: #b5893c;
+  --gold-600: #997235;
+  --ink-900: #131009;
+  --ink-800: #1c1915;
+  --ink-700: #2a2620;
+  --ink-600: #3b362f;
+  --ink-400: #7c756c;
+  --ink-200: #cbc6bd;
+  --paper-0: #ffffff;
+  --paper-50: #fcfaf6;
+  --paper-100: #f8f4ec;
+  --paper-200: #f0eadd;
+  --success: #4f7a4a;
+  --danger: #a8443b;
+  --info: #3e6b85;
+
+  --serif: 'Newsreader', Georgia, serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
+  --sans: 'Newsreader', Georgia, serif; /* tout en éditorial pour le ton client */
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---- Étoffe de fond : encre profonde + halo or + grain fin ------------- */
+.bg-ink {
+  background:
+    radial-gradient(120% 90% at 78% 12%, rgba(181, 137, 60, 0.22) 0%, rgba(181, 137, 60, 0) 55%),
+    radial-gradient(90% 80% at 10% 100%, rgba(219, 182, 103, 0.1) 0%, rgba(0, 0, 0, 0) 60%),
+    linear-gradient(160deg, #17130c 0%, #100d07 55%, #0a0805 100%);
+  color: var(--paper-50);
+}
+.bg-paper {
+  background:
+    radial-gradient(100% 70% at 85% 0%, rgba(181, 137, 60, 0.1) 0%, rgba(255, 255, 255, 0) 55%),
+    linear-gradient(180deg, #fdfbf7 0%, #f7f1e6 100%);
+  color: var(--ink-800);
+}
+.grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---- Typo -------------------------------------------------------------- */
+.serif {
+  font-family: var(--serif);
+  font-weight: 400;
+}
+.kicker {
+  font-family: var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 0.42em;
+  font-weight: 500;
+}
+.gold {
+  color: var(--gold-400);
+}
+.gold-text {
+  background: linear-gradient(100deg, var(--gold-200), var(--gold-500) 55%, var(--gold-300));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hair {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-500), transparent);
+  border: 0;
+}
+
+/* ---- Puce / badge ------------------------------------------------------ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  font-family: var(--mono);
+  font-size: 0.62em;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  padding: 0.55em 1.1em;
+  border-radius: 999px;
+  border: 1px solid rgba(201, 159, 69, 0.45);
+  color: var(--gold-300);
+  background: rgba(181, 137, 60, 0.08);
+}
+
+/* ---- Maquette téléphone (le cœur des scènes) --------------------------- */
+.phone {
+  position: relative;
+  width: 380px;
+  height: 800px;
+  border-radius: 52px;
+  padding: 14px;
+  background: linear-gradient(160deg, #2a2620, #16130d);
+  box-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.06) inset,
+    0 50px 90px -30px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(201, 159, 69, 0.18);
+}
+.phone::before {
+  /* encoche */
+  content: '';
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 128px;
+  height: 30px;
+  border-radius: 999px;
+  background: #0a0805;
+  z-index: 5;
+}
+.phone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 40px;
+  overflow: hidden;
+  background: var(--paper-50);
+  color: var(--ink-800);
+}
+.app-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 46px 22px 16px;
+  background: var(--paper-0);
+  border-bottom: 1px solid var(--paper-200);
+}
+.app-head .mark {
+  width: 34px;
+  height: 34px;
+}
+.app-head b {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.app-head small {
+  display: block;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-400);
+  margin-top: 2px;
+}
+.app-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Cartes d'app génériques */
+.card {
+  background: var(--paper-0);
+  border: 1px solid var(--paper-200);
+  border-radius: 20px;
+  padding: 18px;
+  box-shadow: 0 10px 24px -18px rgba(19, 16, 9, 0.4);
+}
+.card h4 {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.muted {
+  color: var(--ink-400);
+}
+
+/* Photo mock (dégradés = tenons lieu de vraies photos de chantier) */
+.photo {
+  border-radius: 16px;
+  height: 190px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #b9a17a, #6d5a3c);
+}
+.photo.v2 {
+  background: linear-gradient(135deg, #8ea3ad, #3e5560);
+}
+.photo.v3 {
+  background: linear-gradient(135deg, #c6b08a, #7a5a2c);
+}
+.photo .cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 26px 14px 12px;
+  font-family: var(--serif);
+  font-size: 15px;
+  color: #fff;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.6), transparent);
+}
+
+/* Réactions ❤️ 💬 */
+.reacts {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+.react {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-600);
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--paper-200);
+  background: var(--paper-0);
+}
+.react.hot {
+  color: var(--danger);
+  border-color: rgba(168, 68, 59, 0.35);
+  background: rgba(168, 68, 59, 0.06);
+}
+
+/* Options de choix */
+.opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--paper-200);
+  font-family: var(--serif);
+  font-size: 15px;
+}
+.opt .tick {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink-200);
+  display: grid;
+  place-items: center;
+  color: transparent;
+}
+.opt.chosen {
+  border-color: var(--gold-500);
+  background: rgba(181, 137, 60, 0.08);
+}
+.opt.chosen .tick {
+  border-color: var(--success);
+  background: var(--success);
+  color: #fff;
+}
+
+/* Bulles Léon */
+.bubble {
+  max-width: 78%;
+  padding: 12px 15px;
+  border-radius: 18px;
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.4;
+}
+.bubble.me {
+  align-self: flex-end;
+  background: var(--ink-800);
+  color: var(--paper-50);
+  border-bottom-right-radius: 5px;
+}
+.bubble.leon {
+  align-self: flex-start;
+  background: var(--paper-0);
+  border: 1px solid var(--paper-200);
+  border-bottom-left-radius: 5px;
+}
+
+/* Toast notification */
+.toast {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--ink-800);
+  color: var(--paper-50);
+  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.6);
+}
+.toast .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--gold-400);
+  box-shadow: 0 0 0 4px rgba(201, 159, 69, 0.25);
+}
+
+/* ---- Scène / plateau --------------------------------------------------- */
+.stage {
+  position: relative;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+}
+.scene {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  opacity: 0;
+  transition: opacity 0.7s var(--ease-soft);
+  padding: 96px 120px;
+}
+.scene.is-active {
+  opacity: 1;
+}
+
+/* Reveals : masqués tant que la scène n'est pas active */
+.reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.9s var(--ease),
+    transform 0.9s var(--ease);
+  transition-delay: var(--d, 0s);
+}
+.scene.is-active .reveal {
+  opacity: 1;
+  transform: none;
+}
+.reveal.blur {
+  filter: blur(8px);
+}
+.scene.is-active .reveal.blur {
+  filter: blur(0);
+}
+.reveal.rise-lg {
+  transform: translateY(60px) scale(0.98);
+}
+
+/* Progress bar (explicative) */
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--gold-300), var(--gold-500));
+  width: 0;
+  z-index: 60;
+}
+
+/* Vignettes de coin discrètes */
+.corner {
+  position: absolute;
+  font-family: var(--mono);
+  font-size: 15px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(219, 182, 103, 0.55);
+  z-index: 40;
+}
+.corner.tl {
+  top: 54px;
+  left: 60px;
+}
+.corner.br {
+  bottom: 54px;
+  right: 60px;
+}

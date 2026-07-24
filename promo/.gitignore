@@ -1,0 +1,8 @@
+# médias générés (livrés hors dépôt) et fichiers de travail
+*.mp4
+*.webm
+*.m4a
+*.wav
+*.png
+lines_*/
+rec-*/

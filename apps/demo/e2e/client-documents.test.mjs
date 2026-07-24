@@ -1,0 +1,103 @@
+/**
+ * RC1 — Ouverture des documents côté client. Règle unique : tout document est
+ * CONSULTABLE d'un clic (jamais une simple ligne). Un document AVEC fichier ouvre
+ * le fichier ; un document SANS fichier ouvre un document GÉNÉRÉ par PHÉNIX — les
+ * deux via un nouvel onglet (blob). Client-safe strict : un document interne
+ * n'apparaît jamais côté client.
+ */
+import { launch, session, harness, openDemo, openClientTab } from './harness.mjs';
+
+const browser = await launch();
+const { ctx, page, consoleErrors } = await session(browser, { height: 2400 });
+const { assert, summary } = harness();
+
+const OUVRABLE = 'Plan de la salle de bain'; // seed : document client AVEC dataUrl
+const SANS_FICHIER = 'Devis plomberie'; // seed : document client SANS dataUrl
+const INTERNE = 'Contrat sous-traitant'; // seed : document interne (jamais client)
+
+// Les documents client vivent désormais dans l'onglet DOCUMENTS de l'Espace client :
+// une ligne (`li`) par document, titre + « Ouvrir le document » + « Télécharger ».
+const docs = () => page.locator('#section-documents');
+const cardWith = (text) => docs().locator('li').filter({ hasText: text }).first();
+
+try {
+  await openDemo(page);
+  await openClientTab(page, 'Documents');
+  await docs()
+    .getByRole('heading', { name: 'Vos documents' })
+    .waitFor({ state: 'visible', timeout: 6000 });
+
+  await assert('Les documents client sont visibles', async () => {
+    await cardWith(OUVRABLE).waitFor({ state: 'visible', timeout: 5000 });
+    await cardWith(SANS_FICHIER).waitFor({ state: 'visible', timeout: 5000 });
+  });
+
+  await assert(
+    'Document SANS fichier → CONSULTABLE : PHÉNIX génère le document et l’ouvre',
+    async () => {
+      const card = cardWith(SANS_FICHIER);
+      // Plus de « disponible prochainement » : le document s'ouvre (document généré).
+      if ((await card.getByText('Document disponible prochainement').count()) > 0)
+        throw new Error('le document sans fichier reste une ligne inerte');
+      const pagePromise = ctx.waitForEvent('page', { timeout: 6000 });
+      await card.getByRole('button', { name: 'Ouvrir le document' }).click();
+      const tab = await pagePromise;
+      if (!tab.url().startsWith('blob:'))
+        throw new Error(`le document généré ne s'ouvre pas (url=${tab.url()})`);
+      await tab.close();
+    },
+  );
+
+  await assert('Document AVEC fichier → « Ouvrir le document » + « Télécharger »', async () => {
+    const card = cardWith(OUVRABLE);
+    await card.getByRole('button', { name: 'Ouvrir le document' }).waitFor({ state: 'visible' });
+    await card
+      .getByRole('button', { name: new RegExp(`Télécharger : ${OUVRABLE}`) })
+      .waitFor({ state: 'visible' });
+  });
+
+  await assert('Le clic OUVRE réellement le fichier (nouvel onglet)', async () => {
+    const card = cardWith(OUVRABLE);
+    const pagePromise = ctx.waitForEvent('page', { timeout: 6000 });
+    await card.getByRole('button', { name: 'Ouvrir le document' }).click();
+    const tab = await pagePromise;
+    if (!tab.url().startsWith('blob:'))
+      throw new Error(`le document ne s'ouvre pas en aperçu (url=${tab.url()})`);
+    await tab.close();
+  });
+
+  await assert('Client-safe : le document INTERNE n’apparaît jamais côté client', async () => {
+    if ((await page.getByText(INTERNE, { exact: false }).count()) > 0)
+      throw new Error('un document interne fuit dans l’espace client');
+  });
+
+  await assert(
+    'Non-régression conducteur : il voit bien le document interne (Suivi / Journal)',
+    async () => {
+      await page.getByRole('tab', { name: 'Chantier', exact: true }).click();
+      await page.getByRole('tab', { name: 'Suivi', exact: true }).click();
+      // Le Suivi ne montre que la dernière activité : on déplie le journal complet
+      // pour retrouver un document déposé plus tôt.
+      await page
+        .getByRole('button', { name: /Voir tout le journal/ })
+        .click()
+        .catch(() => {});
+      await page
+        .getByText(INTERNE, { exact: false })
+        .first()
+        .waitFor({ state: 'visible', timeout: 5000 });
+    },
+  );
+
+  await assert('Zéro erreur console', async () => {
+    if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));
+  });
+} catch (e) {
+  await assert('FATAL', async () => {
+    throw e;
+  });
+} finally {
+  const failed = summary(consoleErrors);
+  await browser.close();
+  process.exit(failed ? 1 : 0);
+}

@@ -34,7 +34,7 @@ def test_unknown_returns_demande_intent() -> None:
     body = r.json()
     assert body["kind"] == "demande_intent"
     assert body["answer"] is None
-    assert body["demande"]["destinataire"] == "equipe"
+    assert body["demande"]["destinataire"] == "phenix"
     assert "facture" in body["demande"]["question"].lower()
 
 

@@ -29,7 +29,7 @@ class DemandeIntent(BaseModel):
     """Intention de création de demande — PROPOSÉE, jamais écrite par l'IA."""
 
     question: str
-    destinataire: str  # 'equipe'
+    destinataire: str  # 'client' | 'phenix'
 
 
 class AskResponse(BaseModel):

@@ -1,0 +1,181 @@
+/**
+ * Bureau de préparation : bloc « partage client » (3 bloquants validés →
+ * « Prêt à partager »), budget (prévisionnel / engagé / restant), check-list
+ * dérivée + manuelle, alertes NON bloquantes, client-safe. (Section
+ * « Intervenants du chantier » retirée — contacts accessibles ailleurs.)
+ */
+import { launch, session, harness, openDemo } from './harness.mjs';
+
+const browser = await launch();
+const { page, consoleErrors } = await session(browser, { height: 1700 });
+const { assert, summary } = harness();
+
+async function setBudget(v) {
+  await page.getByText('Modifier', { exact: true }).click();
+  await page.getByLabel('Budget prévisionnel').fill(String(v));
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await page.waitForTimeout(300);
+}
+
+try {
+  await openDemo(page);
+  await page.getByRole('button', { name: /Appartement Lyon 6e/ }).click();
+  await page.getByRole('tab', { name: /Préparation/ }).click();
+
+  await assert('Le chantier seedé est PRÊT À PARTAGER (3 éléments validés)', async () => {
+    await page
+      .getByText('Prêt à partager au client')
+      .first()
+      .waitFor({ state: 'visible', timeout: 6000 });
+    await page
+      .getByText('éléments obligatoires validés')
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await page
+      .getByText('Le chantier est prêt à être partagé au client.')
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('Budget compact : prévisionnel · engagé · restant sur une ligne', async () => {
+    await page
+      .getByText('Prévisionnel', { exact: true })
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await page.getByText('Engagé', { exact: true }).waitFor({ state: 'visible', timeout: 4000 });
+    await page.getByText('Restant', { exact: true }).waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('La check-list de partage montre les 3 éléments obligatoires', async () => {
+    for (const b of ['Devis signé', 'Acompte payé', 'Date officielle de démarrage'])
+      await page.getByText(b, { exact: true }).first().waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('Préparation ne gère PLUS les choix client (aucun doublon)', async () => {
+    // La demande de choix se pilote exclusivement dans « Demandes client ».
+    if ((await page.getByText('Propositions préparées par PHÉNIX').count()) > 0)
+      throw new Error('la section « Propositions préparées par PHÉNIX » subsiste en Préparation');
+    if (
+      (await page
+        .getByRole('button', { name: /Envoyer au client|Renvoyer les propositions|Redemander/ })
+        .count()) > 0
+    )
+      throw new Error('un bouton de gestion de choix client subsiste en Préparation');
+  });
+
+  await assert(
+    'Assistant Chantier : PHÉNIX prépare (lecture seule, aucun envoi client)',
+    async () => {
+      await page
+        .getByText('PHÉNIX 360 a préparé votre chantier')
+        .first()
+        .waitFor({ state: 'visible', timeout: 6000 });
+      // Le résumé « a préparé » : au moins les contrôles de pré-réception + documents.
+      await page
+        .getByText('contrôles de pré-réception')
+        .first()
+        .waitFor({ state: 'visible', timeout: 4000 });
+      // L'assistant PRÉPARE : il ne déclenche AUCUNE action (ni envoi client, ni commande).
+      if (
+        (await page
+          .getByRole('button', {
+            name: /Envoyer au client|Demander maintenant|Commander maintenant/,
+          })
+          .count()) > 0
+      )
+        throw new Error('l’assistant expose une action d’envoi/commande (interdit)');
+      // Une section « Documents à récupérer » est préparée (dérivée du contrat).
+      await page
+        .getByText('Documents à récupérer')
+        .first()
+        .waitFor({ state: 'visible', timeout: 4000 });
+    },
+  );
+
+  await assert('Budget sous l’engagé → ALERTE non bloquante (pas un blocage partage)', async () => {
+    await setBudget(5000);
+    await page
+      .getByText(/budget dépassé/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    // Le partage reste possible : un dépassement budget est une alerte, pas un bloquant client.
+    await page.getByText('Prêt à partager au client').first().waitFor({ state: 'visible' });
+    // L'alerte est TOUJOURS visible (aucun dépliage nécessaire).
+    await page
+      .getByText(/Budget engagé au-dessus du prévisionnel/i)
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+    await setBudget(80000);
+  });
+
+  await assert('Check-list manuelle : ajouter un point', async () => {
+    // Libellé hors check-list standard PHÉNIX (préremplie) pour tester l'ajout.
+    await page.getByLabel('Nouveau point de check-list').fill('Vérifier compteur électrique');
+    await page.getByRole('button', { name: 'Ajouter le point' }).click();
+    await page
+      .getByText('Vérifier compteur électrique')
+      .waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('« Intervenants du chantier » a disparu de la Préparation', async () => {
+    if ((await page.getByText('Intervenants du chantier').count()) > 0)
+      throw new Error('la section Intervenants est encore présente');
+  });
+
+  await assert('Le devis est REPLIÉ par défaut ; « Voir le devis » l’affiche', async () => {
+    // Le détail poste par poste ne doit pas alourdir la lecture : replié d'office.
+    if ((await page.getByText('Le devis signé est immuable', { exact: false }).count()) > 0)
+      throw new Error('le détail du devis est visible alors qu’il devrait être replié');
+    await page.getByRole('button', { name: /Voir le devis/ }).click();
+    await page
+      .getByText('Le devis signé est immuable', { exact: false })
+      .first()
+      .waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('« Questions de PHÉNIX » retirée du quotidien', async () => {
+    if ((await page.getByRole('heading', { name: 'Questions de PHÉNIX' }).count()) > 0)
+      throw new Error('la section Questions de PHÉNIX est encore présente');
+  });
+
+  await assert('« Photos avant travaux » : conservées mais REPLIÉES (à la demande)', async () => {
+    // Preuve en cas de litige : on ne les efface pas, mais elles ne polluent pas
+    // le quotidien — repliées par défaut ; l'ajout n'apparaît qu'au clic sur « Voir ».
+    if ((await page.getByRole('button', { name: /Ajouter des photos/ }).count()) > 0)
+      throw new Error('les photos avant travaux sont dépliées par défaut');
+    await page
+      .getByRole('button', { name: /Photos avant travaux/ })
+      .first()
+      .click();
+    await page
+      .getByRole('button', { name: /Ajouter des photos/ })
+      .waitFor({ state: 'visible', timeout: 4000 });
+  });
+
+  await assert('Client-safe : la préparation ne fuit jamais côté client', async () => {
+    await page.getByRole('tab', { name: 'Espace client', exact: true }).click();
+    await page.waitForTimeout(600);
+    for (const secret of [
+      'Check-list de lancement',
+      'Clés récupérées',
+      'Points bloquants',
+      'PHÉNIX 360 a préparé votre chantier',
+      'Points de vigilance',
+    ]) {
+      if ((await page.getByText(secret, { exact: false }).count()) > 0)
+        throw new Error(`fuite côté client : « ${secret} »`);
+    }
+  });
+
+  await assert('Zéro erreur console', async () => {
+    if (consoleErrors.length > 0) throw new Error(consoleErrors.slice(0, 5).join(' | '));
+  });
+} catch (e) {
+  await assert('FATAL', async () => {
+    throw e;
+  });
+} finally {
+  const failed = summary(consoleErrors);
+  await browser.close();
+  process.exit(failed ? 1 : 0);
+}

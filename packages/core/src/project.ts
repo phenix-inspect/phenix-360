@@ -29,12 +29,58 @@ export const PROJECT_STEP_ORDER: Record<ProjectStep, number> = {
   reception: 3,
 };
 
+/**
+ * Statut de vie du projet (distinct de l'étape de chantier) : pilote l'objet
+ * central côté équipe. Saisi/ajusté à la main (≠ avancement, qui est dérivé).
+ */
+/**
+ * Statut MÉTIER du chantier — une propriété unique, saisie/ajustée À LA MAIN par
+ * le conducteur (RC1 : transitions manuelles, jamais automatiques). Distinct de
+ * l'avancement (`currentStep`, dérivé des comptes rendus). Source de vérité unique.
+ */
+export const PROJECT_STATUSES = [
+  'pas_commence',
+  'en_cours',
+  'pre_reception',
+  'levee_reserves',
+  'cloture',
+] as const;
+export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  pas_commence: 'Pas commencé',
+  en_cours: 'En cours',
+  pre_reception: 'Pré-réception',
+  levee_reserves: 'Levée des réserves',
+  cloture: 'Clôturé',
+};
+
+/** Ordre de progression du statut (pour comparer / plafonner / plancher). */
+export const PROJECT_STATUS_ORDER: Record<ProjectStatus, number> = {
+  pas_commence: 0,
+  en_cours: 1,
+  pre_reception: 2,
+  levee_reserves: 3,
+  cloture: 4,
+};
+
 export interface Project {
   id: ProjectId;
-  /** Nom du chantier. */
+  /**
+   * Code chantier `AA-VV-NNN` (ex. « 26-LY-001 ») — identifiant UNIQUE, DÉFINITIF
+   * et lisible, généré automatiquement à la création (voir `project-code.ts`). Ne
+   * change JAMAIS, même si le chantier change de nom, d'adresse ou de ville :
+   * aucun `ProjectPatch` ne l'expose. Référence commune à tout l'écosystème.
+   */
+  code: string;
+  /** Titre du chantier. */
   name: string;
   /** Client propriétaire — V1 : un client = un chantier. */
   clientId: UserId | null;
+  /** Adresse du chantier (facultative, saisie à la création). */
+  address?: string;
+  /** Statut de vie du projet (saisi). */
+  status: ProjectStatus;
   /** Cache dérivé du dernier compte_rendu publié (jamais saisi à la main). */
   currentStep: ProjectStep | null;
   createdAt: IsoDateTime;

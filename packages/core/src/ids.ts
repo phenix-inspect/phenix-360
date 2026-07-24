@@ -17,6 +17,13 @@ export type AttachmentId = Brand<string, 'AttachmentId'>;
 export type CaptureId = Brand<string, 'CaptureId'>;
 export type UserId = Brand<string, 'UserId'>;
 
+/* — Le Fil (agrégat distinct du Journal) — */
+export type MomentId = Brand<string, 'MomentId'>;
+export type FilPhotoId = Brand<string, 'FilPhotoId'>;
+export type CoupDeCoeurId = Brand<string, 'CoupDeCoeurId'>;
+export type MessageId = Brand<string, 'MessageId'>;
+export type ZoneId = Brand<string, 'ZoneId'>;
+
 /** Horodatage ISO 8601 (UTC). Stocké en `timestamptz`, transporté en chaîne. */
 export type IsoDateTime = string;
 
@@ -26,3 +33,8 @@ export const eventId = (v: string): EventId => v as EventId;
 export const attachmentId = (v: string): AttachmentId => v as AttachmentId;
 export const captureId = (v: string): CaptureId => v as CaptureId;
 export const userId = (v: string): UserId => v as UserId;
+export const momentId = (v: string): MomentId => v as MomentId;
+export const filPhotoId = (v: string): FilPhotoId => v as FilPhotoId;
+export const coupDeCoeurId = (v: string): CoupDeCoeurId => v as CoupDeCoeurId;
+export const messageId = (v: string): MessageId => v as MessageId;
+export const zoneId = (v: string): ZoneId => v as ZoneId;

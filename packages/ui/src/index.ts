@@ -11,4 +11,5 @@
  */
 export * from './tokens/index.js';
 export * from './lib/cn.js';
+export * from './brand/brand.js';
 export * from './components/index.js';

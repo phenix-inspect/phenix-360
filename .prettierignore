@@ -6,3 +6,4 @@ dist/
 build/
 .turbo/
 pnpm-lock.yaml
+apps/demo/e2e/fixtures/

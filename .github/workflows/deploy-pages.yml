@@ -1,0 +1,82 @@
+name: Déploiement démo (GitHub Pages)
+
+# Déploie la démo PHÉNIX 360 sur GitHub Pages (dépôt public).
+# Domaine personnalisé https://monphenix360.fr (fichier public/CNAME) → base = /.
+# Gate RC1 activé via VITE_DEMO_PASSWORD (variable de dépôt `DEMO_PASSWORD`,
+# défaut `phenix2026`) — protection dissuasive, pas une vraie auth.
+
+on:
+  push:
+    branches: [claude/phenix-360-scaffold-setup-2lz0ro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un seul déploiement à la fois. En cas de pushs rapprochés, on ANNULE le run en
+# cours au profit du plus récent : sinon deux déploiements Pages se télescopent et
+# ÉCHOUENT tous les deux (le site reste bloqué sur une ancienne version). Le dernier
+# commit gagne toujours, proprement.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build de la démo (domaine racine monphenix360.fr)
+        run: pnpm --filter @phenix360/demo build
+        env:
+          PAGES_BASE: /
+          VITE_DEMO_PASSWORD: ${{ vars.DEMO_PASSWORD || 'phenix2026' }}
+          # Branchement Supabase (mode SaaS). Clés PUBLIQUES par conception (URL +
+          # clé « anon ») : la sécurité vient de la RLS, pas du secret de la clé.
+          # Surchargeable via des variables de dépôt (Settings → Variables) sans
+          # toucher au workflow. Vides → build en mode démo local.
+          VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL || 'https://vbvnalesrmukwdvmwpkn.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZidm5hbGVzcm11a3dkdm13cGtuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1Mzg2MTgsImV4cCI6MjEwMDExNDYxOH0.bac8dtAjTFp9yGXt4e9mG7QVHEkAokYL4PWySlc3zNI' }}
+
+      - name: Fallback SPA (404 → index.html)
+        run: cp apps/demo/dist/index.html apps/demo/dist/404.html
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/demo/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # 1re tentative. GitHub Pages renvoie parfois une erreur TRANSITOIRE
+      # (« Deployment failed, try again later ») sans rapport avec le build : on
+      # ne fait pas échouer le job, on réessaie.
+      - id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      # 2e tentative seulement si la 1re a échoué (auto-guérison de l'aléa Pages).
+      - id: deployment_retry
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4

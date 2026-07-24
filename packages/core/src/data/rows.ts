@@ -7,13 +7,26 @@
  */
 import type { Role } from '../actor.js';
 import type { EventState, EventType, EventVisibility } from '../event.js';
-import type { ProjectStep } from '../project.js';
+import type { ProjectStatus, ProjectStep } from '../project.js';
 
 export interface ProjectRow {
   id: string;
+  /** Code chantier `AA-VV-NNN` — identifiant définitif (colonne stockée). */
+  code: string;
   name: string;
   client_id: string | null;
+  /** Adresse du chantier (colonne stockée) — alimente en-têtes de documents / dossier. */
+  address: string | null;
+  status: ProjectStatus;
   current_step: ProjectStep | null;
+  created_at: string;
+}
+
+export interface MemberRow {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role: Role;
   created_at: string;
 }
 
