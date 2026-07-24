@@ -136,7 +136,13 @@ function AccesChantier({
         </div>
       </dl>
 
-      {demo.isSaaS() && <LienDeSuivi projectId={project.id} code={settings.accessCode} />}
+      {demo.isSaaS() && (
+        <LienDeSuivi
+          projectId={project.id}
+          chantierCode={project.code}
+          code={settings.accessCode}
+        />
+      )}
 
       {saved && (
         <p
@@ -182,13 +188,18 @@ function AccesChantier({
  */
 function LienDeSuivi({
   projectId,
+  chantierCode,
   code,
 }: {
   projectId: Project['id'];
+  chantierCode: string | undefined;
   code: string;
 }): React.JSX.Element {
   const [copied, setCopied] = useState(false);
-  const link = `${window.location.origin}${window.location.pathname}#/c/${projectId}`;
+  // Lien COURT et pro : on met le CODE CHANTIER lisible (26-LY-003) plutôt que
+  // l'UUID. Repli sur l'UUID pour un chantier sans code (données anciennes).
+  const ref = chantierCode && chantierCode.trim() ? chantierCode.trim() : projectId;
+  const link = `${window.location.origin}${window.location.pathname}#/c/${ref}`;
   // Garantit que le code courant est publié côté serveur (le lien fonctionne même
   // pour un chantier créé avant cette fonctionnalité). Best-effort, idempotent.
   useEffect(() => {

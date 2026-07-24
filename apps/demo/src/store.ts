@@ -236,8 +236,32 @@ export interface ClientSettings {
   notifPrefs: ClientNotifPrefs;
 }
 
-/** Code d'accès par défaut d'un chantier (masqué, modifiable par le client). */
+/**
+ * Ancien code d'accès PARTAGÉ (avant les codes par chantier). Conservé comme
+ * repère : tout chantier encore sur cette valeur est migré vers un code UNIQUE dès
+ * que le conducteur ouvre son panneau de lien (`publishClientAccess`).
+ */
 const DEFAULT_ACCESS_CODE = 'phenix2026';
+
+/**
+ * Génère un code d'accès COURT, lisible et UNIQUE par chantier (6 caractères, sans
+ * caractères ambigus 0/O/1/I/L). Chaque chantier a ainsi SON propre mot de passe —
+ * jamais le même d'un chantier à l'autre. Non devinable (aléatoire cryptographique).
+ */
+function generateAccessCode(): string {
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const n = 6;
+  let out = '';
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const buf = new Uint32Array(n);
+    crypto.getRandomValues(buf);
+    for (let i = 0; i < n; i++) out += alphabet[buf[i]! % alphabet.length];
+  } else {
+    for (let i = 0; i < n; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return out;
+}
+
 function defaultClientSettings(): ClientSettings {
   return {
     accessCode: DEFAULT_ACCESS_CODE,
@@ -1257,7 +1281,17 @@ export const demo = {
    */
   publishClientAccess(projectId: ProjectId): void {
     const all = readJson<Record<string, ClientSettings>>(CLIENT_SETTINGS_KEY, {});
-    syncClientAccessCode(projectId, all[projectId]?.accessCode ?? DEFAULT_ACCESS_CODE);
+    const existing = all[projectId]?.accessCode;
+    // Chantier sans code propre, ou encore sur l'ancien code PARTAGÉ → on lui
+    // attribue un code UNIQUE (une seule fois) pour qu'aucun chantier ne partage
+    // le même mot de passe. Sinon, on republie simplement le code courant.
+    if (!existing || existing === DEFAULT_ACCESS_CODE) {
+      const code = generateAccessCode();
+      demo._writeClientSettings(projectId, { accessCode: code });
+      syncClientAccessCode(projectId, code);
+      return;
+    }
+    syncClientAccessCode(projectId, existing);
   },
   /** Le client invite une personne de confiance à suivre son chantier. */
   inviteClientPerson(
@@ -1436,9 +1470,14 @@ export const demo = {
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
     await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
-    // Espace client (lien + code) : le chantier naît avec le code par défaut, que
-    // le conducteur pourra changer dans « Mon espace ». Sans effet en démo.
-    syncClientAccessCode(project.id, DEFAULT_ACCESS_CODE);
+    // Espace client (lien + code) : le chantier naît avec un code d'accès UNIQUE
+    // (jamais partagé avec un autre chantier), que le conducteur pourra changer
+    // dans « Mon espace ». Persisté localement puis publié côté serveur (SaaS).
+    {
+      const accessCode = generateAccessCode();
+      demo._writeClientSettings(project.id, { accessCode });
+      syncClientAccessCode(project.id, accessCode);
+    }
 
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';
@@ -1572,9 +1611,13 @@ export const demo = {
     });
     await backend.addMember({ projectId: project.id, userId: compaId, role: 'compagnon' });
     await backend.addMember({ projectId: project.id, userId: clientId, role: 'client' });
-    // Espace client (lien + code) : code par défaut à la création (modifiable
-    // ensuite dans « Mon espace »). Sans effet en démo.
-    syncClientAccessCode(project.id, DEFAULT_ACCESS_CODE);
+    // Espace client (lien + code) : code d'accès UNIQUE par chantier à la création
+    // (jamais partagé), modifiable ensuite dans « Mon espace ». Persisté puis publié.
+    {
+      const accessCode = generateAccessCode();
+      demo._writeClientSettings(project.id, { accessCode });
+      syncClientAccessCode(project.id, accessCode);
+    }
 
     const people = readJson<Record<string, string>>(PEOPLE_KEY, {});
     people[compaId] = 'Mickaël';

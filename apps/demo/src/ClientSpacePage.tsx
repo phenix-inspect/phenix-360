@@ -1,13 +1,17 @@
 /**
  * PHÉNIX 360 — Espace client par LIEN + CODE (le JUMEAU de l'app)
  * ===========================================================================
- * Page atteinte par `…/#/c/<projectId>` : le client (SANS compte) saisit le code
- * communiqué par son conducteur. Le code est vérifié CÔTÉ SERVEUR (`client_space`,
- * SECURITY DEFINER). Une fois entré, on branche le store en MODE CLIENT
- * (`demo.connectClientSpace` → `ClientSpaceBackend`, qui sert les données de
- * `client_space` et route les écritures du client vers les RPC code-gardées) et on
- * rend LE VRAI `ClientView` — exactement l'espace client validé de l'app, sans
- * compte ni store conducteur. Les deux vues sont donc de vrais JUMEAUX.
+ * Page atteinte par `…/#/c/<ref>` où `<ref>` est le CODE CHANTIER lisible
+ * (`26-LY-003`, lien court et pro) OU l'UUID du chantier (liens historiques) : le
+ * client (SANS compte) saisit le code communiqué par son conducteur. Le code est
+ * vérifié CÔTÉ SERVEUR — `client_space_by_code(code chantier, accès)` pour le lien
+ * court, `client_space(uuid, accès)` pour le lien historique (toutes deux SECURITY
+ * DEFINER). Les deux renvoient le MÊME espace, dont l'UUID RÉEL du chantier ; on
+ * branche ensuite le store en MODE CLIENT sur cet UUID (`demo.connectClientSpace`
+ * → `ClientSpaceBackend`, qui sert les données de `client_space` et route les
+ * écritures du client vers les RPC code-gardées) et on rend LE VRAI `ClientView` —
+ * exactement l'espace client validé de l'app, sans compte ni store conducteur. Les
+ * deux vues sont donc de vrais JUMEAUX.
  *
  * Liveness : le client n'a pas le temps réel (non authentifié) ; on recharge
  * `client_space` à intervalle léger et au retour sur l'onglet.
@@ -20,13 +24,17 @@ import { ClientView } from './surfaces/ClientView';
 import type { ClientSpaceRaw } from './lib/clientSpaceBackend';
 
 /** Mémoire de session : évite de redemander le code à chaque rechargement. */
-const codeKey = (projectId: string): string => `phenix-client-code:${projectId}`;
+const codeKey = (ref: string): string => `phenix-client-code:${ref}`;
 
-export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX.Element {
+/** L'UUID d'un chantier (36 car. hex + tirets), par opposition au code chantier. */
+const isUuidRef = (ref: string): boolean => /^[0-9a-fA-F-]{36}$/.test(ref);
+
+export function ClientSpacePage({ routeRef }: { routeRef: string }): React.JSX.Element {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [connected, setConnected] = useState(false);
+  // UUID RÉEL du chantier une fois résolu (le lien court ne porte que le code).
+  const [projectId, setProjectId] = useState<string | null>(null);
   const snap = useSyncExternalStore(demo.subscribe, demo.getSnapshot);
 
   const enter = useCallback(
@@ -36,25 +44,27 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
       try {
         const client = await getSupabaseClient();
         if (!client) throw new Error('config');
-        const res = await client.rpc('client_space', {
-          p_project: projectId,
-          p_code: theCode.trim(),
-        });
-        if (res.error || !res.data || !(res.data as ClientSpaceRaw).project)
-          throw new Error('denied');
-        demo.connectClientSpace(client, projectId, theCode.trim(), res.data as ClientSpaceRaw);
+        // Lien court (code chantier) → client_space_by_code ; lien UUID historique
+        // → client_space. Les deux renvoient l'espace, dont l'UUID réel du chantier.
+        const res = isUuidRef(routeRef)
+          ? await client.rpc('client_space', { p_project: routeRef, p_code: theCode.trim() })
+          : await client.rpc('client_space_by_code', { p_code: routeRef, p_access: theCode.trim() });
+        const raw = res.data as ClientSpaceRaw | null;
+        if (res.error || !raw || !raw.project) throw new Error('denied');
+        const realId = raw.project.id;
+        demo.connectClientSpace(client, realId, theCode.trim(), raw);
         try {
-          sessionStorage.setItem(codeKey(projectId), theCode.trim());
+          sessionStorage.setItem(codeKey(routeRef), theCode.trim());
         } catch {
           /* stockage indisponible : on continue */
         }
-        setConnected(true);
+        setProjectId(realId);
       } catch {
         setError(
           'Code incorrect, ou chantier introuvable. Vérifiez le code communiqué par votre conducteur.',
         );
         try {
-          sessionStorage.removeItem(codeKey(projectId));
+          sessionStorage.removeItem(codeKey(routeRef));
         } catch {
           /* rien */
         }
@@ -62,25 +72,25 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
         setBusy(false);
       }
     },
-    [projectId],
+    [routeRef],
   );
 
   // Reprise silencieuse : si le code de cette session est déjà connu, on entre.
   useEffect(() => {
     let saved = '';
     try {
-      saved = sessionStorage.getItem(codeKey(projectId)) ?? '';
+      saved = sessionStorage.getItem(codeKey(routeRef)) ?? '';
     } catch {
       saved = '';
     }
     if (saved) void enter(saved);
-  }, [projectId, enter]);
+  }, [routeRef, enter]);
 
   // Liveness : pas de temps réel pour l'anonyme → on recharge périodiquement et
   // au retour sur l'onglet, sans écran d'attente (les saisies en cours sont
   // préservées : elles vivent dans les composants de ClientView).
   useEffect(() => {
-    if (!connected) return;
+    if (!projectId) return;
     const tick = (): void => void demo.refreshClientSpace();
     const iv = window.setInterval(tick, 12_000);
     const onVisible = (): void => {
@@ -93,9 +103,9 @@ export function ClientSpacePage({ projectId }: { projectId: string }): React.JSX
       window.removeEventListener('focus', tick);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [connected]);
+  }, [projectId]);
 
-  if (connected) {
+  if (projectId) {
     const project = snap.projects.find((p) => p.id === projectId);
     if (project) {
       return (

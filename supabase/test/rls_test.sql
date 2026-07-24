@@ -416,3 +416,42 @@ begin
   raise notice 'OK notifications — notify_conductor no-op sûr sans pg_net';
 end
 $$;
+
+-- 13. Lien COURT : client_space_by_code(code chantier, accès) résout par le code
+-- chantier lisible puis délègue à client_space. Rétro-compat de l'espace client.
+do $$
+declare
+  v_nb   int;
+  v_name text;
+  v_bad  boolean := false;
+begin
+  -- On attribue un code chantier lisible au projet de test (l'accès 'test1234'
+  -- a été posé au test 4). La casse ne doit pas compter (upper() côté serveur).
+  update project set code = '26-LY-777'
+   where id = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+
+  -- mauvais code d'accès refusé
+  begin
+    perform client_space_by_code('26-LY-777', 'wrong');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL lien court : mauvais accès accepté'; end if;
+
+  -- code chantier inconnu refusé
+  v_bad := false;
+  begin
+    perform client_space_by_code('99-ZZ-999', 'test1234');
+  exception when sqlstate '42501' then v_bad := true;
+  end;
+  if not v_bad then raise exception 'FAIL lien court : code chantier inconnu accepté'; end if;
+
+  -- bon couple (code chantier insensible à la casse) → même espace que client_space
+  select jsonb_array_length(client_space_by_code('26-ly-777', 'test1234') -> 'events'),
+         client_space_by_code('26-ly-777', 'test1234') -> 'project' ->> 'name'
+    into v_nb, v_name;
+  if v_name is distinct from 'Rénovation Martin — Lyon 6e' then
+    raise exception 'FAIL lien court : mauvais chantier résolu (%)', coalesce(v_name, 'NULL');
+  end if;
+  raise notice 'OK lien court — 26-LY-777 résolu vers %, % événements', v_name, v_nb;
+end
+$$;

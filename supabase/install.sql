@@ -476,6 +476,33 @@ end;
 $$;
 grant execute on function client_space(uuid, text) to anon, authenticated;
 
+-- Variante « LIEN COURT » : le client ouvre …/#/c/<AA-VV-NNN> (le CODE CHANTIER
+-- lisible, pas l'UUID) et saisit son code d'accès. On résout le chantier par son
+-- code + le code d'accès (en cas d'homonymie de code chantier entre conducteurs,
+-- on retient le chantier dont le code d'accès CORRESPOND — jamais de fuite d'un
+-- chantier à l'autre), puis on délègue à `client_space`. Mauvais couple ⇒
+-- exception (aucune donnée ne fuit, même message d'erreur que le code UUID).
+create or replace function client_space_by_code(p_code text, p_access text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_project uuid;
+begin
+  select p.id into v_project
+  from project p
+  join project_client_access a on a.project_id = p.id
+  where upper(p.code) = upper(trim(p_code))
+    and a.code_hash = crypt(p_access, a.code_hash)
+  limit 1;
+
+  if v_project is null then
+    raise exception 'forbidden: bad code' using errcode = '42501';
+  end if;
+
+  return client_space(v_project, p_access);
+end;
+$$;
+grant execute on function client_space_by_code(text, text) to anon, authenticated;
+
 -- Le client RÉAGIT dans « Dans les coulisses » (❤️ + 💬) — jumeau de l'app.
 -- Les interactions du Fil vivent dans le coffre du conducteur (app_kv). On écrit
 -- la réaction du client dans le coffre du conducteur PROPRIÉTAIRE du moment, via

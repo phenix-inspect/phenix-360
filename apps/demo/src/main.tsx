@@ -15,22 +15,24 @@ import { supabaseConfigured } from './lib/supabase';
 installDiagnostics();
 
 /**
- * Lien d'espace client : `…/#/c/<projectId>`. Le client (SANS compte) atterrit
- * sur une page AUTONOME, code-gardée, entièrement séparée de l'app conducteur.
- * Uniquement en mode SaaS (Supabase configuré) ; sinon on ignore le lien.
+ * Lien d'espace client : `…/#/c/<ref>` où `<ref>` est le CODE CHANTIER lisible
+ * (`26-LY-003`, lien court et pro) OU l'UUID du chantier (liens historiques,
+ * toujours acceptés). Le client (SANS compte) atterrit sur une page AUTONOME,
+ * code-gardée, entièrement séparée de l'app conducteur. Uniquement en mode SaaS
+ * (Supabase configuré) ; sinon on ignore le lien.
  */
-function clientProjectId(): string | null {
-  const m = /^#\/c\/([0-9a-fA-F-]{36})$/.exec(window.location.hash);
+function clientRouteRef(): string | null {
+  const m = /^#\/c\/([0-9a-fA-F-]{36}|\d{2}-[A-Za-z]{2}-\d{3})$/.exec(window.location.hash);
   return m && supabaseConfigured() ? (m[1] ?? null) : null;
 }
 
-const clientId = clientProjectId();
+const clientRef = clientRouteRef();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      {clientId ? (
-        <ClientSpacePage projectId={clientId} />
+      {clientRef ? (
+        <ClientSpacePage routeRef={clientRef} />
       ) : (
         <AccessGate>
           <App />
