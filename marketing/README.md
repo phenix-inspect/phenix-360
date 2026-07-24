@@ -12,9 +12,15 @@ Kit marketing de l'espace client (charte exacte de l'app : or #b5893c, encre #1c
 ```bash
 pip3 install imageio-ffmpeg   # ffmpeg avec libx264 (webm → mp4)
 export FFMPEG=$(python3 -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())")
-node record.mjs      # vidéos motion → output/*.mp4 (1080p H.264)
+node record.mjs      # vidéos motion → output/*.mp4 (1080p H.264, muettes)
 node render-pdf.mjs  # brochures → output/*.pdf (A4 vectoriel)
 node shoot.mjs video-presentation.html 0 1   # captures de contrôle par scène
+
+# Musique d'ambiance ORIGINALE (libre de droits) + mux dans les vidéos
+pip3 install numpy
+python3 music.py a 61.8  output/music-a.wav   # présentation : ré majeur, 72 BPM
+python3 music.py b 124.1 output/music-b.wav   # guide : fa majeur, 60 BPM, contemplatif
+# puis mux : ffmpeg -i video.mp4 -i music.wav -map 0:v -map 1:a -c:v copy -c:a aac -shortest out.mp4
 ```
 
 ## Sources
