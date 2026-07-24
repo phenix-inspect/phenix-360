@@ -60,7 +60,7 @@ begin
          || '<p style="font-size:16px">' || v_body || '</p>'
          || '<p style="color:#8a8069;font-size:13px">Chantier : ' || coalesce(v_pname, '')
          || case when v_pcode is not null then ' · ' || v_pcode else '' end || '</p>'
-         || '<p><a href="https://phenix-inspect.github.io/phenix-360/" '
+         || '<p><a href="https://monphenix360.fr/" '
          || 'style="color:#a9803a">Ouvrir PHÉNIX 360</a></p>'
          || '<p style="color:#b8ac90;font-size:12px">— PHÉNIX 360</p></div>';
 

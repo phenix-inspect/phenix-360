@@ -1,7 +1,7 @@
 name: Déploiement démo (GitHub Pages)
 
 # Déploie la démo PHÉNIX 360 sur GitHub Pages (dépôt public).
-# Sert sous https://phenix-inspect.github.io/phenix-360/ → base = /phenix-360/.
+# Domaine personnalisé https://monphenix360.fr (fichier public/CNAME) → base = /.
 # Gate RC1 activé via VITE_DEMO_PASSWORD (variable de dépôt `DEMO_PASSWORD`,
 # défaut `phenix2026`) — protection dissuasive, pas une vraie auth.
 
@@ -40,10 +40,10 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build de la démo (base /phenix-360/)
+      - name: Build de la démo (domaine racine monphenix360.fr)
         run: pnpm --filter @phenix360/demo build
         env:
-          PAGES_BASE: /phenix-360/
+          PAGES_BASE: /
           VITE_DEMO_PASSWORD: ${{ vars.DEMO_PASSWORD || 'phenix2026' }}
           # Branchement Supabase (mode SaaS). Clés PUBLIQUES par conception (URL +
           # clé « anon ») : la sécurité vient de la RLS, pas du secret de la clé.
