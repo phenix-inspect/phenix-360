@@ -1,0 +1,331 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="brand.css" />
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      html,
+      body {
+        background: #100d07;
+      }
+      .page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        page-break-after: always;
+        display: flex;
+        flex-direction: column;
+      }
+      .page:last-child {
+        page-break-after: avoid;
+      }
+      .pad {
+        padding: 24mm 20mm;
+      }
+
+      /* ---- Couverture ---- */
+      .cover {
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .cover .mark {
+        width: 42mm;
+        filter: drop-shadow(0 8mm 16mm rgba(201, 159, 60, 0.35));
+      }
+      .cover .kick {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.42em;
+        font-size: 10pt;
+        color: var(--gold-300);
+        margin: 12mm 0 6mm;
+      }
+      .cover h1 {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 46pt;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        color: var(--paper-50);
+      }
+      .cover .sub {
+        font-family: var(--serif);
+        font-size: 15pt;
+        color: var(--gold-100);
+        margin-top: 8mm;
+        max-width: 120mm;
+      }
+      .cover .foot {
+        position: absolute;
+        bottom: 18mm;
+        left: 0;
+        right: 0;
+        font-family: var(--mono);
+        letter-spacing: 0.28em;
+        font-size: 10pt;
+        color: var(--gold-400);
+      }
+      .cover .corner {
+        position: absolute;
+        top: 18mm;
+        left: 20mm;
+        font-family: var(--mono);
+        letter-spacing: 0.28em;
+        font-size: 9pt;
+        color: rgba(219, 182, 103, 0.6);
+      }
+
+      /* ---- Pages contenu ---- */
+      .sec-kick {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.34em;
+        font-size: 9.5pt;
+        color: var(--gold-600);
+      }
+      h2.title {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 30pt;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        color: var(--ink-900);
+        margin: 5mm 0 6mm;
+      }
+      .intro {
+        font-family: var(--serif);
+        font-size: 13pt;
+        line-height: 1.6;
+        color: var(--ink-600);
+        max-width: 150mm;
+      }
+      .tiles {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6mm;
+        margin-top: 10mm;
+      }
+      .tile {
+        border: 1px solid var(--paper-200);
+        border-radius: 5mm;
+        padding: 7mm;
+        background: linear-gradient(180deg, #fff, #fdfbf7);
+      }
+      .tile .ic {
+        font-size: 20pt;
+      }
+      .tile h3 {
+        font-family: var(--serif);
+        font-size: 15pt;
+        font-weight: 600;
+        color: var(--ink-900);
+        margin: 4mm 0 2mm;
+      }
+      .tile p {
+        font-family: var(--serif);
+        font-size: 11pt;
+        line-height: 1.5;
+        color: var(--ink-500);
+      }
+      .rule {
+        height: 1px;
+        background: linear-gradient(90deg, var(--gold-500), transparent);
+        margin: 3mm 0 0;
+      }
+
+      /* points simples */
+      .points {
+        display: flex;
+        flex-direction: column;
+        gap: 7mm;
+        margin-top: 9mm;
+      }
+      .point {
+        display: flex;
+        gap: 6mm;
+        align-items: flex-start;
+      }
+      .point .n {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 12pt;
+        color: var(--gold-500);
+        border: 1px solid var(--gold-300);
+        border-radius: 999px;
+        width: 11mm;
+        height: 11mm;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+      .point h3 {
+        font-family: var(--serif);
+        font-size: 15pt;
+        font-weight: 600;
+        color: var(--ink-900);
+      }
+      .point p {
+        font-family: var(--serif);
+        font-size: 11.5pt;
+        line-height: 1.5;
+        color: var(--ink-500);
+        margin-top: 1mm;
+      }
+      .cta {
+        margin-top: auto;
+        border-radius: 6mm;
+        padding: 12mm;
+        text-align: center;
+        background:
+          radial-gradient(120% 120% at 80% 0%, rgba(201, 159, 60, 0.16), transparent 60%),
+          linear-gradient(160deg, #1b1710, #100d07);
+        color: var(--paper-50);
+      }
+      .cta .t {
+        font-family: var(--serif);
+        font-size: 20pt;
+        font-weight: 300;
+      }
+      .cta .link {
+        display: inline-block;
+        margin-top: 6mm;
+        font-family: var(--mono);
+        font-size: 14pt;
+        letter-spacing: 0.06em;
+        color: var(--ink-900);
+        background: linear-gradient(100deg, var(--gold-200), var(--gold-400));
+        padding: 4mm 10mm;
+        border-radius: 999px;
+      }
+      .cta .note {
+        font-family: var(--mono);
+        font-size: 8.5pt;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: var(--gold-200);
+        margin-top: 6mm;
+      }
+      .pfoot {
+        position: absolute;
+        bottom: 12mm;
+        left: 20mm;
+        right: 20mm;
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 8pt;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-400);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- COUVERTURE -->
+    <section class="page cover bg-ink grain">
+      <div class="corner">PHÉNIX 360</div>
+      <img class="mark" src="assets/phenix-mark.png" alt="" />
+      <div class="kick">L’espace client</div>
+      <h1>Votre chantier,<br /><span style="font-style: italic; color: var(--gold-300)">en direct.</span></h1>
+      <div class="sub">Suivez votre projet en photos, validez vos choix et gardez tous vos documents — depuis votre téléphone.</div>
+      <div class="foot">monphenix360.fr</div>
+    </section>
+
+    <!-- PAGE 2 — CE QUE VOUS POUVEZ FAIRE -->
+    <section class="page bg-paper">
+      <div class="pad">
+        <div class="sec-kick">Bienvenue chez vous</div>
+        <h2 class="title">Tout votre chantier,<br />au creux de la main.</h2>
+        <p class="intro">
+          PHÉNIX 360 vous ouvre une fenêtre permanente sur votre projet. Pas de compte à créer, pas
+          d’application à installer : un lien, un code, et vous y êtes. Voici ce qui vous attend.
+        </p>
+
+        <div class="tiles">
+          <div class="tile">
+            <div class="ic">📸</div>
+            <h3>Dans les coulisses</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Le récit de votre chantier en photos, publié par votre équipe. Aimez ❤️, commentez 💬.</p>
+          </div>
+          <div class="tile">
+            <div class="ic">✓</div>
+            <h3>Vos choix</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Validez un matériau, une option — ou déléguez à PHÉNIX. Chaque décision est tracée.</p>
+          </div>
+          <div class="tile">
+            <div class="ic">📄</div>
+            <h3>Vos documents</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Devis, comptes rendus, factures, attestations : rangés, datés, téléchargeables.</p>
+          </div>
+          <div class="tile">
+            <div class="ic">💬</div>
+            <h3>Léon, votre concierge</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Une question ? Il répond à toute heure, ou la transmet à votre conducteur.</p>
+          </div>
+          <div class="tile">
+            <div class="ic">🔔</div>
+            <h3>Notifications</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Nouvelle photo, document ou décision : un e-mail vous prévient. Tout est en temps réel.</p>
+          </div>
+          <div class="tile">
+            <div class="ic">👥</div>
+            <h3>Vos proches</h3>
+            <div class="rule"></div>
+            <p style="margin-top: 4mm">Invitez un conjoint, un parent, un associé à suivre l’avancée, eux aussi.</p>
+          </div>
+        </div>
+      </div>
+      <div class="pfoot"><span>PHÉNIX 360 · Espace client</span><span>02</span></div>
+    </section>
+
+    <!-- PAGE 3 — SIMPLE + CTA -->
+    <section class="page bg-paper">
+      <div class="pad" style="flex: 1; display: flex; flex-direction: column">
+        <div class="sec-kick">Simple par nature</div>
+        <h2 class="title">Pensé pour vous,<br />pas pour les experts.</h2>
+
+        <div class="points">
+          <div class="point">
+            <span class="n">1</span>
+            <div>
+              <h3>Aucun compte, aucun mot de passe à retenir</h3>
+              <p>Vous recevez un lien et un code. Un clic, le code — c’est ouvert. Rien à installer.</p>
+            </div>
+          </div>
+          <div class="point">
+            <span class="n">2</span>
+            <div>
+              <h3>En temps réel, où que vous soyez</h3>
+              <p>Chaque photo, document ou décision apparaît instantanément. Depuis le canapé ou le bureau.</p>
+            </div>
+          </div>
+          <div class="point">
+            <span class="n">3</span>
+            <div>
+              <h3>Confidentiel et sécurisé</h3>
+              <p>Votre espace est privé. Seules les personnes que vous invitez peuvent le consulter.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="cta">
+          <div class="t"><span class="gold-text" style="font-style: italic">Bienvenue chez vous.</span></div>
+          <div class="link">monphenix360.fr</div>
+          <div class="note">Un lien · un code · sans compte</div>
+        </div>
+      </div>
+      <div class="pfoot"><span>PHÉNIX 360 · Espace client</span><span>03</span></div>
+    </section>
+  </body>
+</html>

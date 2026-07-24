@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="brand.css" />
+    <style>
+      /* Layouts propres à la présentation 60 s */
+      .split {
+        grid-template-columns: 1fr 420px;
+        align-items: center;
+        gap: 90px;
+      }
+      .split.rev {
+        grid-template-columns: 420px 1fr;
+      }
+      .lead .kicker {
+        font-size: 17px;
+        margin-bottom: 26px;
+      }
+      .lead h1 {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 96px;
+        line-height: 1.02;
+        letter-spacing: -0.02em;
+      }
+      .lead h2 {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 74px;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+      }
+      .lead p {
+        font-family: var(--serif);
+        font-size: 30px;
+        line-height: 1.5;
+        color: var(--ink-200);
+        max-width: 20ch;
+        margin-top: 24px;
+      }
+      .scene.bg-ink .lead p {
+        color: var(--gold-100);
+      }
+      .phone-wrap {
+        display: grid;
+        place-items: center;
+      }
+      .float {
+        animation: float 7s var(--ease-soft) infinite;
+      }
+      @keyframes float {
+        0%,
+        100% {
+          transform: translateY(0);
+        }
+        50% {
+          transform: translateY(-16px);
+        }
+      }
+      .pop {
+        animation: pop 0.7s var(--ease) both;
+      }
+      @keyframes pop {
+        0% {
+          transform: scale(0.6);
+          opacity: 0;
+        }
+        60% {
+          transform: scale(1.08);
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      /* Intro : le monogramme qui respire */
+      .hero {
+        place-items: center;
+        text-align: center;
+      }
+      .hero .mark {
+        width: 150px;
+        filter: drop-shadow(0 20px 50px rgba(201, 159, 69, 0.35));
+      }
+      .hero h1 {
+        font-size: 118px;
+      }
+      .heart-burst {
+        animation: burst 1.1s var(--ease) 0.3s both;
+      }
+      @keyframes burst {
+        0% {
+          transform: scale(0.4);
+          opacity: 0;
+        }
+        50% {
+          transform: scale(1.25);
+          opacity: 1;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .outro {
+        place-items: center;
+        text-align: center;
+      }
+      .outro .logo {
+        width: 560px;
+        max-width: 60vw;
+      }
+      .linkcard {
+        margin-top: 40px;
+        font-family: var(--mono);
+        font-size: 34px;
+        letter-spacing: 0.06em;
+        color: var(--ink-900);
+        background: linear-gradient(100deg, var(--gold-200), var(--gold-400));
+        padding: 22px 46px;
+        border-radius: 999px;
+        box-shadow: 0 24px 60px -24px rgba(201, 159, 69, 0.6);
+      }
+    </style>
+  </head>
+  <body class="bg-ink">
+    <div class="stage bg-ink grain" id="stage">
+      <div class="corner tl">PHÉNIX 360</div>
+
+      <!-- S1 — INTRO -->
+      <section class="scene bg-ink hero is-active" data-dur="6.2">
+        <div>
+          <img class="mark reveal pop" src="assets/phenix-mark.png" style="--d: 0.1s" alt="" />
+          <div class="kicker reveal gold" style="--d: 0.7s; margin: 40px 0 22px">
+            L’espace client
+          </div>
+          <h1 class="serif reveal" style="--d: 0.9s">
+            Votre chantier,<br /><span class="gold-text" style="font-style: italic">en direct.</span>
+          </h1>
+        </div>
+      </section>
+
+      <!-- S2 — DANS LES COULISSES -->
+      <section class="scene split" data-dur="7.6">
+        <div class="lead">
+          <div class="kicker reveal gold" style="--d: 0.1s">Dans les coulisses</div>
+          <h2 class="reveal" style="--d: 0.25s">
+            Suivez l’avancée,<br /><em class="gold-text">en photos.</em>
+          </h2>
+          <p class="reveal" style="--d: 0.5s">Chaque étape capturée par votre équipe, en temps réel.</p>
+        </div>
+        <div class="phone-wrap">
+          <div class="phone reveal rise-lg float" style="--d: 0.2s">
+            <div class="phone-screen">
+              <div class="app-head">
+                <img class="mark" src="assets/phenix-mark.png" alt="" />
+                <div><b>Dans les coulisses</b><small>Aujourd’hui · 14:32</small></div>
+              </div>
+              <div class="app-body">
+                <div class="photo reveal" style="--d: 0.6s">
+                  <div class="cap">Pose du carrelage — salle de bain</div>
+                </div>
+                <div class="reacts reveal" style="--d: 0.9s">
+                  <span class="react hot heart-burst">❤️ Vous</span>
+                  <span class="react">💬 Superbe !</span>
+                </div>
+                <div class="photo v2 reveal" style="--d: 1.15s">
+                  <div class="cap">Enduits — séjour</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S3 — VALIDEZ VOS CHOIX -->
+      <section class="scene split rev" data-dur="7.2">
+        <div class="phone-wrap">
+          <div class="phone reveal rise-lg float" style="--d: 0.2s">
+            <div class="phone-screen">
+              <div class="app-head">
+                <img class="mark" src="assets/phenix-mark.png" alt="" />
+                <div><b>Vos choix</b><small>Décision attendue</small></div>
+              </div>
+              <div class="app-body">
+                <div class="card reveal" style="--d: 0.5s">
+                  <h4>Carrelage salle de bain</h4>
+                  <p class="muted" style="margin-bottom: 14px; font-family: var(--serif)">
+                    Deux options proposées par votre conducteur.
+                  </p>
+                  <div class="opt reveal" style="--d: 0.8s">
+                    Grès clair <span class="tick">✓</span>
+                  </div>
+                  <div class="opt chosen reveal pop" style="--d: 1.15s; margin-top: 10px">
+                    Ardoise anthracite <span class="tick">✓</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lead">
+          <div class="kicker reveal gold" style="--d: 0.1s">Vos choix</div>
+          <h2 class="reveal" style="--d: 0.25s">
+            Décidez<br /><em class="gold-text">d’un geste.</em>
+          </h2>
+          <p class="reveal" style="--d: 0.5s">
+            Validez un matériau, ou laissez faire PHÉNIX. Tout est tracé.
+          </p>
+        </div>
+      </section>
+
+      <!-- S4 — VOS DOCUMENTS -->
+      <section class="scene split" data-dur="7.0">
+        <div class="lead">
+          <div class="kicker reveal gold" style="--d: 0.1s">Vos documents</div>
+          <h2 class="reveal" style="--d: 0.25s">
+            Tout, au<br /><em class="gold-text">même endroit.</em>
+          </h2>
+          <p class="reveal" style="--d: 0.5s">Devis, comptes rendus, factures — accessibles à tout instant.</p>
+        </div>
+        <div class="phone-wrap">
+          <div class="phone reveal rise-lg float" style="--d: 0.2s">
+            <div class="phone-screen">
+              <div class="app-head">
+                <img class="mark" src="assets/phenix-mark.png" alt="" />
+                <div><b>Documents</b><small>4 pièces</small></div>
+              </div>
+              <div class="app-body">
+                <div class="card reveal" style="--d: 0.55s; display: flex; gap: 12px; align-items: center">
+                  <span style="font-size: 26px">📄</span>
+                  <div><b style="font-family: var(--serif)">Devis signé</b><br /><span class="muted" style="font-family: var(--mono); font-size: 11px">PDF · 20 juin</span></div>
+                </div>
+                <div class="card reveal" style="--d: 0.8s; display: flex; gap: 12px; align-items: center">
+                  <span style="font-size: 26px">📐</span>
+                  <div><b style="font-family: var(--serif)">Compte rendu — S24</b><br /><span class="muted" style="font-family: var(--mono); font-size: 11px">PDF · cette semaine</span></div>
+                </div>
+                <div class="card reveal" style="--d: 1.05s; display: flex; gap: 12px; align-items: center">
+                  <span style="font-size: 26px">🧾</span>
+                  <div><b style="font-family: var(--serif)">Facture d’acompte</b><br /><span class="muted" style="font-family: var(--mono); font-size: 11px">PDF · réglée</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S5 — LÉON -->
+      <section class="scene split rev" data-dur="7.2">
+        <div class="phone-wrap">
+          <div class="phone reveal rise-lg float" style="--d: 0.2s">
+            <div class="phone-screen">
+              <div class="app-head">
+                <img class="mark" src="assets/phenix-mark.png" alt="" />
+                <div><b>Léon</b><small>Votre concierge · en ligne</small></div>
+              </div>
+              <div class="app-body">
+                <div class="bubble me reveal" style="--d: 0.5s">Où en est mon chantier ?</div>
+                <div class="bubble leon reveal" style="--d: 1.0s">
+                  Le carrelage est posé, les enduits sèchent. Prochaine étape&nbsp;: la
+                  peinture, dès lundi. 👷
+                </div>
+                <div class="bubble me reveal" style="--d: 1.6s">Merci Léon !</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lead">
+          <div class="kicker reveal gold" style="--d: 0.1s">Votre concierge</div>
+          <h2 class="reveal" style="--d: 0.25s">
+            Léon vous<br /><em class="gold-text">répond. 24/7.</em>
+          </h2>
+          <p class="reveal" style="--d: 0.5s">Une question ? Il répond, ou transmet à votre conducteur.</p>
+        </div>
+      </section>
+
+      <!-- S6 — TEMPS RÉEL / NOTIFS -->
+      <section class="scene split" data-dur="7.0">
+        <div class="lead">
+          <div class="kicker reveal gold" style="--d: 0.1s">Temps réel</div>
+          <h2 class="reveal" style="--d: 0.25s">
+            Averti<br /><em class="gold-text">dès que ça bouge.</em>
+          </h2>
+          <p class="reveal" style="--d: 0.5s">Nouvelle photo, document, décision — vous êtes prévenu.</p>
+        </div>
+        <div class="phone-wrap">
+          <div class="phone reveal rise-lg float" style="--d: 0.2s">
+            <div class="phone-screen">
+              <div class="app-head">
+                <img class="mark" src="assets/phenix-mark.png" alt="" />
+                <div><b>Aujourd’hui</b><small>Tout est à jour</small></div>
+              </div>
+              <div class="app-body">
+                <div class="toast reveal pop" style="--d: 0.6s">
+                  <span class="dot"></span>
+                  <div style="font-family: var(--serif); font-size: 14px">
+                    <b>Nouvelle photo</b> — Pose du carrelage
+                  </div>
+                </div>
+                <div class="toast reveal pop" style="--d: 1.0s; background: var(--ink-700)">
+                  <span class="dot"></span>
+                  <div style="font-family: var(--serif); font-size: 14px">
+                    <b>Décision attendue</b> — Carrelage
+                  </div>
+                </div>
+                <div class="card reveal" style="--d: 1.35s">
+                  <span class="kicker" style="font-size: 10px; color: var(--gold-600)">Prochaine étape</span>
+                  <h4 style="margin-top: 8px">Peinture · lundi</h4>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- S7 — SANS COMPTE -->
+      <section class="scene hero bg-ink" data-dur="6.4">
+        <div>
+          <div class="kicker reveal gold" style="--d: 0.1s; margin-bottom: 30px">Simple, sans effort</div>
+          <h1 class="serif reveal" style="--d: 0.3s; font-size: 84px; font-weight: 300; line-height: 1.05">
+            Un lien. Un code.<br /><em class="gold-text">Aucun compte à créer.</em>
+          </h1>
+          <p class="reveal" style="--d: 0.7s; font-family: var(--serif); font-size: 28px; color: var(--gold-100); margin-top: 28px">
+            Et vous pouvez inviter vos proches à suivre, eux aussi.
+          </p>
+        </div>
+      </section>
+
+      <!-- S8 — OUTRO / CTA -->
+      <section class="scene outro bg-ink" data-dur="9.5">
+        <div>
+          <img class="logo reveal pop" src="assets/phenix-logo.png" style="--d: 0.1s" alt="PHÉNIX 360" />
+          <div class="hair reveal" style="--d: 0.5s; width: 320px; margin: 34px auto"></div>
+          <h2 class="serif reveal" style="--d: 0.65s; font-weight: 300; font-size: 58px">
+            <em class="gold-text">Bienvenue chez vous.</em>
+          </h2>
+          <div class="linkcard reveal pop" style="--d: 1.0s">monphenix360.fr</div>
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const scenes = [...document.querySelectorAll('.scene')];
+      const durs = scenes.map((s) => parseFloat(s.dataset.dur));
+      function show(k) {
+        scenes.forEach((s, j) => s.classList.toggle('is-active', j === k));
+      }
+      function run(k) {
+        if (k >= scenes.length) {
+          document.body.setAttribute('data-done', '1');
+          return;
+        }
+        show(k);
+        setTimeout(() => run(k + 1), durs[k] * 1000);
+      }
+      // Durée totale exposée pour l'enregistreur.
+      window.__TOTAL__ = durs.reduce((a, b) => a + b, 0);
+      window.addEventListener('load', () => {
+        // petit délai pour laisser les polices/images se poser
+        requestAnimationFrame(() => setTimeout(() => run(0), 400));
+      });
+    </script>
+  </body>
+</html>

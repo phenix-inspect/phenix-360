@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="brand.css" />
+    <style>
+      @page {
+        size: A4;
+        margin: 0;
+      }
+      html,
+      body {
+        background: #100d07;
+      }
+      .page {
+        position: relative;
+        width: 210mm;
+        height: 297mm;
+        overflow: hidden;
+        page-break-after: always;
+        display: flex;
+        flex-direction: column;
+      }
+      .page:last-child {
+        page-break-after: avoid;
+      }
+      .pad {
+        padding: 22mm 20mm;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Couverture */
+      .cover {
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+      }
+      .cover .mark {
+        width: 38mm;
+        filter: drop-shadow(0 8mm 16mm rgba(201, 159, 60, 0.35));
+      }
+      .cover .kick {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.42em;
+        font-size: 10pt;
+        color: var(--gold-300);
+        margin: 12mm 0 6mm;
+      }
+      .cover h1 {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 42pt;
+        line-height: 1.05;
+        letter-spacing: -0.02em;
+        color: var(--paper-50);
+      }
+      .cover .sub {
+        font-family: var(--serif);
+        font-size: 14pt;
+        color: var(--gold-100);
+        margin-top: 8mm;
+        max-width: 130mm;
+      }
+      .cover .foot {
+        position: absolute;
+        bottom: 18mm;
+        left: 0;
+        right: 0;
+        font-family: var(--mono);
+        letter-spacing: 0.28em;
+        font-size: 10pt;
+        color: var(--gold-400);
+      }
+      .cover .corner {
+        position: absolute;
+        top: 18mm;
+        left: 20mm;
+        font-family: var(--mono);
+        letter-spacing: 0.28em;
+        font-size: 9pt;
+        color: rgba(219, 182, 103, 0.6);
+      }
+
+      .sec-kick {
+        font-family: var(--mono);
+        text-transform: uppercase;
+        letter-spacing: 0.34em;
+        font-size: 9.5pt;
+        color: var(--gold-600);
+      }
+      h2.title {
+        font-family: var(--serif);
+        font-weight: 300;
+        font-size: 28pt;
+        line-height: 1.08;
+        letter-spacing: -0.02em;
+        color: var(--ink-900);
+        margin: 4mm 0 8mm;
+      }
+
+      .step {
+        display: flex;
+        gap: 7mm;
+        padding: 6mm 0;
+        border-top: 1px solid var(--paper-200);
+        align-items: flex-start;
+      }
+      .step:first-of-type {
+        border-top: 0;
+      }
+      .step .no {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 13pt;
+        color: var(--ink-900);
+        background: linear-gradient(135deg, var(--gold-200), var(--gold-400));
+        border-radius: 3mm;
+        width: 15mm;
+        height: 15mm;
+        display: grid;
+        place-items: center;
+        flex: 0 0 auto;
+      }
+      .step h3 {
+        font-family: var(--serif);
+        font-size: 16pt;
+        font-weight: 600;
+        color: var(--ink-900);
+      }
+      .step p {
+        font-family: var(--serif);
+        font-size: 11.5pt;
+        line-height: 1.5;
+        color: var(--ink-500);
+        margin-top: 1.5mm;
+        max-width: 140mm;
+      }
+      .step .ic {
+        margin-left: auto;
+        font-size: 18pt;
+        opacity: 0.9;
+      }
+
+      .help {
+        margin-top: auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6mm;
+      }
+      .help .box {
+        border: 1px solid var(--paper-200);
+        border-radius: 5mm;
+        padding: 7mm;
+        background: linear-gradient(180deg, #fff, #fdfbf7);
+      }
+      .help h4 {
+        font-family: var(--serif);
+        font-size: 13pt;
+        font-weight: 600;
+        color: var(--ink-900);
+        margin-bottom: 2mm;
+      }
+      .help p {
+        font-family: var(--serif);
+        font-size: 10.5pt;
+        line-height: 1.5;
+        color: var(--ink-500);
+      }
+      .cta {
+        border-radius: 6mm;
+        padding: 10mm;
+        text-align: center;
+        margin-top: 6mm;
+        background:
+          radial-gradient(120% 120% at 80% 0%, rgba(201, 159, 60, 0.16), transparent 60%),
+          linear-gradient(160deg, #1b1710, #100d07);
+        color: var(--paper-50);
+      }
+      .cta .t {
+        font-family: var(--serif);
+        font-size: 17pt;
+        font-weight: 300;
+      }
+      .cta .link {
+        display: inline-block;
+        margin-top: 5mm;
+        font-family: var(--mono);
+        font-size: 13pt;
+        letter-spacing: 0.06em;
+        color: var(--ink-900);
+        background: linear-gradient(100deg, var(--gold-200), var(--gold-400));
+        padding: 3.5mm 9mm;
+        border-radius: 999px;
+      }
+      .pfoot {
+        position: absolute;
+        bottom: 12mm;
+        left: 20mm;
+        right: 20mm;
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 8pt;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--ink-400);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- COUVERTURE -->
+    <section class="page cover bg-ink grain">
+      <div class="corner">PHÉNIX 360 · Guide</div>
+      <img class="mark" src="assets/phenix-mark.png" alt="" />
+      <div class="kick">Guide de prise en main</div>
+      <h1>Votre espace,<br /><span style="font-style: italic; color: var(--gold-300)">pas à pas.</span></h1>
+      <div class="sub">Huit étapes simples pour tout savoir faire dans votre espace client — en moins de deux minutes.</div>
+      <div class="foot">monphenix360.fr</div>
+    </section>
+
+    <!-- PAGE 2 — ÉTAPES 1 À 4 -->
+    <section class="page bg-paper">
+      <div class="pad">
+        <div class="sec-kick">Prise en main</div>
+        <h2 class="title">Les premiers pas.</h2>
+
+        <div class="step">
+          <span class="no">01</span>
+          <div>
+            <h3>Ouvrez votre lien</h3>
+            <p>Vous recevez un lien <b class="gold">monphenix360.fr/…</b> et un code d’accès. Ouvrez le lien, saisissez le code : vous voilà chez vous. Aucun compte, aucune installation.</p>
+          </div>
+          <span class="ic">🔑</span>
+        </div>
+        <div class="step">
+          <span class="no">02</span>
+          <div>
+            <h3>Consultez votre tableau de bord</h3>
+            <p>L’écran <b class="gold">Aujourd’hui</b> résume l’essentiel : l’avancement, ce qui vous attend, la prochaine étape. Votre point de repère à chaque visite.</p>
+          </div>
+          <span class="ic">🏠</span>
+        </div>
+        <div class="step">
+          <span class="no">03</span>
+          <div>
+            <h3>Suivez votre chantier en photos</h3>
+            <p>Dans <b class="gold">« Dans les coulisses »</b>, votre équipe publie les moments clés. Touchez ❤️ pour aimer, 💬 pour laisser un mot : votre conducteur le voit aussitôt.</p>
+          </div>
+          <span class="ic">📸</span>
+        </div>
+        <div class="step">
+          <span class="no">04</span>
+          <div>
+            <h3>Validez vos choix</h3>
+            <p>Un matériau à choisir ? Ouvrez <b class="gold">« Vos choix »</b>, sélectionnez votre option et confirmez. Pas d’avis tranché ? Déléguez à PHÉNIX — tout reste tracé.</p>
+          </div>
+          <span class="ic">✓</span>
+        </div>
+      </div>
+      <div class="pfoot"><span>PHÉNIX 360 · Guide de prise en main</span><span>02</span></div>
+    </section>
+
+    <!-- PAGE 3 — ÉTAPES 5 À 8 + AIDE -->
+    <section class="page bg-paper">
+      <div class="pad">
+        <div class="sec-kick">Aller plus loin</div>
+        <h2 class="title">Maîtrisez votre espace.</h2>
+
+        <div class="step">
+          <span class="no">05</span>
+          <div>
+            <h3>Retrouvez tous vos documents</h3>
+            <p>Onglet <b class="gold">Documents</b> : devis, comptes rendus, factures et attestations, consultables et téléchargeables à tout instant.</p>
+          </div>
+          <span class="ic">📄</span>
+        </div>
+        <div class="step">
+          <span class="no">06</span>
+          <div>
+            <h3>Posez vos questions à Léon</h3>
+            <p>Votre concierge intelligent répond à toute heure. S’il ne sait pas, il transmet directement à votre conducteur.</p>
+          </div>
+          <span class="ic">💬</span>
+        </div>
+        <div class="step">
+          <span class="no">07</span>
+          <div>
+            <h3>Invitez vos proches & réglez vos alertes</h3>
+            <p>Dans <b class="gold">Mon espace</b> : ajoutez un conjoint ou un associé, choisissez vos notifications, changez votre code quand vous le souhaitez.</p>
+          </div>
+          <span class="ic">👥</span>
+        </div>
+        <div class="step">
+          <span class="no">08</span>
+          <div>
+            <h3>Restez informé, sans effort</h3>
+            <p>Nouvelle photo, document ou décision : un e-mail vous prévient. Et tout s’actualise en temps réel, sans rien rafraîchir.</p>
+          </div>
+          <span class="ic">🔔</span>
+        </div>
+
+        <div class="help">
+          <div class="box">
+            <h4>Une question ?</h4>
+            <p>Demandez à <b>Léon</b> depuis votre espace, ou répondez simplement à un message de votre conducteur.</p>
+          </div>
+          <div class="box">
+            <h4>Code oublié ?</h4>
+            <p>Votre conducteur peut vous le rappeler ou en générer un nouveau à tout moment.</p>
+          </div>
+        </div>
+
+        <div class="cta">
+          <div class="t"><span class="gold-text" style="font-style: italic">Votre chantier vous attend.</span></div>
+          <div class="link">monphenix360.fr</div>
+        </div>
+      </div>
+      <div class="pfoot"><span>PHÉNIX 360 · Guide de prise en main</span><span>03</span></div>
+    </section>
+  </body>
+</html>
